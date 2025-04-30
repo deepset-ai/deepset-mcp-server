@@ -68,7 +68,7 @@ def deepset_api_request(endpoint: str, method: str = "GET", data: Optional[Dict]
 
 @mcp.tool()
 def list_pipelines() -> Dict[str, Any]:
-    """Lists all pipelines in the configured deepset Cloud workspace"""
+    """Retrieves a list of all pipelines available within the currently configured deepset workspace. Use this when you need to know the names or IDs of existing pipelines."""
     workspace = get_workspace()
     try:
         return deepset_api_request(f"/workspaces/{workspace}/pipelines")
@@ -77,7 +77,7 @@ def list_pipelines() -> Dict[str, Any]:
 
 @mcp.tool()
 def get_pipeline(pipeline_id: str) -> Dict[str, Any]:
-    """Gets details for a specific pipeline by ID"""
+    """Fetches detailed configuration information for a specific pipeline, identified by its unique `pipeline_id`. This includes its components, connections, and metadata. Use this when you need to inspect the structure or settings of a known pipeline."""
     workspace = get_workspace()
     try:
         return deepset_api_request(f"/workspaces/{workspace}/pipelines/{pipeline_id}")
@@ -86,10 +86,7 @@ def get_pipeline(pipeline_id: str) -> Dict[str, Any]:
 
 @mcp.tool()
 def get_component_schemas() -> Dict[str, Any]:
-    """
-    Fetches all available Haystack component schemas showing their input/output types
-    from the deepset Cloud API
-    """
+    """Retrieves the schemas for all available Haystack components from the deepset API. These schemas define the expected input and output parameters for each component type, which is useful for constructing or validating componets in a pipeline YAML."""
     try:
         return deepset_api_request("/haystack/components/input-output")
     except Exception as e:
@@ -98,13 +95,7 @@ def get_component_schemas() -> Dict[str, Any]:
 @mcp.tool()
 def validate_pipeline_yaml(yaml_content: str) -> Dict[str, Any]:
     """
-    Validates a pipeline YAML definition against the deepset Cloud API
-    
-    Args:
-        yaml_content: The YAML content to validate
-        
-    Returns:
-        Validation results including any errors or warnings
+    Validates the structure and syntax of a provided pipeline YAML configuration against the deepset API specifications. Provide the YAML content as a string. Returns a validation result, indicating success or detailing any errors or warnings found. Use this *before* attempting to create or update a pipeline with new YAML.
     """
     # Basic validation of the input
     if not yaml_content or not yaml_content.strip():
@@ -139,13 +130,7 @@ def validate_pipeline_yaml(yaml_content: str) -> Dict[str, Any]:
 @mcp.tool()
 def get_pipeline_yaml(pipeline_name: str) -> str:
     """
-    Fetches the YAML definition of a specific pipeline
-    
-    Args:
-        pipeline_name: The name of the pipeline to retrieve the YAML for
-        
-    Returns:
-        The pipeline YAML definition as a string
+    Retrieves the complete YAML configuration file for a specific pipeline, identified by its `pipeline_name`. Returns the YAML content as a string. Use this when you need the exact YAML definition of an existing pipeline, for example, to inspect it or use it as a base for modifications.
     """
     workspace = get_workspace()
     try:
@@ -161,14 +146,7 @@ def get_pipeline_yaml(pipeline_name: str) -> str:
 @mcp.tool()
 def update_pipeline_yaml(pipeline_name: str, yaml_content: str) -> Dict[str, Any]:
     """
-    Updates the YAML definition of a specific pipeline.
-
-    Args:
-        pipeline_name: The name of the pipeline to update.
-        yaml_content: The new YAML content for the pipeline.
-
-    Returns:
-        API response indicating success or failure.
+    Updates an existing pipeline in deepset, identified by `pipeline_name`, with a new YAML configuration provided as `yaml_content`. This will replace the entire existing configuration of the pipeline. Use this carefully, preferably after validating the new YAML content.
     """
     # Basic validation
     if not yaml_content or not yaml_content.strip():
@@ -241,4 +219,5 @@ def get_pipeline_yaml_resource(pipeline_name: str) -> str:
 
 if __name__ == "__main__":
     # Using the built-in server runner
-    mcp.run() 
+    # Ensure it binds to 0.0.0.0 to be accessible in Docker
+    mcp.run(host="0.0.0.0", port=8000) 
