@@ -445,18 +445,14 @@ async def list_custom_component_installations() -> str:
                 user_info = "Unknown"
                 if user_id != "Unknown":
                     try:
-                        # Make request to the user API endpoint
-                        user_url = f"{DEEPSET_API_BASE_URL}/users/{user_id}"
-                        user_response = requests.get(
-                            user_url, headers={"Authorization": f"Bearer {get_api_key()}", "Accept": "application/json"}
-                        )
-
-                        if user_response.status_code == 200:
-                            user_data = user_response.json()
-                            given_name = user_data.get("given_name", "")
-                            family_name = user_data.get("family_name", "")
-                            email = user_data.get("email", "")
-
+                        # Get user info through the client
+                        user_result = await client.get_user(user_id)
+                        
+                        if "error" not in user_result:
+                            given_name = user_result.get("given_name", "")
+                            family_name = user_result.get("family_name", "")
+                            email = user_result.get("email", "")
+                            
                             if given_name and family_name:
                                 user_info = f"{given_name} {family_name} ({email})"
                             elif email:
