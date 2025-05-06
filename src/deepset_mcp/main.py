@@ -71,7 +71,6 @@ async def list_pipelines() -> dict[str, Any]:
 
 
 @mcp.tool()
-@async_to_sync
 async def get_pipeline(pipeline_id: str) -> dict[str, Any]:
     """Fetches detailed configuration information for a specific pipeline, identified by its unique `pipeline_id`.
 
@@ -82,7 +81,7 @@ async def get_pipeline(pipeline_id: str) -> dict[str, Any]:
     """
     try:
         async with DeepsetClient() as client:
-            return await client.get_pipeline(pipeline_id)
+            return await client.request(f"/workspaces/{client.workspace}/pipelines/{pipeline_id}")
     except Exception as e:
         return {"error": str(e)}
 
