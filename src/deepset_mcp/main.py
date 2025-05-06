@@ -87,7 +87,6 @@ async def get_pipeline(pipeline_id: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-@async_to_sync
 async def get_component_schemas() -> dict[str, Any]:
     """Retrieves the schemas for all available Haystack components from the deepset API.
 
@@ -96,7 +95,7 @@ async def get_component_schemas() -> dict[str, Any]:
     """
     try:
         async with DeepsetClient() as client:
-            return await client.get_component_schemas()
+            return await client.request("/haystack/components")
     except Exception as e:
         return {"error": str(e)}
 
