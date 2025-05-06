@@ -160,7 +160,6 @@ async def get_pipeline_yaml(pipeline_name: str) -> str | dict[str, Any]:
 
 
 @mcp.tool()
-@async_to_sync
 async def update_pipeline_yaml(pipeline_name: str, yaml_content: str) -> dict[str, Any]:
     """Updates an existing pipeline in deepset.
 
@@ -180,8 +179,10 @@ async def update_pipeline_yaml(pipeline_name: str, yaml_content: str) -> dict[st
 
     try:
         async with DeepsetClient() as client:
-
-            return await client.update_pipeline_yaml(pipeline_name, yaml_content)
+            payload = {"query_yaml": yaml_content}
+            return await client.request(
+                f"/workspaces/{client.workspace}/pipelines/{pipeline_name}/yaml", method="PUT", data=payload
+            )
 
     except requests.exceptions.RequestException as e:
         return {"error": f"Request failed: {str(e)}"}
