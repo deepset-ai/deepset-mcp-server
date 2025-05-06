@@ -137,7 +137,6 @@ async def validate_pipeline_yaml(yaml_content: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-@async_to_sync
 async def get_pipeline_yaml(pipeline_name: str) -> str | dict[str, Any]:
     """Retrieves the complete YAML configuration file for a specific pipeline.
 
@@ -150,7 +149,7 @@ async def get_pipeline_yaml(pipeline_name: str) -> str | dict[str, Any]:
     """
     try:
         async with DeepsetClient() as client:
-            response = await client.get_pipeline_yaml(pipeline_name)
+            response = await client.request(f"/workspaces/{client.workspace}/pipelines/{pipeline_name}/yaml")
             # The response might be already a string or might need formatting
             # depending on the API response structure
             if isinstance(response, dict) and "yaml" in response:
