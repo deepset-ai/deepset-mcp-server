@@ -222,13 +222,9 @@ def get_pipeline_yaml_resource(pipeline_name: str) -> str | dict[str, Any]:
 @async_to_sync
 async def list_pipeline_templates() -> str:
     """Retrieves a list of pipeline templates to build AI applications like RAG or Agents."""
-    workspace = get_workspace()
     try:
-        # Build the query parameters with fixed values
-        endpoint = f"/workspaces/{workspace}/pipeline_templates?limit=100&page_number=1&field=created_at&order=DESC"
-
-        # Make the API request
-        response = deepset_api_request(endpoint)
+        async with DeepsetClient() as client:
+            response = await client.list_pipeline_templates()
 
         # Check for errors in the response
         if isinstance(response, dict) and "error" in response:
