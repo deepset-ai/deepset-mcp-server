@@ -14,8 +14,8 @@ TEST_WORKSPACE = "test-workspace"
 TEST_BASE_URL = "https://test-api.cloud.deepset.ai/api/v1"
 
 
-# Custom mock HTTP client for testing
-class MockHttpClient:
+# Custom mock HTTP client for testing moved to the client.py file
+class MockHttpClient(HttpClient):
     def __init__(self, responses: dict[str, Any]) -> None:
         self.responses = responses
         self.requests: list[dict[str, Any]] = []
