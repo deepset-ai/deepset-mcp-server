@@ -309,8 +309,9 @@ async def get_pipeline_template(template_name: str) -> str:
 async def get_custom_components() -> str:
     """Use this to get a list of all installed custom components."""
     try:
-        # Retrieve all component schemas
-        response = get_component_schemas()
+        # Retrieve all component schemas asynchronously
+        async with DeepsetClient() as client:
+            response = await client.get_custom_components()
 
         # Check for errors in the response
         if isinstance(response, dict) and "error" in response:
