@@ -218,12 +218,12 @@ def get_pipeline_yaml_resource(pipeline_name: str) -> str | dict[str, Any]:
 
 
 @mcp.tool()
-@async_to_sync
 async def list_pipeline_templates() -> str:
     """Retrieves a list of pipeline templates to build AI applications like RAG or Agents."""
     try:
         async with DeepsetClient() as client:
-            response = await client.list_pipeline_templates()
+            endpoint = f"/workspaces/{client.workspace}/pipeline_templates?limit=100&page_number=1&field=created_at&order=DESC"
+            response = await client.request(endpoint)
 
         # Check for errors in the response
         if isinstance(response, dict) and "error" in response:
