@@ -47,6 +47,9 @@ jobs:
       - name: Run lint
         run: uv run ruff check
 
+      - name: Run format
+        run: uv run ruff format --check
+
   types:
     name: Run mypy
     runs-on: ubuntu-latest
