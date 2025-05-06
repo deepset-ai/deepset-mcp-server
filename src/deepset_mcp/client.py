@@ -10,6 +10,65 @@ import httpx
 T = TypeVar("T")
 
 
+# Custom mock HTTP client for testing
+class MockHttpClient(Protocol):
+    def __init__(self, responses: dict[str, Any]) -> None:
+        self.responses = responses
+        self.requests: list[dict[str, Any]] = []
+
+    async def get(
+        self, url: str, *, headers: dict[str, str] | None = None, params: dict[str, Any] | None = None
+    ) -> httpx.Response:
+        self.requests.append({"method": "GET", "url": url, "headers": headers, "params": params})
+        key = f"GET {url}"
+        if key in self.responses:
+            return self.responses[key]
+        # Default mock response
+        mock_response = mock.Mock(spec=httpx.Response)
+        mock_response.status_code = 200
+        mock_response.text = "{}"
+        mock_response.json.return_value = {}
+        return mock_response
+
+    async def post(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        json: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
+    ) -> httpx.Response:
+        self.requests.append({"method": "POST", "url": url, "headers": headers, "json": json, "data": data})
+        key = f"POST {url}"
+        if key in self.responses:
+            return self.responses[key]
+        # Default mock response
+        mock_response = mock.Mock(spec=httpx.Response)
+        mock_response.status_code = 200
+        mock_response.text = "{}"
+        mock_response.json.return_value = {}
+        return mock_response
+
+    async def put(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        json: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
+    ) -> httpx.Response:
+        self.requests.append({"method": "PUT", "url": url, "headers": headers, "json": json, "data": data})
+        key = f"PUT {url}"
+        if key in self.responses:
+            return self.responses[key]
+        # Default mock response
+        mock_response = mock.Mock(spec=httpx.Response)
+        mock_response.status_code = 200
+        mock_response.text = "{}"
+        mock_response.json.return_value = {}
+        return mock_response
+
+
 class HttpClient(Protocol):
     """Protocol for HTTP clients to enable dependency injection and testing."""
 
