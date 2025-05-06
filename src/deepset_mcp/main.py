@@ -44,42 +44,17 @@ def async_to_sync(f):
     return wrapper
 
 
-# Function to make authenticated requests to deepset Cloud API
+# Function to make authenticated requests to deepset Cloud API (async version)
+async def deepset_api_request_async(endpoint: str, method: str = "GET", data: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Makes an async request to the deepset API."""
+    async with DeepsetClient() as client:
+        return await client.request(endpoint, method, data)
+
+
+# Function to make authenticated requests to deepset Cloud API (sync wrapper for compatibility)
 def deepset_api_request(endpoint: str, method: str = "GET", data: dict[str, Any] | None = None) -> dict[str, Any]:
     """Makes a request to the deepset API."""
-    headers = {"Authorization": f"Bearer {get_api_key()}", "Accept": "application/json,text/plain,*/*"}
-
-    url = f"{DEEPSET_API_BASE_URL}{endpoint}"
-
-    try:
-        if method == "GET":
-            response = requests.get(url, headers=headers)
-        elif method == "POST":
-            headers["Content-Type"] = "application/json"
-            response = requests.post(url, headers=headers, json=data)
-        else:
-            raise ValueError(f"Unsupported HTTP method: {method}")
-
-        if response.status_code >= 400:
-            error_message = f"API Error: {response.status_code}"
-            try:
-                error_details = response.json()
-            except requests.exceptions.JSONDecodeError:
-                error_details = response.text if response.text else "No error details provided by API"
-            return {"error": error_message, "details": error_details}
-
-        if not response.text or not response.text.strip():
-            return {"status": "success", "message": "API returned empty response body"}
-
-        try:
-            return response.json()  # type: ignore
-        except requests.exceptions.JSONDecodeError:
-            return {"result": response.text, "warning": "API response was not valid JSON"}
-
-    except requests.exceptions.RequestException as e:
-        return {"error": f"Request failed: {str(e)}"}
-    except Exception as e:
-        return {"error": f"Unexpected error during request: {str(e)}"}
+    return asyncio.run(deepset_api_request_async(endpoint, method, data))
 
 
 @mcp.tool()
