@@ -1,4 +1,5 @@
 import os
+from typing import Any
 from unittest import mock
 
 import requests
@@ -27,7 +28,9 @@ EXPECTED_URL = f"{DEEPSET_API_BASE_URL}{EXPECTED_ENDPOINT}"
 
 
 # --- Helper Function to Mock Response ---
-def create_mock_response(status_code, json_data=None, text_data=None):
+def create_mock_response(
+    status_code: int, json_data: dict[str, Any] | None = None, text_data: str | None = None
+) -> requests.Response:
     """Creates a mock requests.Response object."""
     mock_resp = mock.Mock(spec=requests.Response)
     mock_resp.status_code = status_code
@@ -46,7 +49,7 @@ def create_mock_response(status_code, json_data=None, text_data=None):
 
 @mock.patch.dict(os.environ, {"DEEPSET_WORKSPACE": TEST_WORKSPACE, "DEEPSET_API_KEY": TEST_API_KEY})
 @mock.patch("deepset_mcp.main.requests.put")  # Mock requests.put used in update_pipeline_yaml
-def test_update_pipeline_yaml_success_json_response(mock_put):
+def test_update_pipeline_yaml_success_json_response(mock_put: mock.Mock) -> None:
     """Tests successful update with JSON response."""
     mock_response = create_mock_response(200, json_data={"status": "success", "message": "Updated"})
     mock_put.return_value = mock_response
@@ -65,7 +68,7 @@ def test_update_pipeline_yaml_success_json_response(mock_put):
 
 @mock.patch.dict(os.environ, {"DEEPSET_WORKSPACE": TEST_WORKSPACE, "DEEPSET_API_KEY": TEST_API_KEY})
 @mock.patch("deepset_mcp.main.requests.put")
-def test_update_pipeline_yaml_success_empty_response(mock_put):
+def test_update_pipeline_yaml_success_empty_response(mock_put: mock.Mock) -> None:
     """Tests successful update with empty response body."""
     mock_response = create_mock_response(200, text_data="")  # Empty body
     mock_put.return_value = mock_response
@@ -84,7 +87,7 @@ def test_update_pipeline_yaml_success_empty_response(mock_put):
 
 @mock.patch.dict(os.environ, {"DEEPSET_WORKSPACE": TEST_WORKSPACE, "DEEPSET_API_KEY": TEST_API_KEY})
 @mock.patch("deepset_mcp.main.requests.put")
-def test_update_pipeline_yaml_api_error_422_json(mock_put):
+def test_update_pipeline_yaml_api_error_422_json(mock_put: mock.Mock) -> None:
     """Tests API error (422) with JSON details."""
     error_details = {"detail": [{"type": "validation_error", "msg": "Something is wrong"}]}
     mock_response = create_mock_response(422, json_data=error_details)
@@ -98,7 +101,7 @@ def test_update_pipeline_yaml_api_error_422_json(mock_put):
 
 @mock.patch.dict(os.environ, {"DEEPSET_WORKSPACE": TEST_WORKSPACE, "DEEPSET_API_KEY": TEST_API_KEY})
 @mock.patch("deepset_mcp.main.requests.put")
-def test_update_pipeline_yaml_api_error_500_text(mock_put):
+def test_update_pipeline_yaml_api_error_500_text(mock_put: mock.Mock) -> None:
     """Tests API error (500) with non-JSON text details."""
     error_text = "Internal Server Error"
     mock_response = create_mock_response(500, text_data=error_text)
@@ -112,7 +115,7 @@ def test_update_pipeline_yaml_api_error_500_text(mock_put):
 
 @mock.patch.dict(os.environ, {"DEEPSET_WORKSPACE": TEST_WORKSPACE, "DEEPSET_API_KEY": TEST_API_KEY})
 @mock.patch("deepset_mcp.main.requests.put")
-def test_update_pipeline_yaml_request_exception(mock_put):
+def test_update_pipeline_yaml_request_exception(mock_put: mock.Mock) -> None:
     """Tests network request failure."""
     mock_put.side_effect = requests.exceptions.RequestException("Connection timed out")
 
@@ -125,7 +128,7 @@ def test_update_pipeline_yaml_request_exception(mock_put):
 
 @mock.patch.dict(os.environ, {"DEEPSET_WORKSPACE": TEST_WORKSPACE, "DEEPSET_API_KEY": TEST_API_KEY})
 @mock.patch("deepset_mcp.main.requests.put")  # Still need to mock put, even if not called
-def test_update_pipeline_yaml_empty_content(mock_put):
+def test_update_pipeline_yaml_empty_content(mock_put: mock.Mock) -> None:
     """Tests the function's validation for empty YAML content."""
     result = update_pipeline_yaml(TEST_PIPELINE_NAME, "")
     assert result == {"error": "Empty YAML content provided"}
@@ -134,7 +137,7 @@ def test_update_pipeline_yaml_empty_content(mock_put):
 
 @mock.patch.dict(os.environ, {"DEEPSET_WORKSPACE": TEST_WORKSPACE, "DEEPSET_API_KEY": TEST_API_KEY})
 @mock.patch("deepset_mcp.main.requests.put")
-def test_update_pipeline_yaml_invalid_structure(mock_put):
+def test_update_pipeline_yaml_invalid_structure(mock_put: mock.Mock) -> None:
     """Tests the function's validation for missing 'components:'."""
     result = update_pipeline_yaml(TEST_PIPELINE_NAME, INVALID_YAML_CONTENT_NO_COMPONENTS)
     assert result == {"error": "Invalid YAML content - missing 'components:' section"}

@@ -31,7 +31,7 @@ def get_workspace() -> str:
 
 
 # Function to make authenticated requests to deepset Cloud API
-def deepset_api_request(endpoint: str, method: str = "GET", data: dict | None = None) -> dict[str, Any]:
+def deepset_api_request(endpoint: str, method: str = "GET", data: dict[str, Any] | None = None) -> dict[str, Any]:
     """Makes a request to the deepset API."""
     headers = {"Authorization": f"Bearer {get_api_key()}", "Accept": "application/json,text/plain,*/*"}
 
@@ -58,7 +58,7 @@ def deepset_api_request(endpoint: str, method: str = "GET", data: dict | None = 
             return {"status": "success", "message": "API returned empty response body"}
 
         try:
-            return response.json()
+            return response.json()  # type: ignore
         except requests.exceptions.JSONDecodeError:
             return {"result": response.text, "warning": "API response was not valid JSON"}
 
@@ -150,7 +150,7 @@ def validate_pipeline_yaml(yaml_content: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def get_pipeline_yaml(pipeline_name: str) -> str:
+def get_pipeline_yaml(pipeline_name: str) -> str | dict[str, Any]:
     """Retrieves the complete YAML configuration file for a specific pipeline.
 
     Use this when you need the exact YAML definition of an existing pipeline, for example, to inspect it or use it as
@@ -166,7 +166,7 @@ def get_pipeline_yaml(pipeline_name: str) -> str:
         # The response might be already a string or might need formatting
         # depending on the API response structure
         if isinstance(response, dict) and "yaml" in response:
-            return response["yaml"]
+            return str(response["yaml"])
         return str(response)
     except Exception as e:
         return {"error": str(e)}
@@ -221,7 +221,7 @@ def update_pipeline_yaml(pipeline_name: str, yaml_content: str) -> dict[str, Any
             return {"status": "success", "message": "Pipeline YAML updated successfully (empty response body)"}
 
         try:
-            return response.json()
+            return response.json()  # type: ignore
         except requests.exceptions.JSONDecodeError:
             return {"result": response.text, "warning": "API response was not valid JSON"}
 
@@ -253,9 +253,9 @@ def get_component_schemas_resource() -> str:
 
 
 @mcp.resource("pipeline-yaml://{pipeline_name}")
-def get_pipeline_yaml_resource(pipeline_name: str) -> str:
+def get_pipeline_yaml_resource(pipeline_name: str) -> str | dict[str, Any]:
     """Return the YAML definition of a specific pipeline as a resource."""
-    return get_pipeline_yaml(pipeline_name)
+    return get_pipeline_yaml(pipeline_name)  # type: ignore
 
 
 @mcp.tool()
