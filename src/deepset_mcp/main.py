@@ -180,9 +180,8 @@ async def update_pipeline_yaml(pipeline_name: str, yaml_content: str) -> dict[st
     if not yaml_content.strip().startswith("components:") and "components:" not in yaml_content:
         return {"error": "Invalid YAML content - missing 'components:' section"}
 
-    workspace = get_workspace()
     try:
-        endpoint = f"/workspaces/{workspace}/pipelines/{pipeline_name}/yaml"
+        async with DeepsetClient() as client:
 
         # API expects JSON input even for PUT /yaml endpoint
         headers = {
