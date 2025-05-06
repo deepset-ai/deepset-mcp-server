@@ -138,7 +138,8 @@ async def validate_pipeline_yaml(yaml_content: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def get_pipeline_yaml(pipeline_name: str) -> str | dict[str, Any]:
+@async_to_sync
+async def get_pipeline_yaml(pipeline_name: str) -> str | dict[str, Any]:
     """Retrieves the complete YAML configuration file for a specific pipeline.
 
     Use this when you need the exact YAML definition of an existing pipeline, for example, to inspect it or use it as
