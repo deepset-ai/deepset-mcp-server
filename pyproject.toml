@@ -48,6 +48,11 @@ select = [
     "UP",  # pyupgrade
     "D",   # docstrings
 ]
+ignore = [
+    "D100", # Ok to not have docstring for public modules
+    "D104", # Ok to not have docstring for public package
+    "D401", # First line of docstring in imperative mode
+]
 isort = { combine-as-imports = true, known-first-party = ["deepset_mcp"] }
 
 [tool.ruff.lint.pydocstyle]

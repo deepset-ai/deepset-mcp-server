@@ -1,8 +1,9 @@
 import os
-import requests
-from typing import Dict, Any, Optional
+from typing import Any
 
+import requests
 from mcp.server.fastmcp import FastMCP
+from requests import HTTPError
 
 # Initialize MCP Server
 mcp = FastMCP("Deepset Cloud MCP")
@@ -10,29 +11,32 @@ mcp = FastMCP("Deepset Cloud MCP")
 # Configuration
 DEEPSET_API_BASE_URL = "https://api.cloud.deepset.ai/api/v1"
 
+
 # Helper function to get API key from environment variable
 def get_api_key() -> str:
+    """Gets the API key configured for the environment."""
     api_key = os.environ.get("DEEPSET_API_KEY")
     if not api_key:
         raise ValueError("DEEPSET_API_KEY environment variable not set")
     return api_key
 
+
 # Helper function to get workspace name from environment variable
 def get_workspace() -> str:
+    """Gets the workspace configured for the environment."""
     workspace = os.environ.get("DEEPSET_WORKSPACE")
     if not workspace:
         raise ValueError("DEEPSET_WORKSPACE environment variable not set")
     return workspace
 
+
 # Function to make authenticated requests to deepset Cloud API
-def deepset_api_request(endpoint: str, method: str = "GET", data: Optional[Dict] = None) -> Dict[str, Any]:
-    headers = {
-        "Authorization": f"Bearer {get_api_key()}",
-        "Accept": "application/json,text/plain,*/*"
-    }
-    
+def deepset_api_request(endpoint: str, method: str = "GET", data: dict | None = None) -> dict[str, Any]:
+    """Makes a request to the deepset API."""
+    headers = {"Authorization": f"Bearer {get_api_key()}", "Accept": "application/json,text/plain,*/*"}
+
     url = f"{DEEPSET_API_BASE_URL}{endpoint}"
-    
+
     try:
         if method == "GET":
             response = requests.get(url, headers=headers)
@@ -41,21 +45,18 @@ def deepset_api_request(endpoint: str, method: str = "GET", data: Optional[Dict]
             response = requests.post(url, headers=headers, json=data)
         else:
             raise ValueError(f"Unsupported HTTP method: {method}")
-        
+
         if response.status_code >= 400:
             error_message = f"API Error: {response.status_code}"
             try:
                 error_details = response.json()
             except requests.exceptions.JSONDecodeError:
                 error_details = response.text if response.text else "No error details provided by API"
-            return {
-                "error": error_message,
-                "details": error_details
-            }
-        
+            return {"error": error_message, "details": error_details}
+
         if not response.text or not response.text.strip():
             return {"status": "success", "message": "API returned empty response body"}
-            
+
         try:
             return response.json()
         except requests.exceptions.JSONDecodeError:
@@ -66,76 +67,103 @@ def deepset_api_request(endpoint: str, method: str = "GET", data: Optional[Dict]
     except Exception as e:
         return {"error": f"Unexpected error during request: {str(e)}"}
 
+
 @mcp.tool()
-def list_pipelines() -> Dict[str, Any]:
-    """Retrieves a list of all pipelines available within the currently configured deepset workspace. Use this when you need to know the names or IDs of existing pipelines."""
+def list_pipelines() -> dict[str, Any]:
+    """Retrieves a list of all pipelines available within the currently configured deepset workspace.
+
+    Use this when you need to know the names or IDs of existing pipelines.
+    """
     workspace = get_workspace()
     try:
         return deepset_api_request(f"/workspaces/{workspace}/pipelines")
     except Exception as e:
         return {"error": str(e)}
 
+
 @mcp.tool()
-def get_pipeline(pipeline_id: str) -> Dict[str, Any]:
-    """Fetches detailed configuration information for a specific pipeline, identified by its unique `pipeline_id`. This includes its components, connections, and metadata. Use this when you need to inspect the structure or settings of a known pipeline."""
+def get_pipeline(pipeline_id: str) -> dict[str, Any]:
+    """Fetches detailed configuration information for a specific pipeline, identified by its unique `pipeline_id`.
+
+    This includes its components, connections, and metadata.
+    Use this when you need to inspect the structure or settings of a known pipeline.
+
+    :param pipeline_id: ID of the pipeline to retrieve.
+    """
     workspace = get_workspace()
     try:
         return deepset_api_request(f"/workspaces/{workspace}/pipelines/{pipeline_id}")
     except Exception as e:
         return {"error": str(e)}
 
+
 @mcp.tool()
-def get_component_schemas() -> Dict[str, Any]:
-    """Retrieves the schemas for all available Haystack components from the deepset API. These schemas define the expected input and output parameters for each component type, which is useful for constructing or validating componets in a pipeline YAML."""
+def get_component_schemas() -> dict[str, Any]:
+    """Retrieves the schemas for all available Haystack components from the deepset API.
+
+    These schemas define the expected input and output parameters for each component type, which is useful for
+    constructing or validating componets in a pipeline YAML.
+    """
     try:
         return deepset_api_request("/haystack/components")
     except Exception as e:
         return {"error": str(e)}
 
+
 @mcp.tool()
-def validate_pipeline_yaml(yaml_content: str) -> Dict[str, Any]:
+def validate_pipeline_yaml(yaml_content: str) -> dict[str, Any]:
     """
-    Validates the structure and syntax of a provided pipeline YAML configuration against the deepset API specifications. Provide the YAML content as a string. Returns a validation result, indicating success or detailing any errors or warnings found. Use this *before* attempting to create or update a pipeline with new YAML.
+    Validates the structure and syntax of a provided pipeline YAML configuration against the deepset API specifications.
+
+    Provide the YAML content as a string.
+    Returns a validation result, indicating success or detailing any errors or warnings found.
+    Use this *before* attempting to create or update a pipeline with new YAML.
     """
     # Basic validation of the input
     if not yaml_content or not yaml_content.strip():
         return {"error": "Empty YAML content provided"}
-        
+
     # Check if content looks like YAML (basic check)
-    if not yaml_content.strip().startswith("components:") and not "components:" in yaml_content:
+    if not yaml_content.strip().startswith("components:") and "components:" not in yaml_content:
         return {"error": "Invalid YAML content - missing 'components:' section"}
-    
+
     workspace = get_workspace()
     try:
         # Ensure the YAML is properly formatted for the request
         # The API expects the raw YAML as a string value in the query_yaml field
         payload = {"query_yaml": yaml_content}
-        
+
         # Send the request with the properly formatted payload
-        response = deepset_api_request(
-            f"/workspaces/{workspace}/pipeline_validations",
-            method="POST",
-            data=payload
-        )
+        response = deepset_api_request(f"/workspaces/{workspace}/pipeline_validations", method="POST", data=payload)
         return response
     except Exception as e:
         error_details = str(e)
         # Provide clear error information
         return {
-            "error": f"Validation API error: {error_details}", 
+            "error": f"Validation API error: {error_details}",
             "details": "Make sure your YAML is properly formatted for a query pipeline",
-            "tip": "The YAML must be a valid query pipeline configuration with components, connections, inputs, and outputs sections."
+            "tip": (
+                "The YAML must be a valid query pipeline configuration with components, connections, inputs, and "
+                "outputs sections."
+            ),
         }
+
 
 @mcp.tool()
 def get_pipeline_yaml(pipeline_name: str) -> str:
-    """
-    Retrieves the complete YAML configuration file for a specific pipeline, identified by its `pipeline_name`. Returns the YAML content as a string. Use this when you need the exact YAML definition of an existing pipeline, for example, to inspect it or use it as a base for modifications.
+    """Retrieves the complete YAML configuration file for a specific pipeline.
+
+    Use this when you need the exact YAML definition of an existing pipeline, for example, to inspect it or use it as
+    a base for modifications.
+
+    :param pipeline_name: The name of the pipeline to retrieve.
+
+    :return: The YAML configuration file for the specified pipeline.
     """
     workspace = get_workspace()
     try:
         response = deepset_api_request(f"/workspaces/{workspace}/pipelines/{pipeline_name}/yaml")
-        # The response might be already a string or might need formatting 
+        # The response might be already a string or might need formatting
         # depending on the API response structure
         if isinstance(response, dict) and "yaml" in response:
             return response["yaml"]
@@ -143,15 +171,23 @@ def get_pipeline_yaml(pipeline_name: str) -> str:
     except Exception as e:
         return {"error": str(e)}
 
+
 @mcp.tool()
-def update_pipeline_yaml(pipeline_name: str, yaml_content: str) -> Dict[str, Any]:
-    """
-    Updates an existing pipeline in deepset, identified by `pipeline_name`, with a new YAML configuration provided as `yaml_content`. This will replace the entire existing configuration of the pipeline. Use this carefully, preferably after validating the new YAML content.
+def update_pipeline_yaml(pipeline_name: str, yaml_content: str) -> dict[str, Any]:
+    """Updates an existing pipeline in deepset.
+
+    This will replace the entire existing configuration of the pipeline.
+    Use this carefully, preferably after validating the new YAML content.
+
+    :param pipeline_name: The name of the pipeline to update.
+    :param yaml_content: The YAML content that the pipeline should be updated with.
+
+    :return: A dictionary indicating success or failure of the update.
     """
     # Basic validation
     if not yaml_content or not yaml_content.strip():
         return {"error": "Empty YAML content provided"}
-    if not yaml_content.strip().startswith("components:") and not "components:" in yaml_content:
+    if not yaml_content.strip().startswith("components:") and "components:" not in yaml_content:
         return {"error": "Invalid YAML content - missing 'components:' section"}
 
     workspace = get_workspace()
@@ -162,12 +198,12 @@ def update_pipeline_yaml(pipeline_name: str, yaml_content: str) -> Dict[str, Any
         headers = {
             "Authorization": f"Bearer {get_api_key()}",
             "Content-Type": "application/json",  # Set Content-Type to JSON
-            "Accept": "application/json,text/plain,*/*" 
+            "Accept": "application/json,text/plain,*/*",
         }
-        
+
         # Structure the data as JSON payload
-        payload = {"query_yaml": yaml_content} 
-        
+        payload = {"query_yaml": yaml_content}
+
         url = f"{DEEPSET_API_BASE_URL}{endpoint}"
         # Send JSON payload using the json parameter
         response = requests.put(url, headers=headers, json=payload)
@@ -180,10 +216,10 @@ def update_pipeline_yaml(pipeline_name: str, yaml_content: str) -> Dict[str, Any
             except requests.exceptions.JSONDecodeError:
                 error_details = response.text if response.text else "No error details provided"
             return {"error": error_message, "details": error_details}
-        
+
         if not response.text or not response.text.strip():
-             return {"status": "success", "message": "Pipeline YAML updated successfully (empty response body)"}
-        
+            return {"status": "success", "message": "Pipeline YAML updated successfully (empty response body)"}
+
         try:
             return response.json()
         except requests.exceptions.JSONDecodeError:
@@ -194,35 +230,37 @@ def update_pipeline_yaml(pipeline_name: str, yaml_content: str) -> Dict[str, Any
     except Exception as e:
         return {"error": f"Unexpected error during YAML update: {str(e)}"}
 
+
 @mcp.resource("pipelines://all")
 def get_all_pipelines_resource() -> str:
-    """Return all pipelines as a resource"""
+    """Return all pipelines as a resource."""
     result = list_pipelines()
     return str(result)
 
+
 @mcp.resource("pipeline://{pipeline_id}")
 def get_pipeline_resource(pipeline_id: str) -> str:
-    """Return a specific pipeline as a resource"""
+    """Return a specific pipeline as a resource."""
     result = get_pipeline(pipeline_id)
     return str(result)
 
+
 @mcp.resource("components://schemas")
 def get_component_schemas_resource() -> str:
-    """Return all component schemas as a resource"""
+    """Return all component schemas as a resource."""
     result = get_component_schemas()
     return str(result)
 
+
 @mcp.resource("pipeline-yaml://{pipeline_name}")
 def get_pipeline_yaml_resource(pipeline_name: str) -> str:
-    """Return the YAML definition of a specific pipeline as a resource"""
+    """Return the YAML definition of a specific pipeline as a resource."""
     return get_pipeline_yaml(pipeline_name)
 
 
 @mcp.tool()
 def list_pipeline_templates() -> str:
-    """
-    Retrieves a list of pipeline templates to build AI applications like RAG or Agents.
-    """
+    """Retrieves a list of pipeline templates to build AI applications like RAG or Agents."""
     workspace = get_workspace()
     try:
         # Build the query parameters with fixed values
@@ -301,7 +339,8 @@ def get_pipeline_template(template_name: str) -> str:
             formatted_output.append("## INDEXING PIPELINE YAML\n```yaml\n" + indexing_yaml + "\n```\n")
         else:
             formatted_output.append(
-                "## INDEXING PIPELINE YAML\nNo indexing pipeline YAML available for this template.\n")
+                "## INDEXING PIPELINE YAML\nNo indexing pipeline YAML available for this template.\n"
+            )
 
         # Join all sections and return
         return "\n".join(formatted_output)
@@ -312,9 +351,7 @@ def get_pipeline_template(template_name: str) -> str:
 
 @mcp.tool()
 def get_custom_components() -> str:
-    """
-    Use this to get a list of all installed custom components.
-    """
+    """Use this to get a list of all installed custom components."""
     try:
         # Retrieve all component schemas
         response = get_component_schemas()
@@ -360,7 +397,7 @@ def get_custom_components() -> str:
                 f"- **Type**: `{const_value}`",
                 f"- **Package Version**: {package_version}",
                 f"- **Family**: {family} - {family_description}",
-                f"- **Dynamic Parameters**: {'Yes' if dynamic_params else 'No'}"
+                f"- **Dynamic Parameters**: {'Yes' if dynamic_params else 'No'}",
             ]
 
             # Add init parameters if available
@@ -397,10 +434,7 @@ def get_latest_custom_component_installation_logs() -> str:
         endpoint = "/custom_components/logs"
 
         # Set up headers - using accept: text/plain since log output is plain text
-        headers = {
-            "Authorization": f"Bearer {get_api_key()}",
-            "Accept": "text/plain"
-        }
+        headers = {"Authorization": f"Bearer {get_api_key()}", "Accept": "text/plain"}
 
         url = f"{DEEPSET_API_BASE_URL.replace('/api/v1', '/api/v2')}{endpoint}"
 
@@ -413,7 +447,7 @@ def get_latest_custom_component_installation_logs() -> str:
                 try:
                     # Try to get any structured error info
                     error_details = response.json()
-                except:
+                except Exception:
                     # Fall back to text if not JSON
                     error_details = response.text if response.text else "No error details provided by API"
                 return f"Error retrieving installation logs: {error_message}\nDetails: {error_details}"
@@ -440,10 +474,7 @@ def list_custom_component_installations() -> str:
         endpoint = "/custom_components?limit=20&page_number=1&field=created_at&order=DESC"
 
         # Set up headers
-        headers = {
-            "Authorization": f"Bearer {get_api_key()}",
-            "Accept": "application/json"
-        }
+        headers = {"Authorization": f"Bearer {get_api_key()}", "Accept": "application/json"}
 
         url = f"{DEEPSET_API_BASE_URL.replace('/api/v1', '/api/v2')}{endpoint}"
 
@@ -451,18 +482,14 @@ def list_custom_component_installations() -> str:
             # Make direct request
             response = requests.get(url, headers=headers)
 
-            if response.status_code >= 400:
-                error_message = f"API Error: {response.status_code}"
-                try:
-                    # Try to get any structured error info
-                    error_details = response.json()
-                except:
-                    # Fall back to text if not JSON
-                    error_details = response.text if response.text else "No error details provided by API"
+            try:
+                response.raise_for_status()
+                data = response.json()
+            except HTTPError:
+                error_message = f"HTTP Error: {response.status_code}"
+                error_details = response.text if response.text else "No error details provided by API"
                 return f"Error retrieving installation history: {error_message}\nDetails: {error_details}"
 
-            # Parse JSON response
-            data = response.json()
             installations = data.get("data", [])
             total = data.get("total", 0)
             has_more = data.get("has_more", False)
@@ -487,8 +514,7 @@ def list_custom_component_installations() -> str:
                         # Make request to the user API endpoint
                         user_url = f"{DEEPSET_API_BASE_URL}/users/{user_id}"
                         user_response = requests.get(
-                            user_url,
-                            headers={"Authorization": f"Bearer {get_api_key()}", "Accept": "application/json"}
+                            user_url, headers={"Authorization": f"Bearer {get_api_key()}", "Accept": "application/json"}
                         )
 
                         if user_response.status_code == 200:
@@ -509,7 +535,7 @@ def list_custom_component_installations() -> str:
                     f"## Installation {component_id[:8]}...",
                     f"- **Status**: {status}",
                     f"- **Version**: {version}",
-                    f"- **Installed by**: {user_info}"
+                    f"- **Installed by**: {user_info}",
                 ]
 
                 # Add logs if available
@@ -528,7 +554,8 @@ def list_custom_component_installations() -> str:
 
             if has_more:
                 formatted_output.append(
-                    "*Note: There are more installations available. This listing shows only the 10 most recent.*")
+                    "*Note: There are more installations available. This listing shows only the 10 most recent.*"
+                )
 
             # Join all sections and return
             return "\n".join(formatted_output)
@@ -541,7 +568,9 @@ def list_custom_component_installations() -> str:
 
 
 def launch_mcp() -> None:
+    """Launches the MCP server."""
     mcp.run()
+
 
 if __name__ == "__main__":
     launch_mcp()
