@@ -1,0 +1,27 @@
+name: AI Agent
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+
+jobs:
+  process-ai-issue:
+    if: |
+      (github.event_name == 'issues' && github.event.label.name == 'deepset-ai') ||
+      (github.event_name == 'issue_comment' && contains(github.event.issue.labels.*.name, 'deepset-ai'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Issue to deepset AI Platform
+        env:
+          DEEPSET_API_TOKEN: ${{ secrets.DEEPSET_API_TOKEN }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          curl --request POST \
+               --url https://api.cloud.deepset.ai/api/v1/workspaces/default/pipelines/github-agent-claude/search \
+               --header 'accept: application/json' \
+               --header 'authorization: Bearer ${{ env.DEEPSET_API_TOKEN }}' \
+               --header 'content-type: application/json' \
+               --data '{"debug": false, "view_prompts": false, "queries": ["${{ env.ISSUE_URL }}"], "params": {"agent": {"repo": "${{ env.REPOSITORY }}"}}}'
