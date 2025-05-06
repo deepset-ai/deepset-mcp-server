@@ -162,7 +162,8 @@ async def get_pipeline_yaml(pipeline_name: str) -> str | dict[str, Any]:
 
 
 @mcp.tool()
-def update_pipeline_yaml(pipeline_name: str, yaml_content: str) -> dict[str, Any]:
+@async_to_sync
+async def update_pipeline_yaml(pipeline_name: str, yaml_content: str) -> dict[str, Any]:
     """Updates an existing pipeline in deepset.
 
     This will replace the entire existing configuration of the pipeline.
