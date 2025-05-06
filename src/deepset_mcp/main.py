@@ -39,16 +39,10 @@ def get_workspace() -> str:
 
 
 # Function to make authenticated requests to deepset Cloud API (async version)
-async def deepset_api_request_async(endpoint: str, method: str = "GET", data: dict[str, Any] | None = None) -> dict[str, Any]:
+async def deepset_api_request(endpoint: str, method: str = "GET", data: dict[str, Any] | None = None) -> dict[str, Any]:
     """Makes an async request to the deepset API."""
     async with DeepsetClient() as client:
         return await client.request(endpoint, method, data)
-
-
-# Function to make authenticated requests to deepset Cloud API (sync wrapper for compatibility)
-def deepset_api_request(endpoint: str, method: str = "GET", data: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Makes a request to the deepset API."""
-    return asyncio.run(deepset_api_request_async(endpoint, method, data))
 
 
 @mcp.tool()
