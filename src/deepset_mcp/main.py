@@ -219,7 +219,8 @@ def get_pipeline_yaml_resource(pipeline_name: str) -> str | dict[str, Any]:
 
 
 @mcp.tool()
-def list_pipeline_templates() -> str:
+@async_to_sync
+async def list_pipeline_templates() -> str:
     """Retrieves a list of pipeline templates to build AI applications like RAG or Agents."""
     workspace = get_workspace()
     try:
