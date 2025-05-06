@@ -125,9 +125,9 @@ def test_update_pipeline_yaml_empty_content(mock_update: mock.Mock) -> None:
 
 
 @mock.patch.dict(os.environ, {"DEEPSET_WORKSPACE": TEST_WORKSPACE, "DEEPSET_API_KEY": TEST_API_KEY})
-@mock.patch("deepset_mcp.main.requests.put")
-def test_update_pipeline_yaml_invalid_structure(mock_put: mock.Mock) -> None:
+@mock.patch("deepset_mcp.client.DeepsetClient.update_pipeline_yaml")
+def test_update_pipeline_yaml_invalid_structure(mock_update: mock.Mock) -> None:
     """Tests the function's validation for missing 'components:'."""
     result = update_pipeline_yaml(TEST_PIPELINE_NAME, INVALID_YAML_CONTENT_NO_COMPONENTS)
     assert result == {"error": "Invalid YAML content - missing 'components:' section"}
-    mock_put.assert_not_called()  # Ensure API wasn't called
+    mock_update.assert_not_called()  # Ensure client method wasn't called
