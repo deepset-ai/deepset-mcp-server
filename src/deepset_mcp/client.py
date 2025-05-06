@@ -205,97 +205,101 @@ class DeepsetClient:
             self._logger.error(f"Unexpected error during request: {str(e)}")
             return {"error": f"Unexpected error during request: {str(e)}"}
 
-    # API-specific methods
-    async def list_pipelines(self) -> dict[str, Any]:
-        """List all pipelines in the workspace."""
-        return await self.request(f"/workspaces/{self.workspace}/pipelines")
+    async def request_with_custom_headers(
+        self, endpoint: str, headers: dict[str, str], method: str = "GET", data: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Make a request to the deepset API with custom headers.
 
-    async def get_pipeline(self, pipeline_id: str) -> dict[str, Any]:
-        """Get a pipeline by ID."""
-        return await self.request(f"/workspaces/{self.workspace}/pipelines/{pipeline_id}")
+        This is useful for endpoints that need special headers (like text/plain for logs).
 
-    async def get_component_schemas(self) -> dict[str, Any]:
-        """Get the schemas for all available Haystack components."""
-        return await self.request("/haystack/components")
+        Parameters
+        ----------
+        endpoint : str
+            The endpoint to request, relative to the base URL.
+        headers : dict[str, str]
+            The headers to use for the request. Authorization will be added if not present.
+        method : str, optional
+            The HTTP method to use. Defaults to "GET".
+        data : dict[str, Any], optional
+            The data to send with the request. Defaults to None.
 
-    async def validate_pipeline_yaml(self, yaml_content: str) -> dict[str, Any]:
-        """Validate a pipeline YAML configuration."""
-        payload = {"query_yaml": yaml_content}
-        return await self.request(
-            f"/workspaces/{self.workspace}/pipeline_validations", method="POST", data=payload
-        )
-
-    async def get_pipeline_yaml(self, pipeline_name: str) -> dict[str, Any]:
-        """Get the YAML configuration for a pipeline."""
-        return await self.request(f"/workspaces/{self.workspace}/pipelines/{pipeline_name}/yaml")
-
-    async def update_pipeline_yaml(self, pipeline_name: str, yaml_content: str) -> dict[str, Any]:
-        """Update a pipeline YAML configuration."""
-        payload = {"query_yaml": yaml_content}
-        return await self.request(
-            f"/workspaces/{self.workspace}/pipelines/{pipeline_name}/yaml", method="PUT", data=payload
-        )
-
-    async def list_pipeline_templates(self, limit: int = 100, page: int = 1) -> dict[str, Any]:
-        """List pipeline templates."""
-        endpoint = f"/workspaces/{self.workspace}/pipeline_templates?limit={limit}&page_number={page}&field=created_at&order=DESC"
-        return await self.request(endpoint)
-
-    async def get_pipeline_template(self, template_name: str) -> dict[str, Any]:
-        """Get a pipeline template by name."""
-        return await self.request(f"/workspaces/{self.workspace}/pipeline_templates/{template_name}")
-
-    async def get_custom_components(self) -> dict[str, Any]:
-        """Get all custom components."""
-        return await self.get_component_schemas()
-
-    async def get_latest_custom_component_installation_logs(self) -> dict[str, Any]:
-        """Get the logs from the latest custom component installation."""
-        # This endpoint uses v2 of the API
-        endpoint = "/custom_components/logs"
-        url = self._build_url(endpoint).replace("/api/v1", "/api/v2")
-
+        Returns
+        -------
+        dict[str, Any]
+            The response from the API, processed into a dictionary.
+        """
         if not self._http_client:
             raise RuntimeError("DeepsetClient must be used as an async context manager")
 
-        try:
-            # Use text/plain accept header specifically for logs
-            headers = self._get_headers()
-            headers["Accept"] = "text/plain"
-            response = await self._http_client.get(url, headers=headers)
+        url = self._build_url(endpoint)
+        self._logger.debug(f"Making {method} request to {url} with custom headers")
 
-            if response.status_code >= 400:
-                error_message = f"API Error: {response.status_code}"
-                try:
-                    error_details = response.json()
-                except Exception:
-                    error_details = response.text if response.text else "No error details provided by API"
-                return {"error": error_message, "details": error_details}
-
-            # Return raw text response
-            return {"logs": response.text}
-        except httpx.RequestError as e:
-            return {"error": f"Request failed: {str(e)}"}
-        except Exception as e:
-            return {"error": f"Unexpected error: {str(e)}"}
-
-    async def list_custom_component_installations(self, limit: int = 20, page: int = 1) -> dict[str, Any]:
-        """List custom component installations."""
-        # This endpoint uses v2 of the API
-        endpoint = f"/custom_components?limit={limit}&page_number={page}&field=created_at&order=DESC"
-        url = self._build_url(endpoint).replace("/api/v1", "/api/v2")
-
-        if not self._http_client:
-            raise RuntimeError("DeepsetClient must be used as an async context manager")
+        # Add authorization if not present
+        if "Authorization" not in headers:
+            headers["Authorization"] = f"Bearer {self.api_key}"
 
         try:
-            response = await self._http_client.get(url, headers=self._get_headers())
+            if method == "GET":
+                response = await self._http_client.get(url, headers=headers)
+            elif method == "POST":
+                response = await self._http_client.post(url, headers=headers, json=data)
+            elif method == "PUT":
+                response = await self._http_client.put(url, headers=headers, json=data)
+            else:
+                raise ValueError(f"Unsupported HTTP method: {method}")
+
             return await self._process_response(response)
         except httpx.RequestError as e:
+            self._logger.error(f"Request failed: {str(e)}")
             return {"error": f"Request failed: {str(e)}"}
         except Exception as e:
-            return {"error": f"Unexpected error: {str(e)}"}
+            self._logger.error(f"Unexpected error during request: {str(e)}")
+            return {"error": f"Unexpected error during request: {str(e)}"}
 
-    async def get_user(self, user_id: str) -> dict[str, Any]:
-        """Get information about a user."""
-        return await self.request(f"/users/{user_id}")
+    async def request_v2_api(
+        self, endpoint: str, method: str = "GET", data: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Make a request to the deepset API v2 endpoint.
+
+        Parameters
+        ----------
+        endpoint : str
+            The endpoint to request, relative to the base URL (without /api/v2).
+        method : str, optional
+            The HTTP method to use. Defaults to "GET".
+        data : dict[str, Any], optional
+            The data to send with the request. Defaults to None.
+
+        Returns
+        -------
+        dict[str, Any]
+            The response from the API, processed into a dictionary.
+        """
+        url = self._build_url(endpoint).replace("/api/v1", "/api/v2")
+        self._logger.debug(f"Making {method} request to v2 API: {url}")
+
+        if not self._http_client:
+            raise RuntimeError("DeepsetClient must be used as an async context manager")
+
+        try:
+            if method == "GET":
+                response = await self._http_client.get(url, headers=self._get_headers())
+            elif method == "POST":
+                response = await self._http_client.post(
+                    url, headers=self._get_headers("application/json"), json=data
+                )
+            elif method == "PUT":
+                response = await self._http_client.put(
+                    url, headers=self._get_headers("application/json"), json=data
+                )
+            else:
+                raise ValueError(f"Unsupported HTTP method: {method}")
+
+            return await self._process_response(response)
+        except httpx.RequestError as e:
+            self._logger.error(f"Request failed: {str(e)}")
+            return {"error": f"Request failed: {str(e)}"}
+        except Exception as e:
+            self._logger.error(f"Unexpected error during request: {str(e)}")
+            return {"error": f"Unexpected error during request: {str(e)}"}
+
