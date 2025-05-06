@@ -252,7 +252,8 @@ async def list_pipeline_templates() -> str:
 
 
 @mcp.tool()
-def get_pipeline_template(template_name: str) -> str:
+@async_to_sync
+async def get_pipeline_template(template_name: str) -> str:
     """Retrieves a specific pipeline template by name and returns its YAML configurations.
 
     Parameters
