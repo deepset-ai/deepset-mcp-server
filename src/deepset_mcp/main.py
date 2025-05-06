@@ -305,7 +305,8 @@ async def get_pipeline_template(template_name: str) -> str:
 
 
 @mcp.tool()
-def get_custom_components() -> str:
+@async_to_sync
+async def get_custom_components() -> str:
     """Use this to get a list of all installed custom components."""
     try:
         # Retrieve all component schemas
