@@ -58,7 +58,6 @@ def deepset_api_request(endpoint: str, method: str = "GET", data: dict[str, Any]
 
 
 @mcp.tool()
-@async_to_sync
 async def list_pipelines() -> dict[str, Any]:
     """Retrieves a list of all pipelines available within the currently configured deepset workspace.
 
@@ -66,7 +65,7 @@ async def list_pipelines() -> dict[str, Any]:
     """
     try:
         async with DeepsetClient() as client:
-            return await client.list_pipelines()
+            return await client.request(f"/workspaces/{client.workspace}/pipelines")
     except Exception as e:
         return {"error": str(e)}
 
