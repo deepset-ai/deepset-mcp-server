@@ -144,17 +144,33 @@ async def test_update_pipeline_yaml_api_error_422_json() -> None:
         assert result == error_response
 
 
+@pytest.mark.asyncio
 @mock.patch.dict(os.environ, {"DEEPSET_WORKSPACE": TEST_WORKSPACE, "DEEPSET_API_KEY": TEST_API_KEY})
-@mock.patch("deepset_mcp.client.DeepsetClient.update_pipeline_yaml")
-def test_update_pipeline_yaml_api_error_500_text(mock_update: mock.Mock) -> None:
+async def test_update_pipeline_yaml_api_error_500_text() -> None:
     """Tests API error (500) with non-JSON text details."""
     error_text = "Internal Server Error"
-    mock_update.return_value = {"error": "API Error: 500", "details": error_text}
-
-    result = update_pipeline_yaml(TEST_PIPELINE_NAME, VALID_YAML_CONTENT)
-
-    mock_update.assert_called_once_with(TEST_PIPELINE_NAME, VALID_YAML_CONTENT)
-    assert result == {"error": "API Error: 500", "details": error_text}
+    error_response = {"error": "API Error: 500", "details": error_text}
+    
+    # Since update_pipeline_yaml is async, we need to test it differently
+    with mock.patch("deepset_mcp.main.DeepsetClient") as mock_client_class:
+        # Setup the mock client instance
+        mock_client_instance = mock.MagicMock()
+        mock_client_instance.__aenter__.return_value = mock_client_instance
+        mock_client_instance.__aexit__.return_value = None
+        mock_client_instance.workspace = TEST_WORKSPACE
+        mock_client_instance.request.return_value = error_response
+        mock_client_class.return_value = mock_client_instance
+        
+        # Call the function
+        result = await update_pipeline_yaml(TEST_PIPELINE_NAME, VALID_YAML_CONTENT)
+        
+        # Verify the call was made correctly
+        mock_client_instance.request.assert_called_once_with(
+            f"/workspaces/{TEST_WORKSPACE}/pipelines/{TEST_PIPELINE_NAME}/yaml", 
+            method="PUT", 
+            data={"query_yaml": VALID_YAML_CONTENT}
+        )
+        assert result == error_response
 
 
 @mock.patch.dict(os.environ, {"DEEPSET_WORKSPACE": TEST_WORKSPACE, "DEEPSET_API_KEY": TEST_API_KEY})
