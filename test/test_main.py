@@ -103,14 +103,14 @@ def test_update_pipeline_yaml_api_error_500_text(mock_update: mock.Mock) -> None
 
 
 @mock.patch.dict(os.environ, {"DEEPSET_WORKSPACE": TEST_WORKSPACE, "DEEPSET_API_KEY": TEST_API_KEY})
-@mock.patch("deepset_mcp.main.requests.put")
-def test_update_pipeline_yaml_request_exception(mock_put: mock.Mock) -> None:
+@mock.patch("deepset_mcp.client.DeepsetClient.update_pipeline_yaml")
+def test_update_pipeline_yaml_request_exception(mock_update: mock.Mock) -> None:
     """Tests network request failure."""
-    mock_put.side_effect = requests.exceptions.RequestException("Connection timed out")
+    mock_update.return_value = {"error": "Request failed: Connection timed out"}
 
     result = update_pipeline_yaml(TEST_PIPELINE_NAME, VALID_YAML_CONTENT)
 
-    mock_put.assert_called_once()  # Check call args if needed
+    mock_update.assert_called_once_with(TEST_PIPELINE_NAME, VALID_YAML_CONTENT)
     assert "error" in result
     assert "Request failed: Connection timed out" in result["error"]
 
