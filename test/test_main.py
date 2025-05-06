@@ -116,12 +116,12 @@ def test_update_pipeline_yaml_request_exception(mock_update: mock.Mock) -> None:
 
 
 @mock.patch.dict(os.environ, {"DEEPSET_WORKSPACE": TEST_WORKSPACE, "DEEPSET_API_KEY": TEST_API_KEY})
-@mock.patch("deepset_mcp.main.requests.put")  # Still need to mock put, even if not called
-def test_update_pipeline_yaml_empty_content(mock_put: mock.Mock) -> None:
+@mock.patch("deepset_mcp.client.DeepsetClient.update_pipeline_yaml")  # Still need to mock, even if not called
+def test_update_pipeline_yaml_empty_content(mock_update: mock.Mock) -> None:
     """Tests the function's validation for empty YAML content."""
     result = update_pipeline_yaml(TEST_PIPELINE_NAME, "")
     assert result == {"error": "Empty YAML content provided"}
-    mock_put.assert_not_called()  # Ensure API wasn't called
+    mock_update.assert_not_called()  # Ensure client method wasn't called
 
 
 @mock.patch.dict(os.environ, {"DEEPSET_WORKSPACE": TEST_WORKSPACE, "DEEPSET_API_KEY": TEST_API_KEY})
