@@ -148,9 +148,10 @@ async def test_client_missing_workspace(monkeypatch: MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_pipelines(client: DeepsetClient, mock_http_client: MockHttpClient) -> None:
-    """Test listing pipelines."""
-    result = await client.list_pipelines()
+async def test_request_get(client: DeepsetClient, mock_http_client: MockHttpClient) -> None:
+    """Test basic GET request."""
+    endpoint = f"/workspaces/{TEST_WORKSPACE}/pipelines"
+    result = await client.request(endpoint)
     
     # Check the result
     assert "data" in result
@@ -161,47 +162,70 @@ async def test_list_pipelines(client: DeepsetClient, mock_http_client: MockHttpC
     assert len(mock_http_client.requests) == 1
     request = mock_http_client.requests[0]
     assert request["method"] == "GET"
-    assert request["url"] == f"{TEST_BASE_URL}/workspaces/{TEST_WORKSPACE}/pipelines"
+    assert request["url"] == f"{TEST_BASE_URL}{endpoint}"
     assert "Authorization" in request["headers"]
 
 
 @pytest.mark.asyncio
-async def test_get_pipeline(client: DeepsetClient, mock_http_client: MockHttpClient) -> None:
-    """Test getting a specific pipeline."""
-    pipeline_id = "test-pipeline"
-    await client.get_pipeline(pipeline_id)
-    
-    # Check that the correct request was made
-    assert len(mock_http_client.requests) == 1
-    request = mock_http_client.requests[0]
-    assert request["method"] == "GET"
-    assert request["url"] == f"{TEST_BASE_URL}/workspaces/{TEST_WORKSPACE}/pipelines/{pipeline_id}"
-
-
-@pytest.mark.asyncio
-async def test_validate_pipeline_yaml(client: DeepsetClient, mock_http_client: MockHttpClient) -> None:
-    """Test validating pipeline YAML."""
-    yaml_content = "components:\n  retriever:\n    type: SomeRetriever"
-    await client.validate_pipeline_yaml(yaml_content)
+async def test_request_post(client: DeepsetClient, mock_http_client: MockHttpClient) -> None:
+    """Test POST request with data."""
+    endpoint = f"/workspaces/{TEST_WORKSPACE}/pipeline_validations"
+    data = {"query_yaml": "components:\n  retriever:\n    type: SomeRetriever"}
+    await client.request(endpoint, method="POST", data=data)
     
     # Check that the correct request was made
     assert len(mock_http_client.requests) == 1
     request = mock_http_client.requests[0]
     assert request["method"] == "POST"
-    assert request["url"] == f"{TEST_BASE_URL}/workspaces/{TEST_WORKSPACE}/pipeline_validations"
-    assert request["data"] == {"query_yaml": yaml_content}
+    assert request["url"] == f"{TEST_BASE_URL}{endpoint}"
+    assert request["json"] == data
+    assert "Content-Type" in request["headers"]
+    assert request["headers"]["Content-Type"] == "application/json"
 
 
 @pytest.mark.asyncio
-async def test_update_pipeline_yaml(client: DeepsetClient, mock_http_client: MockHttpClient) -> None:
-    """Test updating pipeline YAML."""
+async def test_request_put(client: DeepsetClient, mock_http_client: MockHttpClient) -> None:
+    """Test PUT request with data."""
     pipeline_name = "test-pipeline"
-    yaml_content = "components:\n  retriever:\n    type: SomeRetriever"
-    await client.update_pipeline_yaml(pipeline_name, yaml_content)
+    endpoint = f"/workspaces/{TEST_WORKSPACE}/pipelines/{pipeline_name}/yaml"
+    data = {"query_yaml": "components:\n  retriever:\n    type: SomeRetriever"}
+    await client.request(endpoint, method="PUT", data=data)
     
     # Check that the correct request was made
     assert len(mock_http_client.requests) == 1
     request = mock_http_client.requests[0]
     assert request["method"] == "PUT"
-    assert request["url"] == f"{TEST_BASE_URL}/workspaces/{TEST_WORKSPACE}/pipelines/{pipeline_name}/yaml"
-    assert request["data"] == {"query_yaml": yaml_content}
+    assert request["url"] == f"{TEST_BASE_URL}{endpoint}"
+    assert request["json"] == data
+
+
+@pytest.mark.asyncio
+async def test_request_with_custom_headers(client: DeepsetClient, mock_http_client: MockHttpClient) -> None:
+    """Test request with custom headers."""
+    endpoint = "/custom/endpoint"
+    custom_headers = {"Accept": "text/plain", "X-Custom-Header": "test-value"}
+    await client.request_with_custom_headers(endpoint, headers=custom_headers)
+    
+    # Check that the correct request was made
+    assert len(mock_http_client.requests) == 1
+    request = mock_http_client.requests[0]
+    assert request["method"] == "GET"
+    assert request["url"] == f"{TEST_BASE_URL}{endpoint}"
+    assert "Authorization" in request["headers"]
+    assert request["headers"]["Accept"] == "text/plain"
+    assert request["headers"]["X-Custom-Header"] == "test-value"
+
+
+@pytest.mark.asyncio
+async def test_request_v2_api(client: DeepsetClient, mock_http_client: MockHttpClient) -> None:
+    """Test request to v2 API endpoint."""
+    endpoint = "/custom_components"
+    await client.request_v2_api(endpoint)
+    
+    # Check that the correct request was made with v2 API URL
+    assert len(mock_http_client.requests) == 1
+    request = mock_http_client.requests[0]
+    assert request["method"] == "GET"
+    # URL should use v2 API
+    expected_url = TEST_BASE_URL.replace("/api/v1", "/api/v2") + endpoint
+    assert request["url"] == expected_url
