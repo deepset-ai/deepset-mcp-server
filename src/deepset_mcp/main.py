@@ -58,14 +58,15 @@ def deepset_api_request(endpoint: str, method: str = "GET", data: dict[str, Any]
 
 
 @mcp.tool()
-def list_pipelines() -> dict[str, Any]:
+@async_to_sync
+async def list_pipelines() -> dict[str, Any]:
     """Retrieves a list of all pipelines available within the currently configured deepset workspace.
 
     Use this when you need to know the names or IDs of existing pipelines.
     """
-    workspace = get_workspace()
     try:
-        return deepset_api_request(f"/workspaces/{workspace}/pipelines")
+        async with DeepsetClient() as client:
+            return await client.list_pipelines()
     except Exception as e:
         return {"error": str(e)}
 
