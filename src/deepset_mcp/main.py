@@ -406,7 +406,8 @@ async def get_latest_custom_component_installation_logs() -> str:
 
 
 @mcp.tool()
-def list_custom_component_installations() -> str:
+@async_to_sync
+async def list_custom_component_installations() -> str:
     """
     Retrieves a list of the most recent custom component installations.
 
