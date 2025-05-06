@@ -149,14 +149,14 @@ async def get_pipeline_yaml(pipeline_name: str) -> str | dict[str, Any]:
 
     :return: The YAML configuration file for the specified pipeline.
     """
-    workspace = get_workspace()
     try:
-        response = deepset_api_request(f"/workspaces/{workspace}/pipelines/{pipeline_name}/yaml")
-        # The response might be already a string or might need formatting
-        # depending on the API response structure
-        if isinstance(response, dict) and "yaml" in response:
-            return str(response["yaml"])
-        return str(response)
+        async with DeepsetClient() as client:
+            response = await client.get_pipeline_yaml(pipeline_name)
+            # The response might be already a string or might need formatting
+            # depending on the API response structure
+            if isinstance(response, dict) and "yaml" in response:
+                return str(response["yaml"])
+            return str(response)
     except Exception as e:
         return {"error": str(e)}
 
