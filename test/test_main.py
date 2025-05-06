@@ -50,21 +50,17 @@ def create_mock_response(
 
 
 @mock.patch.dict(os.environ, {"DEEPSET_WORKSPACE": TEST_WORKSPACE, "DEEPSET_API_KEY": TEST_API_KEY})
-@mock.patch("deepset_mcp.main.requests.put")  # Mock requests.put used in update_pipeline_yaml
-def test_update_pipeline_yaml_success_json_response(mock_put: mock.Mock) -> None:
+@mock.patch("deepset_mcp.client.DeepsetClient.update_pipeline_yaml")
+def test_update_pipeline_yaml_success_json_response(mock_update: mock.Mock) -> None:
     """Tests successful update with JSON response."""
-    mock_response = create_mock_response(200, json_data={"status": "success", "message": "Updated"})
-    mock_put.return_value = mock_response
+    mock_update.return_value = {"status": "success", "message": "Updated"}
 
+    # Since update_pipeline_yaml is now an async function wrapped with async_to_sync,
+    # we need to mock the async method but test the sync wrapper
     result = update_pipeline_yaml(TEST_PIPELINE_NAME, VALID_YAML_CONTENT)
 
-    expected_payload = {"query_yaml": VALID_YAML_CONTENT}
-    expected_headers = {
-        "Authorization": f"Bearer {TEST_API_KEY}",
-        "Content-Type": "application/json",
-        "Accept": "application/json,text/plain,*/*",
-    }
-    mock_put.assert_called_once_with(EXPECTED_URL, headers=expected_headers, json=expected_payload)
+    # Check that the DeepsetClient's update_pipeline_yaml method was called with the right args
+    mock_update.assert_called_once_with(TEST_PIPELINE_NAME, VALID_YAML_CONTENT)
     assert result == {"status": "success", "message": "Updated"}
 
 
