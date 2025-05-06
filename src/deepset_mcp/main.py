@@ -183,36 +183,7 @@ async def update_pipeline_yaml(pipeline_name: str, yaml_content: str) -> dict[st
     try:
         async with DeepsetClient() as client:
 
-        # API expects JSON input even for PUT /yaml endpoint
-        headers = {
-            "Authorization": f"Bearer {get_api_key()}",
-            "Content-Type": "application/json",  # Set Content-Type to JSON
-            "Accept": "application/json,text/plain,*/*",
-        }
-
-        # Structure the data as JSON payload
-        payload = {"query_yaml": yaml_content}
-
-        url = f"{DEEPSET_API_BASE_URL}{endpoint}"
-        # Send JSON payload using the json parameter
-        response = requests.put(url, headers=headers, json=payload)
-
-        # Handle response (using similar logic as deepset_api_request)
-        if response.status_code >= 400:
-            error_message = f"API Error: {response.status_code}"
-            try:
-                error_details = response.json()
-            except requests.exceptions.JSONDecodeError:
-                error_details = response.text if response.text else "No error details provided"
-            return {"error": error_message, "details": error_details}
-
-        if not response.text or not response.text.strip():
-            return {"status": "success", "message": "Pipeline YAML updated successfully (empty response body)"}
-
-        try:
-            return response.json()  # type: ignore
-        except requests.exceptions.JSONDecodeError:
-            return {"result": response.text, "warning": "API response was not valid JSON"}
+            return await client.update_pipeline_yaml(pipeline_name, yaml_content)
 
     except requests.exceptions.RequestException as e:
         return {"error": f"Request failed: {str(e)}"}
