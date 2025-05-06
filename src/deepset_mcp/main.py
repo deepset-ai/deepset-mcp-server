@@ -377,7 +377,6 @@ async def get_custom_components() -> str:
 
 
 @mcp.tool()
-@async_to_sync
 async def get_latest_custom_component_installation_logs() -> str:
     """
     Use this to get the logs from the latest custom component installation.
@@ -387,17 +386,19 @@ async def get_latest_custom_component_installation_logs() -> str:
     """
     try:
         async with DeepsetClient() as client:
-            result = await client.get_latest_custom_component_installation_logs()
+            # This endpoint uses v2 of the API and needs text/plain accept header
+            endpoint = "/custom_components/logs"
+            headers = {"Accept": "text/plain"}
+            result = await client.request_with_custom_headers(
+                endpoint.replace("/api/v1", "/api/v2"), headers=headers
+            )
             
             # Check for error
             if "error" in result:
                 return f"Error retrieving installation logs: {result['error']}\nDetails: {result.get('details', '')}"
             
             # Return raw log text
-            return result.get("logs", "No logs found")
-
-        except requests.exceptions.RequestException as e:
-            return f"Request failed: {str(e)}"
+            return result.get("logs", result.get("result", "No logs found"))
 
     except Exception as e:
         return f"Error retrieving custom component logs: {str(e)}"
