@@ -7,10 +7,9 @@ on:
     branches: [ main ]
 
 jobs:
-  ci:
-    name: test
+  test:
+    name: Run Tests
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -27,3 +26,23 @@ jobs:
 
       - name: Run tests
         run: uv run pytest
+
+  lint:
+    name: Run Linting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install project
+        run: uv sync --locked --all-extras --group lint
+
+      - name: Run lint
+        run: uv run ruff check
