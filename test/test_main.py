@@ -3,10 +3,11 @@ from typing import Any
 from unittest import mock
 
 import pytest
+import httpx
 import requests
 
 # Import from main.py with async client support
-from deepset_mcp.client import DeepsetClient
+from deepset_mcp.client import DeepsetClient, MockHttpClient
 from deepset_mcp.main import DEEPSET_API_BASE_URL, update_pipeline_yaml
 
 # --- Test Data ---
