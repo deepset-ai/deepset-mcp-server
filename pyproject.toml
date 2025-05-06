@@ -29,6 +29,11 @@ lint = [
     "ruff",
 ]
 
+types = [
+    "mypy",
+    "types-requests"
+]
+
 [tool.pytest.ini_options]
 testpaths = ["test"]
 
@@ -57,6 +62,9 @@ isort = { combine-as-imports = true, known-first-party = ["deepset_mcp"] }
 
 [tool.ruff.lint.pydocstyle]
 convention = "pep257"
+
+[tool.mypy]
+strict = true
 
 
 
