@@ -1,9 +1,14 @@
 import os
 from typing import Any
+from functools import wraps
 
+import asyncio
+import httpx
 import requests
 from mcp.server.fastmcp import FastMCP
 from requests import HTTPError
+
+from deepset_mcp.client import DeepsetClient
 
 # Initialize MCP Server
 mcp = FastMCP("Deepset Cloud MCP")
