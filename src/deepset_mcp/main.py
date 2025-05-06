@@ -266,13 +266,10 @@ async def get_pipeline_template(template_name: str) -> str:
     str
         A formatted string containing the template's query and indexing YAML (if available)
     """
-    workspace = get_workspace()
     try:
-        # Build the endpoint URL
-        endpoint = f"/workspaces/{workspace}/pipeline_templates/{template_name}"
-
-        # Make the API request
-        response = deepset_api_request(endpoint)
+        async with DeepsetClient() as client:
+            # Make the API request
+            response = await client.get_pipeline_template(template_name)
 
         # Check for errors in the response
         if isinstance(response, dict) and "error" in response:
