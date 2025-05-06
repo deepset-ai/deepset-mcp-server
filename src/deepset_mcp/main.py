@@ -414,25 +414,15 @@ async def list_custom_component_installations() -> str:
     This will return version number, high-level log, status and information about who uploaded the package.
     """
     try:
-        # Note: This endpoint uses v2 of the API instead of v1
-        endpoint = "/custom_components?limit=20&page_number=1&field=created_at&order=DESC"
-
-        # Set up headers
-        headers = {"Authorization": f"Bearer {get_api_key()}", "Accept": "application/json"}
-
-        url = f"{DEEPSET_API_BASE_URL.replace('/api/v1', '/api/v2')}{endpoint}"
-
-        try:
-            # Make direct request
-            response = requests.get(url, headers=headers)
-
-            try:
-                response.raise_for_status()
-                data = response.json()
-            except HTTPError:
-                error_message = f"HTTP Error: {response.status_code}"
-                error_details = response.text if response.text else "No error details provided by API"
-                return f"Error retrieving installation history: {error_message}\nDetails: {error_details}"
+        async with DeepsetClient() as client:
+            # Make request through the client
+            result = await client.list_custom_component_installations()
+            
+            # Check for error
+            if "error" in result:
+                return f"Error retrieving installation history: {result['error']}\nDetails: {result.get('details', '')}"
+                
+            data = result
 
             installations = data.get("data", [])
             total = data.get("total", 0)
