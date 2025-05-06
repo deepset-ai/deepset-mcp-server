@@ -379,7 +379,8 @@ async def get_custom_components() -> str:
 
 
 @mcp.tool()
-def get_latest_custom_component_installation_logs() -> str:
+@async_to_sync
+async def get_latest_custom_component_installation_logs() -> str:
     """
     Use this to get the logs from the latest custom component installation.
 
