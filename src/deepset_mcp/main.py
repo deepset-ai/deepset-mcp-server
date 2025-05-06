@@ -72,7 +72,8 @@ async def list_pipelines() -> dict[str, Any]:
 
 
 @mcp.tool()
-def get_pipeline(pipeline_id: str) -> dict[str, Any]:
+@async_to_sync
+async def get_pipeline(pipeline_id: str) -> dict[str, Any]:
     """Fetches detailed configuration information for a specific pipeline, identified by its unique `pipeline_id`.
 
     This includes its components, connections, and metadata.
@@ -80,9 +81,9 @@ def get_pipeline(pipeline_id: str) -> dict[str, Any]:
 
     :param pipeline_id: ID of the pipeline to retrieve.
     """
-    workspace = get_workspace()
     try:
-        return deepset_api_request(f"/workspaces/{workspace}/pipelines/{pipeline_id}")
+        async with DeepsetClient() as client:
+            return await client.get_pipeline(pipeline_id)
     except Exception as e:
         return {"error": str(e)}
 
