@@ -90,16 +90,15 @@ def test_update_pipeline_yaml_api_error_422_json(mock_update: mock.Mock) -> None
 
 
 @mock.patch.dict(os.environ, {"DEEPSET_WORKSPACE": TEST_WORKSPACE, "DEEPSET_API_KEY": TEST_API_KEY})
-@mock.patch("deepset_mcp.main.requests.put")
-def test_update_pipeline_yaml_api_error_500_text(mock_put: mock.Mock) -> None:
+@mock.patch("deepset_mcp.client.DeepsetClient.update_pipeline_yaml")
+def test_update_pipeline_yaml_api_error_500_text(mock_update: mock.Mock) -> None:
     """Tests API error (500) with non-JSON text details."""
     error_text = "Internal Server Error"
-    mock_response = create_mock_response(500, text_data=error_text)
-    mock_put.return_value = mock_response
+    mock_update.return_value = {"error": "API Error: 500", "details": error_text}
 
     result = update_pipeline_yaml(TEST_PIPELINE_NAME, VALID_YAML_CONTENT)
 
-    mock_put.assert_called_once()  # Check call args if needed
+    mock_update.assert_called_once_with(TEST_PIPELINE_NAME, VALID_YAML_CONTENT)
     assert result == {"error": "API Error: 500", "details": error_text}
 
 
