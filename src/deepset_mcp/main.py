@@ -251,7 +251,6 @@ async def list_pipeline_templates() -> str:
 
 
 @mcp.tool()
-@async_to_sync
 async def get_pipeline_template(template_name: str) -> str:
     """Retrieves a specific pipeline template by name and returns its YAML configurations.
 
@@ -268,7 +267,7 @@ async def get_pipeline_template(template_name: str) -> str:
     try:
         async with DeepsetClient() as client:
             # Make the API request
-            response = await client.get_pipeline_template(template_name)
+            response = await client.request(f"/workspaces/{client.workspace}/pipeline_templates/{template_name}")
 
         # Check for errors in the response
         if isinstance(response, dict) and "error" in response:
