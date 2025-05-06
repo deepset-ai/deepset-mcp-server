@@ -405,7 +405,6 @@ async def get_latest_custom_component_installation_logs() -> str:
 
 
 @mcp.tool()
-@async_to_sync
 async def list_custom_component_installations() -> str:
     """
     Retrieves a list of the most recent custom component installations.
@@ -414,8 +413,9 @@ async def list_custom_component_installations() -> str:
     """
     try:
         async with DeepsetClient() as client:
-            # Make request through the client
-            result = await client.list_custom_component_installations()
+            # This endpoint uses v2 of the API
+            endpoint = "/custom_components?limit=20&page_number=1&field=created_at&order=DESC"
+            result = await client.request_v2_api(endpoint)
             
             # Check for error
             if "error" in result:
@@ -445,7 +445,7 @@ async def list_custom_component_installations() -> str:
                 if user_id != "Unknown":
                     try:
                         # Get user info through the client
-                        user_result = await client.get_user(user_id)
+                        user_result = await client.request(f"/users/{user_id}")
                         
                         if "error" not in user_result:
                             given_name = user_result.get("given_name", "")
@@ -488,9 +488,6 @@ async def list_custom_component_installations() -> str:
 
             # Join all sections and return
             return "\n".join(formatted_output)
-
-        except requests.exceptions.RequestException as e:
-            return f"Request failed: {str(e)}"
 
     except Exception as e:
         return f"Error retrieving custom component installations: {str(e)}"
