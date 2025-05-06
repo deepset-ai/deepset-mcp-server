@@ -25,8 +25,33 @@ packages = ["src/deepset_mcp"]
 dev = [
   "pytest"
 ]
+lint = [
+    "ruff",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+include = ["pyproject.toml", "src/**/*.py", "test/**/*.py"]
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "D",   # docstrings
+]
+isort = { combine-as-imports = true, known-first-party = ["deepset_mcp"] }
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
 
 
