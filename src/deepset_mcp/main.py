@@ -101,7 +101,6 @@ async def get_component_schemas() -> dict[str, Any]:
 
 
 @mcp.tool()
-@async_to_sync
 async def validate_pipeline_yaml(yaml_content: str) -> dict[str, Any]:
     """
     Validates the structure and syntax of a provided pipeline YAML configuration against the deepset API specifications.
@@ -120,7 +119,10 @@ async def validate_pipeline_yaml(yaml_content: str) -> dict[str, Any]:
 
     try:
         async with DeepsetClient() as client:
-            return await client.validate_pipeline_yaml(yaml_content)
+            payload = {"query_yaml": yaml_content}
+            return await client.request(
+                f"/workspaces/{client.workspace}/pipeline_validations", method="POST", data=payload
+            )
     except Exception as e:
         error_details = str(e)
         # Provide clear error information
