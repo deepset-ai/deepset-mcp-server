@@ -388,30 +388,15 @@ async def get_latest_custom_component_installation_logs() -> str:
     It is useful for debugging custom component installations.
     """
     try:
-        # Note: This endpoint uses v2 of the API instead of v1
-        endpoint = "/custom_components/logs"
-
-        # Set up headers - using accept: text/plain since log output is plain text
-        headers = {"Authorization": f"Bearer {get_api_key()}", "Accept": "text/plain"}
-
-        url = f"{DEEPSET_API_BASE_URL.replace('/api/v1', '/api/v2')}{endpoint}"
-
-        try:
-            # Make direct request since our helper function expects JSON response
-            response = requests.get(url, headers=headers)
-
-            if response.status_code >= 400:
-                error_message = f"API Error: {response.status_code}"
-                try:
-                    # Try to get any structured error info
-                    error_details = response.json()
-                except Exception:
-                    # Fall back to text if not JSON
-                    error_details = response.text if response.text else "No error details provided by API"
-                return f"Error retrieving installation logs: {error_message}\nDetails: {error_details}"
-
+        async with DeepsetClient() as client:
+            result = await client.get_latest_custom_component_installation_logs()
+            
+            # Check for error
+            if "error" in result:
+                return f"Error retrieving installation logs: {result['error']}\nDetails: {result.get('details', '')}"
+            
             # Return raw log text
-            return response.text
+            return result.get("logs", "No logs found")
 
         except requests.exceptions.RequestException as e:
             return f"Request failed: {str(e)}"
