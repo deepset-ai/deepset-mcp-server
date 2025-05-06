@@ -539,7 +539,9 @@ def list_custom_component_installations() -> str:
     except Exception as e:
         return f"Error retrieving custom component installations: {str(e)}"
 
-if __name__ == "__main__":
-    # Using the built-in server runner
-    # Ensure it binds to 0.0.0.0 to be accessible in Docker
+
+def launch_mcp() -> None:
     mcp.run()
+
+if __name__ == "__main__":
+    launch_mcp()

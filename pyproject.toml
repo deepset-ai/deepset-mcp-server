@@ -10,3 +10,20 @@ dependencies = [
     "requests>=2.32.3",
     "uvicorn>=0.34.2",
 ]
+
+[project.scripts]
+deepset-mcp = "deepset_mcp.main:launch_mcp"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+  "pytest"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+
+
