@@ -121,15 +121,9 @@ async def validate_pipeline_yaml(yaml_content: str) -> dict[str, Any]:
     if not yaml_content.strip().startswith("components:") and "components:" not in yaml_content:
         return {"error": "Invalid YAML content - missing 'components:' section"}
 
-    workspace = get_workspace()
     try:
-        # Ensure the YAML is properly formatted for the request
-        # The API expects the raw YAML as a string value in the query_yaml field
-        payload = {"query_yaml": yaml_content}
-
-        # Send the request with the properly formatted payload
-        response = deepset_api_request(f"/workspaces/{workspace}/pipeline_validations", method="POST", data=payload)
-        return response
+        async with DeepsetClient() as client:
+            return await client.validate_pipeline_yaml(yaml_content)
     except Exception as e:
         error_details = str(e)
         # Provide clear error information
