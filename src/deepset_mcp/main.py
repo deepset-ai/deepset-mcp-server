@@ -104,7 +104,8 @@ async def get_component_schemas() -> dict[str, Any]:
 
 
 @mcp.tool()
-def validate_pipeline_yaml(yaml_content: str) -> dict[str, Any]:
+@async_to_sync
+async def validate_pipeline_yaml(yaml_content: str) -> dict[str, Any]:
     """
     Validates the structure and syntax of a provided pipeline YAML configuration against the deepset API specifications.
 
