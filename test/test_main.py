@@ -220,10 +220,19 @@ async def test_update_pipeline_yaml_empty_content() -> None:
         mock_client_instance.__aenter__.assert_not_called()
 
 
+@pytest.mark.asyncio
 @mock.patch.dict(os.environ, {"DEEPSET_WORKSPACE": TEST_WORKSPACE, "DEEPSET_API_KEY": TEST_API_KEY})
-@mock.patch("deepset_mcp.client.DeepsetClient.update_pipeline_yaml")
-def test_update_pipeline_yaml_invalid_structure(mock_update: mock.Mock) -> None:
+async def test_update_pipeline_yaml_invalid_structure() -> None:
     """Tests the function's validation for missing 'components:'."""
-    result = update_pipeline_yaml(TEST_PIPELINE_NAME, INVALID_YAML_CONTENT_NO_COMPONENTS)
-    assert result == {"error": "Invalid YAML content - missing 'components:' section"}
-    mock_update.assert_not_called()  # Ensure client method wasn't called
+    # For this test, we're testing client validation which happens before the API call
+    with mock.patch("deepset_mcp.main.DeepsetClient") as mock_client_class:
+        mock_client_instance = mock.MagicMock()
+        mock_client_class.return_value = mock_client_instance
+        
+        # Call the function with invalid content
+        result = await update_pipeline_yaml(TEST_PIPELINE_NAME, INVALID_YAML_CONTENT_NO_COMPONENTS)
+        
+        # Verify validation failed and client was not used
+        assert result == {"error": "Invalid YAML content - missing 'components:' section"}
+        # The context manager should not have been entered
+        mock_client_instance.__aenter__.assert_not_called()
