@@ -35,13 +35,7 @@ def get_workspace() -> str:
     return workspace
 
 
-# Helper to run async functions in sync context
-def async_to_sync(f):
-    """Decorator to run async functions in sync context."""
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        return asyncio.run(f(*args, **kwargs))
-    return wrapper
+# We don't need to convert async to sync as mcp.tool supports async functions directly
 
 
 # Function to make authenticated requests to deepset Cloud API (async version)
