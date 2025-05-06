@@ -2,6 +2,7 @@ import os
 import logging
 from typing import Any, AsyncIterator, Protocol, TypeVar
 from typing_extensions import Self  # For python 3.11 compatibility
+from unittest import mock
 
 import httpx
 
