@@ -5,6 +5,8 @@ import requests
 from mcp.server.fastmcp import FastMCP
 from requests import HTTPError
 
+from deepset_mcp.client import AsyncDeepsetClient
+
 # Initialize MCP Server
 mcp = FastMCP("Deepset Cloud MCP")
 
@@ -69,20 +71,18 @@ def deepset_api_request(endpoint: str, method: str = "GET", data: dict[str, Any]
 
 
 @mcp.tool()
-def list_pipelines() -> dict[str, Any]:
+async def list_pipelines() -> Any:
     """Retrieves a list of all pipelines available within the currently configured deepset workspace.
 
     Use this when you need to know the names or IDs of existing pipelines.
     """
     workspace = get_workspace()
-    try:
-        return deepset_api_request(f"/workspaces/{workspace}/pipelines")
-    except Exception as e:
-        return {"error": str(e)}
+    async with AsyncDeepsetClient() as client:
+        return await client.request(endpoint=f"v1/workspaces/{workspace}/pipelines", method="GET")
 
 
 @mcp.tool()
-def get_pipeline(pipeline_id: str) -> dict[str, Any]:
+async def get_pipeline(pipeline_id: str) -> Any:
     """Fetches detailed configuration information for a specific pipeline, identified by its unique `pipeline_id`.
 
     This includes its components, connections, and metadata.
@@ -91,23 +91,19 @@ def get_pipeline(pipeline_id: str) -> dict[str, Any]:
     :param pipeline_id: ID of the pipeline to retrieve.
     """
     workspace = get_workspace()
-    try:
-        return deepset_api_request(f"/workspaces/{workspace}/pipelines/{pipeline_id}")
-    except Exception as e:
-        return {"error": str(e)}
+    async with AsyncDeepsetClient() as client:
+        return await client.request(endpoint=f"v1/workspaces/{workspace}/pipelines/{pipeline_id}", method="GET")
 
 
 @mcp.tool()
-def get_component_schemas() -> dict[str, Any]:
+async def get_component_schemas() -> Any:
     """Retrieves the schemas for all available Haystack components from the deepset API.
 
     These schemas define the expected input and output parameters for each component type, which is useful for
     constructing or validating componets in a pipeline YAML.
     """
-    try:
-        return deepset_api_request("/haystack/components")
-    except Exception as e:
-        return {"error": str(e)}
+    async with AsyncDeepsetClient() as client:
+        return await client.request(endpoint="v1/haystack/components", method="GET")
 
 
 @mcp.tool()
