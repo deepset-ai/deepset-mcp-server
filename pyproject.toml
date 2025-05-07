@@ -9,6 +9,7 @@ dependencies = [
     "mcp[cli]>=1.6.0",
     "requests>=2.32.3",
     "uvicorn>=0.34.2",
+    "httpx",
 ]
 
 [project.scripts]
