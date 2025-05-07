@@ -109,6 +109,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "mcp", extra = ["cli"] },
     { name = "requests" },
     { name = "uvicorn" },
@@ -130,6 +131,7 @@ types = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115.12" },
+    { name = "httpx" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.6.0" },
     { name = "requests", specifier = ">=2.32.3" },
     { name = "uvicorn", specifier = ">=0.34.2" },
