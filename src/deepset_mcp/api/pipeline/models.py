@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import StrEnum
+from typing import List
 
 from pydantic import BaseModel, Field
 
@@ -45,3 +46,17 @@ class DeepsetPipeline(BaseModel):
             # When serializing back to JSON, convert datetimes to ISO format
             datetime: lambda dt: dt.isoformat()
         }
+
+
+class ValidationError(BaseModel):
+    """Model representing a validation error from the pipeline validation API."""
+
+    code: str
+    message: str
+
+
+class PipelineValidationResult(BaseModel):
+    """Result of validating a pipeline configuration."""
+
+    valid: bool
+    errors: List[ValidationError] = []
