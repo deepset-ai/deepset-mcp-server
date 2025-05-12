@@ -1,7 +1,7 @@
 from typing import Any
 
 from deepset_mcp.api.client import AsyncClientProtocol
-from deepset_mcp.api.pipeline.models import DeepsetPipeline
+from deepset_mcp.api.pipeline.models import DeepsetPipeline, PipelineValidationResult, ValidationError
 
 
 class PipelineResource:
