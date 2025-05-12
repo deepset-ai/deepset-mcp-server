@@ -1,6 +1,5 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import List
 
 from pydantic import BaseModel, Field
 
@@ -59,4 +58,4 @@ class PipelineValidationResult(BaseModel):
     """Result of validating a pipeline configuration."""
 
     valid: bool
-    errors: List[ValidationError] = []
+    errors: list[ValidationError] = []

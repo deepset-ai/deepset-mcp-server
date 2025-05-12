@@ -5,9 +5,9 @@ from datetime import datetime
 
 import pytest
 from dotenv import load_dotenv
-from httpx import HTTPError
 
 from deepset_mcp.api.client import AsyncDeepsetClient
+from deepset_mcp.api.exceptions import ResourceNotFoundError
 from deepset_mcp.api.pipeline.models import DeepsetPipeline
 from deepset_mcp.api.pipeline.resource import PipelineResource
 
@@ -229,5 +229,66 @@ async def test_get_nonexistent_pipeline(
     non_existent_name = "non-existent-pipeline"
 
     # Trying to get a non-existent pipeline should raise an exception
-    with pytest.raises(HTTPError):
+    with pytest.raises(ResourceNotFoundError):
         await pipeline_resource.get(pipeline_name=non_existent_name)
+
+
+@pytest.mark.asyncio
+async def test_validation_valid_yaml(pipeline_resource: PipelineResource, sample_yaml_config: str) -> None:
+    result = await pipeline_resource.validate(yaml_config=sample_yaml_config)
+
+    assert result.valid is True
+    assert len(result.errors) == 0
+
+
+@pytest.mark.asyncio
+async def test_validation_invalid_yaml(
+    pipeline_resource: PipelineResource,
+) -> None:
+    """Test validating an invalid pipeline YAML configuration."""
+    # Create an invalid YAML with missing required fields
+    invalid_yaml = """
+components:
+  openai_generator:
+    # Missing 'type' field
+    init_parameters:
+      api_key: {"type": "env_var", "env_vars": ["OPENAI_API_KEY"], "strict": false}
+      model: "gpt-4o-mini"
+
+inputs:
+  query:
+    - "openai_generator.prompt"
+
+outputs:
+  answers: "openai_generator.replies"
+"""
+
+    result = await pipeline_resource.validate(yaml_config=invalid_yaml)
+
+    # Check that validation failed with errors
+    assert result.valid is False
+    assert len(result.errors) > 0
+
+    assert result.errors[0].code == "PIPELINE_SCHEMA_ERROR"
+
+
+@pytest.mark.skip(
+    reason="API not working correctly."
+)  # skip until deepset API correctly returns error for yaml syntax errors
+@pytest.mark.asyncio
+async def test_validation_syntax_error(
+    pipeline_resource: PipelineResource,
+) -> None:
+    """Test validating a YAML with syntax errors."""
+    invalid_yaml_syntax = """
+components:
+  openai_generator:
+    type: haystack.components.generators.openai.OpenAIGenerator
+    init_parameters
+      api_key:
+"""
+
+    resp = await pipeline_resource.validate(yaml_config=invalid_yaml_syntax)
+
+    assert resp.valid is False
+    assert resp.errors[0].code == "YAML_ERROR"
