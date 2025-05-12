@@ -15,6 +15,48 @@ class PipelineResource:
         """Initializes a PipelineResource instance."""
         self._client = client
         self._workspace = workspace
+        
+    async def validate(self, yaml_config: str) -> PipelineValidationResult:
+        """
+        Validate a pipeline's YAML configuration against the API.
+        
+        Args:
+            yaml_config: The YAML configuration string to validate
+            
+        Returns:
+            PipelineValidationResult containing validation status and any errors
+            
+        Raises:
+            ValueError: If the YAML is not valid (422 error) or contains syntax errors
+        """
+        data = {
+            "deepset_cloud_version": "v2",
+            "query_yaml": yaml_config
+        }
+        
+        resp = await self._client.request(
+            endpoint=f"v1/workspaces/{self._workspace}/pipeline_validations",
+            method="POST",
+            data=data,
+        )
+        
+        # If successful (status 200), the YAML is valid
+        if resp.success:
+            return PipelineValidationResult(valid=True)
+            
+        # If 400 error, we have validation errors to process
+        if resp.status_code == 400 and resp.json is not None and "errors" in resp.json:
+            errors = [ValidationError(code=error["code"], message=error["message"]) 
+                      for error in resp.json["errors"]]
+            return PipelineValidationResult(valid=False, errors=errors)
+            
+        # For other errors, return as an exception
+        # (like 422 for invalid YAML syntax)
+        if not resp.success:
+            if resp.json and "detail" in resp.json:
+                raise ValueError(f"Pipeline validation failed: {resp.json['detail']}")
+            else:
+                raise ValueError(f"Pipeline validation failed with status {resp.status_code}")
 
     async def list(
         self,
