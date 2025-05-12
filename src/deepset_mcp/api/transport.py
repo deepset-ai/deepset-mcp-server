@@ -12,6 +12,11 @@ class TransportResponse:
     text: str
     status_code: int
     json: dict[str, Any] | None = None
+    
+    @property
+    def success(self) -> bool:
+        """Returns True if the response status code indicates success (< 400)."""
+        return self.status_code < 400
 
 
 class TransportProtocol(Protocol):
