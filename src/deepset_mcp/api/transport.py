@@ -1,12 +1,23 @@
+import json
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 import httpx
 
 
+@dataclass
+class TransportResponse:
+    """Response envelope for HTTP transport."""
+
+    text: str
+    status_code: int
+    json: dict[str, Any] | None = None
+
+
 class TransportProtocol(Protocol):
     """Protocol for HTTP transport."""
 
-    async def request(self, method: str, url: str, **kwargs: Any) -> Any:
+    async def request(self, method: str, url: str, **kwargs: Any) -> TransportResponse:
         """Send an HTTP request and return the parsed JSON response."""
         ...
 
@@ -15,7 +26,7 @@ class TransportProtocol(Protocol):
         ...
 
 
-class AsyncTransport(TransportProtocol):
+class AsyncTransport:
     """Asynchronous HTTP transport using httpx.AsyncClient."""
 
     def __init__(
@@ -48,12 +59,20 @@ class AsyncTransport(TransportProtocol):
         }
         self._client = httpx.AsyncClient(**client_kwargs)
 
-    async def request(self, method: str, url: str, **kwargs: Any) -> Any:
-        """Send an HTTP request and return the parsed JSON response."""
-        resp = await self._client.request(method, url, **kwargs)
-        resp.raise_for_status()
+    async def request(self, method: str, url: str, **kwargs: Any) -> TransportResponse:
+        """Send an HTTP request and return the response."""
+        response = await self._client.request(method, url, **kwargs)
 
-        return resp.json()
+        response.raise_for_status()
+
+        transport_response = TransportResponse(text=response.text, status_code=response.status_code)
+
+        try:
+            transport_response.json = response.json()
+        except json.decoder.JSONDecodeError:
+            pass
+
+        return transport_response
 
     async def close(self) -> None:
         """Clean up any resources (e.g., close connections)."""

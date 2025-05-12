@@ -1,9 +1,9 @@
 import os
-from typing import Any
+from typing import Any, cast
 
 from mcp.server.fastmcp import FastMCP
 
-from deepset_mcp.client import AsyncDeepsetClient
+from deepset_mcp.api.client import AsyncDeepsetClient
 
 # Initialize MCP Server
 mcp = FastMCP("Deepset Cloud MCP")
@@ -19,13 +19,14 @@ def get_workspace() -> str:
 
 @mcp.tool()
 async def list_pipelines() -> Any:
-    """Retrieves a list of all pipelines available within the currently configured deepset workspace.
+    """Retrieves a list of all pipeline available within the currently configured deepset workspace.
 
-    Use this when you need to know the names or IDs of existing pipelines.
+    Use this when you need to know the names or IDs of existing pipeline.
     """
     workspace = get_workspace()
     async with AsyncDeepsetClient() as client:
-        return await client.request(endpoint=f"v1/workspaces/{workspace}/pipelines", method="GET")
+        response = await client.request(endpoint=f"v1/workspaces/{workspace}/pipeline", method="GET")
+        return response.json
 
 
 @mcp.tool()
@@ -39,7 +40,8 @@ async def get_pipeline(pipeline_id: str) -> Any:
     """
     workspace = get_workspace()
     async with AsyncDeepsetClient() as client:
-        return await client.request(endpoint=f"v1/workspaces/{workspace}/pipelines/{pipeline_id}", method="GET")
+        response = await client.request(endpoint=f"v1/workspaces/{workspace}/pipeline/{pipeline_id}", method="GET")
+        return response.json
 
 
 @mcp.tool()
@@ -50,7 +52,8 @@ async def get_component_schemas() -> Any:
     constructing or validating componets in a pipeline YAML.
     """
     async with AsyncDeepsetClient() as client:
-        return await client.request(endpoint="v1/haystack/components", method="GET")
+        response = await client.request(endpoint="v1/haystack/components", method="GET")
+        return response.json
 
 
 @mcp.tool()
@@ -73,11 +76,13 @@ async def validate_pipeline_yaml(yaml_content: str) -> Any:
     workspace = get_workspace()
 
     async with AsyncDeepsetClient() as client:
-        return await client.request(
+        response = await client.request(
             endpoint=f"v1/workspaces/{workspace}/pipeline_validations",
             method="POST",
             data={"query_yaml": yaml_content},
         )
+
+        return response.json
 
 
 @mcp.tool()
@@ -94,7 +99,10 @@ async def get_pipeline_yaml(pipeline_name: str) -> Any:
     workspace = get_workspace()
 
     async with AsyncDeepsetClient() as client:
-        resp = await client.request(endpoint=f"v1/workspaces/{workspace}/pipelines/{pipeline_name}/yaml", method="GET")
+        response = await client.request(
+            endpoint=f"v1/workspaces/{workspace}/pipeline/{pipeline_name}/yaml", method="GET"
+        )
+        resp = response.json
 
     if isinstance(resp, dict) and "yaml" in resp:
         return str(resp["yaml"])
@@ -123,11 +131,13 @@ async def update_pipeline_yaml(pipeline_name: str, yaml_content: str) -> Any:
     workspace = get_workspace()
 
     async with AsyncDeepsetClient() as client:
-        return await client.request(
-            endpoint=f"v1/workspaces/{workspace}/pipelines/{pipeline_name}/yaml",
+        response = await client.request(
+            endpoint=f"v1/workspaces/{workspace}/pipeline/{pipeline_name}/yaml",
             method="PUT",
             data={"query_yaml": yaml_content},
         )
+
+        return response.json
 
 
 @mcp.tool()
@@ -135,9 +145,11 @@ async def list_pipeline_templates() -> str:
     """Retrieves a list of pipeline templates to build AI applications like RAG or Agents."""
     workspace = get_workspace()
     async with AsyncDeepsetClient() as client:
-        response = await client.request(
+        resp = await client.request(
             endpoint=f"v1/workspaces/{workspace}/pipeline_templates?limit=100&page_number=1&field=created_at&order=DESC"
         )
+
+        response = cast(dict[str, Any], resp.json)
 
     if isinstance(response, dict) and "error" in response:
         return f"Error retrieving pipeline templates: {response['error']}"
@@ -177,7 +189,9 @@ async def get_pipeline_template(template_name: str) -> str:
     workspace = get_workspace()
 
     async with AsyncDeepsetClient() as client:
-        response = await client.request(endpoint=f"v1/workspaces/{workspace}/pipeline_templates/{template_name}")
+        resp = await client.request(endpoint=f"v1/workspaces/{workspace}/pipeline_templates/{template_name}")
+
+        response = cast(dict[str, Any], resp.json)
 
     if isinstance(response, dict) and "error" in response:
         return f"Error retrieving pipeline template: {response['error']}"
@@ -294,7 +308,9 @@ async def list_custom_component_installations() -> str:
     """
     endpoint = "v2/custom_components?limit=20&page_number=1&field=created_at&order=DESC"
     async with AsyncDeepsetClient() as client:
-        response = await client.request(endpoint=endpoint)
+        resp = await client.request(endpoint=endpoint)
+
+        response = cast(dict[str, Any], resp.json)
 
     installations = response.get("data", [])
     total = response.get("total", 0)
@@ -320,7 +336,8 @@ async def list_custom_component_installations() -> str:
             async with AsyncDeepsetClient() as client:
                 user_response = await client.request(endpoint=user_url)
 
-            user_data = user_response
+            user_data = user_response.json
+            assert user_data is not None
             given_name = user_data.get("given_name", "")
             family_name = user_data.get("family_name", "")
             email = user_data.get("email", "")
