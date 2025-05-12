@@ -1,36 +1,9 @@
 import os
 from types import TracebackType
-from typing import Any, Protocol, Self
+from typing import Any, Self
 
+from deepset_mcp.api.pipeline.resource import PipelineResource
 from deepset_mcp.api.transport import AsyncTransport, TransportProtocol, TransportResponse
-
-
-class AsyncClientProtocol(Protocol):
-    """Protocol defining the implementation for AsyncClient."""
-
-    async def request(
-        self,
-        endpoint: str,
-        method: str = "GET",
-        data: dict[str, Any] | None = None,
-        headers: dict[str, str] | None = None,
-    ) -> TransportResponse:
-        """Make a request to the API."""
-        ...
-
-    async def close(self) -> None:
-        """Close underlying transport resources."""
-        ...
-
-    async def __aenter__(self) -> Self:
-        """Enter the AsyncContextManager."""
-        ...
-
-    async def __aexit__(
-        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None
-    ) -> bool:
-        """Exit the AsyncContextmanager and clean up resources."""
-        ...
 
 
 class AsyncDeepsetClient:
@@ -115,3 +88,7 @@ class AsyncDeepsetClient:
         """Exit the AsyncContextmanager and clean up resources."""
         await self.close()
         return False
+
+    def pipelines(self, workspace: str) -> PipelineResource:
+        """Resource to interact with pipelines in the specified workspace."""
+        return PipelineResource(client=self, workspace=workspace)

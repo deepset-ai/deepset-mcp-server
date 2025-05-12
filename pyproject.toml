@@ -27,7 +27,8 @@ packages = ["src/deepset_mcp"]
 dev = [
     "pytest",
     "pytest-asyncio",
-    "python-dotenv"
+    "python-dotenv",
+    "pyyaml",
 ]
 lint = [
     "ruff",

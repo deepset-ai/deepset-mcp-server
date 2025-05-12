@@ -4,6 +4,8 @@ from typing import Any, Protocol
 
 import httpx
 
+from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
+
 
 @dataclass
 class TransportResponse:
@@ -12,11 +14,39 @@ class TransportResponse:
     text: str
     status_code: int
     json: dict[str, Any] | None = None
-    
+
     @property
     def success(self) -> bool:
         """Returns True if the response status code indicates success (< 400)."""
         return self.status_code < 400
+
+
+def raise_for_status(response: TransportResponse) -> None:
+    """Raises the appropriate exception based on the response status code."""
+    if response.success:
+        return
+
+    # Map status codes to exception classes
+    exception_map = {
+        400: BadRequestError,
+        404: ResourceNotFoundError,
+    }
+
+    # Extract error details from response if available
+    detail = response.json.get("details") if response.json else None
+    message = response.json.get("message") if response.json else response.text
+
+    # Get exception class
+    exception_class = exception_map.get(response.status_code)
+
+    if exception_class:
+        # For specific exceptions (BadRequestError, ResourceNotFoundError)
+        raise exception_class(message=message, detail=detail)
+    else:
+        # For the catch-all case, include the status code
+        raise UnexpectedAPIError(
+            status_code=response.status_code, message=message or "Unexpected API error", detail=detail
+        )
 
 
 class TransportProtocol(Protocol):
