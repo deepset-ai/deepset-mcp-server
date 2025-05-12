@@ -4,9 +4,10 @@ from typing import Any, Self
 
 import pytest
 
-from deepset_mcp.api.client import AsyncClientProtocol
-from deepset_mcp.api.pipeline.models import DeepsetPipeline, PipelineServiceLevel
+from deepset_mcp.api.exceptions import UnexpectedAPIError
+from deepset_mcp.api.pipeline.models import DeepsetPipeline, PipelineServiceLevel, PipelineValidationResult
 from deepset_mcp.api.pipeline.resource import PipelineResource
+from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.transport import TransportResponse
 
 
@@ -64,6 +65,9 @@ class DummyClient(AsyncClientProtocol):
             if endpoint.endswith(resp_key):
                 if isinstance(resp_data, Exception):
                     raise resp_data
+
+                if isinstance(resp_data, TransportResponse):
+                    return resp_data
 
                 # Create a real TransportResponse instead of a mock
                 if isinstance(resp_data, dict):
@@ -550,3 +554,120 @@ class TestPipelineResource:
         assert len(client.requests) == 2
         assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines/old-pipeline"
         assert client.requests[1]["endpoint"] == "v1/workspaces/test-workspace/pipelines/new-pipeline/yaml"
+
+    @pytest.mark.asyncio
+    async def test_validation_success(self) -> None:
+        """Test successful validation of valid YAML config."""
+        # Create a valid YAML config
+        valid_yaml = """version: '1.0'
+    pipeline:
+      name: test
+      nodes:
+        - name: example
+          type: test"""
+
+        # Create client with successful response
+        client = DummyClient(responses={"test-workspace/pipeline_validations": {"status": "success"}})
+
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        result = await resource.validate(yaml_config=valid_yaml)
+
+        # Check the result
+        assert isinstance(result, PipelineValidationResult)
+        assert result.valid is True
+        assert len(result.errors) == 0
+
+        # Verify request
+        assert len(client.requests) == 1
+        assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipeline_validations"
+        assert client.requests[0]["method"] == "POST"
+        assert client.requests[0]["data"] == {"query_yaml": valid_yaml}
+
+    @pytest.mark.asyncio
+    async def test_validation_with_errors(self) -> None:
+        """Test validation with config errors."""
+        # Create a YAML config with errors
+        invalid_yaml = """version: '1.0'
+    pipeline:
+      name: test
+      nodes:
+        - name: missing_type"""
+
+        # Create a response with validation errors
+        validation_errors = {
+            "details": [
+                {"code": "required_field_missing", "message": "Field 'type' is required for node 'missing_type'"}
+            ]
+        }
+
+        # Create mock client with 400 response containing validation errors
+        client = DummyClient()
+
+        # Manually prepare the TransportResponse for validation errors
+        transport_response = TransportResponse(text="", status_code=400, json=validation_errors)
+
+        # Set the custom response
+        client.responses = {"test-workspace/pipeline_validations": transport_response}
+
+        # Run the validation
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        result = await resource.validate(yaml_config=invalid_yaml)
+
+        # Check the result
+        assert isinstance(result, PipelineValidationResult)
+        assert result.valid is False
+        assert len(result.errors) == 1
+        assert result.errors[0].code == "required_field_missing"
+        assert result.errors[0].message == "Field 'type' is required for node 'missing_type'"
+
+    @pytest.mark.asyncio
+    async def test_validation_with_invalid_yaml(self) -> None:
+        """Test validation with syntactically invalid YAML."""
+        # Create an invalid YAML string
+        invalid_yaml = "invalid: yaml: :"
+
+        # Create response for 422 invalid YAML error
+        invalid_yaml_response = TransportResponse(text="", status_code=422, json={"detail": "Invalid YAML syntax"})
+
+        client = DummyClient(responses={"test-workspace/pipeline_validations": invalid_yaml_response})
+
+        # Run the validation and expect an exception
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        result = await resource.validate(yaml_config=invalid_yaml)
+
+        assert result.valid is False
+        assert len(result.errors) == 1
+        assert result.errors[0].code == "YAML_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_validation_with_empty_yaml(self) -> None:
+        """Test validation with empty YAML string."""
+        empty_yaml = ""
+
+        # Create response for empty YAML error
+        empty_yaml_response = TransportResponse(text="", status_code=422, json={"detail": "YAML cannot be empty"})
+
+        client = DummyClient(responses={"test-workspace/pipeline_validations": empty_yaml_response})
+
+        # Run the validation and expect an exception
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        result = await resource.validate(yaml_config=empty_yaml)
+
+        assert result.valid is False
+        assert len(result.errors) == 1
+        assert result.errors[0].code == "YAML_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_validation_with_unknown_error(self) -> None:
+        """Test validation with unknown error response."""
+        yaml_config = "version: '1.0'"
+
+        # Create response for unknown error
+        unknown_error_response = TransportResponse(text="", status_code=500, json=None)
+
+        client = DummyClient(responses={"test-workspace/pipeline_validations": unknown_error_response})
+
+        # Run the validation and expect an exception
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        with pytest.raises(UnexpectedAPIError):
+            await resource.validate(yaml_config=yaml_config)
