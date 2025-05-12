@@ -25,7 +25,7 @@ jobs:
         run: uv sync --locked --all-extras --dev
 
       - name: Run tests
-        run: uv run pytest
+        run: uv run --dev pytest -m "not integration"
 
   lint:
     name: Run Linting
