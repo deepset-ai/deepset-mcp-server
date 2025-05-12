@@ -1,10 +1,11 @@
+import json
 from typing import Any
 
 import pytest
 import pytest_asyncio
 
-from deepset_mcp.client import AsyncDeepsetClient
-from deepset_mcp.transport import AsyncTransport, TransportProtocol
+from deepset_mcp.api.client import AsyncDeepsetClient
+from deepset_mcp.api.transport import AsyncTransport, TransportProtocol, TransportResponse
 
 
 class DummyProtocol(TransportProtocol):
@@ -12,11 +13,12 @@ class DummyProtocol(TransportProtocol):
         self.requests: list[dict[str, Any]] = []
         self.closed: bool = False
 
-    async def request(self, method: str, url: str, **kwargs: Any) -> Any:
+    async def request(self, method: str, url: str, **kwargs: Any) -> TransportResponse:
         # Record the request and return a dummy response
         record: dict[str, Any] = {"method": method, "url": url, **kwargs}
         self.requests.append(record)
-        return {"dummy": "response"}
+        dummy_response = {"dummy": "response"}
+        return TransportResponse(status_code=200, text=json.dumps(dummy_response), json=dummy_response)
 
     async def close(self) -> None:
         self.closed = True
@@ -58,8 +60,8 @@ async def test_request_default_headers_and_url() -> None:
     client: AsyncDeepsetClient = AsyncDeepsetClient(api_key="key", base_url="https://api.test", transport=dummy)
 
     resp: Any = await client.request("endpoint")
-    # Should normalize endpoint to '/endpoint'
-    assert resp == {"dummy": "response"}
+
+    assert resp.json == {"dummy": "response"}
     assert len(dummy.requests) == 1
 
     call: dict[str, Any] = dummy.requests[0]
@@ -80,7 +82,7 @@ async def test_request_with_data_and_custom_headers() -> None:
     data: dict[str, Any] = {"foo": "bar"}
     custom: dict[str, str] = {"X-Custom": "value"}
     resp: Any = await client.request("/path", method="POST", data=data, headers=custom)
-    assert resp == {"dummy": "response"}
+    assert resp.json == {"dummy": "response"}
     assert len(dummy.requests) == 1
 
     call = dummy.requests[0]

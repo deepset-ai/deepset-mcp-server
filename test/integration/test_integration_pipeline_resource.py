@@ -1,0 +1,233 @@
+import os
+import uuid
+from collections.abc import AsyncGenerator
+from datetime import datetime
+
+import pytest
+from dotenv import load_dotenv
+from httpx import HTTPError
+
+from deepset_mcp.api.client import AsyncDeepsetClient
+from deepset_mcp.api.pipeline.models import DeepsetPipeline
+from deepset_mcp.api.pipeline.resource import PipelineResource
+
+pytestmark = pytest.mark.integration
+load_dotenv()
+
+
+@pytest.fixture
+def test_workspace_name() -> str:
+    """Create a unique workspace name for testing."""
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    return f"test-workspace-{timestamp}-{uuid.uuid4().hex[:8]}"
+
+
+@pytest.fixture
+async def client() -> AsyncGenerator[AsyncDeepsetClient, None]:
+    """Create and configure the deepset client."""
+    api_key = os.environ.get("DEEPSET_API_KEY")
+    if not api_key:
+        pytest.skip("DEEPSET_API_KEY environment variable not set")
+
+    async with AsyncDeepsetClient(api_key=api_key) as client:
+        yield client
+
+
+@pytest.fixture
+async def test_workspace(
+    client: AsyncDeepsetClient,
+    test_workspace_name: str,
+) -> AsyncGenerator[str, None]:
+    """Create a test workspace and clean it up after tests."""
+    # Create a test workspace
+    await client.request(
+        endpoint="v1/workspaces",
+        method="POST",
+        data={"name": test_workspace_name},
+    )
+
+    yield test_workspace_name
+
+    # Clean up the workspace after tests
+    try:
+        await client.request(
+            endpoint=f"v1/workspaces/{test_workspace_name}",
+            method="DELETE",
+        )
+    except Exception as e:
+        print(f"Failed to delete test workspace: {e}")
+
+
+@pytest.fixture
+async def pipeline_resource(
+    client: AsyncDeepsetClient,
+    test_workspace: str,
+) -> PipelineResource:
+    """Create a PipelineResource instance for testing."""
+    return PipelineResource(client=client, workspace=test_workspace)
+
+
+@pytest.fixture
+def sample_yaml_config() -> str:
+    """Return a sample YAML configuration for testing."""
+    return """
+components:
+  openai_generator:
+    type: haystack.components.generators.openai.OpenAIGenerator
+    init_parameters:
+      api_key: {"type": "env_var", "env_vars": ["OPENAI_API_KEY"], "strict": false}
+      model: "gpt-4o-mini"
+      generation_kwargs:
+        temperature: 0.1
+        max_tokens: 300
+
+  prompt_builder:
+    type: haystack.components.builders.prompt_builder.PromptBuilder
+    init_parameters:
+      template: |
+        Answer the following question: {{question}}
+
+        Answer:
+
+  answer_builder:
+    type: haystack.components.builders.answer_builder.AnswerBuilder
+    init_parameters: {}
+
+connections:
+  - sender: prompt_builder.prompt
+    receiver: openai_generator.prompt
+  - sender: openai_generator.replies
+    receiver: answer_builder.replies
+
+inputs:
+  query:
+    - "prompt_builder.question"
+    - "answer_builder.query"
+
+outputs:
+  answers: "answer_builder.answers"
+"""
+
+
+@pytest.mark.asyncio
+async def test_create_pipeline(
+    pipeline_resource: PipelineResource,
+    sample_yaml_config: str,
+) -> None:
+    """Test creating a new pipeline."""
+    pipeline_name = "test-pipeline"
+
+    # Create a new pipeline
+    await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
+
+    # Verify the pipeline was created by retrieving it
+    pipeline: DeepsetPipeline = await pipeline_resource.get(pipeline_name=pipeline_name)
+
+    assert pipeline.name == pipeline_name
+    assert pipeline.yaml_config == sample_yaml_config
+
+
+@pytest.mark.asyncio
+async def test_list_pipelines(
+    pipeline_resource: PipelineResource,
+    sample_yaml_config: str,
+) -> None:
+    """Test listing pipelines with pagination."""
+    # Create multiple test pipelines
+    pipeline_names = []
+    for i in range(3):
+        pipeline_name = f"test-list-pipeline-{i}"
+        pipeline_names.append(pipeline_name)
+        await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
+
+    # Test listing without pagination
+    pipelines = await pipeline_resource.list(limit=10)
+    assert len(pipelines) == 3
+
+    # Verify our created pipelines are in the list
+    retrieved_names = [p.name for p in pipelines]
+    for name in pipeline_names:
+        assert name in retrieved_names
+
+    # Test pagination
+    if len(pipelines) > 1:
+        # Get the first page with 1 item
+        first_page = await pipeline_resource.list(limit=1)
+        assert len(first_page) == 1
+
+        # Get the second page
+        second_page = await pipeline_resource.list(page_number=2, limit=1)
+        assert len(second_page) == 1
+
+        # Verify they're different pipelines
+        assert first_page[0].id != second_page[0].id
+
+
+@pytest.mark.asyncio
+async def test_get_pipeline(
+    pipeline_resource: PipelineResource,
+    sample_yaml_config: str,
+) -> None:
+    """Test getting a single pipeline by name."""
+    pipeline_name = "test-get-pipeline"
+
+    # Create a pipeline to retrieve
+    await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
+
+    # Test getting with YAML config
+    pipeline_with_yaml: DeepsetPipeline = await pipeline_resource.get(pipeline_name=pipeline_name, include_yaml=True)
+    assert pipeline_with_yaml.name == pipeline_name
+    assert pipeline_with_yaml.yaml_config == sample_yaml_config
+
+    # Test getting without YAML config
+    pipeline_without_yaml: DeepsetPipeline = await pipeline_resource.get(
+        pipeline_name=pipeline_name, include_yaml=False
+    )
+    assert pipeline_without_yaml.name == pipeline_name
+    assert pipeline_without_yaml.yaml_config is None
+
+
+@pytest.mark.asyncio
+async def test_update_pipeline(
+    pipeline_resource: PipelineResource,
+    sample_yaml_config: str,
+) -> None:
+    """Test updating an existing pipeline's name and config."""
+    original_name = "test-update-pipeline-original"
+    updated_name = "test-update-pipeline-updated"
+
+    # Create a pipeline to update
+    await pipeline_resource.create(name=original_name, yaml_config=sample_yaml_config)
+
+    # Update the pipeline name
+    await pipeline_resource.update(
+        pipeline_name=original_name,
+        updated_pipeline_name=updated_name,
+    )
+
+    # Verify the name was updated
+    updated_pipeline: DeepsetPipeline = await pipeline_resource.get(pipeline_name=updated_name)
+    assert updated_pipeline.name == updated_name
+
+    # Update the pipeline config
+    modified_yaml = sample_yaml_config.replace("temperature: 0.1", "temperature: 0.2")
+    await pipeline_resource.update(
+        pipeline_name=updated_name,
+        yaml_config=modified_yaml,
+    )
+
+    # Verify the config was updated
+    updated_pipeline = await pipeline_resource.get(pipeline_name=updated_name)
+    assert updated_pipeline.yaml_config == modified_yaml
+
+
+@pytest.mark.asyncio
+async def test_get_nonexistent_pipeline(
+    pipeline_resource: PipelineResource,
+) -> None:
+    """Test error handling when getting a non-existent pipeline."""
+    non_existent_name = "non-existent-pipeline"
+
+    # Trying to get a non-existent pipeline should raise an exception
+    with pytest.raises(HTTPError):
+        await pipeline_resource.get(pipeline_name=non_existent_name)
