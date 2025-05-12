@@ -68,8 +68,6 @@ class AsyncTransport:
         """Send an HTTP request and return the response."""
         response = await self._client.request(method, url, **kwargs)
 
-        response.raise_for_status()
-
         transport_response = TransportResponse(text=response.text, status_code=response.status_code)
 
         try:
