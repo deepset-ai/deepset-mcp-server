@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Self
 
 import pytest
 
@@ -25,6 +24,7 @@ from deepset_mcp.tools.pipeline import (
     update_pipeline,
     validate_pipeline,
 )
+from test.unit.conftest import BaseFakeClient
 
 
 class FakePipelineResource:
@@ -85,24 +85,13 @@ class FakePipelineResource:
         raise NotImplementedError
 
 
-class FakeClient:
+class FakeClient(BaseFakeClient):
     def __init__(self, resource: FakePipelineResource) -> None:
         self._resource = resource
+        super().__init__()
 
     def pipelines(self, workspace: str) -> FakePipelineResource:
         return self._resource
-
-    # Stubs for protocol compliance (unused in these tests)
-    async def request(self, endpoint: str, method: str = "GET", data=None, headers=None):  # type: ignore
-        raise NotImplementedError
-
-    async def close(self) -> None: ...
-
-    async def __aenter__(self) -> Self:
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> bool:  # type: ignore
-        return False
 
 
 @pytest.mark.asyncio
