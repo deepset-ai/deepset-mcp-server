@@ -7,7 +7,7 @@ import pytest
 from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.pipeline.models import DeepsetPipeline, PipelineServiceLevel, PipelineValidationResult
 from deepset_mcp.api.pipeline.resource import PipelineResource
-from deepset_mcp.api.protocols import AsyncClientProtocol
+from deepset_mcp.api.protocols import AsyncClientProtocol, PipelineResourceProtocol
 from deepset_mcp.api.transport import TransportResponse
 
 
@@ -99,6 +99,9 @@ class DummyClient(AsyncClientProtocol):
         """Exit the AsyncContextmanager and clean up resources."""
         await self.close()
         return False
+
+    def pipelines(self, workspace: str) -> PipelineResourceProtocol:
+        return PipelineResource(client=self, workspace=workspace)
 
 
 def create_sample_pipeline(
@@ -497,10 +500,9 @@ class TestPipelineResource:
 
         # Create resource and call update method with no changes
         resource = PipelineResource(client=client, workspace="test-workspace")
-        await resource.update(pipeline_name=pipeline_name)
 
-        # Verify no requests were made
-        assert len(client.requests) == 0
+        with pytest.raises(ValueError):
+            await resource.update(pipeline_name=pipeline_name)
 
     @pytest.mark.asyncio
     async def test_update_pipeline_name_error(self) -> None:
