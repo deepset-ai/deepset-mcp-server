@@ -8,7 +8,7 @@ from deepset_mcp.api.transport import TransportResponse
 class HaystackServiceProtocol(Protocol):
     """Protocol defining the implementation for HaystackService."""
 
-    async def get_component_schema(self) -> dict[str, Any]:
+    async def get_component_schemas(self) -> dict[str, Any]:
         """Fetch the component schema from the API."""
         ...
 

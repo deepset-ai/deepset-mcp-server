@@ -11,7 +11,7 @@ class HaystackServiceResource(HaystackServiceProtocol):
         """Initializes a HaystackServiceResource instance."""
         self._client = client
 
-    async def get_component_schema(self) -> dict[str, Any]:
+    async def get_component_schemas(self) -> dict[str, Any]:
         """Fetch the component schema from the API.
 
         Returns:
