@@ -40,3 +40,13 @@ To use it with Claude Desktop app, use the following config:
 - the ability to dump the conversation of improving the copilot
 - test with different models not just Claude Sonnet 3.7
 - test with different clients other than Claude Desktop app
+
+
+## Todo
+
+### Haystack Knowledge
+- list_component_families
+- get_component_family
+- get_component_definition
+
+
