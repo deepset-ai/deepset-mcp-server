@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Self
+from typing import Self
 
 import pytest
 
@@ -11,6 +11,7 @@ from deepset_mcp.api.exceptions import (
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     DeepsetUser,
+    NoContentResponse,
     PipelineServiceLevel,
     PipelineValidationResult,
     ValidationError,
@@ -32,15 +33,17 @@ class FakePipelineResource:
         list_response: list[DeepsetPipeline] | None = None,
         get_response: DeepsetPipeline | None = None,
         validate_response: PipelineValidationResult | None = None,
-        create_response: Any | None = None,
-        update_response: Any | None = None,
+        create_response: NoContentResponse | None = None,
+        update_response: NoContentResponse | None = None,
         get_exception: Exception | None = None,
         update_exception: Exception | None = None,
+        create_exception: Exception | None = None,
     ) -> None:
         self._list_response = list_response
         self._get_response = get_response
         self._validate_response = validate_response
         self._create_response = create_response
+        self._create_exception = create_exception
         self._update_response = update_response
         self._get_exception = get_exception
         self._update_exception = update_exception
@@ -62,7 +65,9 @@ class FakePipelineResource:
             return self._validate_response
         raise NotImplementedError
 
-    async def create(self, name: str, yaml_config: str) -> Any:
+    async def create(self, name: str, yaml_config: str) -> NoContentResponse:
+        if self._create_exception:
+            raise self._create_exception
         if self._create_response is not None:
             return self._create_response
         raise NotImplementedError
@@ -72,7 +77,7 @@ class FakePipelineResource:
         pipeline_name: str,
         updated_pipeline_name: str | None = None,
         yaml_config: str | None = None,
-    ) -> Any:
+    ) -> NoContentResponse:
         if self._update_exception:
             raise self._update_exception
         if self._update_response is not None:
@@ -204,27 +209,23 @@ async def test_create_pipeline_handles_validation_failure() -> None:
 async def test_create_pipeline_handles_success_and_failure_response() -> None:
     valid_result = PipelineValidationResult(valid=True, errors=[])
 
-    class Creation:
-        def __init__(self, success: bool, text: str = "") -> None:
-            self.success = success
-            self.text = text
-
     # success
     resource_succ = FakePipelineResource(
         validate_response=valid_result,
-        create_response=Creation(success=True),
+        create_response=NoContentResponse(message="created successfully"),
     )
     client_succ = FakeClient(resource_succ)
     res_succ = await create_pipeline(client_succ, workspace="ws", pipeline_name="p1", yaml_configuration="a: b")
+
     assert "created successfully" in res_succ
     # failure
     resource_fail = FakePipelineResource(
         validate_response=valid_result,
-        create_response=Creation(success=False, text="bad things"),
+        create_exception=BadRequestError(message="bad things"),
     )
     client_fail = FakeClient(resource_fail)
     res_fail = await create_pipeline(client_fail, workspace="ws", pipeline_name="p1", yaml_configuration="a: b")
-    assert "Failed to create pipeline 'p1': bad things" == res_fail
+    assert "Failed to create pipeline 'p1': bad things (Status Code: 400)" == res_fail
 
 
 @pytest.mark.asyncio
@@ -373,7 +374,7 @@ async def test_update_pipeline_exceptions_on_update() -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_pipeline_success_and_failure_response() -> None:
+async def test_update_pipeline_success_response() -> None:
     user = DeepsetUser(user_id="u1", given_name="A", family_name="B")
     orig_yaml = "foo: 1"
     original = DeepsetPipeline(
@@ -389,14 +390,11 @@ async def test_update_pipeline_success_and_failure_response() -> None:
     )
     val_ok = PipelineValidationResult(valid=True, errors=[])
 
-    class UpdateResp:
-        def __init__(self, success: bool, text: str = "") -> None:
-            self.success = success
-            self.text = text
-
     # success
     res_succ = FakePipelineResource(
-        get_response=original, validate_response=val_ok, update_response=UpdateResp(success=True)
+        get_response=original,
+        validate_response=val_ok,
+        update_response=NoContentResponse(message="successfully updated"),
     )
     client_succ = FakeClient(res_succ)
     r_success = await update_pipeline(
@@ -407,16 +405,3 @@ async def test_update_pipeline_success_and_failure_response() -> None:
         replacement_config_snippet="foo: 2",
     )
     assert "successfully updated" in r_success.lower()
-    # failure
-    res_fail = FakePipelineResource(
-        get_response=original, validate_response=val_ok, update_response=UpdateResp(success=False, text="nope")
-    )
-    client_fail = FakeClient(res_fail)
-    r_fail = await update_pipeline(
-        client_fail,
-        workspace="ws",
-        pipeline_name="np",
-        original_config_snippet="foo: 1",
-        replacement_config_snippet="foo: 2",
-    )
-    assert r_fail == "Failed to update the pipeline 'np': nope"
