@@ -3,10 +3,11 @@ from types import TracebackType
 from typing import Any, Self
 
 from deepset_mcp.api.pipeline.resource import PipelineResource
+from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.transport import AsyncTransport, TransportProtocol, TransportResponse
 
 
-class AsyncDeepsetClient:
+class AsyncDeepsetClient(AsyncClientProtocol):
     """Async Client for interacting with the deepset API."""
 
     def __init__(

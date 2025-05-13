@@ -2,11 +2,11 @@ from typing import Any
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.pipeline.models import DeepsetPipeline, PipelineValidationResult, ValidationError
-from deepset_mcp.api.protocols import AsyncClientProtocol
+from deepset_mcp.api.protocols import AsyncClientProtocol, PipelineResourceProtocol
 from deepset_mcp.api.transport import TransportResponse, raise_for_status
 
 
-class PipelineResource:
+class PipelineResource(PipelineResourceProtocol):
     """Manages interactions with the deepset pipeline API."""
 
     def __init__(
