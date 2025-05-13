@@ -5,6 +5,14 @@ from deepset_mcp.api.pipeline.models import DeepsetPipeline, NoContentResponse, 
 from deepset_mcp.api.transport import TransportResponse
 
 
+class HaystackServiceProtocol(Protocol):
+    """Protocol defining the implementation for HaystackService."""
+
+    async def get_component_schema(self) -> dict[str, Any]:
+        """Fetch the component schema from the API."""
+        ...
+
+
 class AsyncClientProtocol(Protocol):
     """Protocol defining the implementation for AsyncClient."""
 
@@ -34,6 +42,10 @@ class AsyncClientProtocol(Protocol):
 
     def pipelines(self, workspace: str) -> "PipelineResourceProtocol":
         """Access pipelines in the specified workspace."""
+        ...
+
+    def haystack_service(self) -> "HaystackServiceProtocol":
+        """Access the Haystack service."""
         ...
 
 
