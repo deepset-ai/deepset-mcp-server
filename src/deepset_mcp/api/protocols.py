@@ -40,10 +40,6 @@ class AsyncClientProtocol(Protocol):
 class PipelineResourceProtocol(Protocol):
     """Protocol defining the implementation for PipelineResource."""
 
-    def __init__(self, client: AsyncClientProtocol, workspace: str) -> None:
-        """Initialize a PipelineResource."""
-        ...
-
     async def validate(self, yaml_config: str) -> PipelineValidationResult:
         """Validate a pipeline's YAML configuration against the API."""
         ...
