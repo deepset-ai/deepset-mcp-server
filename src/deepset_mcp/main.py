@@ -1,9 +1,9 @@
 import os
-from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
 from deepset_mcp.api.client import AsyncDeepsetClient
+from deepset_mcp.tools.haystack_service import list_component_families as list_component_families_tool
 from deepset_mcp.tools.pipeline import (
     create_pipeline as create_pipeline_tool,
     get_pipeline as get_pipeline_tool,
@@ -88,15 +88,16 @@ async def update_pipeline(
 
 
 @mcp.tool()
-async def get_component_schemas() -> Any:
-    """Retrieves the schemas for all available Haystack components from the deepset API.
+async def list_component_families() -> str:
+    """
+    Returns a list of all component families available in deepset alongside their descriptions.
 
-    These schemas define the expected input and output parameters for each component type, which is useful for
-    constructing or validating componets in a pipeline YAML.
+    Use this as a starting point for when you are unsure what types of components are available.
     """
     async with AsyncDeepsetClient() as client:
-        response = await client.request(endpoint="v1/haystack/components", method="GET")
-        return response.json
+        response = await list_component_families_tool(client)
+
+    return response
 
 
 @mcp.tool()

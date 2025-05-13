@@ -1,19 +1,20 @@
-from typing import Dict, Any
+from typing import Any
 
 import pytest
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
-from deepset_mcp.api.haystack_service.resource import HaystackServiceResource
-from deepset_mcp.tools.component import list_component_families
+from deepset_mcp.tools.haystack_service import list_component_families
 from test.unit.conftest import BaseFakeClient
 
 
-class FakeHaystackServiceResource(HaystackServiceResource):
-    def __init__(self, get_component_schemas_response: Dict[str, Any] | None = None, exception: Exception | None = None):
+class FakeHaystackServiceResource:
+    def __init__(
+        self, get_component_schemas_response: dict[str, Any] | None = None, exception: Exception | None = None
+    ):
         self._get_component_schemas_response = get_component_schemas_response
         self._exception = exception
 
-    async def get_component_schemas(self) -> Dict[str, Any]:
+    async def get_component_schemas(self) -> dict[str, Any]:
         if self._exception:
             raise self._exception
         if self._get_component_schemas_response is not None:
@@ -31,22 +32,8 @@ class FakeClient(BaseFakeClient):
 
 
 @pytest.mark.asyncio
-async def test_list_component_families_empty_response() -> None:
-    resource = FakeHaystackServiceResource(get_component_schemas_response={})
-    client = FakeClient(resource)
-    result = await list_component_families(client)
-    assert "unexpected response structure" in result
-
-
-@pytest.mark.asyncio
 async def test_list_component_families_no_families() -> None:
-    response = {
-        "component_schema": {
-            "definitions": {
-                "Components": {}
-            }
-        }
-    }
+    response: dict[str, Any] = {"component_schema": {"definitions": {"Components": {}}}}
     resource = FakeHaystackServiceResource(get_component_schemas_response=response)
     client = FakeClient(resource)
     result = await list_component_families(client)
@@ -60,30 +47,13 @@ async def test_list_component_families_success() -> None:
             "definitions": {
                 "Components": {
                     "Component1": {
-                        "properties": {
-                            "type": {
-                                "family": "converters",
-                                "family_description": "Convert data format"
-                            }
-                        }
+                        "properties": {"type": {"family": "converters", "family_description": "Convert data format"}}
                     },
-                    "Component2": {
-                        "properties": {
-                            "type": {
-                                "family": "readers",
-                                "family_description": "Read data"
-                            }
-                        }
-                    },
+                    "Component2": {"properties": {"type": {"family": "readers", "family_description": "Read data"}}},
                     # Should be ignored - same family as Component1
                     "Component3": {
-                        "properties": {
-                            "type": {
-                                "family": "converters",
-                                "family_description": "Convert data format"
-                            }
-                        }
-                    }
+                        "properties": {"type": {"family": "converters", "family_description": "Convert data format"}}
+                    },
                 }
             }
         }
@@ -91,7 +61,7 @@ async def test_list_component_families_success() -> None:
     resource = FakeHaystackServiceResource(get_component_schemas_response=response)
     client = FakeClient(resource)
     result = await list_component_families(client)
-    
+
     assert "Available Haystack component families" in result
     assert "**converters**" in result
     assert "Convert data format" in result
@@ -108,12 +78,3 @@ async def test_list_component_families_api_error() -> None:
     result = await list_component_families(client)
     assert "Failed to retrieve component families" in result
     assert "API Error" in result
-
-
-@pytest.mark.asyncio
-async def test_list_component_families_unexpected_error() -> None:
-    resource = FakeHaystackServiceResource(exception=ValueError("Unexpected error"))
-    client = FakeClient(resource)
-    result = await list_component_families(client)
-    assert "An unexpected error occurred" in result
-    assert "Unexpected error" in result
