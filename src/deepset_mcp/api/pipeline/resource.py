@@ -1,9 +1,14 @@
 from typing import Any
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
-from deepset_mcp.api.pipeline.models import DeepsetPipeline, PipelineValidationResult, ValidationError
+from deepset_mcp.api.pipeline.models import (
+    DeepsetPipeline,
+    NoContentResponse,
+    PipelineValidationResult,
+    ValidationError,
+)
 from deepset_mcp.api.protocols import AsyncClientProtocol, PipelineResourceProtocol
-from deepset_mcp.api.transport import TransportResponse, raise_for_status
+from deepset_mcp.api.transport import raise_for_status
 
 
 class PipelineResource(PipelineResourceProtocol):
@@ -109,7 +114,7 @@ class PipelineResource(PipelineResourceProtocol):
 
         return pipeline
 
-    async def create(self, name: str, yaml_config: str) -> TransportResponse:
+    async def create(self, name: str, yaml_config: str) -> NoContentResponse:
         """Create a new pipeline with a name and YAML config."""
         data = {"name": name, "query_yaml": yaml_config}
         resp = await self._client.request(
@@ -120,14 +125,14 @@ class PipelineResource(PipelineResourceProtocol):
 
         raise_for_status(resp)
 
-        return resp
+        return NoContentResponse(message="Pipeline created successfully.")
 
     async def update(
         self,
         pipeline_name: str,
         updated_pipeline_name: str | None = None,
         yaml_config: str | None = None,
-    ) -> TransportResponse:
+    ) -> NoContentResponse:
         """Update name and/or YAML config of an existing pipeline."""
         # Handle name update first if any
         if updated_pipeline_name is not None:
@@ -142,7 +147,7 @@ class PipelineResource(PipelineResourceProtocol):
             pipeline_name = updated_pipeline_name
 
             if yaml_config is None:
-                return name_resp
+                return NoContentResponse(message="Pipeline name updated successfully.")
 
         if yaml_config is not None:
             yaml_resp = await self._client.request(
@@ -153,6 +158,11 @@ class PipelineResource(PipelineResourceProtocol):
 
             raise_for_status(yaml_resp)
 
-            return yaml_resp
+            if updated_pipeline_name is not None:
+                response = NoContentResponse(message="Pipeline name and YAML updated successfully.")
+            else:
+                response = NoContentResponse(message="Pipeline YAML updated successfully.")
+
+            return response
 
         raise ValueError("Either `updated_pipeline_name` or `yaml_config` must be provided.")

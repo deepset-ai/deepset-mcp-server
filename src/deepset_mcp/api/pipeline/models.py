@@ -59,3 +59,10 @@ class PipelineValidationResult(BaseModel):
 
     valid: bool
     errors: list[ValidationError] = []
+
+
+class NoContentResponse(BaseModel):
+    """Response model for an empty response."""
+
+    success: bool = True
+    message: str = "No content"
