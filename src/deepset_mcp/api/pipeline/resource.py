@@ -3,7 +3,7 @@ from typing import Any
 from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.pipeline.models import DeepsetPipeline, PipelineValidationResult, ValidationError
 from deepset_mcp.api.protocols import AsyncClientProtocol
-from deepset_mcp.api.transport import raise_for_status
+from deepset_mcp.api.transport import TransportResponse, raise_for_status
 
 
 class PipelineResource:
@@ -109,7 +109,7 @@ class PipelineResource:
 
         return pipeline
 
-    async def create(self, name: str, yaml_config: str) -> None:
+    async def create(self, name: str, yaml_config: str) -> TransportResponse:
         """Create a new pipeline with a name and YAML config."""
         data = {"name": name, "query_yaml": yaml_config}
         resp = await self._client.request(
@@ -120,12 +120,14 @@ class PipelineResource:
 
         raise_for_status(resp)
 
+        return resp
+
     async def update(
         self,
         pipeline_name: str,
         updated_pipeline_name: str | None = None,
         yaml_config: str | None = None,
-    ) -> None:
+    ) -> TransportResponse:
         """Update name and/or YAML config of an existing pipeline."""
         # Handle name update first if any
         if updated_pipeline_name is not None:
@@ -139,6 +141,9 @@ class PipelineResource:
 
             pipeline_name = updated_pipeline_name
 
+            if yaml_config is None:
+                return name_resp
+
         if yaml_config is not None:
             yaml_resp = await self._client.request(
                 endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}/yaml",
@@ -147,3 +152,7 @@ class PipelineResource:
             )
 
             raise_for_status(yaml_resp)
+
+            return yaml_resp
+
+        raise ValueError("Either `updated_pipeline_name` or `yaml_config` must be provided.")
