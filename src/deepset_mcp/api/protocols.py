@@ -1,7 +1,7 @@
 from types import TracebackType
 from typing import Any, Protocol, Self
 
-from deepset_mcp.api.pipeline.models import DeepsetPipeline, PipelineValidationResult
+from deepset_mcp.api.pipeline.models import DeepsetPipeline, NoContentResponse, PipelineValidationResult
 from deepset_mcp.api.transport import TransportResponse
 
 
@@ -56,7 +56,7 @@ class PipelineResourceProtocol(Protocol):
         """List pipelines in the configured workspace with optional pagination."""
         ...
 
-    async def create(self, name: str, yaml_config: str) -> Any:
+    async def create(self, name: str, yaml_config: str) -> NoContentResponse:
         """Create a new pipeline with a name and YAML config."""
         ...
 
@@ -65,6 +65,6 @@ class PipelineResourceProtocol(Protocol):
         pipeline_name: str,
         updated_pipeline_name: str | None = None,
         yaml_config: str | None = None,
-    ) -> Any:
+    ) -> NoContentResponse:
         """Update name and/or YAML config of an existing pipeline."""
         ...

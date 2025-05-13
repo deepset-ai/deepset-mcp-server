@@ -43,14 +43,16 @@ async def create_pipeline(
     if not validation_response.valid:
         return validation_result_to_llm_readable_string(validation_response)
 
-    creation_response = await client.pipelines(workspace=workspace).create(
-        name=pipeline_name, yaml_config=yaml_configuration
-    )
+    try:
+        await client.pipelines(workspace=workspace).create(name=pipeline_name, yaml_config=yaml_configuration)
+    except ResourceNotFoundError:
+        return f"There is no workspace named '{workspace}'. Did you mean to configure it?"
+    except BadRequestError as e:
+        return f"Failed to create pipeline '{pipeline_name}': {e}"
+    except UnexpectedAPIError as e:
+        return f"Failed to create pipeline '{pipeline_name}': {e}"
 
-    if creation_response.success:
-        return f"Pipeline '{pipeline_name}' created successfully."
-
-    return f"Failed to create pipeline '{pipeline_name}': {creation_response.text}"
+    return f"Pipeline '{pipeline_name}' created successfully."
 
 
 async def update_pipeline(
@@ -96,7 +98,7 @@ async def update_pipeline(
         return validation_result_to_llm_readable_string(validation_response)
 
     try:
-        update_response = await client.pipelines(workspace=workspace).update(
+        await client.pipelines(workspace=workspace).update(
             pipeline_name=pipeline_name, yaml_config=updated_yaml_configuration
         )
     except ResourceNotFoundError:
@@ -106,7 +108,4 @@ async def update_pipeline(
     except UnexpectedAPIError as e:
         return f"Failed to update the pipeline '{pipeline_name}': {e}"
 
-    if update_response.success:
-        return f"The pipeline '{pipeline_name}' was successfully updated."
-
-    return f"Failed to update the pipeline '{pipeline_name}': {update_response.text}"
+    return f"The pipeline '{pipeline_name}' was successfully updated."
