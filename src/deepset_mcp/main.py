@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
@@ -86,20 +87,16 @@ async def update_pipeline(
     return response
 
 
-#
-#
-# @mcp.tool()
-# async def get_component_schemas() -> Any:
-#     """Retrieves the schemas for all available Haystack components from the deepset API.
-#
-#     These schemas define the expected input and output parameters for each component type, which is useful for
-#     constructing or validating componets in a pipeline YAML.
-#     """
-#     async with AsyncDeepsetClient() as client:
-#         response = await client.request(endpoint="v1/haystack/components", method="GET")
-#         return response.json
-#
-#
+@mcp.tool()
+async def get_component_schemas() -> Any:
+    """Retrieves the schemas for all available Haystack components from the deepset API.
+
+    These schemas define the expected input and output parameters for each component type, which is useful for
+    constructing or validating componets in a pipeline YAML.
+    """
+    async with AsyncDeepsetClient() as client:
+        response = await client.request(endpoint="v1/haystack/components", method="GET")
+        return response.json
 
 
 @mcp.tool()
