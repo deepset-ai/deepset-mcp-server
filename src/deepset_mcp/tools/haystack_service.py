@@ -7,7 +7,8 @@ async def get_component_definition(client: AsyncClientProtocol, component_type: 
 
     Args:
         client: The API client to use
-        component_type: Fully qualified component type (e.g. haystack.components.routers.conditional_router.ConditionalRouter)
+        component_type: Fully qualified component type
+            (e.g. haystack.components.routers.conditional_router.ConditionalRouter)
 
     Returns:
         A formatted string containing the component definition
@@ -34,7 +35,7 @@ async def get_component_definition(client: AsyncClientProtocol, component_type: 
     # Extract relevant information
     component_type_info = component_def["properties"]["type"]
     init_params = component_def["properties"].get("init_parameters", {}).get("properties", {})
-    
+
     # Format the output
     parts = [
         f"Component: {component_type}",
@@ -42,7 +43,7 @@ async def get_component_definition(client: AsyncClientProtocol, component_type: 
         f"Family: {component_type_info.get('family', 'Unknown')}",
         f"Family Description: {component_type_info.get('family_description', 'No description available.')}",
         f"\nDescription:\n{component_def.get('description', 'No description available.')}\n",
-        "\nInitialization Parameters:"
+        "\nInitialization Parameters:",
     ]
 
     if not init_params:
