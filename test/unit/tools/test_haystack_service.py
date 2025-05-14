@@ -94,7 +94,11 @@ async def test_get_component_definition_success() -> None:
         }
     }
 
-    resource = FakeHaystackServiceResource(get_component_schemas_response=response)
+    class FakeHaystackServiceResourceWithIO(FakeHaystackServiceResource):
+        async def get_component_input_output(self, component_name: str) -> dict[str, Any]:
+            return io_response
+
+    resource = FakeHaystackServiceResourceWithIO(get_component_schemas_response=response)
     client = FakeClient(resource)
     result = await get_component_definition(client, component_type)
 
@@ -106,6 +110,15 @@ async def test_get_component_definition_success() -> None:
     assert "sheet_name" in result
     assert "table_format" in result
     assert "default: csv" in result
+    
+    # Check input/output schema information
+    assert "Input Schema:" in result
+    assert "file_path" in result
+    assert "Path to the XLSX file" in result
+    assert "(required)" in result
+    assert "Output Schema:" in result
+    assert "List of documents" in result
+    assert "array" in result
 
 
 @pytest.mark.asyncio
