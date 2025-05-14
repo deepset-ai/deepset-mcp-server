@@ -79,14 +79,10 @@ async def test_get_component_definition_success() -> None:
     io_response = {
         "input": {
             "properties": {
-                "file_path": {
-                    "_annotation": "str",
-                    "description": "Path to the XLSX file",
-                    "type": "string"
-                }
+                "file_path": {"_annotation": "str", "description": "Path to the XLSX file", "type": "string"}
             },
             "required": ["file_path"],
-            "type": "object"
+            "type": "object",
         },
         "output": {
             "properties": {
@@ -94,7 +90,7 @@ async def test_get_component_definition_success() -> None:
                     "_annotation": "typing.List[haystack.dataclasses.document.Document]",
                     "description": "List of documents",
                     "type": "array",
-                    "items": {"$ref": "#/definitions/Document"}
+                    "items": {"$ref": "#/definitions/Document"},
                 }
             },
             "required": ["documents"],
@@ -103,19 +99,13 @@ async def test_get_component_definition_success() -> None:
                 "Document": {
                     "type": "object",
                     "properties": {
-                        "content": {
-                            "type": "string",
-                            "description": "The content of the document"
-                        },
-                        "meta": {
-                            "type": "object",
-                            "description": "Metadata about the document"
-                        }
+                        "content": {"type": "string", "description": "The content of the document"},
+                        "meta": {"type": "object", "description": "Metadata about the document"},
                     },
-                    "required": ["content"]
+                    "required": ["content"],
                 }
-            }
-        }
+            },
+        },
     }
 
     class FakeHaystackServiceResourceWithIO(FakeHaystackServiceResource):
@@ -134,7 +124,7 @@ async def test_get_component_definition_success() -> None:
     assert "sheet_name" in result
     assert "table_format" in result
     assert "default: csv" in result
-    
+
     # Check input/output schema information
     assert "Input Schema:" in result
     assert "file_path" in result

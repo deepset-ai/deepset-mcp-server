@@ -60,7 +60,7 @@ async def get_component_definition(client: AsyncClientProtocol, component_type: 
         # Extract component name from the full path
         component_name = component_type.split(".")[-1]
         io_info = await haystack_service.get_component_input_output(component_name)
-        
+
         # Add Input Schema
         parts.append("\nInput Schema:")
         if "input" in io_info:
@@ -107,7 +107,9 @@ async def get_component_definition(client: AsyncClientProtocol, component_type: 
                                     prop_type = prop_info.get("_annotation", prop_info.get("type", "Unknown"))
                                     prop_desc = prop_info.get("description", "No description available.")
                                     default = f" (default: {prop_info['default']})" if "default" in prop_info else ""
-                                    parts.append(f"      {prop_name}: {prop_type}{req_marker}{default}\n        {prop_desc}")
+                                    parts.append(
+                                        f"      {prop_name}: {prop_type}{req_marker}{default}\n        {prop_desc}"
+                                    )
             else:
                 # Simple output schema
                 desc = output_info.get("description", "No description available.")
