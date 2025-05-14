@@ -142,7 +142,11 @@ async def test_get_component_definition_success() -> None:
     assert "(required)" in result
     assert "Output Schema:" in result
     assert "List of documents" in result
-    assert "array" in result
+    assert "documents: typing.List[haystack.dataclasses.document.Document]" in result
+    assert "Definitions:" in result
+    assert "Document:" in result
+    assert "content: string (required)" in result
+    assert "meta: object" in result
 
 
 @pytest.mark.asyncio
