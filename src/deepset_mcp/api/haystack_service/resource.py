@@ -27,3 +27,23 @@ class HaystackServiceResource(HaystackServiceProtocol):
         raise_for_status(resp)
 
         return resp.json if resp.json is not None else {}
+
+    async def get_component_input_output(self, component_name: str) -> dict[str, Any]:
+        """Fetch the component input and output schema from the API.
+
+        Args:
+            component_name: The name of the component to fetch the input/output schema for
+
+        Returns:
+            The component input/output schema as a dictionary
+        """
+        resp = await self._client.request(
+            endpoint="v1/haystack/components/input-output",
+            method="GET",
+            headers={"accept": "application/json"},
+            data={"domain": "deepset-cloud", "names": component_name},
+        )
+
+        raise_for_status(resp)
+
+        return resp.json if resp.json is not None else {}
