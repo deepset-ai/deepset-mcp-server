@@ -241,6 +241,27 @@ async def test_get_component_definition_api_error() -> None:
 
 
 @pytest.mark.asyncio
+async def test_search_component_definition_no_components() -> None:
+    schema_response = {"component_schema": {"definitions": {"Components": {}}}}
+    resource = FakeHaystackServiceResource(get_component_schemas_response=schema_response)
+    client = FakeClient(resource)
+    model = FakeModel()
+
+    result = await search_component_definition(client, "test query", model)
+    assert "No components found" in result
+
+
+@pytest.mark.asyncio
+async def test_search_component_definition_api_error() -> None:
+    resource = FakeHaystackServiceResource(exception=UnexpectedAPIError(status_code=500, message="API Error"))
+    client = FakeClient(resource)
+    model = FakeModel()
+
+    result = await search_component_definition(client, "test query", model)
+    assert "Failed to retrieve component schemas" in result
+
+
+@pytest.mark.asyncio
 async def test_list_component_families_no_families() -> None:
     response: dict[str, Any] = {"component_schema": {"definitions": {"Components": {}}}}
     resource = FakeHaystackServiceResource(get_component_schemas_response=response)
