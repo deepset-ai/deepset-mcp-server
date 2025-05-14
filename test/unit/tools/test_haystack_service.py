@@ -89,8 +89,32 @@ async def test_get_component_definition_success() -> None:
             "type": "object"
         },
         "output": {
-            "description": "List of documents",
-            "type": "array"
+            "properties": {
+                "documents": {
+                    "_annotation": "typing.List[haystack.dataclasses.document.Document]",
+                    "description": "List of documents",
+                    "type": "array",
+                    "items": {"$ref": "#/definitions/Document"}
+                }
+            },
+            "required": ["documents"],
+            "type": "object",
+            "definitions": {
+                "Document": {
+                    "type": "object",
+                    "properties": {
+                        "content": {
+                            "type": "string",
+                            "description": "The content of the document"
+                        },
+                        "meta": {
+                            "type": "object",
+                            "description": "Metadata about the document"
+                        }
+                    },
+                    "required": ["content"]
+                }
+            }
         }
     }
 
