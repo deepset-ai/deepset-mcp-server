@@ -76,7 +76,43 @@ async def test_get_component_definition_success() -> None:
         }
     }
 
-    resource = FakeHaystackServiceResource(get_component_schemas_response=response)
+    io_response = {
+        "input": {
+            "properties": {
+                "file_path": {"_annotation": "str", "description": "Path to the XLSX file", "type": "string"}
+            },
+            "required": ["file_path"],
+            "type": "object",
+        },
+        "output": {
+            "properties": {
+                "documents": {
+                    "_annotation": "typing.List[haystack.dataclasses.document.Document]",
+                    "description": "List of documents",
+                    "type": "array",
+                    "items": {"$ref": "#/definitions/Document"},
+                }
+            },
+            "required": ["documents"],
+            "type": "object",
+            "definitions": {
+                "Document": {
+                    "type": "object",
+                    "properties": {
+                        "content": {"type": "string", "description": "The content of the document"},
+                        "meta": {"type": "object", "description": "Metadata about the document"},
+                    },
+                    "required": ["content"],
+                }
+            },
+        },
+    }
+
+    class FakeHaystackServiceResourceWithIO(FakeHaystackServiceResource):
+        async def get_component_input_output(self, component_name: str) -> dict[str, Any]:
+            return io_response
+
+    resource = FakeHaystackServiceResourceWithIO(get_component_schemas_response=response)
     client = FakeClient(resource)
     result = await get_component_definition(client, component_type)
 
@@ -88,6 +124,19 @@ async def test_get_component_definition_success() -> None:
     assert "sheet_name" in result
     assert "table_format" in result
     assert "default: csv" in result
+
+    # Check input/output schema information
+    assert "Input Schema:" in result
+    assert "file_path" in result
+    assert "Path to the XLSX file" in result
+    assert "(required)" in result
+    assert "Output Schema:" in result
+    assert "List of documents" in result
+    assert "documents: typing.List[haystack.dataclasses.document.Document]" in result
+    assert "Definitions:" in result
+    assert "Document:" in result
+    assert "content: string (required)" in result
+    assert "meta: object" in result
 
 
 @pytest.mark.asyncio
