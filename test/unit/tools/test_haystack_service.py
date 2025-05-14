@@ -13,6 +13,24 @@ from deepset_mcp.tools.model_protocol import ModelProtocol
 from test.unit.conftest import BaseFakeClient
 
 
+class FakeModel(ModelProtocol):
+    def encode(self, sentences: List[str] | str) -> np.ndarray:
+        # Convert input to list if it's a single string
+        if isinstance(sentences, str):
+            sentences = [sentences]
+
+        # Create fake embeddings with consistent similarities
+        embeddings = np.zeros((len(sentences), 3))
+        for i, sentence in enumerate(sentences):
+            if "converter" in sentence.lower():
+                embeddings[i] = [1, 0, 0]
+            elif "reader" in sentence.lower():
+                embeddings[i] = [0, 1, 0]
+            else:
+                embeddings[i] = [0, 0, 1]
+        return embeddings
+
+
 class FakeHaystackServiceResource:
     def __init__(
         self, get_component_schemas_response: dict[str, Any] | None = None, exception: Exception | None = None
