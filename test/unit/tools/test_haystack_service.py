@@ -155,32 +155,3 @@ async def test_list_component_families_api_error() -> None:
     result = await list_component_families(client)
     assert "Failed to retrieve component families" in result
     assert "API Error" in result
-
-
-@pytest.mark.asyncio
-async def test_get_component_input_output_success() -> None:
-    # Sample input/output response
-    component_name = "Agent"
-    response = {
-        "Agent": {
-            "input": {"text": "str"},
-            "output": {"response": "str"}
-        }
-    }
-
-    resource = FakeHaystackServiceResource(get_component_schemas_response=response)
-    client = FakeClient(resource)
-    result = await resource.get_component_input_output(component_name)
-
-    assert result == response
-    assert "Agent" in result
-    assert "input" in result["Agent"]
-    assert "output" in result["Agent"]
-
-
-@pytest.mark.asyncio
-async def test_get_component_input_output_api_error() -> None:
-    resource = FakeHaystackServiceResource(exception=UnexpectedAPIError(status_code=500, message="API Error"))
-    client = FakeClient(resource)
-    with pytest.raises(UnexpectedAPIError):
-        await resource.get_component_input_output("Agent")

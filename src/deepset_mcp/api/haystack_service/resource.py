@@ -1,5 +1,6 @@
 from typing import Any
 
+from deepset_mcp.api.exceptions import ResourceNotFoundError
 from deepset_mcp.api.protocols import AsyncClientProtocol, HaystackServiceProtocol
 from deepset_mcp.api.transport import raise_for_status
 
@@ -38,12 +39,15 @@ class HaystackServiceResource(HaystackServiceProtocol):
             The component input/output schema as a dictionary
         """
         resp = await self._client.request(
-            endpoint="v1/haystack/components/input-output",
+            endpoint=f"v1/haystack/components/input-output?domain=deepset-cloud&names={component_name}",
             method="GET",
             headers={"accept": "application/json"},
-            data={"domain": "deepset-cloud", "names": component_name},
+            response_type=list[dict[str, Any]],
         )
 
         raise_for_status(resp)
 
-        return resp.json if resp.json is not None else {}
+        if resp.json is None or len(resp.json) == 0:
+            raise ResourceNotFoundError(f"Component '{component_name}' not found.")
+
+        return resp.json[0] if resp.json is not None else {}

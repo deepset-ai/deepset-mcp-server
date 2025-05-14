@@ -1,6 +1,6 @@
 import json
 from types import TracebackType
-from typing import Any, Self
+from typing import Any, Self, TypeVar, overload
 
 from deepset_mcp.api.protocols import (
     AsyncClientProtocol,
@@ -9,6 +9,8 @@ from deepset_mcp.api.protocols import (
     PipelineTemplateResourceProtocol,
 )
 from deepset_mcp.api.transport import TransportResponse
+
+T = TypeVar("T")
 
 
 class BaseFakeClient(AsyncClientProtocol):
@@ -27,13 +29,37 @@ class BaseFakeClient(AsyncClientProtocol):
         self.requests: list[dict[str, Any]] = []
         self.closed = False
 
+    @overload
     async def request(
         self,
         endpoint: str,
+        *,
+        response_type: type[T],
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
-    ) -> TransportResponse:
+    ) -> TransportResponse[T]: ...
+
+    @overload
+    async def request(
+        self,
+        endpoint: str,
+        *,
+        response_type: None = None,
+        method: str = "GET",
+        data: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> TransportResponse[Any]: ...
+
+    async def request(
+        self,
+        endpoint: str,
+        *,
+        response_type: type[T] | None = None,
+        method: str = "GET",
+        data: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> TransportResponse[Any]:
         """
         Record the request and return a predefined response.
 

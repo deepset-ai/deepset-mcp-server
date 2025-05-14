@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import Any, TypeVar, overload
 
 import pytest
 import pytest_asyncio
@@ -7,17 +7,32 @@ import pytest_asyncio
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.api.transport import AsyncTransport, TransportProtocol, TransportResponse
 
+T = TypeVar("T")
+
 
 class DummyProtocol(TransportProtocol):
     def __init__(self) -> None:
         self.requests: list[dict[str, Any]] = []
         self.closed: bool = False
 
-    async def request(self, method: str, url: str, **kwargs: Any) -> TransportResponse:
+    @overload
+    async def request(
+        self, method: str, url: str, *, response_type: type[T], **kwargs: Any
+    ) -> TransportResponse[T]: ...
+
+    @overload
+    async def request(
+        self, method: str, url: str, *, response_type: None = None, **kwargs: Any
+    ) -> TransportResponse[Any]: ...
+
+    async def request(
+        self, method: str, url: str, *, response_type: type[T] | None = None, **kwargs: Any
+    ) -> TransportResponse[Any]:
         # Record the request and return a dummy response
         record: dict[str, Any] = {"method": method, "url": url, **kwargs}
         self.requests.append(record)
         dummy_response = {"dummy": "response"}
+
         return TransportResponse(status_code=200, text=json.dumps(dummy_response), json=dummy_response)
 
     async def close(self) -> None:

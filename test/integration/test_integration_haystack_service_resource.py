@@ -33,6 +33,7 @@ async def test_get_component_input_output(
     response = await haystack_service_resource.get_component_input_output("Agent")
 
     assert isinstance(response, dict)
-    assert "Agent" in response
-    assert "input" in response["Agent"]
-    assert "output" in response["Agent"]
+    assert "name" in response
+    assert response["name"] == "Agent"
+    assert "input" in response
+    assert "output" in response
