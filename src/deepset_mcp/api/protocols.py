@@ -2,6 +2,7 @@ from types import TracebackType
 from typing import Any, Protocol, Self
 
 from deepset_mcp.api.pipeline.models import DeepsetPipeline, NoContentResponse, PipelineValidationResult
+from deepset_mcp.api.pipeline_template.models import PipelineTemplate
 from deepset_mcp.api.transport import TransportResponse
 
 
