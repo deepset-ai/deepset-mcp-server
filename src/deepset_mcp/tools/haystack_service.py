@@ -1,5 +1,14 @@
 from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.protocols import AsyncClientProtocol
+from numpy.typing import NDArray
+from typing import Dict, List, Any, Optional, Tuple
+
+from deepset_mcp.tools.component_helper import (
+    extract_component_info,
+    format_io_info,
+    extract_component_texts,
+)
+from deepset_mcp.tools.model_protocol import ModelProtocol
 
 
 async def get_component_definition(client: AsyncClientProtocol, component_type: str) -> str:
