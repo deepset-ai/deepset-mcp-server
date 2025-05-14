@@ -49,6 +49,10 @@ class AsyncClientProtocol(Protocol):
         """Access the Haystack service."""
         ...
 
+    def pipeline_templates(self, workspace: str) -> "PipelineTemplateResourceProtocol":
+        """Access pipeline templates in the specified workspace."""
+        ...
+
 
 class PipelineResourceProtocol(Protocol):
     """Protocol defining the implementation for PipelineResource."""
