@@ -70,7 +70,7 @@ class FakeClient(BaseFakeClient):
 async def test_get_component_definition_success() -> None:
     # Sample component definition similar to the example provided
     component_type = "haystack.components.converters.xlsx.XLSXToDocument"
-    response: dict[str, Any] = {
+    schema_response: dict[str, Any] = {
         "component_schema": {
             "definitions": {
                 "Components": {
@@ -136,11 +136,10 @@ async def test_get_component_definition_success() -> None:
         },
     }
 
-    class FakeHaystackServiceResourceWithIO(FakeHaystackServiceResource):
-        async def get_component_input_output(self, component_name: str) -> dict[str, Any]:
-            return io_response
-
-    resource = FakeHaystackServiceResourceWithIO(get_component_schemas_response=response)
+    resource = FakeHaystackServiceResource(
+        get_component_schemas_response=schema_response,
+        get_component_io_response=io_response
+    )
     client = FakeClient(resource)
     result = await get_component_definition(client, component_type)
 
