@@ -2,6 +2,7 @@ from types import TracebackType
 from typing import Any, Protocol, Self
 
 from deepset_mcp.api.pipeline.models import DeepsetPipeline, NoContentResponse, PipelineValidationResult
+from deepset_mcp.api.pipeline_template.models import PipelineTemplate
 from deepset_mcp.api.transport import TransportResponse
 
 
@@ -46,6 +47,22 @@ class AsyncClientProtocol(Protocol):
 
     def haystack_service(self) -> "HaystackServiceProtocol":
         """Access the Haystack service."""
+        ...
+
+    def pipeline_templates(self, workspace: str) -> "PipelineTemplateResourceProtocol":
+        """Access pipeline templates in the specified workspace."""
+        ...
+
+
+class PipelineTemplateResourceProtocol(Protocol):
+    """Protocol defining the implementation for PipelineTemplateResource."""
+
+    async def get_template(self, template_name: str) -> PipelineTemplate:
+        """Fetch a single pipeline template by its name."""
+        ...
+
+    async def list_templates(self, limit: int = 100) -> list[PipelineTemplate]:
+        """List pipeline templates in the configured workspace."""
         ...
 
 
