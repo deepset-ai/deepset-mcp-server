@@ -41,28 +41,8 @@ async def get_component_definition(client: AsyncClientProtocol, component_type: 
     if not component_def:
         return f"Component not found: {component_type}"
 
-    # Extract relevant information
-    component_type_info = component_def["properties"]["type"]
-    init_params = component_def["properties"].get("init_parameters", {}).get("properties", {})
-
-    # Format the basic component information
-    parts = [
-        f"Component: {component_type}",
-        f"Name: {component_def.get('title', 'Unknown')}",
-        f"Family: {component_type_info.get('family', 'Unknown')}",
-        f"Family Description: {component_type_info.get('family_description', 'No description available.')}",
-        f"\nDescription:\n{component_def.get('description', 'No description available.')}\n",
-        "\nInitialization Parameters:",
-    ]
-
-    if not init_params:
-        parts.append("  No initialization parameters")
-    else:
-        for param_name, param_info in init_params.items():
-            param_type = param_info.get("_annotation", param_info.get("type", "Unknown"))
-            param_desc = param_info.get("description", "No description available.")
-            default = f" (default: {param_info['default']})" if "default" in param_info else ""
-            parts.append(f"  {param_name}: {param_type}{default}\n    {param_desc}")
+    # Get component information
+    parts = [extract_component_info(components, component_def)]
 
     # Fetch and add input/output information
     try:
