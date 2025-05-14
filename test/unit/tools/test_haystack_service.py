@@ -33,7 +33,10 @@ class FakeModel(ModelProtocol):
 
 class FakeHaystackServiceResource:
     def __init__(
-        self, get_component_schemas_response: dict[str, Any] | None = None, exception: Exception | None = None
+        self,
+        get_component_schemas_response: dict[str, Any] | None = None,
+        get_component_io_response: dict[str, Any] | None = None,
+        exception: Exception | None = None,
     ):
         self._get_component_schemas_response = get_component_schemas_response
         self._exception = exception
