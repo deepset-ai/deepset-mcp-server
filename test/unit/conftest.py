@@ -2,7 +2,12 @@ import json
 from types import TracebackType
 from typing import Any, Self
 
-from deepset_mcp.api.protocols import AsyncClientProtocol, HaystackServiceProtocol, PipelineResourceProtocol
+from deepset_mcp.api.protocols import (
+    AsyncClientProtocol,
+    HaystackServiceProtocol,
+    PipelineResourceProtocol,
+    PipelineTemplateResourceProtocol,
+)
 from deepset_mcp.api.transport import TransportResponse
 
 
@@ -101,4 +106,8 @@ class BaseFakeClient(AsyncClientProtocol):
 
     def haystack_service(self) -> HaystackServiceProtocol:
         """Overwrite this method when testing HaystackService."""
+        raise NotImplementedError
+
+    def pipeline_templates(self, workspace: str) -> PipelineTemplateResourceProtocol:
+        """Overwrite this method when testing PipelineTemplateResource."""
         raise NotImplementedError

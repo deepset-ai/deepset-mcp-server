@@ -1,10 +1,12 @@
 from typing import Any
 
+from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.pipeline_template.models import PipelineTemplate
-from deepset_mcp.api.protocols import AsyncClientProtocol, PipelineTemplateResourceProtocol
+from deepset_mcp.api.protocols import AsyncClientProtocol
+from deepset_mcp.api.transport import raise_for_status
 
 
-class PipelineTemplateResource(PipelineTemplateResourceProtocol):
+class PipelineTemplateResource:
     """Resource for interacting with pipeline templates in a workspace."""
 
     def __init__(self, client: AsyncClientProtocol, workspace: str) -> None:
@@ -34,7 +36,9 @@ class PipelineTemplateResource(PipelineTemplateResourceProtocol):
             The requested pipeline template
         """
         response = await self._client.request(f"/v1/workspaces/{self._workspace}/pipeline_templates/{template_name}")
-        data = response.json()
+        raise_for_status(response)
+        data = response.json
+
         return PipelineTemplate.model_validate(data)
 
     async def list_templates(self, limit: int = 100) -> list[PipelineTemplate]:
@@ -51,9 +55,15 @@ class PipelineTemplateResource(PipelineTemplateResourceProtocol):
             List of pipeline templates
         """
         response = await self._client.request(
-            f"/v1/workspaces/{self._workspace}/pipeline_templates",
+            f"/v1/workspaces/{self._workspace}/pipeline_templates?limit={limit}&page_number=1&field=created_at&order=DESC",
             method="GET",
-            data={"limit": limit, "page_number": 1, "field": "created_at", "order": "DESC"},
         )
-        response_data: dict[str, Any] = response.json()
+
+        raise_for_status(response)
+
+        if response.json is None:
+            raise UnexpectedAPIError(message="Unexpected API response, no templates returned.")
+
+        response_data: dict[str, Any] = response.json
+
         return [PipelineTemplate.model_validate(template) for template in response_data["data"]]
