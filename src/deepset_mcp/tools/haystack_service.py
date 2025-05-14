@@ -56,6 +56,58 @@ async def get_component_definition(client: AsyncClientProtocol, component_type: 
     return "\n".join(parts)
 
 
+async def search_component_definition(
+    client: AsyncClientProtocol, query: str, model: ModelProtocol, top_k: int = 5
+) -> str:
+    """Searches for components based on name or description using semantic similarity.
+
+    Args:
+        client: The API client to use
+        query: The search query
+        model: The model to use for computing embeddings
+        top_k: Maximum number of results to return (default: 5)
+
+    Returns:
+        A formatted string containing the matched component definitions
+    """
+    haystack_service = client.haystack_service()
+
+    try:
+        response = await haystack_service.get_component_schemas()
+    except UnexpectedAPIError as e:
+        return f"Failed to retrieve component schemas: {e}"
+
+    components = response["component_schema"]["definitions"]["Components"]
+
+    # Extract text for embedding from all components
+    component_texts: List[Tuple[str, str]] = [
+        extract_component_texts(comp) for comp in components.values()
+    ]
+    
+    if not component_texts:
+        return "No components found"
+
+    # Compute embeddings
+    query_embedding = model.encode(query)
+    component_embeddings = model.encode([text for _, text in component_texts])
+
+    # Compute similarities
+    similarities = query_embedding @ component_embeddings.T
+
+    # Get indices of top_k most similar components
+    top_indices = similarities.argsort()[-top_k:][::-1]
+
+    # Format results
+    results = []
+    for idx in top_indices:
+        component_type = component_texts[idx][0]
+        # Get full component definition
+        definition = await get_component_definition(client, component_type)
+        results.append(f"Similarity Score: {similarities[idx]:.3f}\n{definition}\n{'-' * 80}\n")
+
+    return "\n".join(results)
+
+
 async def list_component_families(client: AsyncClientProtocol) -> str:
     """Lists all Haystack component families that are available on deepset."""
     haystack_service = client.haystack_service()
