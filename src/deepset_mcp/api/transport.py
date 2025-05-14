@@ -1,27 +1,29 @@
 import json
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Generic, Protocol, TypeVar, cast, overload
 
 import httpx
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
 
+T = TypeVar("T")
+
 
 @dataclass
-class TransportResponse:
-    """Response envelope for HTTP transport."""
+class TransportResponse(Generic[T]):
+    """Reponse envelope for HTTP transport."""
 
     text: str
     status_code: int
-    json: dict[str, Any] | None = None
+    json: T | None = None
 
     @property
     def success(self) -> bool:
-        """Returns True if the response status code indicates success (< 400)."""
+        """Check if the response was successful (status code < 400)."""
         return self.status_code < 400
 
 
-def raise_for_status(response: TransportResponse) -> None:
+def raise_for_status(response: TransportResponse[Any]) -> None:
     """Raises the appropriate exception based on the response status code."""
     if response.success:
         return
@@ -32,9 +34,12 @@ def raise_for_status(response: TransportResponse) -> None:
         404: ResourceNotFoundError,
     }
 
-    # Extract error details from response if available
-    detail = response.json.get("details") if response.json else None
-    message = response.json.get("message") if response.json else response.text
+    if isinstance(response.json, dict):
+        detail = response.json.get("details") if response.json else None
+        message = response.json.get("message") if response.json else response.text
+    else:
+        detail = json.dumps(response.json) if response.json else None
+        message = response.text
 
     # Get exception class
     exception_class = exception_map.get(response.status_code)
@@ -52,8 +57,20 @@ def raise_for_status(response: TransportResponse) -> None:
 class TransportProtocol(Protocol):
     """Protocol for HTTP transport."""
 
-    async def request(self, method: str, url: str, **kwargs: Any) -> TransportResponse:
-        """Send an HTTP request and return the parsed JSON response."""
+    @overload
+    async def request(
+        self, method: str, url: str, *, response_type: type[T], **kwargs: Any
+    ) -> TransportResponse[T]: ...
+
+    @overload
+    async def request(
+        self, method: str, url: str, *, response_type: None = None, **kwargs: Any
+    ) -> TransportResponse[Any]: ...
+
+    async def request(
+        self, method: str, url: str, *, response_type: type[T] | None = None, **kwargs: Any
+    ) -> TransportResponse[Any]:
+        """Send an HTTP request and return the response."""
         ...
 
     async def close(self) -> None:
@@ -94,18 +111,34 @@ class AsyncTransport:
         }
         self._client = httpx.AsyncClient(**client_kwargs)
 
-    async def request(self, method: str, url: str, **kwargs: Any) -> TransportResponse:
+    @overload
+    async def request(
+        self, method: str, url: str, *, response_type: type[T], **kwargs: Any
+    ) -> TransportResponse[T]: ...
+
+    @overload
+    async def request(
+        self, method: str, url: str, *, response_type: None = None, **kwargs: Any
+    ) -> TransportResponse[Any]: ...
+
+    async def request(
+        self, method: str, url: str, *, response_type: type[T] | None = None, **kwargs: Any
+    ) -> TransportResponse[Any]:
         """Send an HTTP request and return the response."""
         response = await self._client.request(method, url, **kwargs)
 
-        transport_response = TransportResponse(text=response.text, status_code=response.status_code)
+        if response_type is not None:
+            raw = response.json()
+            payload: T = cast(T, raw)
+            return TransportResponse(text=response.text, status_code=response.status_code, json=payload)
 
         try:
-            transport_response.json = response.json()
+            untyped_response = response.json()
         except json.decoder.JSONDecodeError:
+            untyped_response = None
             pass
 
-        return transport_response
+        return TransportResponse(text=response.text, status_code=response.status_code, json=untyped_response)
 
     async def close(self) -> None:
         """Clean up any resources (e.g., close connections)."""

@@ -21,6 +21,13 @@ class FakeHaystackServiceResource:
             return self._get_component_schemas_response
         raise NotImplementedError
 
+    async def get_component_input_output(self, component_name: str) -> dict[str, Any]:
+        if self._exception:
+            raise self._exception
+        if self._get_component_schemas_response is not None:
+            return self._get_component_schemas_response
+        raise NotImplementedError
+
 
 class FakeClient(BaseFakeClient):
     def __init__(self, resource: FakeHaystackServiceResource):

@@ -48,8 +48,7 @@ class PipelineResource(PipelineResourceProtocol):
         if resp.success:
             return PipelineValidationResult(valid=True)
 
-        # If 400 error, we have validation errors to process
-        if resp.status_code == 400 and resp.json is not None and "details" in resp.json:
+        if resp.status_code == 400 and resp.json is not None and isinstance(resp.json, dict) and "details" in resp.json:
             errors = [ValidationError(code=error["code"], message=error["message"]) for error in resp.json["details"]]
 
             return PipelineValidationResult(valid=False, errors=errors)
