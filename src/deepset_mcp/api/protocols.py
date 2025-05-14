@@ -54,6 +54,18 @@ class AsyncClientProtocol(Protocol):
         ...
 
 
+class PipelineTemplateResourceProtocol(Protocol):
+    """Protocol defining the implementation for PipelineTemplateResource."""
+
+    async def get_template(self, template_name: str) -> PipelineTemplate:
+        """Fetch a single pipeline template by its name."""
+        ...
+
+    async def list_templates(self, limit: int = 100) -> list[PipelineTemplate]:
+        """List pipeline templates in the configured workspace."""
+        ...
+
+
 class PipelineResourceProtocol(Protocol):
     """Protocol defining the implementation for PipelineResource."""
 
