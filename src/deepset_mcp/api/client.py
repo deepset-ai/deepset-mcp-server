@@ -4,6 +4,7 @@ from typing import Any, Self
 
 from deepset_mcp.api.haystack_service.resource import HaystackServiceResource
 from deepset_mcp.api.pipeline.resource import PipelineResource
+from deepset_mcp.api.pipeline_template.resource import PipelineTemplateResource
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.transport import AsyncTransport, TransportProtocol, TransportResponse
 
