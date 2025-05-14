@@ -3,7 +3,10 @@ import os
 from mcp.server.fastmcp import FastMCP
 
 from deepset_mcp.api.client import AsyncDeepsetClient
-from deepset_mcp.tools.haystack_service import list_component_families as list_component_families_tool
+from deepset_mcp.tools.haystack_service import (
+    get_component_definition as get_component_definition_tool,
+    list_component_families as list_component_families_tool,
+)
 from deepset_mcp.tools.pipeline import (
     create_pipeline as create_pipeline_tool,
     get_pipeline as get_pipeline_tool,
@@ -96,6 +99,20 @@ async def list_component_families() -> str:
     """
     async with AsyncDeepsetClient() as client:
         response = await list_component_families_tool(client)
+
+    return response
+
+
+@mcp.tool()
+async def get_component_definition(component_type: str) -> str:
+    """Use this to get the full definition of a specific component.
+
+    The component type is the fully qualified import path of the component class.
+    For example: haystack.components.converters.xlsx.XLSXToDocument
+    The component definition contains a description, parameters, and example usage of the component.
+    """
+    async with AsyncDeepsetClient() as client:
+        response = await get_component_definition_tool(client, component_type)
 
     return response
 

@@ -3,7 +3,7 @@ from typing import Any
 import pytest
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
-from deepset_mcp.tools.haystack_service import list_component_families
+from deepset_mcp.tools.haystack_service import get_component_definition, list_component_families
 from test.unit.conftest import BaseFakeClient
 
 
@@ -29,6 +29,76 @@ class FakeClient(BaseFakeClient):
 
     def haystack_service(self) -> FakeHaystackServiceResource:
         return self._resource
+
+
+@pytest.mark.asyncio
+async def test_get_component_definition_success() -> None:
+    # Sample component definition similar to the example provided
+    component_type = "haystack.components.converters.xlsx.XLSXToDocument"
+    response: dict[str, Any] = {
+        "component_schema": {
+            "definitions": {
+                "Components": {
+                    "XLSXToDocument": {
+                        "title": "XLSXToDocument",
+                        "description": "Converts XLSX files into Documents.",
+                        "properties": {
+                            "type": {
+                                "const": component_type,
+                                "family": "converters",
+                                "family_description": "Convert data into a format your pipeline can query.",
+                            },
+                            "init_parameters": {
+                                "properties": {
+                                    "sheet_name": {
+                                        "_annotation": "typing.Union[str, int, list, None]",
+                                        "description": "The name of the sheet to read.",
+                                        "default": None,
+                                    },
+                                    "table_format": {
+                                        "_annotation": "str",
+                                        "description": "The format to convert the Excel file to.",
+                                        "default": "csv",
+                                    },
+                                }
+                            },
+                        },
+                    }
+                }
+            }
+        }
+    }
+
+    resource = FakeHaystackServiceResource(get_component_schemas_response=response)
+    client = FakeClient(resource)
+    result = await get_component_definition(client, component_type)
+
+    # Check that all required information is present
+    assert component_type in result
+    assert "XLSXToDocument" in result
+    assert "converters" in result
+    assert "Convert data into a format" in result
+    assert "sheet_name" in result
+    assert "table_format" in result
+    assert "default: csv" in result
+
+
+@pytest.mark.asyncio
+async def test_get_component_definition_not_found() -> None:
+    response: dict[str, Any] = {"component_schema": {"definitions": {"Components": {}}}}
+    resource = FakeHaystackServiceResource(get_component_schemas_response=response)
+    client = FakeClient(resource)
+    result = await get_component_definition(client, "nonexistent.component")
+    assert "Component not found" in result
+
+
+@pytest.mark.asyncio
+async def test_get_component_definition_api_error() -> None:
+    resource = FakeHaystackServiceResource(exception=UnexpectedAPIError(status_code=500, message="API Error"))
+    client = FakeClient(resource)
+    result = await get_component_definition(client, "some.component")
+    assert "Failed to retrieve component definition" in result
+    assert "API Error" in result
 
 
 @pytest.mark.asyncio
