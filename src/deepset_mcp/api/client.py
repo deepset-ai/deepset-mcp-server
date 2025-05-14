@@ -99,3 +99,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
     def haystack_service(self) -> HaystackServiceResource:
         """Resource to interact with the Haystack service API."""
         return HaystackServiceResource(client=self)
+
+    def pipeline_templates(self, workspace: str) -> PipelineTemplateResource:
+        """Resource to interact with pipeline templates in the specified workspace."""
+        return PipelineTemplateResource(client=self, workspace=workspace)
