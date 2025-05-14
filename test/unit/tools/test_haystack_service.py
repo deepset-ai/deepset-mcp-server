@@ -76,6 +76,24 @@ async def test_get_component_definition_success() -> None:
         }
     }
 
+    io_response = {
+        "input": {
+            "properties": {
+                "file_path": {
+                    "_annotation": "str",
+                    "description": "Path to the XLSX file",
+                    "type": "string"
+                }
+            },
+            "required": ["file_path"],
+            "type": "object"
+        },
+        "output": {
+            "description": "List of documents",
+            "type": "array"
+        }
+    }
+
     resource = FakeHaystackServiceResource(get_component_schemas_response=response)
     client = FakeClient(resource)
     result = await get_component_definition(client, component_type)
