@@ -1,9 +1,15 @@
-from typing import Any
+from typing import Any, List
 
+import numpy as np
 import pytest
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
-from deepset_mcp.tools.haystack_service import get_component_definition, list_component_families
+from deepset_mcp.tools.haystack_service import (
+    get_component_definition,
+    list_component_families,
+    search_component_definition,
+)
+from deepset_mcp.tools.model_protocol import ModelProtocol
 from test.unit.conftest import BaseFakeClient
 
 
