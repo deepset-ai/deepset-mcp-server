@@ -4,6 +4,7 @@ from typing import Any, Self
 
 from deepset_mcp.api.haystack_service.resource import HaystackServiceResource
 from deepset_mcp.api.pipeline.resource import PipelineResource
+from deepset_mcp.api.pipeline_template.resource import PipelineTemplateResource
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.transport import AsyncTransport, TransportProtocol, TransportResponse
 
@@ -98,3 +99,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
     def haystack_service(self) -> HaystackServiceResource:
         """Resource to interact with the Haystack service API."""
         return HaystackServiceResource(client=self)
+
+    def pipeline_templates(self, workspace: str) -> PipelineTemplateResource:
+        """Resource to interact with pipeline templates in the specified workspace."""
+        return PipelineTemplateResource(client=self, workspace=workspace)
