@@ -1,12 +1,14 @@
 import os
 from types import TracebackType
-from typing import Any, Self
+from typing import Any, Self, TypeVar, overload
 
 from deepset_mcp.api.haystack_service.resource import HaystackServiceResource
 from deepset_mcp.api.pipeline.resource import PipelineResource
 from deepset_mcp.api.pipeline_template.resource import PipelineTemplateResource
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.transport import AsyncTransport, TransportProtocol, TransportResponse
+
+T = TypeVar("T")
 
 
 class AsyncDeepsetClient(AsyncClientProtocol):
@@ -46,13 +48,37 @@ class AsyncDeepsetClient(AsyncClientProtocol):
                 config=transport_config,
             )
 
+    @overload
     async def request(
         self,
         endpoint: str,
+        *,
+        response_type: type[T],
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
-    ) -> TransportResponse:
+    ) -> TransportResponse[T]: ...
+
+    @overload
+    async def request(
+        self,
+        endpoint: str,
+        *,
+        response_type: None = None,
+        method: str = "GET",
+        data: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> TransportResponse[Any]: ...
+
+    async def request(
+        self,
+        endpoint: str,
+        *,
+        method: str = "GET",
+        data: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        response_type: type[T] | None = None,
+    ) -> TransportResponse[Any]:
         """Make a request to the deepset API."""
         if not endpoint.startswith("/"):
             endpoint = f"/{endpoint}"
@@ -75,6 +101,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
             url,
             json=data,
             headers=request_headers,
+            response_type=response_type,
         )
 
     async def close(self) -> None:

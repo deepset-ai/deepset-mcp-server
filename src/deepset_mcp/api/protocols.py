@@ -1,5 +1,5 @@
 from types import TracebackType
-from typing import Any, Protocol, Self
+from typing import Any, Protocol, Self, TypeVar, overload
 
 from deepset_mcp.api.pipeline.models import DeepsetPipeline, NoContentResponse, PipelineValidationResult
 from deepset_mcp.api.pipeline_template.models import PipelineTemplate
@@ -13,17 +13,48 @@ class HaystackServiceProtocol(Protocol):
         """Fetch the component schema from the API."""
         ...
 
+    async def get_component_input_output(self, component_name: str) -> dict[str, Any]:
+        """Fetch input and output schema for a component from the API."""
+        ...
+
+
+T = TypeVar("T")
+
 
 class AsyncClientProtocol(Protocol):
     """Protocol defining the implementation for AsyncClient."""
 
+    @overload
     async def request(
         self,
         endpoint: str,
+        *,
+        response_type: type[T],
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
-    ) -> TransportResponse:
+    ) -> TransportResponse[T]: ...
+
+    @overload
+    async def request(
+        self,
+        endpoint: str,
+        *,
+        response_type: None = None,
+        method: str = "GET",
+        data: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> TransportResponse[Any]: ...
+
+    async def request(
+        self,
+        endpoint: str,
+        *,
+        response_type: type[T] | None = None,
+        method: str = "GET",
+        data: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> TransportResponse[Any]:
         """Make a request to the API."""
         ...
 

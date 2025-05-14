@@ -19,7 +19,7 @@ def make_component_schema_response() -> dict[str, Any]:
 
 
 @pytest.fixture
-def mock_successful_response(mock_client: BaseFakeClient) -> None:
+def mock_successful_schema_response(mock_client: BaseFakeClient) -> None:
     """Configure the mock client to return a successful response."""
     mock_client.responses["haystack/components"] = TransportResponse(
         status_code=200,
@@ -29,9 +29,27 @@ def mock_successful_response(mock_client: BaseFakeClient) -> None:
 
 
 @pytest.fixture
-def mock_error_response(mock_client: BaseFakeClient) -> None:
+def mock_schema_error_response(mock_client: BaseFakeClient) -> None:
     """Configure the mock client to return an error response."""
     mock_client.responses["haystack/components"] = TransportResponse(
+        status_code=500,
+        json={"message": "Internal server error"},
+        text="Internal server error",
+    )
+
+
+@pytest.fixture
+def mock_successful_io_response(mock_client: BaseFakeClient) -> None:
+    mock_client.responses["v1/haystack/components/input-output?domain=deepset-cloud&names=Agent"] = TransportResponse(
+        status_code=200,
+        json=[{"name": "Agent", "input": "Mock input", "output": "Mock output"}],
+        text=json.dumps([{"name": "Agent", "input": "Mock input", "output": "Mock output"}]),
+    )
+
+
+@pytest.fixture
+def mock_io_error_response(mock_client: BaseFakeClient) -> None:
+    mock_client.responses["v1/haystack/components/input-output?domain=deepset-cloud&names=Agent"] = TransportResponse(
         status_code=500,
         json={"message": "Internal server error"},
         text="Internal server error",
@@ -47,7 +65,7 @@ def test_initialization(mock_client: BaseFakeClient) -> None:
 @pytest.mark.asyncio
 async def test_get_component_schema_success(
     mock_client: BaseFakeClient,
-    mock_successful_response: None,
+    mock_successful_schema_response: None,
 ) -> None:
     """Test successful component schema retrieval."""
     resource = HaystackServiceResource(client=mock_client)
@@ -65,10 +83,31 @@ async def test_get_component_schema_success(
 @pytest.mark.asyncio
 async def test_get_component_schema_error(
     mock_client: BaseFakeClient,
-    mock_error_response: None,
+    mock_schema_error_response: None,
 ) -> None:
     """Test error handling in component schema retrieval."""
     resource = HaystackServiceResource(client=mock_client)
 
     with pytest.raises(UnexpectedAPIError):
         await resource.get_component_schemas()
+
+
+@pytest.mark.asyncio
+async def test_get_component_input_output_success(
+    mock_client: BaseFakeClient,
+    mock_successful_io_response: None,
+) -> None:
+    resource = HaystackServiceResource(client=mock_client)
+    result = await resource.get_component_input_output("Agent")
+
+    assert result == {"name": "Agent", "input": "Mock input", "output": "Mock output"}
+
+
+@pytest.mark.asyncio
+async def test_get_component_input_output_error(
+    mock_client: BaseFakeClient,
+    mock_io_error_response: None,
+) -> None:
+    resource = HaystackServiceResource(client=mock_client)
+    with pytest.raises(UnexpectedAPIError):
+        await resource.get_component_input_output("Agent")

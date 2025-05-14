@@ -578,7 +578,7 @@ class TestPipelineResource:
         yaml_config = "version: '1.0'"
 
         # Create response for unknown error
-        unknown_error_response = TransportResponse(text="", status_code=500, json=None)
+        unknown_error_response: TransportResponse[None] = TransportResponse(text="", status_code=500, json=None)
 
         client = DummyClient(responses={"test-workspace/pipeline_validations": unknown_error_response})
 
