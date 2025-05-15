@@ -131,3 +131,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
     def pipeline_templates(self, workspace: str) -> PipelineTemplateResource:
         """Resource to interact with pipeline templates in the specified workspace."""
         return PipelineTemplateResource(client=self, workspace=workspace)
+        
+    def indexes(self, workspace: str) -> IndexResource:
+        """Resource to interact with indexes in the specified workspace."""
+        return IndexResource(client=self, workspace=workspace)
