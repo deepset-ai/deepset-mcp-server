@@ -9,12 +9,12 @@ from deepset_mcp.api.exceptions import (
 )
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
-    DeepsetUser,
     NoContentResponse,
     PipelineServiceLevel,
     PipelineValidationResult,
     ValidationError,
 )
+from deepset_mcp.api.shared_models import DeepsetUser
 
 # Adjust the import path below to match your project structure
 from deepset_mcp.tools.pipeline import (
