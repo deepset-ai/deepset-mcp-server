@@ -12,6 +12,8 @@ dependencies = [
     "httpx",
     "pydantic>=2.0.0",
     "pyyaml",
+    "numpy",
+    "model2vec",
 ]
 
 [project.scripts]

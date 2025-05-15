@@ -1,17 +1,45 @@
 from typing import Any
 
+import numpy as np
 import pytest
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
-from deepset_mcp.tools.haystack_service import get_component_definition, list_component_families
+from deepset_mcp.tools.haystack_service import (
+    get_component_definition,
+    list_component_families,
+    search_component_definition,
+)
+from deepset_mcp.tools.model_protocol import ModelProtocol
 from test.unit.conftest import BaseFakeClient
+
+
+class FakeModel(ModelProtocol):
+    def encode(self, sentences: list[str] | str) -> np.ndarray[Any, Any]:
+        # Convert input to list if it's a single string
+        if isinstance(sentences, str):
+            sentences = [sentences]
+
+        # Create fake embeddings with consistent similarities
+        embeddings = np.zeros((len(sentences), 3))
+        for i, sentence in enumerate(sentences):
+            if "converter" in sentence.lower():
+                embeddings[i] = [0, 0, 0.9]
+            elif "reader" in sentence.lower():
+                embeddings[i] = [0, 1, 0]
+            else:
+                embeddings[i] = [0, 0, 1]
+        return embeddings
 
 
 class FakeHaystackServiceResource:
     def __init__(
-        self, get_component_schemas_response: dict[str, Any] | None = None, exception: Exception | None = None
+        self,
+        get_component_schemas_response: dict[str, Any] | None = None,
+        get_component_io_response: dict[str, Any] | None = None,
+        exception: Exception | None = None,
     ):
         self._get_component_schemas_response = get_component_schemas_response
+        self._get_component_io_response = get_component_io_response
         self._exception = exception
 
     async def get_component_schemas(self) -> dict[str, Any]:
@@ -24,8 +52,8 @@ class FakeHaystackServiceResource:
     async def get_component_input_output(self, component_name: str) -> dict[str, Any]:
         if self._exception:
             raise self._exception
-        if self._get_component_schemas_response is not None:
-            return self._get_component_schemas_response
+        if self._get_component_io_response is not None:
+            return self._get_component_io_response
         raise NotImplementedError
 
 
@@ -42,7 +70,7 @@ class FakeClient(BaseFakeClient):
 async def test_get_component_definition_success() -> None:
     # Sample component definition similar to the example provided
     component_type = "haystack.components.converters.xlsx.XLSXToDocument"
-    response: dict[str, Any] = {
+    schema_response: dict[str, Any] = {
         "component_schema": {
             "definitions": {
                 "Components": {
@@ -108,11 +136,9 @@ async def test_get_component_definition_success() -> None:
         },
     }
 
-    class FakeHaystackServiceResourceWithIO(FakeHaystackServiceResource):
-        async def get_component_input_output(self, component_name: str) -> dict[str, Any]:
-            return io_response
-
-    resource = FakeHaystackServiceResourceWithIO(get_component_schemas_response=response)
+    resource = FakeHaystackServiceResource(
+        get_component_schemas_response=schema_response, get_component_io_response=io_response
+    )
     client = FakeClient(resource)
     result = await get_component_definition(client, component_type)
 
@@ -149,12 +175,88 @@ async def test_get_component_definition_not_found() -> None:
 
 
 @pytest.mark.asyncio
+async def test_search_component_definition_success() -> None:
+    schema_response = {
+        "component_schema": {
+            "definitions": {
+                "Components": {
+                    "XLSXConverter": {
+                        "title": "XLSXConverter",
+                        "description": "Converts Excel files",
+                        "properties": {
+                            "type": {
+                                "const": "haystack.components.converters.XLSXConverter",
+                                "family": "converters",
+                            },
+                        },
+                    },
+                    "PDFReader": {
+                        "title": "PDFReader",
+                        "description": "Reads PDF files",
+                        "properties": {
+                            "type": {
+                                "const": "haystack.components.readers.PDFReader",
+                                "family": "readers",
+                            },
+                        },
+                    },
+                }
+            }
+        }
+    }
+
+    io_response = {
+        "input": {"properties": {"file_path": {"type": "string"}}},
+        "output": {"properties": {"text": {"type": "string"}}},
+    }
+
+    resource = FakeHaystackServiceResource(
+        get_component_schemas_response=schema_response, get_component_io_response=io_response
+    )
+    client = FakeClient(resource)
+    model = FakeModel()
+
+    # Search for converters
+    result = await search_component_definition(client, "convert excel files", model)
+    assert "XLSXConverter" in result
+    assert "Similarity Score:" in result
+    assert "haystack.components.converters.XLSXConverter" in result
+
+    # Search for readers
+    result = await search_component_definition(client, "read pdf documents", model)
+    assert "PDFReader" in result
+    assert "Similarity Score:" in result
+    assert "haystack.components.readers.PDFReader" in result
+
+
+@pytest.mark.asyncio
 async def test_get_component_definition_api_error() -> None:
     resource = FakeHaystackServiceResource(exception=UnexpectedAPIError(status_code=500, message="API Error"))
     client = FakeClient(resource)
     result = await get_component_definition(client, "some.component")
     assert "Failed to retrieve component definition" in result
     assert "API Error" in result
+
+
+@pytest.mark.asyncio
+async def test_search_component_definition_no_components() -> None:
+    schema_response: dict[str, Any] = {"component_schema": {"definitions": {"Components": {}}}}
+    resource = FakeHaystackServiceResource(get_component_schemas_response=schema_response)
+    client = FakeClient(resource)
+    model = FakeModel()
+
+    result = await search_component_definition(client, "test query", model)
+    assert "No components found" in result
+
+
+@pytest.mark.asyncio
+async def test_search_component_definition_api_error() -> None:
+    resource = FakeHaystackServiceResource(exception=UnexpectedAPIError(status_code=500, message="API Error"))
+    client = FakeClient(resource)
+    model = FakeModel()
+
+    result = await search_component_definition(client, "test query", model)
+    assert "Failed to retrieve component schemas" in result
 
 
 @pytest.mark.asyncio
