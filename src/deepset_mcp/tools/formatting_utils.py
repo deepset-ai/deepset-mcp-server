@@ -1,4 +1,5 @@
 from deepset_mcp.api.pipeline.models import DeepsetPipeline, PipelineValidationResult
+from deepset_mcp.api.pipeline_template.models import PipelineTemplate
 
 
 def pipeline_to_llm_readable_string(pipeline: DeepsetPipeline) -> str:
