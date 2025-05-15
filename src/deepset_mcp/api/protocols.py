@@ -84,6 +84,10 @@ class AsyncClientProtocol(Protocol):
     def pipeline_templates(self, workspace: str) -> "PipelineTemplateResourceProtocol":
         """Access pipeline templates in the specified workspace."""
         ...
+        
+    def indexes(self, workspace: str) -> "IndexResourceProtocol":
+        """Access indexes in the specified workspace."""
+        ...
 
 
 class PipelineTemplateResourceProtocol(Protocol):
