@@ -105,7 +105,7 @@ class TestPipelineTemplateResource:
         # Create client with predefined response
         client = DummyClient(
             responses={
-                "test-workspace/pipeline_templates?limit=100&page_number=1&field=created_at&order=DESC": {
+                "test-workspace/pipeline_templates": {
                     "data": sample_templates,
                     "has_more": False,
                     "total": 2,
@@ -125,10 +125,7 @@ class TestPipelineTemplateResource:
 
         # Verify request
         assert len(client.requests) == 1
-        assert (
-            client.requests[0]["endpoint"]
-            == "/v1/workspaces/test-workspace/pipeline_templates?limit=100&page_number=1&field=created_at&order=DESC"
-        )
+        assert client.requests[0]["endpoint"] == "/v1/workspaces/test-workspace/pipeline_templates"
         assert client.requests[0]["method"] == "GET"
 
     @pytest.mark.asyncio
@@ -142,7 +139,7 @@ class TestPipelineTemplateResource:
         # Create client with predefined response
         client = DummyClient(
             responses={
-                "test-workspace/pipeline_templates?limit=1&page_number=1&field=created_at&order=DESC": {
+                "test-workspace/pipeline_templates": {
                     "data": sample_templates,
                     "has_more": True,
                     "total": 2,
@@ -160,10 +157,7 @@ class TestPipelineTemplateResource:
         assert result[0].template_name == "Template 1"
 
         # Verify request
-        assert (
-            client.requests[0]["endpoint"]
-            == "/v1/workspaces/test-workspace/pipeline_templates?limit=1&page_number=1&field=created_at&order=DESC"
-        )
+        assert client.requests[0]["endpoint"] == "/v1/workspaces/test-workspace/pipeline_templates"
 
     @pytest.mark.asyncio
     async def test_list_templates_empty_result(self) -> None:
@@ -171,7 +165,7 @@ class TestPipelineTemplateResource:
         # Create client with empty response
         client = DummyClient(
             responses={
-                "test-workspace/pipeline_templates?limit=100&page_number=1&field=created_at&order=DESC": {
+                "test-workspace/pipeline_templates": {
                     "data": [],
                     "has_more": False,
                     "total": 0,

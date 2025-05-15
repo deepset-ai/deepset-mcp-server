@@ -38,6 +38,7 @@ class BaseFakeClient(AsyncClientProtocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        **kwargs: Any,
     ) -> TransportResponse[T]: ...
 
     @overload
@@ -49,6 +50,7 @@ class BaseFakeClient(AsyncClientProtocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        **kwargs: Any,
     ) -> TransportResponse[Any]: ...
 
     async def request(
@@ -59,6 +61,7 @@ class BaseFakeClient(AsyncClientProtocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        **kwargs: Any,
     ) -> TransportResponse[Any]:
         """
         Record the request and return a predefined response.
@@ -84,7 +87,7 @@ class BaseFakeClient(AsyncClientProtocol):
         ValueError
             If no response is predefined for the endpoint.
         """
-        self.requests.append({"endpoint": endpoint, "method": method, "data": data, "headers": headers})
+        self.requests.append({"endpoint": endpoint, "method": method, "data": data, "headers": headers, **kwargs})
 
         # Find the appropriate response
         for resp_key, resp_data in self.responses.items():

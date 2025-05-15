@@ -79,7 +79,7 @@ class PipelineResource(PipelineResourceProtocol):
 
         resp = await self._client.request(
             endpoint=f"v1/workspaces/{self._workspace}/pipelines",
-            method="GET", 
+            method="GET",
             params=params,
         )
 

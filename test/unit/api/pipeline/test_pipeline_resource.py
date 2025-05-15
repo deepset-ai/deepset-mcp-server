@@ -68,7 +68,7 @@ class TestPipelineResource:
         # Create client with predefined response
         client = DummyClient(
             responses={
-                "test-workspace/pipelines?page_number=1&limit=10": {
+                "test-workspace/pipelines": {
                     "data": sample_pipelines,
                     "has_more": False,
                     "total": 2,
@@ -88,8 +88,9 @@ class TestPipelineResource:
 
         # Verify request
         assert len(client.requests) == 1
-        assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines?page_number=1&limit=10"
+        assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines"
         assert client.requests[0]["method"] == "GET"
+        assert client.requests[0]["params"] == {"page_number": 1, "limit": 10}
 
     @pytest.mark.asyncio
     async def test_list_pipelines_with_pagination(self) -> None:
@@ -103,7 +104,7 @@ class TestPipelineResource:
         # Create client with predefined response
         client = DummyClient(
             responses={
-                "test-workspace/pipelines?page_number=2&limit=5": {
+                "test-workspace/pipelines": {
                     "data": sample_pipelines,
                     "has_more": False,
                     "total": 10,
@@ -121,15 +122,14 @@ class TestPipelineResource:
         assert result[1].id == "4"
 
         # Verify request
-        assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines?page_number=2&limit=5"
+        assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines"
+        assert client.requests[0]["params"] == {"page_number": 2, "limit": 5}
 
     @pytest.mark.asyncio
     async def test_list_pipelines_empty_result(self) -> None:
         """Test listing pipelines when there are no pipelines."""
         # Create client with empty response
-        client = DummyClient(
-            responses={"test-workspace/pipelines?page_number=1&limit=10": {"data": [], "has_more": False, "total": 0}}
-        )
+        client = DummyClient(responses={"test-workspace/pipelines": {"data": [], "has_more": False, "total": 0}})
 
         # Create resource and call list method
         resource = PipelineResource(client=client, workspace="test-workspace")
@@ -142,7 +142,7 @@ class TestPipelineResource:
     async def test_list_pipelines_error(self) -> None:
         """Test handling of errors when listing pipelines."""
         # Create client that raises an exception
-        client = DummyClient(responses={"test-workspace/pipelines?page_number=1&limit=10": ValueError("API Error")})
+        client = DummyClient(responses={"test-workspace/pipelines": ValueError("API Error")})
 
         # Create resource
         resource = PipelineResource(client=client, workspace="test-workspace")
@@ -155,9 +155,7 @@ class TestPipelineResource:
     async def test_list_pipelines_with_zero_limit(self) -> None:
         """Test listing pipelines with a limit of zero (edge case)."""
         # Create client
-        client = DummyClient(
-            responses={"test-workspace/pipelines?page_number=1&limit=0": {"data": [], "has_more": False, "total": 10}}
-        )
+        client = DummyClient(responses={"test-workspace/pipelines": {"data": [], "has_more": False, "total": 10}})
 
         # Create resource and call list method with limit=0
         resource = PipelineResource(client=client, workspace="test-workspace")
@@ -167,7 +165,8 @@ class TestPipelineResource:
         assert len(result) == 0
 
         # Verify request
-        assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines?page_number=1&limit=0"
+        assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines"
+        assert client.requests[0]["params"] == {"page_number": 1, "limit": 0}
 
     @pytest.mark.asyncio
     async def test_get_pipeline_with_yaml(self) -> None:
