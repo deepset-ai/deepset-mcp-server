@@ -4,7 +4,7 @@ from deepset_mcp.tools.formatting_utils import pipeline_template_to_llm_readable
 
 
 async def list_pipeline_templates(client: AsyncClientProtocol, workspace: str) -> str:
-    """Retrieves a list of all pipeline templates available within the currently configured deepset workspace."""
+    """Retrieves a list of all available pipeline templates."""
     try:
         response = await client.pipeline_templates(workspace=workspace).list_templates()
         formatted_templates = [pipeline_template_to_llm_readable_string(t) for t in response]
@@ -16,7 +16,7 @@ async def list_pipeline_templates(client: AsyncClientProtocol, workspace: str) -
 
 
 async def get_pipeline_template(client: AsyncClientProtocol, workspace: str, template_name: str) -> str:
-    """Fetches detailed configuration information for a specific pipeline template, identified by its unique `template_name`."""
+    """Fetches detailed information for a specific pipeline template, identified by its `template_name`."""
     try:
         response = await client.pipeline_templates(workspace=workspace).get_template(template_name)
         return pipeline_template_to_llm_readable_string(response)

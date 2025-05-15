@@ -10,7 +10,6 @@ def pipeline_template_to_llm_readable_string(template: PipelineTemplate) -> str:
 ### Basic Information
 
 **Name:** {template.template_name}
-**ID:** {template.pipeline_template_id}
 **Author:** {template.author}
 **Description:** {template.description}
 '''
@@ -20,7 +19,9 @@ def pipeline_template_to_llm_readable_string(template: PipelineTemplate) -> str:
         template_parts.append("\n### Best For\n" + "\n".join(f"- {use}" for use in template.best_for))
 
     if template.potential_applications:
-        template_parts.append("\n### Potential Applications\n" + "\n".join(f"- {app}" for app in template.potential_applications))
+        template_parts.append(
+            "\n### Potential Applications\n" + "\n".join(f"- {app}" for app in template.potential_applications)
+        )
 
     if template.tags:
         template_parts.append("\n### Tags\n" + "\n".join(f"- {tag.name}" for tag in template.tags))
@@ -29,7 +30,9 @@ def pipeline_template_to_llm_readable_string(template: PipelineTemplate) -> str:
         template_parts.append("\n### Template Configuration")
         template_parts.append(f"\n```yaml\n{template.yaml_config}\n```")
 
-    template_parts.append(f'\n</pipeline_template name="{template.template_name}" id="{template.pipeline_template_id}">')
+    template_parts.append(
+        f'\n</pipeline_template name="{template.template_name}" id="{template.pipeline_template_id}">'
+    )
 
     return "\n".join(template_parts)
 

@@ -1,11 +1,10 @@
-from unittest.mock import AsyncMock
+from uuid import UUID
 
 import pytest
-from uuid import UUID
 
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.pipeline_template.models import PipelineTemplate, PipelineTemplateTag
-from deepset_mcp.tools.pipeline_template import list_pipeline_templates, get_pipeline_template
+from deepset_mcp.tools.pipeline_template import get_pipeline_template, list_pipeline_templates
 from test.unit.conftest import BaseFakeClient
 
 
@@ -56,7 +55,7 @@ async def test_list_pipeline_templates_returns_formatted_string() -> None:
         best_for=["use case 1", "use case 2"],
         potential_applications=["app 1", "app 2"],
         query_yaml="config1: value1",
-        tags=[PipelineTemplateTag(name="tag1", tag_id=UUID("10000000-0000-0000-0000-000000000001"))]
+        tags=[PipelineTemplateTag(name="tag1", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
     )
     template2 = PipelineTemplate(
         pipeline_name="template2",
@@ -66,7 +65,7 @@ async def test_list_pipeline_templates_returns_formatted_string() -> None:
         best_for=["use case 3"],
         potential_applications=["app 3"],
         query_yaml="config2: value2",
-        tags=[PipelineTemplateTag(name="tag2", tag_id=UUID("20000000-0000-0000-0000-000000000002"))]
+        tags=[PipelineTemplateTag(name="tag2", tag_id=UUID("20000000-0000-0000-0000-000000000002"))],
     )
     resource = FakePipelineTemplateResource(list_response=[template1, template2])
     client = FakeClient(resource)
@@ -108,7 +107,7 @@ async def test_get_pipeline_template_returns_formatted_string() -> None:
         best_for=["use case 1"],
         potential_applications=["app 1"],
         query_yaml="config: value",
-        tags=[PipelineTemplateTag(name="tag1", tag_id=UUID("10000000-0000-0000-0000-000000000001"))]
+        tags=[PipelineTemplateTag(name="tag1", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
     )
     resource = FakePipelineTemplateResource(get_response=template)
     client = FakeClient(resource)
