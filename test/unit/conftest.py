@@ -5,6 +5,7 @@ from typing import Any, Self, TypeVar, overload
 from deepset_mcp.api.protocols import (
     AsyncClientProtocol,
     HaystackServiceProtocol,
+    IndexResourceProtocol,
     PipelineResourceProtocol,
     PipelineTemplateResourceProtocol,
 )
@@ -139,4 +140,8 @@ class BaseFakeClient(AsyncClientProtocol):
 
     def pipeline_templates(self, workspace: str) -> PipelineTemplateResourceProtocol:
         """Overwrite this method when testing PipelineTemplateResource."""
+        raise NotImplementedError
+
+    def indexes(self, workspace: str) -> IndexResourceProtocol:
+        """Overwrite this method when testing IndexResource."""
         raise NotImplementedError

@@ -1,9 +1,9 @@
 from types import TracebackType
 from typing import Any, Protocol, Self, TypeVar, overload
 
+from deepset_mcp.api.indexes.models import Index, IndexList
 from deepset_mcp.api.pipeline.models import DeepsetPipeline, NoContentResponse, PipelineValidationResult
 from deepset_mcp.api.pipeline_template.models import PipelineTemplate
-from deepset_mcp.api.indexes.models import Index, IndexList
 from deepset_mcp.api.transport import TransportResponse
 
 
@@ -87,7 +87,7 @@ class AsyncClientProtocol(Protocol):
     def pipeline_templates(self, workspace: str) -> "PipelineTemplateResourceProtocol":
         """Access pipeline templates in the specified workspace."""
         ...
-        
+
     def indexes(self, workspace: str) -> "IndexResourceProtocol":
         """Access indexes in the specified workspace."""
         ...
@@ -95,12 +95,12 @@ class AsyncClientProtocol(Protocol):
 
 class IndexResourceProtocol(Protocol):
     """Protocol defining the implementation for IndexResource."""
-    
-    async def list(self, limit: int | None = None, page_number: int | None = None) -> IndexList:
+
+    async def list(self, limit: int = 10, page_number: int = 1) -> IndexList:
         """List indexes in the configured workspace."""
         ...
-        
-    async def get(self, name: str) -> Index:
+
+    async def get(self, index_name: str) -> Index:
         """Fetch a single index by its name."""
         ...
 

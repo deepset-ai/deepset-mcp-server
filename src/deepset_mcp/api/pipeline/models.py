@@ -3,6 +3,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
+from deepset_mcp.api.shared_models import DeepsetUser
+
 
 class PipelineServiceLevel(StrEnum):
     """Describes the service level of a pipeline."""
@@ -10,15 +12,6 @@ class PipelineServiceLevel(StrEnum):
     PRODUCTION = "PRODUCTION"
     DEVELOPMENT = "DEVELOPMENT"
     DRAFT = "DRAFT"
-
-
-class DeepsetUser(BaseModel):
-    """Model representing a user on the deepset platform."""
-
-    id: str = Field(alias="user_id")
-    given_name: str | None = None
-    family_name: str | None = None
-    email: str | None = None
 
 
 class DeepsetPipeline(BaseModel):

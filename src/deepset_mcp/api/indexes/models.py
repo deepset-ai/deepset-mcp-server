@@ -1,15 +1,9 @@
 from datetime import datetime
-from typing import Optional
+from typing import Any
 
 from pydantic import BaseModel
 
-
-class User(BaseModel):
-    """A deepset user."""
-
-    given_name: str
-    family_name: str
-    user_id: str
+from deepset_mcp.api.shared_models import DeepsetUser
 
 
 class IndexStatus(BaseModel):
@@ -27,18 +21,18 @@ class Index(BaseModel):
 
     pipeline_index_id: str
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     config_yaml: str
     workspace_id: str
-    settings: dict
+    settings: dict[str, Any]
     desired_status: str
-    deployed_at: Optional[datetime] = None
-    last_edited_at: Optional[datetime] = None
+    deployed_at: datetime | None = None
+    last_edited_at: datetime | None = None
     max_index_replica_count: int
     created_at: datetime
-    updated_at: Optional[datetime] = None
-    created_by: User
-    last_edited_by: Optional[User] = None
+    updated_at: datetime | None = None
+    created_by: DeepsetUser
+    last_edited_by: DeepsetUser | None = None
     status: IndexStatus
 
 
