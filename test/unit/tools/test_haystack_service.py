@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any
 
 import numpy as np
 import pytest
@@ -14,7 +14,7 @@ from test.unit.conftest import BaseFakeClient
 
 
 class FakeModel(ModelProtocol):
-    def encode(self, sentences: List[str] | str) -> np.ndarray:
+    def encode(self, sentences: list[str] | str) -> np.ndarray[Any, Any]:
         # Convert input to list if it's a single string
         if isinstance(sentences, str):
             sentences = [sentences]
@@ -23,7 +23,7 @@ class FakeModel(ModelProtocol):
         embeddings = np.zeros((len(sentences), 3))
         for i, sentence in enumerate(sentences):
             if "converter" in sentence.lower():
-                embeddings[i] = [1, 0, 0]
+                embeddings[i] = [0, 0, 0.9]
             elif "reader" in sentence.lower():
                 embeddings[i] = [0, 1, 0]
             else:
@@ -137,8 +137,7 @@ async def test_get_component_definition_success() -> None:
     }
 
     resource = FakeHaystackServiceResource(
-        get_component_schemas_response=schema_response,
-        get_component_io_response=io_response
+        get_component_schemas_response=schema_response, get_component_io_response=io_response
     )
     client = FakeClient(resource)
     result = await get_component_definition(client, component_type)
@@ -208,12 +207,11 @@ async def test_search_component_definition_success() -> None:
 
     io_response = {
         "input": {"properties": {"file_path": {"type": "string"}}},
-        "output": {"properties": {"text": {"type": "string"}}}
+        "output": {"properties": {"text": {"type": "string"}}},
     }
 
     resource = FakeHaystackServiceResource(
-        get_component_schemas_response=schema_response,
-        get_component_io_response=io_response
+        get_component_schemas_response=schema_response, get_component_io_response=io_response
     )
     client = FakeClient(resource)
     model = FakeModel()
@@ -242,7 +240,7 @@ async def test_get_component_definition_api_error() -> None:
 
 @pytest.mark.asyncio
 async def test_search_component_definition_no_components() -> None:
-    schema_response = {"component_schema": {"definitions": {"Components": {}}}}
+    schema_response: dict[str, Any] = {"component_schema": {"definitions": {"Components": {}}}}
     resource = FakeHaystackServiceResource(get_component_schemas_response=schema_response)
     client = FakeClient(resource)
     model = FakeModel()

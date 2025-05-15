@@ -1,15 +1,13 @@
 from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.protocols import AsyncClientProtocol
-from numpy.typing import NDArray
-from typing import Dict, List, Any, Optional, Tuple
-
 from deepset_mcp.tools.component_helper import (
     extract_component_info,
-    format_io_info,
     extract_component_texts,
+    format_io_info,
 )
 from deepset_mcp.tools.model_protocol import ModelProtocol
 
+import numpy as np
 
 async def get_component_definition(client: AsyncClientProtocol, component_type: str) -> str:
     """Returns the definition of a specific Haystack component.
@@ -80,10 +78,9 @@ async def search_component_definition(
     components = response["component_schema"]["definitions"]["Components"]
 
     # Extract text for embedding from all components
-    component_texts: List[Tuple[str, str]] = [
-        extract_component_texts(comp) for comp in components.values()
-    ]
-    
+    component_texts: list[tuple[str, str]] = [extract_component_texts(comp) for comp in components.values()]
+    component_types: list[str] = [c[0] for c in component_texts]
+
     if not component_texts:
         return "No components found"
 
@@ -91,19 +88,23 @@ async def search_component_definition(
     query_embedding = model.encode(query)
     component_embeddings = model.encode([text for _, text in component_texts])
 
-    # Compute similarities
-    similarities = query_embedding @ component_embeddings.T
+    query_embedding_reshaped = query_embedding.reshape(1, -1)
 
-    # Get indices of top_k most similar components
-    top_indices = similarities.argsort()[-top_k:][::-1]
+    # Calculate dot product between target and all paths
+    # This gives us a similarity score for each path
+    similarities = np.dot(component_embeddings, query_embedding_reshaped.T).flatten()
 
-    # Format results
+    # Create (path, similarity) pairs
+    component_similarities = list(zip(component_types, similarities))
+
+    # Sort by similarity score in descending order
+    component_similarities.sort(key=lambda x: x[1], reverse=True)
+
+    top_components = component_similarities[:top_k]
     results = []
-    for idx in top_indices:
-        component_type = component_texts[idx][0]
-        # Get full component definition
+    for component_type, sim in top_components:
         definition = await get_component_definition(client, component_type)
-        results.append(f"Similarity Score: {similarities[idx]:.3f}\n{definition}\n{'-' * 80}\n")
+        results.append(f"Similarity Score: {sim:.3f}\n{definition}\n{'-' * 80}\n")
 
     return "\n".join(results)
 

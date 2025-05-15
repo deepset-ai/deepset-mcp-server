@@ -1,7 +1,11 @@
 from typing import Any, Protocol
+
 import numpy as np
 
+
 class ModelProtocol(Protocol):
+    """Protocol for static embedding models."""
+
     def encode(self, sentences: list[str] | str) -> np.ndarray[Any, Any]:
         """
         Encodes a single or multiple sentences.

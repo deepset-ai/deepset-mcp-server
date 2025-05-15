@@ -1,11 +1,11 @@
 from deepset_mcp.tools.component_helper import (
     extract_component_info,
-    format_io_info,
     extract_component_texts,
+    format_io_info,
 )
 
 
-def test_extract_component_info():
+def test_extract_component_info() -> None:
     component_def = {
         "title": "TestComponent",
         "description": "A test component",
@@ -44,7 +44,7 @@ def test_extract_component_info():
     assert "Second parameter" in result
 
 
-def test_format_io_info():
+def test_format_io_info() -> None:
     io_info = {
         "input": {
             "properties": {
@@ -92,7 +92,7 @@ def test_format_io_info():
     assert "A field" in result
 
 
-def test_extract_component_texts():
+def test_extract_component_texts() -> None:
     component_def = {
         "title": "TestComponent",
         "description": "A test component",

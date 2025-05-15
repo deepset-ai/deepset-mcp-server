@@ -1,7 +1,7 @@
-from typing import Any, Dict, Tuple, Optional
+from typing import Any
 
 
-def extract_component_info(components: Dict[str, Any], component_def: Dict[str, Any]) -> str:
+def extract_component_info(components: dict[str, Any], component_def: dict[str, Any]) -> str:
     """Extracts and formats component information from its definition.
 
     Args:
@@ -37,7 +37,7 @@ def extract_component_info(components: Dict[str, Any], component_def: Dict[str, 
     return "\n".join(parts)
 
 
-def format_io_info(io_info: Dict[str, Any]) -> str:
+def format_io_info(io_info: dict[str, Any]) -> str:
     """Formats the input/output information for a component.
 
     Args:
@@ -108,7 +108,7 @@ def format_io_info(io_info: Dict[str, Any]) -> str:
     return "\n".join(parts)
 
 
-def extract_component_texts(component_def: Dict[str, Any]) -> Tuple[str, str]:
+def extract_component_texts(component_def: dict[str, Any]) -> tuple[str, str]:
     """Extracts the component name and description for embedding.
 
     Args:

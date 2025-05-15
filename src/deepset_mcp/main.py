@@ -6,6 +6,7 @@ from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.tools.haystack_service import (
     get_component_definition as get_component_definition_tool,
     list_component_families as list_component_families_tool,
+    search_component_definition as search_component_definition_tool,
 )
 from deepset_mcp.tools.pipeline import (
     create_pipeline as create_pipeline_tool,
@@ -14,6 +15,10 @@ from deepset_mcp.tools.pipeline import (
     update_pipeline as update_pipeline_tool,
     validate_pipeline as validate_pipeline_tool,
 )
+
+from model2vec import StaticModel  # type: ignore
+
+INITIALIZED_MODEL = StaticModel.from_pretrained("minishlab/potion-base-2M")
 
 # Initialize MCP Server
 mcp = FastMCP("Deepset Cloud MCP")
@@ -133,6 +138,18 @@ async def validate_pipeline(yaml_configuration: str) -> str:
 
     return response
 
+@mcp.tool()
+async def search_component_definitions(query: str) -> str:
+    """Use this to search for components in deepset.
+
+    You can use full natural language queries to find components.
+    You can also use simple keywords.
+    Use this if you want to find the definition for a component but you are not sure what the exact name of the component is.
+    """
+    async with AsyncDeepsetClient() as client:
+        response = await search_component_definition_tool(client=client, query=query, model=INITIALIZED_MODEL)
+
+    return response
 
 #
 #
