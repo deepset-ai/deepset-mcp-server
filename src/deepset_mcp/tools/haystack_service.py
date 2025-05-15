@@ -1,3 +1,5 @@
+import numpy as np
+
 from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.tools.component_helper import (
@@ -7,7 +9,6 @@ from deepset_mcp.tools.component_helper import (
 )
 from deepset_mcp.tools.model_protocol import ModelProtocol
 
-import numpy as np
 
 async def get_component_definition(client: AsyncClientProtocol, component_type: str) -> str:
     """Returns the definition of a specific Haystack component.
@@ -95,7 +96,7 @@ async def search_component_definition(
     similarities = np.dot(component_embeddings, query_embedding_reshaped.T).flatten()
 
     # Create (path, similarity) pairs
-    component_similarities = list(zip(component_types, similarities))
+    component_similarities = list(zip(component_types, similarities, strict=False))
 
     # Sort by similarity score in descending order
     component_similarities.sort(key=lambda x: x[1], reverse=True)
