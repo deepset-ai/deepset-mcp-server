@@ -39,9 +39,10 @@ class HaystackServiceResource(HaystackServiceProtocol):
             The component input/output schema as a dictionary
         """
         resp = await self._client.request(
-            endpoint=f"v1/haystack/components/input-output?domain=deepset-cloud&names={component_name}",
+            endpoint="v1/haystack/components/input-output",
             method="GET",
             headers={"accept": "application/json"},
+            params={"domain": "deepset-cloud", "names": component_name},
             response_type=list[dict[str, Any]],
         )
 

@@ -33,6 +33,7 @@ class AsyncClientProtocol(Protocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        **kwargs: Any,
     ) -> TransportResponse[T]: ...
 
     @overload
@@ -44,6 +45,7 @@ class AsyncClientProtocol(Protocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        **kwargs: Any,
     ) -> TransportResponse[Any]: ...
 
     async def request(
@@ -54,6 +56,7 @@ class AsyncClientProtocol(Protocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        **kwargs: Any,
     ) -> TransportResponse[Any]:
         """Make a request to the API."""
         ...
