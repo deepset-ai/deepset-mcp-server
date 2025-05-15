@@ -77,10 +77,10 @@ class PipelineResource(PipelineResourceProtocol):
             "limit": limit,
         }
 
-        query = "?" + "&".join(f"{k}={v}" for k, v in params.items()) if params else ""
         resp = await self._client.request(
-            endpoint=f"v1/workspaces/{self._workspace}/pipelines{query}",
-            method="GET",
+            endpoint=f"v1/workspaces/{self._workspace}/pipelines",
+            method="GET", 
+            params=params,
         )
 
         raise_for_status(resp)
