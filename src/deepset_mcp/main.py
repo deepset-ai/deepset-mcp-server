@@ -50,6 +50,35 @@ async def list_pipelines() -> str:
 
 
 @mcp.tool()
+async def list_pipeline_templates() -> str:
+    """Retrieves a list of all pipeline templates available within the currently configured deepset workspace.
+
+    Use this when you need to know the available pipeline templates and their capabilities.
+    """
+    workspace = get_workspace()
+    async with AsyncDeepsetClient() as client:
+        response = await list_pipeline_templates_tool(client, workspace)
+
+    return response
+
+
+@mcp.tool()
+async def get_pipeline_template(template_name: str) -> str:
+    """Fetches detailed configuration information for a specific pipeline template.
+
+    This includes its YAML configuration, metadata, and recommended use cases.
+    Use this when you need to inspect a specific template's structure or settings.
+
+    :param template_name: Name of the pipeline template to retrieve.
+    """
+    workspace = get_workspace()
+    async with AsyncDeepsetClient() as client:
+        response = await get_pipeline_template_tool(client, workspace, template_name)
+
+    return response
+
+
+@mcp.tool()
 async def get_pipeline(pipeline_name: str) -> str:
     """Fetches detailed configuration information for a specific pipeline, identified by its unique `pipeline_name`.
 
