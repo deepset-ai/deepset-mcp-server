@@ -1,5 +1,13 @@
+import numpy as np
+
 from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.protocols import AsyncClientProtocol
+from deepset_mcp.tools.component_helper import (
+    extract_component_info,
+    extract_component_texts,
+    format_io_info,
+)
+from deepset_mcp.tools.model_protocol import ModelProtocol
 
 
 async def get_component_definition(client: AsyncClientProtocol, component_type: str) -> str:
@@ -32,95 +40,74 @@ async def get_component_definition(client: AsyncClientProtocol, component_type: 
     if not component_def:
         return f"Component not found: {component_type}"
 
-    # Extract relevant information
-    component_type_info = component_def["properties"]["type"]
-    init_params = component_def["properties"].get("init_parameters", {}).get("properties", {})
-
-    # Format the basic component information
-    parts = [
-        f"Component: {component_type}",
-        f"Name: {component_def.get('title', 'Unknown')}",
-        f"Family: {component_type_info.get('family', 'Unknown')}",
-        f"Family Description: {component_type_info.get('family_description', 'No description available.')}",
-        f"\nDescription:\n{component_def.get('description', 'No description available.')}\n",
-        "\nInitialization Parameters:",
-    ]
-
-    if not init_params:
-        parts.append("  No initialization parameters")
-    else:
-        for param_name, param_info in init_params.items():
-            param_type = param_info.get("_annotation", param_info.get("type", "Unknown"))
-            param_desc = param_info.get("description", "No description available.")
-            default = f" (default: {param_info['default']})" if "default" in param_info else ""
-            parts.append(f"  {param_name}: {param_type}{default}\n    {param_desc}")
+    # Get component information
+    parts = [extract_component_info(components, component_def)]
 
     # Fetch and add input/output information
     try:
         # Extract component name from the full path
         component_name = component_type.split(".")[-1]
         io_info = await haystack_service.get_component_input_output(component_name)
-
-        # Add Input Schema
-        parts.append("\nInput Schema:")
-        if "input" in io_info:
-            input_props = io_info["input"].get("properties", {})
-            if not input_props:
-                parts.append("  No input parameters")
-            else:
-                required = io_info["input"].get("required", [])
-                for param_name, param_info in input_props.items():
-                    req_marker = " (required)" if param_name in required else ""
-                    param_type = param_info.get("_annotation", param_info.get("type", "Unknown"))
-                    param_desc = param_info.get("description", "No description available.")
-                    default = f" (default: {param_info['default']})" if "default" in param_info else ""
-                    parts.append(f"  {param_name}: {param_type}{req_marker}{default}\n    {param_desc}")
-        else:
-            parts.append("  Input schema not available")
-
-        # Add Output Schema
-        parts.append("\nOutput Schema:")
-        if "output" in io_info and isinstance(io_info["output"], dict):
-            output_info = io_info["output"]
-            if "properties" in output_info:
-                output_props = output_info.get("properties", {})
-                if not output_props:
-                    parts.append("  No output parameters")
-                else:
-                    required = output_info.get("required", [])
-                    for param_name, param_info in output_props.items():
-                        req_marker = " (required)" if param_name in required else ""
-                        param_type = param_info.get("_annotation", param_info.get("type", "Unknown"))
-                        param_desc = param_info.get("description", "No description available.")
-                        default = f" (default: {param_info['default']})" if "default" in param_info else ""
-                        parts.append(f"  {param_name}: {param_type}{req_marker}{default}\n    {param_desc}")
-
-                    # Include any definitions if they exist
-                    if "definitions" in output_info:
-                        parts.append("\n  Definitions:")
-                        for def_name, def_info in output_info["definitions"].items():
-                            parts.append(f"\n    {def_name}:")
-                            if "properties" in def_info:
-                                def_required = def_info.get("required", [])
-                                for prop_name, prop_info in def_info["properties"].items():
-                                    req_marker = " (required)" if prop_name in def_required else ""
-                                    prop_type = prop_info.get("_annotation", prop_info.get("type", "Unknown"))
-                                    prop_desc = prop_info.get("description", "No description available.")
-                                    default = f" (default: {prop_info['default']})" if "default" in prop_info else ""
-                                    parts.append(
-                                        f"      {prop_name}: {prop_type}{req_marker}{default}\n        {prop_desc}"
-                                    )
-            else:
-                # Simple output schema
-                desc = output_info.get("description", "No description available.")
-                output_type = output_info.get("type", "Unknown")
-                parts.append(f"  Type: {output_type}\n  {desc}")
-        else:
-            parts.append("  Output schema not available")
+        parts.append(format_io_info(io_info))
     except Exception as e:
         parts.append(f"\nFailed to fetch input/output schema: {str(e)}")
 
     return "\n".join(parts)
+
+
+async def search_component_definition(
+    client: AsyncClientProtocol, query: str, model: ModelProtocol, top_k: int = 5
+) -> str:
+    """Searches for components based on name or description using semantic similarity.
+
+    Args:
+        client: The API client to use
+        query: The search query
+        model: The model to use for computing embeddings
+        top_k: Maximum number of results to return (default: 5)
+
+    Returns:
+        A formatted string containing the matched component definitions
+    """
+    haystack_service = client.haystack_service()
+
+    try:
+        response = await haystack_service.get_component_schemas()
+    except UnexpectedAPIError as e:
+        return f"Failed to retrieve component schemas: {e}"
+
+    components = response["component_schema"]["definitions"]["Components"]
+
+    # Extract text for embedding from all components
+    component_texts: list[tuple[str, str]] = [extract_component_texts(comp) for comp in components.values()]
+    component_types: list[str] = [c[0] for c in component_texts]
+
+    if not component_texts:
+        return "No components found"
+
+    # Compute embeddings
+    query_embedding = model.encode(query)
+    component_embeddings = model.encode([text for _, text in component_texts])
+
+    query_embedding_reshaped = query_embedding.reshape(1, -1)
+
+    # Calculate dot product between target and all paths
+    # This gives us a similarity score for each path
+    similarities = np.dot(component_embeddings, query_embedding_reshaped.T).flatten()
+
+    # Create (path, similarity) pairs
+    component_similarities = list(zip(component_types, similarities, strict=False))
+
+    # Sort by similarity score in descending order
+    component_similarities.sort(key=lambda x: x[1], reverse=True)
+
+    top_components = component_similarities[:top_k]
+    results = []
+    for component_type, sim in top_components:
+        definition = await get_component_definition(client, component_type)
+        results.append(f"Similarity Score: {sim:.3f}\n{definition}\n{'-' * 80}\n")
+
+    return "\n".join(results)
 
 
 async def list_component_families(client: AsyncClientProtocol) -> str:
