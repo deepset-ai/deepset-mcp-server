@@ -90,6 +90,18 @@ class AsyncClientProtocol(Protocol):
         ...
 
 
+class IndexResourceProtocol(Protocol):
+    """Protocol defining the implementation for IndexResource."""
+    
+    async def list(self, limit: int | None = None, page_number: int | None = None) -> IndexList:
+        """List indexes in the configured workspace."""
+        ...
+        
+    async def get(self, name: str) -> Index:
+        """Fetch a single index by its name."""
+        ...
+
+
 class PipelineTemplateResourceProtocol(Protocol):
     """Protocol defining the implementation for PipelineTemplateResource."""
 
