@@ -40,7 +40,7 @@ def mock_schema_error_response(mock_client: BaseFakeClient) -> None:
 
 @pytest.fixture
 def mock_successful_io_response(mock_client: BaseFakeClient) -> None:
-    mock_client.responses["v1/haystack/components/input-output?domain=deepset-cloud&names=Agent"] = TransportResponse(
+    mock_client.responses["v1/haystack/components/input-output"] = TransportResponse(
         status_code=200,
         json=[{"name": "Agent", "input": "Mock input", "output": "Mock output"}],
         text=json.dumps([{"name": "Agent", "input": "Mock input", "output": "Mock output"}]),
@@ -49,7 +49,7 @@ def mock_successful_io_response(mock_client: BaseFakeClient) -> None:
 
 @pytest.fixture
 def mock_io_error_response(mock_client: BaseFakeClient) -> None:
-    mock_client.responses["v1/haystack/components/input-output?domain=deepset-cloud&names=Agent"] = TransportResponse(
+    mock_client.responses["v1/haystack/components/input-output"] = TransportResponse(
         status_code=500,
         json={"message": "Internal server error"},
         text="Internal server error",

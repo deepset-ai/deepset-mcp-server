@@ -57,6 +57,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        **kwargs: Any,
     ) -> TransportResponse[T]: ...
 
     @overload
@@ -68,6 +69,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        **kwargs: Any,
     ) -> TransportResponse[Any]: ...
 
     async def request(
@@ -78,6 +80,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         response_type: type[T] | None = None,
+        **kwargs: Any,
     ) -> TransportResponse[Any]:
         """Make a request to the deepset API."""
         if not endpoint.startswith("/"):
@@ -102,6 +105,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
             json=data,
             headers=request_headers,
             response_type=response_type,
+            **kwargs,
         )
 
     async def close(self) -> None:
