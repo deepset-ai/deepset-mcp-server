@@ -55,8 +55,9 @@ class PipelineTemplateResource:
             List of pipeline templates
         """
         response = await self._client.request(
-            f"/v1/workspaces/{self._workspace}/pipeline_templates?limit={limit}&page_number=1&field=created_at&order=DESC",
+            f"/v1/workspaces/{self._workspace}/pipeline_templates",
             method="GET",
+            params={"limit": limit, "page_number": 1, "field": "created_at", "order": "DESC"},
         )
 
         raise_for_status(response)
