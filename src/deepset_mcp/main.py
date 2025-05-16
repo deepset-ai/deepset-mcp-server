@@ -623,23 +623,24 @@ async def search_component_definitions(query: str) -> str:
 #     return "\n".join(formatted_output)
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Run the Deepset MCP server."
-    )
+def main() -> None:
+    """Entrypoint for the deepset MCP server."""
+    parser = argparse.ArgumentParser(description="Run the Deepset MCP server.")
     parser.add_argument(
-        "--workspace", "-w",
+        "--workspace",
+        "-w",
         help="Deepset workspace (env DEEPSET_WORKSPACE)",
     )
     parser.add_argument(
-        "--api-key", "-k",
+        "--api-key",
+        "-k",
         help="Deepset API key (env DEEPSET_API_KEY)",
     )
     args = parser.parse_args()
 
     # prefer flags, fallback to env
     workspace = args.workspace or os.getenv("DEEPSET_WORKSPACE")
-    api_key   = args.api_key   or os.getenv("DEEPSET_API_KEY")
+    api_key = args.api_key or os.getenv("DEEPSET_API_KEY")
     if not workspace:
         parser.error("Missing workspace: set --workspace or DEEPSET_WORKSPACE")
     if not api_key:
@@ -647,7 +648,7 @@ def main():
 
     # make sure downstream tools see them
     os.environ["DEEPSET_WORKSPACE"] = workspace
-    os.environ["DEEPSET_API_KEY"]    = api_key
+    os.environ["DEEPSET_API_KEY"] = api_key
 
     # run with SSE transport (HTTP+Server-Sent Events)
     mcp.run(transport="stdio")
@@ -655,4 +656,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
