@@ -1,30 +1,54 @@
-# Use an official Python runtime as a parent image
+# ─── BUILD STAGE ───────────────────────────────────────────────────────────────
+FROM python:3.11-slim AS builder
+
+# 1. Install curl & build tools for uv & any C extensions
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl build-essential \
+ && rm -rf /var/lib/apt/lists/*
+
+# 2. Install uv standalone and symlink it
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
+ && ln -sf /root/.local/bin/uv /usr/local/bin/uv
+
+WORKDIR /src
+
+# 3. Copy in only what uv needs to build the locked venv
+COPY pyproject.toml uv.lock README.md entrypoint.sh ./
+COPY src/deepset_mcp/ src/deepset_mcp/
+
+# 4. Create & populate .venv from uv.lock
+RUN uv sync --locked
+
+
+
+# ─── RUNTIME STAGE ─────────────────────────────────────────────────────────────
 FROM python:3.11-slim
 
-# Set the working directory in the container
+# 2. Create an unprivileged user with a home directory
+RUN groupadd --system appgroup \
+ && useradd --system --create-home --home-dir /home/appuser --gid appgroup appuser
+
+ENV HOME=/home/appuser
+
 WORKDIR /app
 
-# Install uv - the recommended Python package installer
-RUN pip install uv
+# 5. Copy in the pre-built venv and your project sources
+COPY --from=builder /src/.venv               /app/.venv
+COPY --from=builder /src/pyproject.toml      /app/pyproject.toml
+COPY --from=builder /src/uv.lock              /app/uv.lock
+COPY --from=builder /src/README.md            /app/README.md
+COPY --from=builder /src/src/deepset_mcp      /app/src/deepset_mcp
+COPY --from=builder /src/entrypoint.sh        /app/entrypoint.sh
 
-# Copy dependency definitions
-COPY pyproject.toml uv.lock README.md .
+RUN chmod +x /app/entrypoint.sh
 
-# Install project dependencies using uv based on the lock file
-RUN uv sync
+# 6. Ensure appuser owns all of /app
+RUN chown -R appuser:appgroup /app
 
-# Copy the rest of the application code
-COPY src .
+# 7. Put the venv’s bin first in PATH
+ENV PATH="/app/.venv/bin:${PATH}"
 
-# Make port 8000 available to the world outside this container
-# Assuming FastMCP runs on port 8000 by default (common for FastAPI/Uvicorn)
-EXPOSE 8000
+# 9. Switch to non-root user
+USER appuser
 
-# Define environment variables needed by the application
-# These should be provided at runtime, not hardcoded
-ENV DEEPSET_API_KEY="" 
-ENV DEEPSET_WORKSPACE=""
-# Set PYTHONUNBUFFERED to ensure logs are output immediately
-ENV PYTHONUNBUFFERED=1
-
-CMD ["uv", "run", "deepset-mcp"]
+ENTRYPOINT ["/app/entrypoint.sh"]
