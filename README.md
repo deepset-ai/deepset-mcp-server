@@ -5,7 +5,7 @@ Use these tools to develop pipelines, or to get information about components and
 
 
 
-## Usage
+## Installation
 
 ### Claude Desktop App
 
@@ -85,7 +85,45 @@ Running the server with uv gives you faster startup time and consumes slightly l
 
 ### Other MCP Clients
 
-The repo was not tested with other MCP clients but tools like Cursor or the Haystack MCP tools should work out of the box.
+The repo was not tested with other MCP clients but tools like Cursor or the Haystack MCP package should work out of the box.
+
+
+## Usage
+
+_Assuming you are using the MCP server through Claude Desktop and you are part of the deepset organization._
+
+**Setup:**
+1. Go to "Projects" in Claude Desktop
+2. Select the "Your Team"-tab
+3. Select the "deepset-copilot" project
+
+![Screenshot of the Projects menu in the Claude Desktop App.](assets/claude_desktop_projects.png)
+
+The _deepset-copilot_ project contains system instructions that are optimized for the deepset MCP server.
+
+You can also access the system prompt [here](src/deepset_mcp/prompts/deepset_copilot_prompt.md).
+
+The MCP server also exposes the system prompt as the `deepset_copilot`-prompt.
+In Claude Desktop you can click on the plus-sign below the chat bar and select "Add from deepset" to add the prompt.
+However, this will only load the prompt as text context into your message. It won't set the prompt as system instructions.
+Using it via system instructions in Claude Desktop yields better results.
+
+Using these instructions with Claude will help you to create or update pipelines.
+You can also ask questions about pipelines in the workspace or get information about components
+(e.g. What init params do they accept? What inputs and outputs do they have?).
+
+You can activate and deactivate specific tools in the "Search and tools"-menu that is available below the chat bar.
+
+Claude will ask for your permission before a tool call is executed. You can opt to "allow once", "allow always" or "deny".
+
+
+
+**Limitations**
+
+Unfortunately, you need to set the workspace and organization (through the API key) in the `claude_desktop_config.json`.
+There is no way to pass the API key dynamically to Claude in a secure way.
+The workspace could be passed into the tool call, it's an easy enhancement but I'd like to get feedback first.
+
 
 
 
