@@ -5,10 +5,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi>=0.115.12",
-    "mcp[cli]>=1.6.0",
-    "requests>=2.32.3",
-    "uvicorn>=0.34.2",
+    "fastapi",
+    "mcp",
     "httpx",
     "pydantic>=2.0.0",
     "pyyaml",
@@ -17,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-deepset-mcp = "deepset_mcp.main:launch_mcp"
+deepset-mcp = "deepset_mcp.main:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -38,7 +36,6 @@ lint = [
 
 types = [
     "mypy",
-    "types-requests",
     "types-PyYAML",
 ]
 
