@@ -1,10 +1,22 @@
-# Local MCP Server for deepset platform
+# MCP Server for the deepset AI platform
 
-It provides tools that can list pipelines, fetch YAML, fetch component schemas, validate YAML, and update YAML.
+The deepset MCP server exposes tools that MCP clients like Claude or Cursor can use to interact with the deepset AI platform.
+Use these tools to develop pipelines, or to get information about components and how they are defined.
+
+
 
 
 ## Usage
-To use it with Claude Desktop app, use the following config:
+
+### Claude Desktop App
+Prerequisites:
+- [Claude Desktop App](https://claude.ai/download) needs to be installed
+- You need to be on the Claude Pro, Team, Max, or Enterprise plan
+- You need an installation of [Docker](https://docs.docker.com/desktop/) (scroll down to step 4 if you want to use `uv` instead of Docker)
+
+1. Go to: `/Users/your_user/Library/Application Support/Claude` (Mac)
+2. Either open or create `claude_desktop_config.json`
+3. Add the following json as your config (or update your existing config if you are already using other MCP servers)
 
 ```json
 {
@@ -18,7 +30,7 @@ To use it with Claude Desktop app, use the following config:
         "DEEPSET_WORKSPACE",
         "-e",
         "DEEPSET_API_KEY",
-        "deepset/deepset-mcp-server:main"
+        "deepset/deepset-mcp-server"
       ],
       "env": {
        "DEEPSET_WORKSPACE":"<WORKSPACE>",
@@ -29,6 +41,8 @@ To use it with Claude Desktop app, use the following config:
   }
 }
 ```
+
+4. (Optional) Use the following config if you want to use `uv` instead of docker
 
 
 ## Further improvements ideas
