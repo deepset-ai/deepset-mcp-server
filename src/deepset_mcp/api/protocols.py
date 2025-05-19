@@ -104,6 +104,31 @@ class IndexResourceProtocol(Protocol):
         """Fetch a single index by its name."""
         ...
 
+    async def create(self, name: str, config_yaml: str, description: str | None = None) -> Index:
+        """Create a new index with the given name and configuration.
+
+        :param name: Name of the index
+        :param config_yaml: YAML configuration for the index
+        :param description: Optional description for the index
+        :returns: Created index details
+        """
+        ...
+
+    async def update(
+        self,
+        index_name: str,
+        updated_index_name: str | None = None,
+        config_yaml: str | None = None
+    ) -> Index:
+        """Update name and/or configuration of an existing index.
+
+        :param index_name: Name of the index to update
+        :param updated_index_name: Optional new name for the index
+        :param config_yaml: Optional new YAML configuration
+        :returns: Updated index details
+        """
+        ...
+
 
 class PipelineTemplateResourceProtocol(Protocol):
     """Protocol defining the implementation for PipelineTemplateResource."""
