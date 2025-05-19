@@ -47,57 +47,48 @@ class IndexResource:
 
         return Index.model_validate(response.json)
 
-    async def create(self, name: str, config_yaml: str, description: str | None = None) -> Index:
+    async def create(self, name: str, yaml_config: str, description: str | None = None) -> Index:
         """Create a new index with the given name and configuration.
 
         :param name: Name of the index
-        :param config_yaml: YAML configuration for the index
+        :param yaml_config: YAML configuration for the index
         :param description: Optional description for the index
         :returns: Created index details
         """
         data = {
             "name": name,
-            "config_yaml": config_yaml,
+            "config_yaml": yaml_config,
         }
         if description is not None:
             data["description"] = description
 
-        response = await self._client.request(
-            f"/api/v1/workspaces/{self._workspace}/indexes",
-            method="POST",
-            data=data
-        )
+        response = await self._client.request(f"/api/v1/workspaces/{self._workspace}/indexes", method="POST", data=data)
 
         raise_for_status(response)
 
         return Index.model_validate(response.json)
 
     async def update(
-        self,
-        index_name: str,
-        updated_index_name: str | None = None,
-        config_yaml: str | None = None
+        self, index_name: str, updated_index_name: str | None = None, yaml_config: str | None = None
     ) -> Index:
         """Update name and/or configuration of an existing index.
 
         :param index_name: Name of the index to update
         :param updated_index_name: Optional new name for the index
-        :param config_yaml: Optional new YAML configuration
+        :param yaml_config: Optional new YAML configuration
         :returns: Updated index details
         """
         data = {}
         if updated_index_name is not None:
             data["name"] = updated_index_name
-        if config_yaml is not None:
-            data["config_yaml"] = config_yaml
+        if yaml_config is not None:
+            data["config_yaml"] = yaml_config
 
         if not data:
-            raise ValueError("At least one of updated_index_name or config_yaml must be provided")
+            raise ValueError("At least one of updated_index_name or yaml_config must be provided")
 
         response = await self._client.request(
-            f"/api/v1/workspaces/{self._workspace}/indexes/{index_name}",
-            method="PATCH",
-            data=data
+            f"/api/v1/workspaces/{self._workspace}/indexes/{index_name}", method="PATCH", data=data
         )
 
         raise_for_status(response)
