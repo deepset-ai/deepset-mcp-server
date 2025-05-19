@@ -239,3 +239,36 @@ class TestIndexResource:
         resource = IndexResource(fake_client, workspace)
         with pytest.raises(ValueError, match="At least one of updated_index_name or config_yaml must be provided"):
             await resource.update(index_name="test-index")
+
+    async def test_create_index_invalid_request(
+        self, fake_client: BaseFakeClient, workspace: str, fake_create_400_response: None
+    ) -> None:
+        """Test that creating an index with invalid parameters raises an error."""
+        resource = IndexResource(fake_client, workspace)
+        with pytest.raises(UnexpectedAPIError):
+            await resource.create(
+                name="invalid-index",
+                config_yaml="invalid: yaml"
+            )
+
+    async def test_update_nonexistent_index(
+        self, fake_client: BaseFakeClient, workspace: str, fake_update_404_response: None
+    ) -> None:
+        """Test that updating a nonexistent index raises ResourceNotFoundError."""
+        resource = IndexResource(fake_client, workspace)
+        with pytest.raises(ResourceNotFoundError):
+            await resource.update(
+                index_name="nonexistent-index",
+                updated_index_name="new-name"
+            )
+
+    async def test_update_index_invalid_config(
+        self, fake_client: BaseFakeClient, workspace: str, fake_update_400_response: None
+    ) -> None:
+        """Test that updating an index with invalid configuration raises an error."""
+        resource = IndexResource(fake_client, workspace)
+        with pytest.raises(UnexpectedAPIError):
+            await resource.update(
+                index_name="invalid-index",
+                config_yaml="invalid: yaml"
+            )
