@@ -28,7 +28,7 @@ class IndexResource:
             "page_number": page_number,
         }
 
-        response = await self._client.request(f"/api/v1/workspaces/{self._workspace}/indexes", params=params)
+        response = await self._client.request(f"/v1/workspaces/{self._workspace}/indexes", params=params)
 
         raise_for_status(response)
 
@@ -41,7 +41,7 @@ class IndexResource:
 
         :returns: Index details.
         """
-        response = await self._client.request(f"/api/v1/workspaces/{self._workspace}/indexes/{index_name}")
+        response = await self._client.request(f"/v1/workspaces/{self._workspace}/indexes/{index_name}")
 
         raise_for_status(response)
 
@@ -62,7 +62,7 @@ class IndexResource:
         if description is not None:
             data["description"] = description
 
-        response = await self._client.request(f"/api/v1/workspaces/{self._workspace}/indexes", method="POST", data=data)
+        response = await self._client.request(f"v1/workspaces/{self._workspace}/indexes", method="POST", data=data)
 
         raise_for_status(response)
 
@@ -88,7 +88,7 @@ class IndexResource:
             raise ValueError("At least one of updated_index_name or yaml_config must be provided")
 
         response = await self._client.request(
-            f"/api/v1/workspaces/{self._workspace}/indexes/{index_name}", method="PATCH", data=data
+            f"/v1/workspaces/{self._workspace}/indexes/{index_name}", method="PATCH", data=data
         )
 
         raise_for_status(response)
