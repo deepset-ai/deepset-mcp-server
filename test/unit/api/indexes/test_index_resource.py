@@ -60,7 +60,7 @@ def fake_list_successful_response(
     fake_client: BaseFakeClient, index_list_response: dict[str, Any], workspace: str
 ) -> None:
     """Configure the fake client to return a successful response."""
-    fake_client.responses[f"/api/v1/workspaces/{workspace}/indexes"] = TransportResponse(
+    fake_client.responses[f"v1/workspaces/{workspace}/indexes"] = TransportResponse(
         status_code=200,
         json=index_list_response,
         text=json.dumps(index_list_response),
@@ -70,7 +70,7 @@ def fake_list_successful_response(
 @pytest.fixture()
 def fake_get_successful_response(fake_client: BaseFakeClient, index_response: dict[str, Any], workspace: str) -> None:
     """Configure the fake client to return a successful response."""
-    fake_client.responses[f"/api/v1/workspaces/{workspace}/indexes/test-index"] = TransportResponse(
+    fake_client.responses[f"v1/workspaces/{workspace}/indexes/test-index"] = TransportResponse(
         status_code=200,
         json=index_response,
         text=json.dumps(index_response),
@@ -80,7 +80,7 @@ def fake_get_successful_response(fake_client: BaseFakeClient, index_response: di
 @pytest.fixture()
 def fake_get_404_response(fake_client: BaseFakeClient, workspace: str) -> None:
     """Configure fake client to return a 404 response."""
-    fake_client.responses[f"/api/v1/workspaces/{workspace}/indexes/nonexistent-index"] = TransportResponse(
+    fake_client.responses[f"/v1/workspaces/{workspace}/indexes/nonexistent-index"] = TransportResponse(
         status_code=404,
         json={"detail": "Resource not found"},
         text=json.dumps({"detail": "Resource not found"}),
@@ -90,7 +90,7 @@ def fake_get_404_response(fake_client: BaseFakeClient, workspace: str) -> None:
 @pytest.fixture()
 def fake_get_500_response(fake_client: BaseFakeClient, workspace: str) -> None:
     """Configure fake client to return a 500 response."""
-    fake_client.responses[f"/api/v1/workspaces/{workspace}/indexes/server-error-index"] = TransportResponse(
+    fake_client.responses[f"/v1/workspaces/{workspace}/indexes/server-error-index"] = TransportResponse(
         status_code=500,
         json={"detail": "Internal server error"},
         text=json.dumps({"detail": "Internal server error"}),
@@ -100,7 +100,7 @@ def fake_get_500_response(fake_client: BaseFakeClient, workspace: str) -> None:
 @pytest.fixture()
 def fake_create_400_response(fake_client: BaseFakeClient, workspace: str) -> None:
     """Configure fake client to return a 400 response for invalid create request."""
-    fake_client.responses[f"/api/v1/workspaces/{workspace}/indexes"] = TransportResponse(
+    fake_client.responses[f"v1/workspaces/{workspace}/indexes"] = TransportResponse(
         status_code=400,
         json={"detail": "Invalid request parameters"},
         text=json.dumps({"detail": "Invalid request parameters"}),
@@ -110,7 +110,7 @@ def fake_create_400_response(fake_client: BaseFakeClient, workspace: str) -> Non
 @pytest.fixture()
 def fake_update_404_response(fake_client: BaseFakeClient, workspace: str) -> None:
     """Configure fake client to return a 404 response for nonexistent index update."""
-    fake_client.responses[f"/api/v1/workspaces/{workspace}/indexes/nonexistent-index"] = TransportResponse(
+    fake_client.responses[f"/v1/workspaces/{workspace}/indexes/nonexistent-index"] = TransportResponse(
         status_code=404,
         json={"detail": "Index not found"},
         text=json.dumps({"detail": "Index not found"}),
@@ -120,7 +120,7 @@ def fake_update_404_response(fake_client: BaseFakeClient, workspace: str) -> Non
 @pytest.fixture()
 def fake_update_400_response(fake_client: BaseFakeClient, workspace: str) -> None:
     """Configure fake client to return a 400 response for invalid update request."""
-    fake_client.responses[f"/api/v1/workspaces/{workspace}/indexes/invalid-index"] = TransportResponse(
+    fake_client.responses[f"/v1/workspaces/{workspace}/indexes/invalid-index"] = TransportResponse(
         status_code=400,
         json={"detail": "Invalid configuration format"},
         text=json.dumps({"detail": "Invalid configuration format"}),
@@ -182,7 +182,7 @@ class TestIndexResource:
         self, fake_client: BaseFakeClient, workspace: str, index_response: dict[str, Any]
     ) -> None:
         """Test creating a new index."""
-        fake_client.responses[f"/api/v1/workspaces/{workspace}/indexes"] = TransportResponse(
+        fake_client.responses[f"v1/workspaces/{workspace}/indexes"] = TransportResponse(
             status_code=201, json=index_response, text=json.dumps(index_response)
         )
 
@@ -205,7 +205,7 @@ class TestIndexResource:
         self, fake_client: BaseFakeClient, workspace: str, index_response: dict[str, Any]
     ) -> None:
         """Test updating an existing index."""
-        fake_client.responses[f"/api/v1/workspaces/{workspace}/indexes/test-index"] = TransportResponse(
+        fake_client.responses[f"/v1/workspaces/{workspace}/indexes/test-index"] = TransportResponse(
             status_code=200, json=index_response, text=json.dumps(index_response)
         )
 
