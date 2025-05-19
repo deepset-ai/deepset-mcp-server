@@ -147,3 +147,68 @@ class TestIndexResource:
         # Check the last request's parameters
         last_request = fake_client.requests[-1]
         assert last_request["params"] == {"limit": 20, "page_number": 2}
+
+    async def test_create_index_successful(
+        self, fake_client: BaseFakeClient, workspace: str, index_response: dict[str, Any]
+    ) -> None:
+        """Test creating a new index."""
+        fake_client.responses[f"/api/v1/workspaces/{workspace}/indexes"] = TransportResponse(
+            status_code=201,
+            json=index_response,
+            text=json.dumps(index_response)
+        )
+
+        resource = IndexResource(fake_client, workspace)
+        result = await resource.create(
+            name="test-index",
+            config_yaml="yaml: content",
+            description="Test description"
+        )
+
+        assert isinstance(result, Index)
+        assert result.name == "test-index"
+
+        # Verify request
+        last_request = fake_client.requests[-1]
+        assert last_request["method"] == "POST"
+        assert last_request["data"] == {
+            "name": "test-index",
+            "config_yaml": "yaml: content",
+            "description": "Test description"
+        }
+
+    async def test_update_index_successful(
+        self, fake_client: BaseFakeClient, workspace: str, index_response: dict[str, Any]
+    ) -> None:
+        """Test updating an existing index."""
+        fake_client.responses[f"/api/v1/workspaces/{workspace}/indexes/test-index"] = TransportResponse(
+            status_code=200,
+            json=index_response,
+            text=json.dumps(index_response)
+        )
+
+        resource = IndexResource(fake_client, workspace)
+        result = await resource.update(
+            index_name="test-index",
+            updated_index_name="new-name",
+            config_yaml="new: config"
+        )
+
+        assert isinstance(result, Index)
+        assert result.name == "test-index"
+
+        # Verify request
+        last_request = fake_client.requests[-1]
+        assert last_request["method"] == "PATCH"
+        assert last_request["data"] == {
+            "name": "new-name",
+            "config_yaml": "new: config"
+        }
+
+    async def test_update_index_without_changes_fails(
+        self, fake_client: BaseFakeClient, workspace: str
+    ) -> None:
+        """Test that updating an index without any changes raises ValueError."""
+        resource = IndexResource(fake_client, workspace)
+        with pytest.raises(ValueError, match="At least one of updated_index_name or config_yaml must be provided"):
+            await resource.update(index_name="test-index")
