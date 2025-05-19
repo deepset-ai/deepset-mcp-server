@@ -3,7 +3,7 @@ from typing import Any
 
 import pytest
 
-from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
+from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.indexes.models import Index, IndexList
 from deepset_mcp.api.indexes.resource import IndexResource
 from deepset_mcp.api.transport import TransportResponse
@@ -97,6 +97,36 @@ def fake_get_500_response(fake_client: BaseFakeClient, workspace: str) -> None:
     )
 
 
+@pytest.fixture()
+def fake_create_400_response(fake_client: BaseFakeClient, workspace: str) -> None:
+    """Configure fake client to return a 400 response for invalid create request."""
+    fake_client.responses[f"/api/v1/workspaces/{workspace}/indexes"] = TransportResponse(
+        status_code=400,
+        json={"detail": "Invalid request parameters"},
+        text=json.dumps({"detail": "Invalid request parameters"}),
+    )
+
+
+@pytest.fixture()
+def fake_update_404_response(fake_client: BaseFakeClient, workspace: str) -> None:
+    """Configure fake client to return a 404 response for nonexistent index update."""
+    fake_client.responses[f"/api/v1/workspaces/{workspace}/indexes/nonexistent-index"] = TransportResponse(
+        status_code=404,
+        json={"detail": "Index not found"},
+        text=json.dumps({"detail": "Index not found"}),
+    )
+
+
+@pytest.fixture()
+def fake_update_400_response(fake_client: BaseFakeClient, workspace: str) -> None:
+    """Configure fake client to return a 400 response for invalid update request."""
+    fake_client.responses[f"/api/v1/workspaces/{workspace}/indexes/invalid-index"] = TransportResponse(
+        status_code=400,
+        json={"detail": "Invalid configuration format"},
+        text=json.dumps({"detail": "Invalid configuration format"}),
+    )
+
+
 class TestIndexResource:
     """Test the IndexResource."""
 
@@ -147,3 +177,77 @@ class TestIndexResource:
         # Check the last request's parameters
         last_request = fake_client.requests[-1]
         assert last_request["params"] == {"limit": 20, "page_number": 2}
+
+    async def test_create_index_successful(
+        self, fake_client: BaseFakeClient, workspace: str, index_response: dict[str, Any]
+    ) -> None:
+        """Test creating a new index."""
+        fake_client.responses[f"/api/v1/workspaces/{workspace}/indexes"] = TransportResponse(
+            status_code=201, json=index_response, text=json.dumps(index_response)
+        )
+
+        resource = IndexResource(fake_client, workspace)
+        result = await resource.create(name="test-index", yaml_config="yaml: content", description="Test description")
+
+        assert isinstance(result, Index)
+        assert result.name == "test-index"
+
+        # Verify request
+        last_request = fake_client.requests[-1]
+        assert last_request["method"] == "POST"
+        assert last_request["data"] == {
+            "name": "test-index",
+            "config_yaml": "yaml: content",
+            "description": "Test description",
+        }
+
+    async def test_update_index_successful(
+        self, fake_client: BaseFakeClient, workspace: str, index_response: dict[str, Any]
+    ) -> None:
+        """Test updating an existing index."""
+        fake_client.responses[f"/api/v1/workspaces/{workspace}/indexes/test-index"] = TransportResponse(
+            status_code=200, json=index_response, text=json.dumps(index_response)
+        )
+
+        resource = IndexResource(fake_client, workspace)
+        result = await resource.update(
+            index_name="test-index", updated_index_name="new-name", yaml_config="new: config"
+        )
+
+        assert isinstance(result, Index)
+        assert result.name == "test-index"
+
+        # Verify request
+        last_request = fake_client.requests[-1]
+        assert last_request["method"] == "PATCH"
+        assert last_request["data"] == {"name": "new-name", "config_yaml": "new: config"}
+
+    async def test_update_index_without_changes_fails(self, fake_client: BaseFakeClient, workspace: str) -> None:
+        """Test that updating an index without any changes raises ValueError."""
+        resource = IndexResource(fake_client, workspace)
+        with pytest.raises(ValueError, match="At least one of updated_index_name or yaml_config must be provided"):
+            await resource.update(index_name="test-index")
+
+    async def test_create_index_invalid_request(
+        self, fake_client: BaseFakeClient, workspace: str, fake_create_400_response: None
+    ) -> None:
+        """Test that creating an index with invalid parameters raises an error."""
+        resource = IndexResource(fake_client, workspace)
+        with pytest.raises(BadRequestError):
+            await resource.create(name="invalid-index", yaml_config="invalid: yaml")
+
+    async def test_update_nonexistent_index(
+        self, fake_client: BaseFakeClient, workspace: str, fake_update_404_response: None
+    ) -> None:
+        """Test that updating a nonexistent index raises ResourceNotFoundError."""
+        resource = IndexResource(fake_client, workspace)
+        with pytest.raises(ResourceNotFoundError):
+            await resource.update(index_name="nonexistent-index", updated_index_name="new-name")
+
+    async def test_update_index_invalid_config(
+        self, fake_client: BaseFakeClient, workspace: str, fake_update_400_response: None
+    ) -> None:
+        """Test that updating an index with invalid configuration raises an error."""
+        resource = IndexResource(fake_client, workspace)
+        with pytest.raises(BadRequestError):
+            await resource.update(index_name="invalid-index", yaml_config="invalid: yaml")
