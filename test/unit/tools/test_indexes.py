@@ -11,40 +11,52 @@ from test.unit.conftest import BaseFakeClient
 
 
 class FakeIndexResource(IndexResourceProtocol):
-    def __init__(self, mocker: MockFixture):
-        self._mocker = mocker
-        self._list = self._mocker.AsyncMock(return_value=IndexList(data=[]))
-        self._get = self._mocker.AsyncMock(
-            return_value=Index(
-                name="test_index",
-                config_yaml="config",
-                id="123",
-                description="Test index",
-            )
+    def __init__(
+        self,
+        list_response: IndexList | None = None,
+        get_response: Index | None = None,
+        create_response: Index | None = None,
+        get_exception: Exception | None = None,
+        create_exception: Exception | None = None,
+        update_exception: Exception | None = None,
+    ) -> None:
+        self._list_response = list_response or IndexList(data=[])
+        self._get_response = get_response or Index(
+            name="test_index",
+            config_yaml="config",
+            id="123",
+            description="Test index",
         )
-        self._create = self._mocker.AsyncMock(
-            return_value=Index(
-                name="test_index",
-                config_yaml="config",
-                id="123",
-                description="Test index",
-            )
-        )
-        self._update = self._mocker.AsyncMock()
+        self._create_response = create_response
+        self._get_exception = get_exception
+        self._create_exception = create_exception
+        self._update_exception = update_exception
 
     async def list(self, limit: int = 10, page_number: int = 1) -> IndexList:
-        return await self._list(limit=limit, page_number=page_number)
+        return self._list_response
 
     async def get(self, index_name: str) -> Index:
-        return await self._get(index_name=index_name)
+        if self._get_exception:
+            raise self._get_exception
+        return self._get_response
 
     async def create(self, name: str, yaml_config: str, description: str | None = None) -> Index:
-        return await self._create(name=name, yaml_config=yaml_config, description=description)
+        if self._create_exception:
+            raise self._create_exception
+        if self._create_response is not None:
+            return self._create_response
+        return Index(
+            name=name,
+            config_yaml=yaml_config,
+            id="123",
+            description=description,
+        )
 
     async def update(
         self, index_name: str, updated_index_name: str | None = None, yaml_config: str | None = None
     ) -> None:
-        await self._update(index_name=index_name, updated_index_name=updated_index_name, yaml_config=yaml_config)
+        if self._update_exception:
+            raise self._update_exception
 
 
 @pytest.fixture(name="client")
