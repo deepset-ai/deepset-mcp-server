@@ -69,18 +69,17 @@ async def test_list_indexes_returns_formatted_string_when_no_indexes(client: Asy
 
 @pytest.mark.asyncio
 async def test_list_indexes_returns_formatted_string_with_indexes(
-    client: AsyncClientProtocol, mocker: MockFixture
+    client: AsyncClientProtocol
 ) -> None:
     index = Index(name="test_index", config_yaml="config", id="123", description="Test index")
-    fake_resource: IndexResourceProtocol = client.indexes(workspace="test")
-    assert isinstance(fake_resource, FakeIndexResource)
-    fake_resource._list.return_value = IndexList(data=[index])
-
-    result = await list_indexes(client=client, workspace="test")
+    c = FakeClient()
+    c._indexes = FakeIndexResource(list_response=IndexList(data=[index]))
+    
+    result = await list_indexes(client=c, workspace="test")
 
     assert "test_index" in result
     assert "config" in result
-    assert "123" in result
+    assert "123" in result 
     assert "Test index" in result
 
 
