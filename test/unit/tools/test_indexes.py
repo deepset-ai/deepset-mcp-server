@@ -164,7 +164,7 @@ async def test_create_index_returns_error_message(
 
 @pytest.mark.asyncio
 async def test_update_index_returns_success_message(
-    client: AsyncClientProtocol, mocker: MockFixture
+    client: AsyncClientProtocol
 ) -> None:
     result = await update_index(
         client=client,
