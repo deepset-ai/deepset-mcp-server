@@ -145,16 +145,14 @@ async def test_create_index_returns_success_message(
 )
 async def test_create_index_returns_error_message(
     client: AsyncClientProtocol,
-    mocker: MockFixture,
     error_class: type[Exception],
     expected_message: str,
 ) -> None:
-    fake_resource: IndexResourceProtocol = client.indexes(workspace="test")
-    assert isinstance(fake_resource, FakeIndexResource)
-    fake_resource._create.side_effect = error_class("Error")
+    c = FakeClient()
+    c._indexes = FakeIndexResource(create_exception=error_class("Error"))
 
     result = await create_index(
-        client=client,
+        client=c,
         workspace="test",
         index_name="test_index",
         yaml_configuration="config",
