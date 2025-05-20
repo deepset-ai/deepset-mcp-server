@@ -179,7 +179,7 @@ async def test_update_index_returns_success_message(
 
 @pytest.mark.asyncio
 async def test_update_index_returns_error_message_when_no_changes_provided(
-    client: AsyncClientProtocol, mocker: MockFixture
+    client: AsyncClientProtocol
 ) -> None:
     result = await update_index(
         client=client,
