@@ -122,7 +122,7 @@ async def test_get_index_returns_error_message_when_index_not_found(
 
 @pytest.mark.asyncio
 async def test_create_index_returns_success_message(
-    client: AsyncClientProtocol, mocker: MockFixture
+    client: AsyncClientProtocol
 ) -> None:
     result = await create_index(
         client=client,
