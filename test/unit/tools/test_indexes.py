@@ -97,7 +97,7 @@ async def test_list_indexes_returns_formatted_string_with_indexes(
 
 @pytest.mark.asyncio
 async def test_get_index_returns_formatted_string(
-    client: AsyncClientProtocol, mocker: MockFixture
+    client: AsyncClientProtocol
 ) -> None:
     result = await get_index(client=client, workspace="test", index_name="test_index")
 
