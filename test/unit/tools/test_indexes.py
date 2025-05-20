@@ -48,10 +48,10 @@ class FakeIndexResource(IndexResourceProtocol):
 
 
 @pytest.fixture(name="client")
-def client_fixture(mocker: MockFixture) -> AsyncGenerator[AsyncClientProtocol, None]:
+def client_fixture() -> AsyncGenerator[AsyncClientProtocol, None]:
     class FakeClient(BaseFakeClient):
         def indexes(self, workspace: str) -> IndexResourceProtocol:
-            return FakeIndexResource(mocker)
+            return FakeIndexResource()
 
     c = FakeClient()
     return c
