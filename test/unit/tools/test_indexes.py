@@ -200,16 +200,14 @@ async def test_update_index_returns_error_message_when_no_changes_provided(
 )
 async def test_update_index_returns_error_message(
     client: AsyncClientProtocol,
-    mocker: MockFixture,
     error_class: type[Exception],
     expected_message: str,
 ) -> None:
-    fake_resource: IndexResourceProtocol = client.indexes(workspace="test")
-    assert isinstance(fake_resource, FakeIndexResource)
-    fake_resource._update.side_effect = error_class("Error")
+    c = FakeClient()
+    c._indexes = FakeIndexResource(update_exception=error_class("Error"))
 
     result = await update_index(
-        client=client,
+        client=c,
         workspace="test",
         index_name="test_index",
         updated_index_name="new_test_index",
