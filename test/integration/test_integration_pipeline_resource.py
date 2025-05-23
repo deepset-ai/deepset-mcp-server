@@ -72,10 +72,11 @@ async def test_create_pipeline(
     await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
 
     # Verify the pipeline was created by retrieving it
-    pipeline: DeepsetPipeline = await pipeline_resource.get(pipeline_name=pipeline_name)
+    handle: PipelineHandle = await pipeline_resource.get(pipeline_name=pipeline_name)
 
-    assert pipeline.name == pipeline_name
-    assert pipeline.yaml_config == sample_yaml_config
+    assert handle.name == pipeline_name
+    assert handle.yaml_config == sample_yaml_config
+    assert isinstance(handle.pipeline, DeepsetPipeline)
 
 
 @pytest.mark.asyncio
