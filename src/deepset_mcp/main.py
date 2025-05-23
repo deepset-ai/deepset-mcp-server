@@ -11,6 +11,12 @@ from deepset_mcp.tools.haystack_service import (
     list_component_families as list_component_families_tool,
     search_component_definition as search_component_definition_tool,
 )
+from deepset_mcp.tools.indexes import (
+    create_index as create_index_tool,
+    get_index as get_index_tool,
+    list_indexes as list_indexes_tool,
+    update_index as update_index_tool,
+)
 from deepset_mcp.tools.pipeline import (
     create_pipeline as create_pipeline_tool,
     get_pipeline as get_pipeline_tool,
@@ -193,6 +199,81 @@ async def search_component_definitions(query: str) -> str:
     async with AsyncDeepsetClient() as client:
         response = await search_component_definition_tool(client=client, query=query, model=INITIALIZED_MODEL)
 
+    return response
+
+
+@mcp.tool()
+async def list_indexes() -> str:
+    """Retrieves a list of all indexes available in the deepset workspace.
+
+    Use this to get an overview of existing indexes and their configurations.
+    The response includes basic information for each index.
+    """
+    workspace = get_workspace()
+    async with AsyncDeepsetClient() as client:
+        response = await list_indexes_tool(client=client, workspace=workspace)
+    return response
+
+
+@mcp.tool()
+async def get_index(index_name: str) -> str:
+    """Fetches detailed configuration information for a specific index.
+
+    Use this to get the full configuration and details of a single index.
+
+    :param index_name: The name of the index to fetch.
+    """
+    workspace = get_workspace()
+    async with AsyncDeepsetClient() as client:
+        response = await get_index_tool(client=client, workspace=workspace, index_name=index_name)
+    return response
+
+
+@mcp.tool()
+async def create_index(index_name: str, yaml_configuration: str, description: str | None = None) -> str:
+    """Creates a new index in the deepset workspace.
+
+    Use this to create a new index with the given configuration.
+    Make sure the YAML configuration is valid before creating the index.
+
+    :param index_name: The name for the new index.
+    :param yaml_configuration: YAML configuration for the index.
+    :param description: Optional description for the index.
+    """
+    workspace = get_workspace()
+    async with AsyncDeepsetClient() as client:
+        response = await create_index_tool(
+            client=client,
+            workspace=workspace,
+            index_name=index_name,
+            yaml_configuration=yaml_configuration,
+            description=description,
+        )
+    return response
+
+
+@mcp.tool()
+async def update_index(
+    index_name: str, updated_index_name: str | None = None, yaml_configuration: str | None = None
+) -> str:
+    """Updates an existing index in the deepset workspace.
+
+    Use this to update the name or configuration of an existing index.
+    You must provide at least one of updated_index_name or yaml_configuration.
+
+    :param index_name: The name of the index to update.
+    :param updated_index_name: Optional new name for the index.
+    :param yaml_configuration: Optional new YAML configuration.
+    """
+    workspace = get_workspace()
+    async with AsyncDeepsetClient() as client:
+        response = await update_index_tool(
+            client=client,
+            workspace=workspace,
+            index_name=index_name,
+            updated_index_name=updated_index_name,
+            yaml_configuration=yaml_configuration,
+        )
     return response
 
 
