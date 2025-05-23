@@ -14,6 +14,7 @@ def create_sample_template(
     author: str = "deepset-ai",
     description: str = "A test template",
     template_id: str = "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    pipeline_type: str = "QUERY",
 ) -> dict[str, Any]:
     """Create a sample pipeline template response dictionary for testing."""
     return {
@@ -29,6 +30,7 @@ def create_sample_template(
         "potential_applications": ["testing", "development"],
         "recommended_dataset": ["sample-data"],
         "tags": [{"name": "test", "tag_id": "d4a85f64-5717-4562-b3fc-2c963f66afa6"}],
+        "pipeline_type": pipeline_type,
     }
 
 
