@@ -11,7 +11,6 @@ from deepset_mcp.api.pipeline.models import (
 from deepset_mcp.api.transport import raise_for_status
 
 if TYPE_CHECKING:
-    from deepset_mcp.api.pipeline.handle import PipelineHandle
     from deepset_mcp.api.protocols import AsyncClientProtocol
 
 
