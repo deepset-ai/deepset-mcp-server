@@ -156,3 +156,98 @@ async def test_get_pipeline_template_handles_unexpected_error() -> None:
 
     assert "Failed to fetch pipeline template 'test_template'" in result
     assert "Server error" in result
+
+
+@pytest.mark.asyncio
+async def test_list_pipeline_templates_with_filter() -> None:
+    """Test that filter parameter is passed correctly to the resource."""
+    template = PipelineTemplate(
+        pipeline_name="query_template",
+        pipeline_template_id=UUID("00000000-0000-0000-0000-000000000001"),
+        author="Test Author",
+        description="A query template",
+        best_for=["use case 1"],
+        potential_applications=["app 1"],
+        query_yaml="config: value",
+        tags=[PipelineTemplateTag(name="tag1", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
+        pipeline_type=PipelineType.QUERY,
+    )
+    resource = FakePipelineTemplateResource(list_response=[template])
+    client = FakeClient(resource)
+    
+    filter_value = "pipeline_type eq 'QUERY'"
+    await list_pipeline_templates(
+        client, 
+        workspace="ws1", 
+        filter=filter_value
+    )
+    
+    # Verify the filter was passed to the resource
+    assert resource.last_list_call_params["filter"] == filter_value
+
+
+@pytest.mark.asyncio
+async def test_list_pipeline_templates_with_custom_sorting() -> None:
+    """Test that custom sorting parameters are passed correctly."""
+    template = PipelineTemplate(
+        pipeline_name="test_template",
+        pipeline_template_id=UUID("00000000-0000-0000-0000-000000000001"),
+        author="Test Author",
+        description="A test template",
+        best_for=["use case 1"],
+        potential_applications=["app 1"],
+        query_yaml="config: value",
+        tags=[PipelineTemplateTag(name="tag1", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
+        pipeline_type=PipelineType.QUERY,
+    )
+    resource = FakePipelineTemplateResource(list_response=[template])
+    client = FakeClient(resource)
+    
+    await list_pipeline_templates(
+        client,
+        workspace="ws1",
+        limit=50,
+        field="name",
+        order="ASC"
+    )
+    
+    # Verify parameters were passed correctly
+    assert resource.last_list_call_params["limit"] == 50
+    assert resource.last_list_call_params["field"] == "name"
+    assert resource.last_list_call_params["order"] == "ASC"
+    assert resource.last_list_call_params["filter"] is None
+
+
+@pytest.mark.asyncio
+async def test_list_pipeline_templates_with_filter_and_sorting() -> None:
+    """Test that both filter and sorting parameters work together."""
+    template = PipelineTemplate(
+        pipeline_name="query_template",
+        pipeline_template_id=UUID("00000000-0000-0000-0000-000000000001"),
+        author="Test Author",
+        description="A query template",
+        best_for=["use case 1"],
+        potential_applications=["app 1"],
+        query_yaml="config: value",
+        tags=[PipelineTemplateTag(name="tag1", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
+        pipeline_type=PipelineType.QUERY,
+    )
+    resource = FakePipelineTemplateResource(list_response=[template])
+    client = FakeClient(resource)
+    
+    filter_value = "tags/any(tag: tag/name eq 'category:basic qa') and pipeline_type eq 'QUERY'"
+    
+    await list_pipeline_templates(
+        client,
+        workspace="ws1",
+        limit=25,
+        field="name",
+        order="ASC",
+        filter=filter_value
+    )
+    
+    # Verify all parameters were passed correctly
+    assert resource.last_list_call_params["limit"] == 25
+    assert resource.last_list_call_params["field"] == "name"
+    assert resource.last_list_call_params["order"] == "ASC"
+    assert resource.last_list_call_params["filter"] == filter_value
