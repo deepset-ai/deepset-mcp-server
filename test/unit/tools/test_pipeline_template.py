@@ -20,8 +20,23 @@ class FakePipelineTemplateResource:
         self._get_response = get_response
         self._list_exception = list_exception
         self._get_exception = get_exception
+        self.last_list_call_params: dict[str, Any] = {}
 
-    async def list_templates(self, limit: int = 100) -> list[PipelineTemplate]:
+    async def list_templates(
+        self,
+        limit: int = 100,
+        field: str = "created_at",
+        order: str = "DESC",
+        filter: str | None = None
+    ) -> list[PipelineTemplate]:
+        # Store the parameters for verification
+        self.last_list_call_params = {
+            "limit": limit,
+            "field": field,
+            "order": order,
+            "filter": filter
+        }
+        
         if self._list_exception:
             raise self._list_exception
         if self._list_response is not None:
