@@ -173,3 +173,40 @@ class PipelineResource:
             return response
 
         raise ValueError("Either `updated_pipeline_name` or `yaml_config` must be provided.")
+
+    async def get_logs(
+        self,
+        pipeline_name: str,
+        limit: int = 30,
+        level: str | None = None,
+    ) -> PipelineLogList:
+        """Fetch logs for a specific pipeline.
+
+        :param pipeline_name: Name of the pipeline to fetch logs for.
+        :param limit: Maximum number of log entries to return.
+        :param level: Filter logs by level (info, warning, error). If None, returns all levels.
+
+        :returns: A PipelineLogList containing the log entries.
+        """
+        params: dict[str, Any] = {
+            "limit": limit,
+            "filter": "origin eq 'querypipeline'",
+        }
+
+        # Add level filter if specified
+        if level is not None:
+            params["filter"] = f"level eq '{level}' and origin eq 'querypipeline'"
+
+        resp = await self._client.request(
+            endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}/logs",
+            method="GET",
+            params=params,
+        )
+
+        raise_for_status(resp)
+
+        if resp.json is not None:
+            return PipelineLogList.model_validate(resp.json)
+        else:
+            # Return empty log list if no response
+            return PipelineLogList(data=[], has_more=False, total=0)
