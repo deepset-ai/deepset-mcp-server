@@ -126,6 +126,7 @@ async def test_get_pipeline_template_returns_formatted_string() -> None:
         potential_applications=["app 1"],
         query_yaml="config: value",
         tags=[PipelineTemplateTag(name="tag1", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
+        pipeline_type=PipelineType.QUERY,
     )
     resource = FakePipelineTemplateResource(get_response=template)
     client = FakeClient(resource)
