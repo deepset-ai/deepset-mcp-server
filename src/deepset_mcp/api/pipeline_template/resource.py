@@ -41,23 +41,40 @@ class PipelineTemplateResource:
 
         return PipelineTemplate.model_validate(data)
 
-    async def list_templates(self, limit: int = 100) -> list[PipelineTemplate]:
+    async def list_templates(
+        self, 
+        limit: int = 100, 
+        field: str = "created_at", 
+        order: str = "DESC", 
+        filter: str | None = None
+    ) -> list[PipelineTemplate]:
         """List pipeline templates in the configured workspace.
 
         Parameters
         ----------
         limit : int, optional (default=100)
             Maximum number of templates to return
+        field : str, optional (default="created_at")
+            Field to sort by
+        order : str, optional (default="DESC")
+            Sort order (ASC or DESC)
+        filter : str | None, optional (default=None)
+            OData filter expression for filtering templates
 
         Returns
         -------
         list[PipelineTemplate]
             List of pipeline templates
         """
+        params = {"limit": limit, "page_number": 1, "field": field, "order": order}
+        
+        if filter is not None:
+            params["filter"] = filter
+
         response = await self._client.request(
             f"/v1/workspaces/{self._workspace}/pipeline_templates",
             method="GET",
-            params={"limit": limit, "page_number": 1, "field": "created_at", "order": "DESC"},
+            params=params,
         )
 
         raise_for_status(response)
