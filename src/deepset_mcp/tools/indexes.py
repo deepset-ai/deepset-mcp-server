@@ -1,6 +1,6 @@
-from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.tools.formatting_utils_index import index_to_llm_readable_string, index_list_to_llm_readable_string
+from deepset_mcp.api.protocols import AsyncClientProtocol
+from deepset_mcp.tools.formatting_utils_index import index_list_to_llm_readable_string, index_to_llm_readable_string
 
 
 async def list_indexes(client: AsyncClientProtocol, workspace: str) -> str:
@@ -15,19 +15,21 @@ async def get_index(client: AsyncClientProtocol, workspace: str, index_name: str
         response = await client.indexes(workspace=workspace).get(index_name)
     except ResourceNotFoundError:
         return f"There is no index named '{index_name}'. Did you mean to create it?"
-    
+
     return index_to_llm_readable_string(response)
 
 
 async def create_index(
-    client: AsyncClientProtocol, workspace: str, index_name: str, yaml_configuration: str, description: str | None = None
+    client: AsyncClientProtocol,
+    workspace: str,
+    index_name: str,
+    yaml_configuration: str,
+    description: str | None = None,
 ) -> str:
     """Creates a new index within the currently configured deepset workspace."""
     try:
-        response = await client.indexes(workspace=workspace).create(
-            name=index_name,
-            yaml_config=yaml_configuration,
-            description=description
+        await client.indexes(workspace=workspace).create(
+            name=index_name, yaml_config=yaml_configuration, description=description
         )
     except ResourceNotFoundError:
         return f"There is no workspace named '{workspace}'. Did you mean to configure it?"
@@ -44,7 +46,7 @@ async def update_index(
     workspace: str,
     index_name: str,
     updated_index_name: str | None = None,
-    yaml_configuration: str | None = None
+    yaml_configuration: str | None = None,
 ) -> str:
     """Updates an existing index in the specified workspace.
 
@@ -56,9 +58,7 @@ async def update_index(
 
     try:
         await client.indexes(workspace=workspace).update(
-            index_name=index_name,
-            updated_index_name=updated_index_name,
-            yaml_config=yaml_configuration
+            index_name=index_name, updated_index_name=updated_index_name, yaml_config=yaml_configuration
         )
     except ResourceNotFoundError:
         return f"There is no index named '{index_name}'. Did you mean to create it?"

@@ -11,18 +11,18 @@ from deepset_mcp.tools.haystack_service import (
     list_component_families as list_component_families_tool,
     search_component_definition as search_component_definition_tool,
 )
+from deepset_mcp.tools.indexes import (
+    create_index as create_index_tool,
+    get_index as get_index_tool,
+    list_indexes as list_indexes_tool,
+    update_index as update_index_tool,
+)
 from deepset_mcp.tools.pipeline import (
     create_pipeline as create_pipeline_tool,
     get_pipeline as get_pipeline_tool,
     list_pipelines as list_pipelines_tool,
     update_pipeline as update_pipeline_tool,
     validate_pipeline as validate_pipeline_tool,
-)
-from deepset_mcp.tools.indexes import (
-    create_index as create_index_tool,
-    get_index as get_index_tool,
-    list_indexes as list_indexes_tool,
-    update_index as update_index_tool,
 )
 from deepset_mcp.tools.pipeline_template import (
     get_pipeline_template as get_pipeline_template_tool,
@@ -247,16 +247,14 @@ async def create_index(index_name: str, yaml_configuration: str, description: st
             workspace=workspace,
             index_name=index_name,
             yaml_configuration=yaml_configuration,
-            description=description
+            description=description,
         )
     return response
 
 
 @mcp.tool()
 async def update_index(
-    index_name: str,
-    updated_index_name: str | None = None,
-    yaml_configuration: str | None = None
+    index_name: str, updated_index_name: str | None = None, yaml_configuration: str | None = None
 ) -> str:
     """Updates an existing index in the deepset workspace.
 
@@ -274,7 +272,7 @@ async def update_index(
             workspace=workspace,
             index_name=index_name,
             updated_index_name=updated_index_name,
-            yaml_configuration=yaml_configuration
+            yaml_configuration=yaml_configuration,
         )
     return response
 
