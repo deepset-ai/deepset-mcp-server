@@ -48,3 +48,17 @@ class PipelineHandle:
         :returns: The underlying DeepsetPipeline instance with all pipeline data.
         """
         return self._pipeline
+
+    async def get_logs(
+        self,
+        limit: int = 30,
+        level: str | None = None,
+    ) -> "PipelineLogList":
+        """Fetch logs for this pipeline.
+
+        :param limit: Maximum number of log entries to return.
+        :param level: Filter logs by level (info, warning, error). If None, returns all levels.
+
+        :returns: A PipelineLogList containing the log entries.
+        """
+        return await self._resource.get_logs(pipeline_name=self._pipeline.name, limit=limit, level=level)
