@@ -67,16 +67,14 @@ class PipelineResource:
         self,
         page_number: int = 1,
         limit: int = 10,
-    ) -> list["PipelineHandle"]:
+    ) -> list[DeepsetPipeline]:
         """
         Retrieve pipeline in the configured workspace with optional pagination.
 
         :param page_number: Page number for paging.
         :param limit: Max number of items to return.
-        :return: List of PipelineHandle instances.
+        :return: List of DeepsetPipeline instances.
         """
-        from deepset_mcp.api.pipeline.handle import PipelineHandle
-
         params: dict[str, Any] = {
             "page_number": page_number,
             "limit": limit,
@@ -97,7 +95,7 @@ class PipelineResource:
         else:
             pipelines = []
 
-        return [PipelineHandle(pipeline=pipeline, resource=self) for pipeline in pipelines]
+        return pipelines
 
     async def get(self, pipeline_name: str, include_yaml: bool = True) -> "PipelineHandle":
         """Fetch a single pipeline by its name."""
