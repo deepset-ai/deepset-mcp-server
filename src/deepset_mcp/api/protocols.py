@@ -1,13 +1,15 @@
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Protocol, Self, TypeVar, overload
+from typing import Any, Protocol, Self, TypeVar, overload
 
 from deepset_mcp.api.indexes.models import Index, IndexList
-from deepset_mcp.api.pipeline.models import NoContentResponse, PipelineValidationResult
+from deepset_mcp.api.pipeline.models import (
+    DeepsetPipeline,
+    NoContentResponse,
+    PipelineLogList,
+    PipelineValidationResult,
+)
 from deepset_mcp.api.pipeline_template.models import PipelineTemplate
 from deepset_mcp.api.transport import TransportResponse
-
-if TYPE_CHECKING:
-    from deepset_mcp.api.pipeline.handle import PipelineHandle
 
 
 class HaystackServiceProtocol(Protocol):
@@ -151,7 +153,7 @@ class PipelineResourceProtocol(Protocol):
         """Validate a pipeline's YAML configuration against the API."""
         ...
 
-    async def get(self, pipeline_name: str, include_yaml: bool = True) -> "PipelineHandle":
+    async def get(self, pipeline_name: str, include_yaml: bool = True) -> DeepsetPipeline:
         """Fetch a single pipeline by its name."""
         ...
 
@@ -159,7 +161,7 @@ class PipelineResourceProtocol(Protocol):
         self,
         page_number: int = 1,
         limit: int = 10,
-    ) -> list["PipelineHandle"]:
+    ) -> list[DeepsetPipeline]:
         """List pipelines in the configured workspace with optional pagination."""
         ...
 
@@ -174,4 +176,13 @@ class PipelineResourceProtocol(Protocol):
         yaml_config: str | None = None,
     ) -> NoContentResponse:
         """Update name and/or YAML config of an existing pipeline."""
+        ...
+
+    async def get_logs(
+        self,
+        pipeline_name: str,
+        limit: int = 30,
+        level: str | None = None,
+    ) -> PipelineLogList:
+        """Fetch logs for a specific pipeline."""
         ...

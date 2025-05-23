@@ -7,7 +7,7 @@ from deepset_mcp.api.exceptions import (
     ResourceNotFoundError,
     UnexpectedAPIError,
 )
-from deepset_mcp.api.pipeline.handle import PipelineHandle
+from deepset_mcp.api.pipeline import PipelineLogList
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     NoContentResponse,
@@ -49,17 +49,17 @@ class FakePipelineResource:
         self._get_exception = get_exception
         self._update_exception = update_exception
 
-    async def list(self, page_number: int = 1, limit: int = 10) -> list[PipelineHandle]:
+    async def list(self, page_number: int = 1, limit: int = 10) -> list[DeepsetPipeline]:
         if self._list_response is not None:
             # Convert DeepsetPipeline instances to PipelineHandle
-            return [PipelineHandle(pipeline=p, resource=self) for p in self._list_response]
+            return self._list_response
         raise NotImplementedError
 
-    async def get(self, pipeline_name: str, include_yaml: bool = True) -> PipelineHandle:
+    async def get(self, pipeline_name: str, include_yaml: bool = True) -> DeepsetPipeline:
         if self._get_exception:
             raise self._get_exception
         if self._get_response is not None:
-            return PipelineHandle(pipeline=self._get_response, resource=self)
+            return self._get_response
         raise NotImplementedError
 
     async def validate(self, yaml_config: str) -> PipelineValidationResult:
@@ -84,6 +84,14 @@ class FakePipelineResource:
             raise self._update_exception
         if self._update_response is not None:
             return self._update_response
+        raise NotImplementedError
+
+    async def get_logs(
+        self,
+        pipeline_name: str,
+        limit: int = 30,
+        level: str | None = None,
+    ) -> PipelineLogList:
         raise NotImplementedError
 
 

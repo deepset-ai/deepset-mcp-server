@@ -4,13 +4,13 @@ from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     NoContentResponse,
+    PipelineLogList,
     PipelineValidationResult,
     ValidationError,
 )
 from deepset_mcp.api.transport import raise_for_status
 
 if TYPE_CHECKING:
-    from deepset_mcp.api.pipeline.handle import PipelineHandle
     from deepset_mcp.api.protocols import AsyncClientProtocol
 
 
@@ -67,16 +67,14 @@ class PipelineResource:
         self,
         page_number: int = 1,
         limit: int = 10,
-    ) -> list["PipelineHandle"]:
+    ) -> list[DeepsetPipeline]:
         """
         Retrieve pipeline in the configured workspace with optional pagination.
 
         :param page_number: Page number for paging.
         :param limit: Max number of items to return.
-        :return: List of PipelineHandle instances.
+        :return: List of DeepsetPipeline instances.
         """
-        from deepset_mcp.api.pipeline.handle import PipelineHandle
-
         params: dict[str, Any] = {
             "page_number": page_number,
             "limit": limit,
@@ -97,12 +95,10 @@ class PipelineResource:
         else:
             pipelines = []
 
-        return [PipelineHandle(pipeline=pipeline, resource=self) for pipeline in pipelines]
+        return pipelines
 
-    async def get(self, pipeline_name: str, include_yaml: bool = True) -> "PipelineHandle":
+    async def get(self, pipeline_name: str, include_yaml: bool = True) -> DeepsetPipeline:
         """Fetch a single pipeline by its name."""
-        from deepset_mcp.api.pipeline.handle import PipelineHandle
-
         resp = await self._client.request(endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}")
         raise_for_status(resp)
 
@@ -118,7 +114,7 @@ class PipelineResource:
             if yaml_response.json is not None:
                 pipeline.yaml_config = yaml_response.json["query_yaml"]
 
-        return PipelineHandle(pipeline=pipeline, resource=self)
+        return pipeline
 
     async def create(self, name: str, yaml_config: str) -> NoContentResponse:
         """Create a new pipeline with a name and YAML config."""
@@ -172,3 +168,40 @@ class PipelineResource:
             return response
 
         raise ValueError("Either `updated_pipeline_name` or `yaml_config` must be provided.")
+
+    async def get_logs(
+        self,
+        pipeline_name: str,
+        limit: int = 30,
+        level: str | None = None,
+    ) -> PipelineLogList:
+        """Fetch logs for a specific pipeline.
+
+        :param pipeline_name: Name of the pipeline to fetch logs for.
+        :param limit: Maximum number of log entries to return.
+        :param level: Filter logs by level (info, warning, error). If None, returns all levels.
+
+        :returns: A PipelineLogList containing the log entries.
+        """
+        params: dict[str, Any] = {
+            "limit": limit,
+            "filter": "origin eq 'querypipeline'",
+        }
+
+        # Add level filter if specified
+        if level is not None:
+            params["filter"] = f"level eq '{level}' and origin eq 'querypipeline'"
+
+        resp = await self._client.request(
+            endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}/logs",
+            method="GET",
+            params=params,
+        )
+
+        raise_for_status(resp)
+
+        if resp.json is not None:
+            return PipelineLogList.model_validate(resp.json)
+        else:
+            # Return empty log list if no response
+            return PipelineLogList(data=[], has_more=False, total=0)
