@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -59,3 +60,23 @@ class NoContentResponse(BaseModel):
 
     success: bool = True
     message: str = "No content"
+
+
+class PipelineLog(BaseModel):
+    """Model representing a single log entry from a pipeline."""
+
+    log_id: str
+    message: str
+    logged_at: datetime
+    level: str
+    origin: str
+    exceptions: str | None = None
+    extra_fields: dict[str, Any] = Field(default_factory=dict)
+
+
+class PipelineLogList(BaseModel):
+    """Model representing a paginated list of pipeline logs."""
+
+    data: list[PipelineLog]
+    has_more: bool
+    total: int
