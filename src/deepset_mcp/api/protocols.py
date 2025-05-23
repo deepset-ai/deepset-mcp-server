@@ -176,3 +176,12 @@ class PipelineResourceProtocol(Protocol):
     ) -> NoContentResponse:
         """Update name and/or YAML config of an existing pipeline."""
         ...
+
+    async def get_logs(
+        self,
+        pipeline_name: str,
+        limit: int = 30,
+        level: str | None = None,
+    ) -> "PipelineLogList":
+        """Fetch logs for a specific pipeline."""
+        ...
