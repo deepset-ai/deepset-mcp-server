@@ -1,9 +1,10 @@
+from typing import Any
 from uuid import UUID
 
 import pytest
 
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.pipeline_template.models import PipelineTemplate, PipelineTemplateTag
+from deepset_mcp.api.pipeline_template.models import PipelineTemplate, PipelineTemplateTag, PipelineType
 from deepset_mcp.tools.pipeline_template import get_pipeline_template, list_pipeline_templates
 from test.unit.conftest import BaseFakeClient
 
@@ -20,8 +21,14 @@ class FakePipelineTemplateResource:
         self._get_response = get_response
         self._list_exception = list_exception
         self._get_exception = get_exception
+        self.last_list_call_params: dict[str, Any] = {}
 
-    async def list_templates(self, limit: int = 100) -> list[PipelineTemplate]:
+    async def list_templates(
+        self, limit: int = 100, field: str = "created_at", order: str = "DESC", filter: str | None = None
+    ) -> list[PipelineTemplate]:
+        # Store the parameters for verification
+        self.last_list_call_params = {"limit": limit, "field": field, "order": order, "filter": filter}
+
         if self._list_exception:
             raise self._list_exception
         if self._list_response is not None:
@@ -49,6 +56,7 @@ class FakeClient(BaseFakeClient):
 async def test_list_pipeline_templates_returns_formatted_string() -> None:
     template1 = PipelineTemplate(
         pipeline_name="template1",
+        name="template1",
         pipeline_template_id=UUID("00000000-0000-0000-0000-000000000001"),
         author="Alice Smith",
         description="First template",
@@ -56,9 +64,11 @@ async def test_list_pipeline_templates_returns_formatted_string() -> None:
         potential_applications=["app 1", "app 2"],
         query_yaml="config1: value1",
         tags=[PipelineTemplateTag(name="tag1", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
+        pipeline_type=PipelineType.QUERY,
     )
     template2 = PipelineTemplate(
         pipeline_name="template2",
+        name="template2",
         pipeline_template_id=UUID("00000000-0000-0000-0000-000000000002"),
         author="Bob Jones",
         description="Second template",
@@ -66,6 +76,7 @@ async def test_list_pipeline_templates_returns_formatted_string() -> None:
         potential_applications=["app 3"],
         query_yaml="config2: value2",
         tags=[PipelineTemplateTag(name="tag2", tag_id=UUID("20000000-0000-0000-0000-000000000002"))],
+        pipeline_type=PipelineType.INDEXING,
     )
     resource = FakePipelineTemplateResource(list_response=[template1, template2])
     client = FakeClient(resource)
@@ -101,6 +112,7 @@ async def test_list_pipeline_templates_handles_unexpected_error() -> None:
 async def test_get_pipeline_template_returns_formatted_string() -> None:
     template = PipelineTemplate(
         pipeline_name="test_template",
+        name="test_template",
         pipeline_template_id=UUID("00000000-0000-0000-0000-000000000001"),
         author="Eve Brown",
         description="Test template",
@@ -108,6 +120,7 @@ async def test_get_pipeline_template_returns_formatted_string() -> None:
         potential_applications=["app 1"],
         query_yaml="config: value",
         tags=[PipelineTemplateTag(name="tag1", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
+        pipeline_type=PipelineType.QUERY,
     )
     resource = FakePipelineTemplateResource(get_response=template)
     client = FakeClient(resource)
@@ -137,3 +150,84 @@ async def test_get_pipeline_template_handles_unexpected_error() -> None:
 
     assert "Failed to fetch pipeline template 'test_template'" in result
     assert "Server error" in result
+
+
+@pytest.mark.asyncio
+async def test_list_pipeline_templates_with_filter() -> None:
+    """Test that filter parameter is passed correctly to the resource."""
+    template = PipelineTemplate(
+        pipeline_name="query_template",
+        name="query_template",
+        pipeline_template_id=UUID("00000000-0000-0000-0000-000000000001"),
+        author="Test Author",
+        description="A query template",
+        best_for=["use case 1"],
+        potential_applications=["app 1"],
+        query_yaml="config: value",
+        tags=[PipelineTemplateTag(name="tag1", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
+        pipeline_type=PipelineType.QUERY,
+    )
+    resource = FakePipelineTemplateResource(list_response=[template])
+    client = FakeClient(resource)
+
+    filter_value = "pipeline_type eq 'QUERY'"
+    await list_pipeline_templates(client, workspace="ws1", filter=filter_value)
+
+    # Verify the filter was passed to the resource
+    assert resource.last_list_call_params["filter"] == filter_value
+
+
+@pytest.mark.asyncio
+async def test_list_pipeline_templates_with_custom_sorting() -> None:
+    """Test that custom sorting parameters are passed correctly."""
+    template = PipelineTemplate(
+        pipeline_name="test_template",
+        name="test_template",
+        pipeline_template_id=UUID("00000000-0000-0000-0000-000000000001"),
+        author="Test Author",
+        description="A test template",
+        best_for=["use case 1"],
+        potential_applications=["app 1"],
+        query_yaml="config: value",
+        tags=[PipelineTemplateTag(name="tag1", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
+        pipeline_type=PipelineType.QUERY,
+    )
+    resource = FakePipelineTemplateResource(list_response=[template])
+    client = FakeClient(resource)
+
+    await list_pipeline_templates(client, workspace="ws1", limit=50, field="name", order="ASC")
+
+    # Verify parameters were passed correctly
+    assert resource.last_list_call_params["limit"] == 50
+    assert resource.last_list_call_params["field"] == "name"
+    assert resource.last_list_call_params["order"] == "ASC"
+    assert resource.last_list_call_params["filter"] is None
+
+
+@pytest.mark.asyncio
+async def test_list_pipeline_templates_with_filter_and_sorting() -> None:
+    """Test that both filter and sorting parameters work together."""
+    template = PipelineTemplate(
+        pipeline_name="query_template",
+        name="query_template",
+        pipeline_template_id=UUID("00000000-0000-0000-0000-000000000001"),
+        author="Test Author",
+        description="A query template",
+        best_for=["use case 1"],
+        potential_applications=["app 1"],
+        query_yaml="config: value",
+        tags=[PipelineTemplateTag(name="tag1", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
+        pipeline_type=PipelineType.QUERY,
+    )
+    resource = FakePipelineTemplateResource(list_response=[template])
+    client = FakeClient(resource)
+
+    filter_value = "tags/any(tag: tag/name eq 'category:basic qa') and pipeline_type eq 'QUERY'"
+
+    await list_pipeline_templates(client, workspace="ws1", limit=25, field="name", order="ASC", filter=filter_value)
+
+    # Verify all parameters were passed correctly
+    assert resource.last_list_call_params["limit"] == 25
+    assert resource.last_list_call_params["field"] == "name"
+    assert resource.last_list_call_params["order"] == "ASC"
+    assert resource.last_list_call_params["filter"] == filter_value
