@@ -8,6 +8,7 @@ from deepset_mcp.api.transport import TransportResponse
 
 if TYPE_CHECKING:
     from deepset_mcp.api.pipeline.handle import PipelineHandle
+    from deepset_mcp.api.pipeline.log_models import PipelineLogList
 
 
 class HaystackServiceProtocol(Protocol):
