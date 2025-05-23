@@ -6,6 +6,11 @@ from deepset_mcp.api.pipeline.models import DeepsetPipeline, NoContentResponse, 
 from deepset_mcp.api.pipeline_template.models import PipelineTemplate
 from deepset_mcp.api.transport import TransportResponse
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from deepset_mcp.api.pipeline.handle import PipelineHandle
+
 
 class HaystackServiceProtocol(Protocol):
     """Protocol defining the implementation for HaystackService."""
