@@ -1,10 +1,13 @@
 from types import TracebackType
-from typing import Any, Protocol, Self, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Protocol, Self, TypeVar, overload
 
 from deepset_mcp.api.indexes.models import Index, IndexList
-from deepset_mcp.api.pipeline.models import DeepsetPipeline, NoContentResponse, PipelineValidationResult
+from deepset_mcp.api.pipeline.models import NoContentResponse, PipelineValidationResult
 from deepset_mcp.api.pipeline_template.models import PipelineTemplate
 from deepset_mcp.api.transport import TransportResponse
+
+if TYPE_CHECKING:
+    from deepset_mcp.api.pipeline.handle import PipelineHandle
 
 
 class HaystackServiceProtocol(Protocol):
@@ -148,7 +151,7 @@ class PipelineResourceProtocol(Protocol):
         """Validate a pipeline's YAML configuration against the API."""
         ...
 
-    async def get(self, pipeline_name: str) -> DeepsetPipeline:
+    async def get(self, pipeline_name: str, include_yaml: bool = True) -> "PipelineHandle":
         """Fetch a single pipeline by its name."""
         ...
 
@@ -156,7 +159,7 @@ class PipelineResourceProtocol(Protocol):
         self,
         page_number: int = 1,
         limit: int = 10,
-    ) -> list[DeepsetPipeline]:
+    ) -> list["PipelineHandle"]:
         """List pipelines in the configured workspace with optional pagination."""
         ...
 

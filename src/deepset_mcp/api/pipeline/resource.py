@@ -1,4 +1,4 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.pipeline.models import (
@@ -7,16 +7,19 @@ from deepset_mcp.api.pipeline.models import (
     PipelineValidationResult,
     ValidationError,
 )
-from deepset_mcp.api.protocols import AsyncClientProtocol, PipelineResourceProtocol
 from deepset_mcp.api.transport import raise_for_status
 
+if TYPE_CHECKING:
+    from deepset_mcp.api.pipeline.handle import PipelineHandle
+    from deepset_mcp.api.protocols import AsyncClientProtocol
 
-class PipelineResource(PipelineResourceProtocol):
+
+class PipelineResource:
     """Manages interactions with the deepset pipeline API."""
 
     def __init__(
         self,
-        client: AsyncClientProtocol,
+        client: "AsyncClientProtocol",
         workspace: str,
     ) -> None:
         """Initializes a PipelineResource instance."""
@@ -64,14 +67,16 @@ class PipelineResource(PipelineResourceProtocol):
         self,
         page_number: int = 1,
         limit: int = 10,
-    ) -> list[DeepsetPipeline]:
+    ) -> list["PipelineHandle"]:
         """
         Retrieve pipeline in the configured workspace with optional pagination.
 
         :param page_number: Page number for paging.
         :param limit: Max number of items to return.
-        :return: PipelineListResponse containing `data`, `has_more`, and `total`.
+        :return: List of PipelineHandle instances.
         """
+        from deepset_mcp.api.pipeline.handle import PipelineHandle
+
         params: dict[str, Any] = {
             "page_number": page_number,
             "limit": limit,
@@ -92,10 +97,12 @@ class PipelineResource(PipelineResourceProtocol):
         else:
             pipelines = []
 
-        return pipelines
+        return [PipelineHandle(pipeline=pipeline, resource=self) for pipeline in pipelines]
 
-    async def get(self, pipeline_name: str, include_yaml: bool = True) -> DeepsetPipeline:
+    async def get(self, pipeline_name: str, include_yaml: bool = True) -> "PipelineHandle":
         """Fetch a single pipeline by its name."""
+        from deepset_mcp.api.pipeline.handle import PipelineHandle
+
         resp = await self._client.request(endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}")
         raise_for_status(resp)
 
@@ -111,7 +118,7 @@ class PipelineResource(PipelineResourceProtocol):
             if yaml_response.json is not None:
                 pipeline.yaml_config = yaml_response.json["query_yaml"]
 
-        return pipeline
+        return PipelineHandle(pipeline=pipeline, resource=self)
 
     async def create(self, name: str, yaml_config: str) -> NoContentResponse:
         """Create a new pipeline with a name and YAML config."""

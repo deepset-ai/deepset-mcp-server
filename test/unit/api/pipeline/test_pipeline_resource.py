@@ -3,6 +3,7 @@ from typing import Any
 import pytest
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
+from deepset_mcp.api.pipeline.handle import PipelineHandle
 from deepset_mcp.api.pipeline.models import DeepsetPipeline, PipelineServiceLevel, PipelineValidationResult
 from deepset_mcp.api.pipeline.resource import PipelineResource
 from deepset_mcp.api.protocols import PipelineResourceProtocol
@@ -82,9 +83,10 @@ class TestPipelineResource:
 
         # Verify results
         assert len(result) == 2
-        assert isinstance(result[0], DeepsetPipeline)
+        assert isinstance(result[0], PipelineHandle)
         assert result[0].id == "1"
         assert result[0].name == "Pipeline 1"
+        assert isinstance(result[0].pipeline, DeepsetPipeline)
 
         # Verify request
         assert len(client.requests) == 1
@@ -189,10 +191,11 @@ class TestPipelineResource:
         result = await resource.get(pipeline_name=pipeline_name)
 
         # Verify results
-        assert isinstance(result, DeepsetPipeline)
+        assert isinstance(result, PipelineHandle)
         assert result.id == "test-pipeline-id"
         assert result.name == pipeline_name
         assert result.yaml_config == yaml_config
+        assert isinstance(result.pipeline, DeepsetPipeline)
 
         # Verify requests
         assert len(client.requests) == 2
@@ -214,10 +217,11 @@ class TestPipelineResource:
         result = await resource.get(pipeline_name=pipeline_name, include_yaml=False)
 
         # Verify results
-        assert isinstance(result, DeepsetPipeline)
+        assert isinstance(result, PipelineHandle)
         assert result.id == "test-pipeline-id"
         assert result.name == pipeline_name
         assert result.yaml_config is None
+        assert isinstance(result.pipeline, DeepsetPipeline)
 
         # Verify only one request was made (no YAML request)
         assert len(client.requests) == 1
@@ -273,6 +277,7 @@ class TestPipelineResource:
         result = await resource.get(pipeline_name=pipeline_name, include_yaml=False)
 
         # Verify results
+        assert isinstance(result, PipelineHandle)
         assert result.name == pipeline_name
 
         # Verify request
