@@ -277,6 +277,7 @@ class TestPipelineResource:
         result = await resource.get(pipeline_name=pipeline_name, include_yaml=False)
 
         # Verify results
+        assert isinstance(result, PipelineHandle)
         assert result.name == pipeline_name
 
         # Verify request
