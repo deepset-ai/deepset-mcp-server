@@ -2,6 +2,7 @@ import pytest
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.api.exceptions import ResourceNotFoundError
+from deepset_mcp.api.pipeline.handle import PipelineHandle
 from deepset_mcp.api.pipeline.models import DeepsetPipeline
 from deepset_mcp.api.pipeline.resource import PipelineResource
 
@@ -71,10 +72,11 @@ async def test_create_pipeline(
     await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
 
     # Verify the pipeline was created by retrieving it
-    pipeline: DeepsetPipeline = await pipeline_resource.get(pipeline_name=pipeline_name)
+    handle: PipelineHandle = await pipeline_resource.get(pipeline_name=pipeline_name)
 
-    assert pipeline.name == pipeline_name
-    assert pipeline.yaml_config == sample_yaml_config
+    assert handle.name == pipeline_name
+    assert handle.yaml_config == sample_yaml_config
+    assert isinstance(handle.pipeline, DeepsetPipeline)
 
 
 @pytest.mark.asyncio
@@ -91,23 +93,30 @@ async def test_list_pipelines(
         await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
 
     # Test listing without pagination
-    pipelines = await pipeline_resource.list(limit=10)
-    assert len(pipelines) == 3
+    handles = await pipeline_resource.list(limit=10)
+    assert len(handles) == 3
 
     # Verify our created pipelines are in the list
-    retrieved_names = [p.name for p in pipelines]
+    retrieved_names = [h.name for h in handles]
     for name in pipeline_names:
         assert name in retrieved_names
 
+    # Verify all are PipelineHandle instances
+    for handle in handles:
+        assert isinstance(handle, PipelineHandle)
+        assert isinstance(handle.pipeline, DeepsetPipeline)
+
     # Test pagination
-    if len(pipelines) > 1:
+    if len(handles) > 1:
         # Get the first page with 1 item
         first_page = await pipeline_resource.list(limit=1)
         assert len(first_page) == 1
+        assert isinstance(first_page[0], PipelineHandle)
 
         # Get the second page
         second_page = await pipeline_resource.list(page_number=2, limit=1)
         assert len(second_page) == 1
+        assert isinstance(second_page[0], PipelineHandle)
 
         # Verify they're different pipelines
         assert first_page[0].id != second_page[0].id
@@ -125,16 +134,16 @@ async def test_get_pipeline(
     await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
 
     # Test getting with YAML config
-    pipeline_with_yaml: DeepsetPipeline = await pipeline_resource.get(pipeline_name=pipeline_name, include_yaml=True)
-    assert pipeline_with_yaml.name == pipeline_name
-    assert pipeline_with_yaml.yaml_config == sample_yaml_config
+    handle_with_yaml: PipelineHandle = await pipeline_resource.get(pipeline_name=pipeline_name, include_yaml=True)
+    assert handle_with_yaml.name == pipeline_name
+    assert handle_with_yaml.yaml_config == sample_yaml_config
+    assert isinstance(handle_with_yaml.pipeline, DeepsetPipeline)
 
     # Test getting without YAML config
-    pipeline_without_yaml: DeepsetPipeline = await pipeline_resource.get(
-        pipeline_name=pipeline_name, include_yaml=False
-    )
-    assert pipeline_without_yaml.name == pipeline_name
-    assert pipeline_without_yaml.yaml_config is None
+    handle_without_yaml: PipelineHandle = await pipeline_resource.get(pipeline_name=pipeline_name, include_yaml=False)
+    assert handle_without_yaml.name == pipeline_name
+    assert handle_without_yaml.yaml_config is None
+    assert isinstance(handle_without_yaml.pipeline, DeepsetPipeline)
 
 
 @pytest.mark.asyncio
@@ -156,8 +165,9 @@ async def test_update_pipeline(
     )
 
     # Verify the name was updated
-    updated_pipeline: DeepsetPipeline = await pipeline_resource.get(pipeline_name=updated_name)
-    assert updated_pipeline.name == updated_name
+    updated_handle: PipelineHandle = await pipeline_resource.get(pipeline_name=updated_name)
+    assert updated_handle.name == updated_name
+    assert isinstance(updated_handle.pipeline, DeepsetPipeline)
 
     # Update the pipeline config
     modified_yaml = sample_yaml_config.replace("temperature: 0.1", "temperature: 0.2")
@@ -167,8 +177,9 @@ async def test_update_pipeline(
     )
 
     # Verify the config was updated
-    updated_pipeline = await pipeline_resource.get(pipeline_name=updated_name)
-    assert updated_pipeline.yaml_config == modified_yaml
+    updated_handle = await pipeline_resource.get(pipeline_name=updated_name)
+    assert updated_handle.yaml_config == modified_yaml
+    assert isinstance(updated_handle.pipeline, DeepsetPipeline)
 
 
 @pytest.mark.asyncio

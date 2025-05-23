@@ -8,7 +8,7 @@ from deepset_mcp.tools.formatting_utils import pipeline_to_llm_readable_string, 
 async def list_pipelines(client: AsyncClientProtocol, workspace: str) -> str:
     """Retrieves a list of all pipeline available within the currently configured deepset workspace."""
     response = await client.pipelines(workspace=workspace).list()
-    formatted_pipelines = [pipeline_to_llm_readable_string(p) for p in response]
+    formatted_pipelines = [pipeline_to_llm_readable_string(h.pipeline) for h in response]
 
     return "\n\n".join(formatted_pipelines)
 
@@ -16,7 +16,7 @@ async def list_pipelines(client: AsyncClientProtocol, workspace: str) -> str:
 async def get_pipeline(client: AsyncClientProtocol, workspace: str, pipeline_name: str) -> str:
     """Fetches detailed configuration information for a specific pipeline, identified by its unique `pipeline_name`."""
     response = await client.pipelines(workspace=workspace).get(pipeline_name)
-    return pipeline_to_llm_readable_string(response)
+    return pipeline_to_llm_readable_string(response.pipeline)
 
 
 async def validate_pipeline(client: AsyncClientProtocol, workspace: str, yaml_configuration: str) -> str:
@@ -70,14 +70,14 @@ async def update_pipeline(
     replacement snippet is used to update the pipeline's configuration in the target workspace.
     """
     try:
-        original_pipeline = await client.pipelines(workspace=workspace).get(pipeline_name=pipeline_name)
+        original_handle = await client.pipelines(workspace=workspace).get(pipeline_name=pipeline_name)
     except ResourceNotFoundError:
         return f"There is no pipeline named '{pipeline_name}'. Did you mean to create it?"
 
-    if original_pipeline.yaml_config is None:
+    if original_handle.yaml_config is None:
         raise ValueError("The pipeline does not have a YAML configuration.")
 
-    occurrences = original_pipeline.yaml_config.count(original_config_snippet)
+    occurrences = original_handle.yaml_config.count(original_config_snippet)
 
     if occurrences == 0:
         return f"No occurrences of the provided configuration snippet were found in the pipeline '{pipeline_name}'."
@@ -88,7 +88,7 @@ async def update_pipeline(
             f"'{pipeline_name}'. Specify a more precise snippet to proceed with the update."
         )
 
-    updated_yaml_configuration = original_pipeline.yaml_config.replace(
+    updated_yaml_configuration = original_handle.yaml_config.replace(
         original_config_snippet, replacement_config_snippet, 1
     )
 
