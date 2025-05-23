@@ -16,7 +16,7 @@ async def list_pipelines(client: AsyncClientProtocol, workspace: str) -> str:
 async def get_pipeline(client: AsyncClientProtocol, workspace: str, pipeline_name: str) -> str:
     """Fetches detailed configuration information for a specific pipeline, identified by its unique `pipeline_name`."""
     response = await client.pipelines(workspace=workspace).get(pipeline_name)
-    return pipeline_to_llm_readable_string(response)
+    return pipeline_to_llm_readable_string(response.pipeline)
 
 
 async def validate_pipeline(client: AsyncClientProtocol, workspace: str, yaml_configuration: str) -> str:
