@@ -93,3 +93,48 @@ async def test_list_templates_with_limit(
 
     # Verify that the number of templates is not more than the limit
     assert len(templates) <= limit
+
+
+@pytest.mark.asyncio
+async def test_list_templates_with_filter(
+    template_resource: PipelineTemplateResource,
+) -> None:
+    """Test listing templates with a pipeline type filter."""
+    # Test filtering by QUERY pipeline type
+    query_templates = await template_resource.list_templates(filter="pipeline_type eq 'QUERY'")
+    
+    # Verify that all returned templates are QUERY type
+    assert isinstance(query_templates, list)
+    
+    # If templates are available, verify they are all QUERY type
+    for template in query_templates:
+        assert isinstance(template, PipelineTemplate)
+        assert template.pipeline_type == "QUERY"
+    
+    # Test filtering by INDEXING pipeline type
+    indexing_templates = await template_resource.list_templates(filter="pipeline_type eq 'INDEXING'")
+    
+    # Verify that all returned templates are INDEXING type
+    assert isinstance(indexing_templates, list)
+    
+    # If templates are available, verify they are all INDEXING type
+    for template in indexing_templates:
+        assert isinstance(template, PipelineTemplate)
+        assert template.pipeline_type == "INDEXING"
+
+
+@pytest.mark.asyncio
+async def test_list_templates_with_custom_sorting(
+    template_resource: PipelineTemplateResource,
+) -> None:
+    """Test listing templates with custom sorting."""
+    # Test sorting by name in ascending order
+    templates = await template_resource.list_templates(field="name", order="ASC", limit=5)
+    
+    # Verify that the templates are returned as a list
+    assert isinstance(templates, list)
+    
+    # If we have multiple templates, verify they are sorted correctly
+    if len(templates) > 1:
+        for i in range(len(templates) - 1):
+            assert templates[i].template_name <= templates[i + 1].template_name
