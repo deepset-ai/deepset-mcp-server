@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 from deepset_mcp.api.pipeline.models import DeepsetPipeline
 
 if TYPE_CHECKING:
+    from deepset_mcp.api.pipeline.log_models import PipelineLogList
     from deepset_mcp.api.protocols import PipelineResourceProtocol
 
 
