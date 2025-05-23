@@ -29,11 +29,11 @@ class TestIntegrationPipelineLogs:
             pytest.skip("DEEPSET_TEST_PIPELINE environment variable not set")
 
         async with AsyncDeepsetClient() as client:
-            # Get pipeline handle
-            handle = await client.pipelines(workspace).get(pipeline_name, include_yaml=False)
-            
-            # Get logs
-            logs = await handle.get_logs(limit=5)
+            # Get logs directly from resource
+            logs = await client.pipelines(workspace).get_logs(
+                pipeline_name=pipeline_name,
+                limit=5
+            )
             
             # Verify response structure
             assert isinstance(logs, PipelineLogList)
