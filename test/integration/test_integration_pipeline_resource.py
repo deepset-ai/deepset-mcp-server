@@ -107,14 +107,16 @@ async def test_list_pipelines(
         assert isinstance(handle.pipeline, DeepsetPipeline)
 
     # Test pagination
-    if len(pipelines) > 1:
+    if len(handles) > 1:
         # Get the first page with 1 item
         first_page = await pipeline_resource.list(limit=1)
         assert len(first_page) == 1
+        assert isinstance(first_page[0], PipelineHandle)
 
         # Get the second page
         second_page = await pipeline_resource.list(page_number=2, limit=1)
         assert len(second_page) == 1
+        assert isinstance(second_page[0], PipelineHandle)
 
         # Verify they're different pipelines
         assert first_page[0].id != second_page[0].id
