@@ -3,7 +3,7 @@ from uuid import UUID
 import pytest
 
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.pipeline_template.models import PipelineTemplate, PipelineTemplateTag
+from deepset_mcp.api.pipeline_template.models import PipelineTemplate, PipelineTemplateTag, PipelineType
 from deepset_mcp.tools.pipeline_template import get_pipeline_template, list_pipeline_templates
 from test.unit.conftest import BaseFakeClient
 
