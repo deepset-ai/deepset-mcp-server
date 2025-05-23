@@ -93,13 +93,18 @@ async def test_list_pipelines(
         await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
 
     # Test listing without pagination
-    pipelines = await pipeline_resource.list(limit=10)
-    assert len(pipelines) == 3
+    handles = await pipeline_resource.list(limit=10)
+    assert len(handles) == 3
 
     # Verify our created pipelines are in the list
-    retrieved_names = [p.name for p in pipelines]
+    retrieved_names = [h.name for h in handles]
     for name in pipeline_names:
         assert name in retrieved_names
+    
+    # Verify all are PipelineHandle instances
+    for handle in handles:
+        assert isinstance(handle, PipelineHandle)
+        assert isinstance(handle.pipeline, DeepsetPipeline)
 
     # Test pagination
     if len(pipelines) > 1:
