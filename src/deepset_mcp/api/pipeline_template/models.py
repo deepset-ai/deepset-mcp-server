@@ -1,6 +1,14 @@
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+
+
+class PipelineType(StrEnum):
+    """Enum representing the type of a pipeline template."""
+
+    QUERY = "QUERY"
+    INDEXING = "INDEXING"
 
 
 class PipelineTemplateTag(BaseModel):
@@ -21,3 +29,4 @@ class PipelineTemplate(BaseModel):
     potential_applications: list[str] = Field(alias="potential_applications")
     yaml_config: str | None = Field(None, alias="query_yaml")
     tags: list[PipelineTemplateTag]
+    pipeline_type: PipelineType
