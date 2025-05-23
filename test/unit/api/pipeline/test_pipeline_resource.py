@@ -215,11 +215,10 @@ class TestPipelineResource:
         result = await resource.get(pipeline_name=pipeline_name, include_yaml=False)
 
         # Verify results
-        assert isinstance(result, PipelineHandle)
+        assert isinstance(result, DeepsetPipeline)
         assert result.id == "test-pipeline-id"
         assert result.name == pipeline_name
         assert result.yaml_config is None
-        assert isinstance(result.pipeline, DeepsetPipeline)
 
         # Verify only one request was made (no YAML request)
         assert len(client.requests) == 1
