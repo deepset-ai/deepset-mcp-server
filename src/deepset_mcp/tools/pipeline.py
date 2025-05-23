@@ -8,7 +8,7 @@ from deepset_mcp.tools.formatting_utils import pipeline_to_llm_readable_string, 
 async def list_pipelines(client: AsyncClientProtocol, workspace: str) -> str:
     """Retrieves a list of all pipeline available within the currently configured deepset workspace."""
     response = await client.pipelines(workspace=workspace).list()
-    formatted_pipelines = [pipeline_to_llm_readable_string(p) for p in response]
+    formatted_pipelines = [pipeline_to_llm_readable_string(h.pipeline) for h in response]
 
     return "\n\n".join(formatted_pipelines)
 
