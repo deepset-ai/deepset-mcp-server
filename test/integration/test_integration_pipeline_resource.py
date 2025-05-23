@@ -167,8 +167,9 @@ async def test_update_pipeline(
     )
 
     # Verify the name was updated
-    updated_pipeline: DeepsetPipeline = await pipeline_resource.get(pipeline_name=updated_name)
-    assert updated_pipeline.name == updated_name
+    updated_handle: PipelineHandle = await pipeline_resource.get(pipeline_name=updated_name)
+    assert updated_handle.name == updated_name
+    assert isinstance(updated_handle.pipeline, DeepsetPipeline)
 
     # Update the pipeline config
     modified_yaml = sample_yaml_config.replace("temperature: 0.1", "temperature: 0.2")
@@ -178,8 +179,9 @@ async def test_update_pipeline(
     )
 
     # Verify the config was updated
-    updated_pipeline = await pipeline_resource.get(pipeline_name=updated_name)
-    assert updated_pipeline.yaml_config == modified_yaml
+    updated_handle = await pipeline_resource.get(pipeline_name=updated_name)
+    assert updated_handle.yaml_config == modified_yaml
+    assert isinstance(updated_handle.pipeline, DeepsetPipeline)
 
 
 @pytest.mark.asyncio
