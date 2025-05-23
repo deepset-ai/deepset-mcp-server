@@ -1,7 +1,6 @@
 import pytest
 from typing import Any
 
-from deepset_mcp.api.pipeline.handle import PipelineHandle
 from deepset_mcp.api.pipeline.log_models import PipelineLog, PipelineLogList
 from deepset_mcp.api.pipeline.models import DeepsetPipeline, PipelineServiceLevel
 from deepset_mcp.api.pipeline.resource import PipelineResource
