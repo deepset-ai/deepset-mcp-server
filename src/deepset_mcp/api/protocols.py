@@ -134,7 +134,9 @@ class PipelineTemplateResourceProtocol(Protocol):
         """Fetch a single pipeline template by its name."""
         ...
 
-    async def list_templates(self, limit: int = 100) -> list[PipelineTemplate]:
+    async def list_templates(
+        self, limit: int = 100, field: str = "created_at", order: str = "DESC", filter: str | None = None
+    ) -> list[PipelineTemplate]:
         """List pipeline templates in the configured workspace."""
         ...
 

@@ -14,6 +14,7 @@ def create_sample_template(
     author: str = "deepset-ai",
     description: str = "A test template",
     template_id: str = "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    pipeline_type: str = "query",
 ) -> dict[str, Any]:
     """Create a sample pipeline template response dictionary for testing."""
     return {
@@ -29,6 +30,7 @@ def create_sample_template(
         "potential_applications": ["testing", "development"],
         "recommended_dataset": ["sample-data"],
         "tags": [{"name": "test", "tag_id": "d4a85f64-5717-4562-b3fc-2c963f66afa6"}],
+        "pipeline_type": pipeline_type,
     }
 
 
@@ -179,3 +181,75 @@ class TestPipelineTemplateResource:
 
         # Verify empty results
         assert len(result) == 0
+
+    @pytest.mark.asyncio
+    async def test_list_templates_with_filter(self) -> None:
+        """Test listing templates with a filter."""
+        # Create sample data
+        sample_templates = [
+            create_sample_template(
+                name="Query Template", template_id="1fa85f64-5717-4562-b3fc-2c963f66afa6", pipeline_type="query"
+            ),
+        ]
+
+        # Create client with predefined response
+        client = DummyClient(
+            responses={
+                "test-workspace/pipeline_templates": {
+                    "data": sample_templates,
+                    "has_more": False,
+                    "total": 1,
+                }
+            }
+        )
+
+        # Create resource and call list method with filter
+        resource = PipelineTemplateResource(client=client, workspace="test-workspace")
+        result = await resource.list_templates(filter="pipeline_type eq 'QUERY'")
+
+        # Verify results
+        assert len(result) == 1
+        assert isinstance(result[0], PipelineTemplate)
+        assert result[0].template_name == "Query Template"
+        assert result[0].pipeline_type == "query"
+
+        # Verify request includes filter
+        assert len(client.requests) == 1
+        assert client.requests[0]["endpoint"] == "/v1/workspaces/test-workspace/pipeline_templates"
+        assert "filter" in client.requests[0]["params"]
+        assert client.requests[0]["params"]["filter"] == "pipeline_type eq 'QUERY'"
+
+    @pytest.mark.asyncio
+    async def test_list_templates_with_custom_sorting(self) -> None:
+        """Test listing templates with custom field and order."""
+        # Create sample data
+        sample_templates = [
+            create_sample_template(name="Template A", template_id="1fa85f64-5717-4562-b3fc-2c963f66afa6"),
+            create_sample_template(name="Template B", template_id="2fa85f64-5717-4562-b3fc-2c963f66afa6"),
+        ]
+
+        # Create client with predefined response
+        client = DummyClient(
+            responses={
+                "test-workspace/pipeline_templates": {
+                    "data": sample_templates,
+                    "has_more": False,
+                    "total": 2,
+                }
+            }
+        )
+
+        # Create resource and call list method with custom sorting
+        resource = PipelineTemplateResource(client=client, workspace="test-workspace")
+        result = await resource.list_templates(field="name", order="ASC")
+
+        # Verify results
+        assert len(result) == 2
+        assert isinstance(result[0], PipelineTemplate)
+        assert result[0].template_name == "Template A"
+        assert result[1].template_name == "Template B"
+
+        # Verify request includes custom sorting
+        assert len(client.requests) == 1
+        assert client.requests[0]["params"]["field"] == "name"
+        assert client.requests[0]["params"]["order"] == "ASC"
