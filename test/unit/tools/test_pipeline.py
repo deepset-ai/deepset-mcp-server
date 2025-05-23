@@ -14,6 +14,7 @@ from deepset_mcp.api.pipeline.models import (
     PipelineValidationResult,
     ValidationError,
 )
+from deepset_mcp.api.pipeline.handle import PipelineHandle
 from deepset_mcp.api.shared_models import DeepsetUser
 
 # Adjust the import path below to match your project structure
