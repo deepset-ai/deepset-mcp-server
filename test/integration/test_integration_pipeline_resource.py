@@ -222,9 +222,6 @@ outputs:
     assert result.errors[0].code == "PIPELINE_SCHEMA_ERROR"
 
 
-@pytest.mark.skip(
-    reason="API not working correctly."
-)  # skip until deepset API correctly returns error for yaml syntax errors
 @pytest.mark.asyncio
 async def test_validation_syntax_error(
     pipeline_resource: PipelineResource,
