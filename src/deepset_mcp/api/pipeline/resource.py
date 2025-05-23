@@ -97,10 +97,8 @@ class PipelineResource:
 
         return pipelines
 
-    async def get(self, pipeline_name: str, include_yaml: bool = True) -> "PipelineHandle":
+    async def get(self, pipeline_name: str, include_yaml: bool = True) -> DeepsetPipeline:
         """Fetch a single pipeline by its name."""
-        from deepset_mcp.api.pipeline.handle import PipelineHandle
-
         resp = await self._client.request(endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}")
         raise_for_status(resp)
 
@@ -116,7 +114,7 @@ class PipelineResource:
             if yaml_response.json is not None:
                 pipeline.yaml_config = yaml_response.json["query_yaml"]
 
-        return PipelineHandle(pipeline=pipeline, resource=self)
+        return pipeline
 
     async def create(self, name: str, yaml_config: str) -> NoContentResponse:
         """Create a new pipeline with a name and YAML config."""
