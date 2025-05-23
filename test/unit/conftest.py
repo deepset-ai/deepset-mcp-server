@@ -132,7 +132,8 @@ class BaseFakeClient(AsyncClientProtocol):
 
     def pipelines(self, workspace: str) -> PipelineResourceProtocol:
         """Overwrite this method when testing PipelineResource."""
-        raise NotImplementedError
+        from deepset_mcp.api.pipeline.resource import PipelineResource
+        return PipelineResource(client=self, workspace=workspace)
 
     def haystack_service(self) -> HaystackServiceProtocol:
         """Overwrite this method when testing HaystackService."""
