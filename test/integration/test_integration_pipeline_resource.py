@@ -134,16 +134,18 @@ async def test_get_pipeline(
     await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
 
     # Test getting with YAML config
-    pipeline_with_yaml: DeepsetPipeline = await pipeline_resource.get(pipeline_name=pipeline_name, include_yaml=True)
-    assert pipeline_with_yaml.name == pipeline_name
-    assert pipeline_with_yaml.yaml_config == sample_yaml_config
+    handle_with_yaml: PipelineHandle = await pipeline_resource.get(pipeline_name=pipeline_name, include_yaml=True)
+    assert handle_with_yaml.name == pipeline_name
+    assert handle_with_yaml.yaml_config == sample_yaml_config
+    assert isinstance(handle_with_yaml.pipeline, DeepsetPipeline)
 
     # Test getting without YAML config
-    pipeline_without_yaml: DeepsetPipeline = await pipeline_resource.get(
+    handle_without_yaml: PipelineHandle = await pipeline_resource.get(
         pipeline_name=pipeline_name, include_yaml=False
     )
-    assert pipeline_without_yaml.name == pipeline_name
-    assert pipeline_without_yaml.yaml_config is None
+    assert handle_without_yaml.name == pipeline_name
+    assert handle_without_yaml.yaml_config is None
+    assert isinstance(handle_without_yaml.pipeline, DeepsetPipeline)
 
 
 @pytest.mark.asyncio
