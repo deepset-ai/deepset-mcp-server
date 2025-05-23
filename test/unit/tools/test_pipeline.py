@@ -49,16 +49,17 @@ class FakePipelineResource:
         self._get_exception = get_exception
         self._update_exception = update_exception
 
-    async def list(self, page_number: int = 1, limit: int = 10) -> list[DeepsetPipeline]:
+    async def list(self, page_number: int = 1, limit: int = 10) -> list[PipelineHandle]:
         if self._list_response is not None:
-            return self._list_response
+            # Convert DeepsetPipeline instances to PipelineHandle
+            return [PipelineHandle(pipeline=p, resource=self) for p in self._list_response]
         raise NotImplementedError
 
-    async def get(self, pipeline_name: str) -> DeepsetPipeline:
+    async def get(self, pipeline_name: str) -> PipelineHandle:
         if self._get_exception:
             raise self._get_exception
         if self._get_response is not None:
-            return self._get_response
+            return PipelineHandle(pipeline=self._get_response, resource=self)
         raise NotImplementedError
 
     async def validate(self, yaml_config: str) -> PipelineValidationResult:
