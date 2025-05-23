@@ -7,19 +7,19 @@ from deepset_mcp.api.pipeline.models import (
     PipelineValidationResult,
     ValidationError,
 )
-from deepset_mcp.api.protocols import AsyncClientProtocol, PipelineResourceProtocol
 from deepset_mcp.api.transport import raise_for_status
 
 if TYPE_CHECKING:
     from deepset_mcp.api.pipeline.handle import PipelineHandle
+    from deepset_mcp.api.protocols import AsyncClientProtocol
 
 
-class PipelineResource(PipelineResourceProtocol):
+class PipelineResource:
     """Manages interactions with the deepset pipeline API."""
 
     def __init__(
         self,
-        client: AsyncClientProtocol,
+        client: "AsyncClientProtocol",
         workspace: str,
     ) -> None:
         """Initializes a PipelineResource instance."""
@@ -76,7 +76,7 @@ class PipelineResource(PipelineResourceProtocol):
         :return: List of PipelineHandle instances.
         """
         from deepset_mcp.api.pipeline.handle import PipelineHandle
-        
+
         params: dict[str, Any] = {
             "page_number": page_number,
             "limit": limit,
@@ -102,7 +102,7 @@ class PipelineResource(PipelineResourceProtocol):
     async def get(self, pipeline_name: str, include_yaml: bool = True) -> "PipelineHandle":
         """Fetch a single pipeline by its name."""
         from deepset_mcp.api.pipeline.handle import PipelineHandle
-        
+
         resp = await self._client.request(endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}")
         raise_for_status(resp)
 

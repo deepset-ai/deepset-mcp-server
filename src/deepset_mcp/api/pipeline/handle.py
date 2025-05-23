@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 class PipelineHandle:
     """Handle for performing operations on a specific pipeline.
-    
+
     This class provides a convenient interface for interacting with a pipeline,
     combining the pipeline data model with resource operations. It allows both
     direct access to pipeline attributes and future operations like getting logs
@@ -17,7 +17,7 @@ class PipelineHandle:
 
     def __init__(self, pipeline: DeepsetPipeline, resource: "PipelineResourceProtocol") -> None:
         """Initialize a PipelineHandle.
-        
+
         :param pipeline: The pipeline data model containing all pipeline information.
         :param resource: The resource interface for performing operations on this pipeline.
         """
@@ -43,7 +43,7 @@ class PipelineHandle:
     @property
     def pipeline(self) -> DeepsetPipeline:
         """Access the full pipeline data model.
-        
+
         :returns: The underlying DeepsetPipeline instance with all pipeline data.
         """
         return self._pipeline

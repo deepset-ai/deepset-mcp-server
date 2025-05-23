@@ -7,6 +7,7 @@ from deepset_mcp.api.exceptions import (
     ResourceNotFoundError,
     UnexpectedAPIError,
 )
+from deepset_mcp.api.pipeline.handle import PipelineHandle
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     NoContentResponse,
@@ -14,7 +15,6 @@ from deepset_mcp.api.pipeline.models import (
     PipelineValidationResult,
     ValidationError,
 )
-from deepset_mcp.api.pipeline.handle import PipelineHandle
 from deepset_mcp.api.shared_models import DeepsetUser
 
 # Adjust the import path below to match your project structure
@@ -55,7 +55,7 @@ class FakePipelineResource:
             return [PipelineHandle(pipeline=p, resource=self) for p in self._list_response]
         raise NotImplementedError
 
-    async def get(self, pipeline_name: str) -> PipelineHandle:
+    async def get(self, pipeline_name: str, include_yaml: bool = True) -> PipelineHandle:
         if self._get_exception:
             raise self._get_exception
         if self._get_response is not None:

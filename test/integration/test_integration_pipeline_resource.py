@@ -2,8 +2,8 @@ import pytest
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.api.exceptions import ResourceNotFoundError
-from deepset_mcp.api.pipeline.models import DeepsetPipeline
 from deepset_mcp.api.pipeline.handle import PipelineHandle
+from deepset_mcp.api.pipeline.models import DeepsetPipeline
 from deepset_mcp.api.pipeline.resource import PipelineResource
 
 pytestmark = pytest.mark.integration
@@ -100,7 +100,7 @@ async def test_list_pipelines(
     retrieved_names = [h.name for h in handles]
     for name in pipeline_names:
         assert name in retrieved_names
-    
+
     # Verify all are PipelineHandle instances
     for handle in handles:
         assert isinstance(handle, PipelineHandle)
@@ -140,9 +140,7 @@ async def test_get_pipeline(
     assert isinstance(handle_with_yaml.pipeline, DeepsetPipeline)
 
     # Test getting without YAML config
-    handle_without_yaml: PipelineHandle = await pipeline_resource.get(
-        pipeline_name=pipeline_name, include_yaml=False
-    )
+    handle_without_yaml: PipelineHandle = await pipeline_resource.get(pipeline_name=pipeline_name, include_yaml=False)
     assert handle_without_yaml.name == pipeline_name
     assert handle_without_yaml.yaml_config is None
     assert isinstance(handle_without_yaml.pipeline, DeepsetPipeline)
