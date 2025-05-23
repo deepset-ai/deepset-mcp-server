@@ -135,11 +135,7 @@ class PipelineTemplateResourceProtocol(Protocol):
         ...
 
     async def list_templates(
-        self,
-        limit: int = 100,
-        field: str = "created_at",
-        order: str = "DESC",
-        filter: str | None = None
+        self, limit: int = 100, field: str = "created_at", order: str = "DESC", filter: str | None = None
     ) -> list[PipelineTemplate]:
         """List pipeline templates in the configured workspace."""
         ...

@@ -4,22 +4,22 @@ from deepset_mcp.tools.formatting_utils import pipeline_template_to_llm_readable
 
 
 async def list_pipeline_templates(
-    client: AsyncClientProtocol, 
-    workspace: str, 
+    client: AsyncClientProtocol,
+    workspace: str,
     limit: int = 100,
     field: str = "created_at",
     order: str = "DESC",
-    filter: str | None = None
+    filter: str | None = None,
 ) -> str:
     """Retrieves a list of all available pipeline templates.
-    
+
     :param client: The async client for API requests.
     :param workspace: The workspace to list templates from.
     :param limit: Maximum number of templates to return (default: 100).
     :param field: Field to sort by (default: "created_at").
     :param order: Sort order, either "ASC" or "DESC" (default: "DESC").
     :param filter: OData filter expression to filter templates by criteria.
-    
+
     :returns: Formatted string with template information.
     """
     try:

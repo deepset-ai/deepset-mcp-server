@@ -42,11 +42,7 @@ class PipelineTemplateResource:
         return PipelineTemplate.model_validate(data)
 
     async def list_templates(
-        self, 
-        limit: int = 100, 
-        field: str = "created_at", 
-        order: str = "DESC", 
-        filter: str | None = None
+        self, limit: int = 100, field: str = "created_at", order: str = "DESC", filter: str | None = None
     ) -> list[PipelineTemplate]:
         """List pipeline templates in the configured workspace.
 
@@ -67,7 +63,7 @@ class PipelineTemplateResource:
             List of pipeline templates
         """
         params = {"limit": limit, "page_number": 1, "field": field, "order": order}
-        
+
         if filter is not None:
             params["filter"] = filter
 

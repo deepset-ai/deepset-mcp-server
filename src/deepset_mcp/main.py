@@ -66,28 +66,14 @@ async def list_pipelines() -> str:
 
 
 @mcp.tool()
-async def list_pipeline_templates(
-    limit: int = 100,
-    field: str = "created_at",
-    order: str = "DESC",
-    filter: str | None = None
-) -> str:
+async def list_pipeline_templates() -> str:
     """Retrieves a list of all pipeline templates available within the currently configured deepset workspace.
 
     Use this when you need to know the available pipeline templates and their capabilities.
-    You can filter templates by pipeline type (QUERY or INDEXING) using OData filter syntax.
-    Example filter: "pipeline_type eq 'QUERY'" or "tags/any(tag: tag/name eq 'category:basic qa') and pipeline_type eq 'QUERY'"
-    
-    :param limit: Maximum number of templates to return (default: 100).
-    :param field: Field to sort by (default: "created_at").
-    :param order: Sort order, either "ASC" or "DESC" (default: "DESC").
-    :param filter: OData filter expression to filter templates by criteria like pipeline type.
     """
     workspace = get_workspace()
     async with AsyncDeepsetClient() as client:
-        response = await list_pipeline_templates_tool(
-            client, workspace, limit=limit, field=field, order=order, filter=filter
-        )
+        response = await list_pipeline_templates_tool(client, workspace)
 
     return response
 

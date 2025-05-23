@@ -14,7 +14,7 @@ def create_sample_template(
     author: str = "deepset-ai",
     description: str = "A test template",
     template_id: str = "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-    pipeline_type: str = "QUERY",
+    pipeline_type: str = "query",
 ) -> dict[str, Any]:
     """Create a sample pipeline template response dictionary for testing."""
     return {
@@ -188,9 +188,7 @@ class TestPipelineTemplateResource:
         # Create sample data
         sample_templates = [
             create_sample_template(
-                name="Query Template", 
-                template_id="1fa85f64-5717-4562-b3fc-2c963f66afa6",
-                pipeline_type="QUERY"
+                name="Query Template", template_id="1fa85f64-5717-4562-b3fc-2c963f66afa6", pipeline_type="query"
             ),
         ]
 
@@ -213,7 +211,7 @@ class TestPipelineTemplateResource:
         assert len(result) == 1
         assert isinstance(result[0], PipelineTemplate)
         assert result[0].template_name == "Query Template"
-        assert result[0].pipeline_type == "QUERY"
+        assert result[0].pipeline_type == "query"
 
         # Verify request includes filter
         assert len(client.requests) == 1

@@ -24,20 +24,11 @@ class FakePipelineTemplateResource:
         self.last_list_call_params: dict[str, Any] = {}
 
     async def list_templates(
-        self,
-        limit: int = 100,
-        field: str = "created_at",
-        order: str = "DESC",
-        filter: str | None = None
+        self, limit: int = 100, field: str = "created_at", order: str = "DESC", filter: str | None = None
     ) -> list[PipelineTemplate]:
         # Store the parameters for verification
-        self.last_list_call_params = {
-            "limit": limit,
-            "field": field,
-            "order": order,
-            "filter": filter
-        }
-        
+        self.last_list_call_params = {"limit": limit, "field": field, "order": order, "filter": filter}
+
         if self._list_exception:
             raise self._list_exception
         if self._list_response is not None:
@@ -65,6 +56,7 @@ class FakeClient(BaseFakeClient):
 async def test_list_pipeline_templates_returns_formatted_string() -> None:
     template1 = PipelineTemplate(
         pipeline_name="template1",
+        name="template1",
         pipeline_template_id=UUID("00000000-0000-0000-0000-000000000001"),
         author="Alice Smith",
         description="First template",
@@ -76,6 +68,7 @@ async def test_list_pipeline_templates_returns_formatted_string() -> None:
     )
     template2 = PipelineTemplate(
         pipeline_name="template2",
+        name="template2",
         pipeline_template_id=UUID("00000000-0000-0000-0000-000000000002"),
         author="Bob Jones",
         description="Second template",
@@ -119,6 +112,7 @@ async def test_list_pipeline_templates_handles_unexpected_error() -> None:
 async def test_get_pipeline_template_returns_formatted_string() -> None:
     template = PipelineTemplate(
         pipeline_name="test_template",
+        name="test_template",
         pipeline_template_id=UUID("00000000-0000-0000-0000-000000000001"),
         author="Eve Brown",
         description="Test template",
@@ -163,6 +157,7 @@ async def test_list_pipeline_templates_with_filter() -> None:
     """Test that filter parameter is passed correctly to the resource."""
     template = PipelineTemplate(
         pipeline_name="query_template",
+        name="query_template",
         pipeline_template_id=UUID("00000000-0000-0000-0000-000000000001"),
         author="Test Author",
         description="A query template",
@@ -174,14 +169,10 @@ async def test_list_pipeline_templates_with_filter() -> None:
     )
     resource = FakePipelineTemplateResource(list_response=[template])
     client = FakeClient(resource)
-    
+
     filter_value = "pipeline_type eq 'QUERY'"
-    await list_pipeline_templates(
-        client, 
-        workspace="ws1", 
-        filter=filter_value
-    )
-    
+    await list_pipeline_templates(client, workspace="ws1", filter=filter_value)
+
     # Verify the filter was passed to the resource
     assert resource.last_list_call_params["filter"] == filter_value
 
@@ -191,6 +182,7 @@ async def test_list_pipeline_templates_with_custom_sorting() -> None:
     """Test that custom sorting parameters are passed correctly."""
     template = PipelineTemplate(
         pipeline_name="test_template",
+        name="test_template",
         pipeline_template_id=UUID("00000000-0000-0000-0000-000000000001"),
         author="Test Author",
         description="A test template",
@@ -202,15 +194,9 @@ async def test_list_pipeline_templates_with_custom_sorting() -> None:
     )
     resource = FakePipelineTemplateResource(list_response=[template])
     client = FakeClient(resource)
-    
-    await list_pipeline_templates(
-        client,
-        workspace="ws1",
-        limit=50,
-        field="name",
-        order="ASC"
-    )
-    
+
+    await list_pipeline_templates(client, workspace="ws1", limit=50, field="name", order="ASC")
+
     # Verify parameters were passed correctly
     assert resource.last_list_call_params["limit"] == 50
     assert resource.last_list_call_params["field"] == "name"
@@ -223,6 +209,7 @@ async def test_list_pipeline_templates_with_filter_and_sorting() -> None:
     """Test that both filter and sorting parameters work together."""
     template = PipelineTemplate(
         pipeline_name="query_template",
+        name="query_template",
         pipeline_template_id=UUID("00000000-0000-0000-0000-000000000001"),
         author="Test Author",
         description="A query template",
@@ -234,18 +221,11 @@ async def test_list_pipeline_templates_with_filter_and_sorting() -> None:
     )
     resource = FakePipelineTemplateResource(list_response=[template])
     client = FakeClient(resource)
-    
+
     filter_value = "tags/any(tag: tag/name eq 'category:basic qa') and pipeline_type eq 'QUERY'"
-    
-    await list_pipeline_templates(
-        client,
-        workspace="ws1",
-        limit=25,
-        field="name",
-        order="ASC",
-        filter=filter_value
-    )
-    
+
+    await list_pipeline_templates(client, workspace="ws1", limit=25, field="name", order="ASC", filter=filter_value)
+
     # Verify all parameters were passed correctly
     assert resource.last_list_call_params["limit"] == 25
     assert resource.last_list_call_params["field"] == "name"
