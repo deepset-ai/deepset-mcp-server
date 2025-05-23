@@ -83,10 +83,9 @@ class TestPipelineResource:
 
         # Verify results
         assert len(result) == 2
-        assert isinstance(result[0], PipelineHandle)
+        assert isinstance(result[0], DeepsetPipeline)
         assert result[0].id == "1"
         assert result[0].name == "Pipeline 1"
-        assert isinstance(result[0].pipeline, DeepsetPipeline)
 
         # Verify request
         assert len(client.requests) == 1
