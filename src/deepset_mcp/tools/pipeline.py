@@ -70,14 +70,14 @@ async def update_pipeline(
     replacement snippet is used to update the pipeline's configuration in the target workspace.
     """
     try:
-        original_pipeline = await client.pipelines(workspace=workspace).get(pipeline_name=pipeline_name)
+        original_handle = await client.pipelines(workspace=workspace).get(pipeline_name=pipeline_name)
     except ResourceNotFoundError:
         return f"There is no pipeline named '{pipeline_name}'. Did you mean to create it?"
 
-    if original_pipeline.yaml_config is None:
+    if original_handle.yaml_config is None:
         raise ValueError("The pipeline does not have a YAML configuration.")
 
-    occurrences = original_pipeline.yaml_config.count(original_config_snippet)
+    occurrences = original_handle.yaml_config.count(original_config_snippet)
 
     if occurrences == 0:
         return f"No occurrences of the provided configuration snippet were found in the pipeline '{pipeline_name}'."
@@ -88,7 +88,7 @@ async def update_pipeline(
             f"'{pipeline_name}'. Specify a more precise snippet to proceed with the update."
         )
 
-    updated_yaml_configuration = original_pipeline.yaml_config.replace(
+    updated_yaml_configuration = original_handle.yaml_config.replace(
         original_config_snippet, replacement_config_snippet, 1
     )
 
