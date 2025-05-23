@@ -1,10 +1,10 @@
 from typing import TYPE_CHECKING, Any
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
-from deepset_mcp.api.pipeline.log_models import PipelineLogList
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     NoContentResponse,
+    PipelineLogList,
     PipelineValidationResult,
     ValidationError,
 )

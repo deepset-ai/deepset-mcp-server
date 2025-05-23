@@ -1,13 +1,15 @@
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Protocol, Self, TypeVar, overload
+from typing import Any, Protocol, Self, TypeVar, overload
 
 from deepset_mcp.api.indexes.models import Index, IndexList
-from deepset_mcp.api.pipeline.models import DeepsetPipeline, NoContentResponse, PipelineValidationResult
+from deepset_mcp.api.pipeline.models import (
+    DeepsetPipeline,
+    NoContentResponse,
+    PipelineLogList,
+    PipelineValidationResult,
+)
 from deepset_mcp.api.pipeline_template.models import PipelineTemplate
 from deepset_mcp.api.transport import TransportResponse
-
-if TYPE_CHECKING:
-    from deepset_mcp.api.pipeline.log_models import PipelineLogList
 
 
 class HaystackServiceProtocol(Protocol):
@@ -181,6 +183,6 @@ class PipelineResourceProtocol(Protocol):
         pipeline_name: str,
         limit: int = 30,
         level: str | None = None,
-    ) -> "PipelineLogList":
+    ) -> PipelineLogList:
         """Fetch logs for a specific pipeline."""
         ...
