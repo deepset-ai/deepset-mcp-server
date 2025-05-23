@@ -3,6 +3,7 @@ import pytest
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.api.exceptions import ResourceNotFoundError
 from deepset_mcp.api.pipeline.models import DeepsetPipeline
+from deepset_mcp.api.pipeline.handle import PipelineHandle
 from deepset_mcp.api.pipeline.resource import PipelineResource
 
 pytestmark = pytest.mark.integration
