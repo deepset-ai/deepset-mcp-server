@@ -151,7 +151,7 @@ class PipelineResourceProtocol(Protocol):
         """Validate a pipeline's YAML configuration against the API."""
         ...
 
-    async def get(self, pipeline_name: str, include_yaml: bool = True) -> "PipelineHandle":
+    async def get(self, pipeline_name: str, include_yaml: bool = True) -> DeepsetPipeline:
         """Fetch a single pipeline by its name."""
         ...
 
@@ -159,7 +159,7 @@ class PipelineResourceProtocol(Protocol):
         self,
         page_number: int = 1,
         limit: int = 10,
-    ) -> list["PipelineHandle"]:
+    ) -> list[DeepsetPipeline]:
         """List pipelines in the configured workspace with optional pagination."""
         ...
 
