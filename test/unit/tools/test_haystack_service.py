@@ -335,7 +335,7 @@ async def test_list_component_families_success() -> None:
 @pytest.mark.asyncio
 async def test_list_component_families_api_error() -> None:
     resource = FakeHaystackServiceResource(exception=UnexpectedAPIError(status_code=500, message="API Error"))
-    client = FakeClient(resource)
+    client = FakeClient(resource=resource)
     result = await list_component_families(client)
     assert "Failed to retrieve component families" in result
     assert "API Error" in result
