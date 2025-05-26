@@ -172,7 +172,7 @@ async def test_get_component_definition_success() -> None:
     resource = FakeHaystackServiceResource(
         get_component_schemas_response=schema_response, get_component_io_response=io_response
     )
-    client = FakeClient(resource)
+    client = FakeClient(resource=resource)
     result = await get_component_definition(client, component_type)
 
     # Check that all required information is present
