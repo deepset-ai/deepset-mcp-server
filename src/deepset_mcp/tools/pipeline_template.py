@@ -1,6 +1,9 @@
+import numpy as np
+
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.tools.formatting_utils import pipeline_template_to_llm_readable_string
+from deepset_mcp.tools.model_protocol import ModelProtocol
 
 
 async def list_pipeline_templates(
