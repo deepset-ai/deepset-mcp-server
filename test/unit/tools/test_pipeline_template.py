@@ -1,12 +1,36 @@
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
+import numpy as np
 import pytest
 
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.pipeline_template.models import PipelineTemplate, PipelineTemplateTag, PipelineType
-from deepset_mcp.tools.pipeline_template import get_pipeline_template, list_pipeline_templates
+from deepset_mcp.tools.model_protocol import ModelProtocol
+from deepset_mcp.tools.pipeline_template import (
+    get_pipeline_template,
+    list_pipeline_templates,
+    search_pipeline_templates,
+)
 from test.unit.conftest import BaseFakeClient
+
+
+class FakeModel(ModelProtocol):
+    def encode(self, sentences: list[str] | str) -> np.ndarray[Any, Any]:
+        # Convert input to list if it's a single string
+        if isinstance(sentences, str):
+            sentences = [sentences]
+
+        # Create fake embeddings with consistent similarities
+        embeddings = np.zeros((len(sentences), 3))
+        for i, sentence in enumerate(sentences):
+            if "rag" in sentence.lower() or "retrieval" in sentence.lower():
+                embeddings[i] = [1, 0, 0]
+            elif "chat" in sentence.lower() or "conversation" in sentence.lower():
+                embeddings[i] = [0.8, 0.2, 0]
+            else:
+                embeddings[i] = [0, 0, 1]
+        return embeddings
 
 
 class FakePipelineTemplateResource:
@@ -231,3 +255,70 @@ async def test_list_pipeline_templates_with_filter_and_sorting() -> None:
     assert resource.last_list_call_params["field"] == "name"
     assert resource.last_list_call_params["order"] == "ASC"
     assert resource.last_list_call_params["filter"] == filter_value
+
+
+@pytest.mark.asyncio
+async def test_search_pipeline_templates_success() -> None:
+    # Create sample pipeline templates
+    templates = [
+        PipelineTemplate(
+            author="Deepset",
+            best_for=["Document Q&A"],
+            description="A retrieval-augmented generation template for answering questions",
+            pipeline_name="rag-pipeline",
+            name="RAG Pipeline",
+            pipeline_template_id=uuid4(),
+            potential_applications=["FAQ systems", "Document search"],
+            query_yaml="components:\n  retriever: ...\n  generator: ...",
+            tags=[],
+            pipeline_type=PipelineType.QUERY,
+        ),
+        PipelineTemplate(
+            author="Deepset",
+            best_for=["Conversational AI"],
+            description="A chat-based conversational pipeline for interactive responses",
+            pipeline_name="chat-pipeline",
+            name="Chat Pipeline",
+            pipeline_template_id=uuid4(),
+            potential_applications=["Chatbots", "Virtual assistants"],
+            query_yaml="components:\n  chat_generator: ...\n  memory: ...",
+            tags=[],
+            pipeline_type=PipelineType.QUERY,
+        ),
+    ]
+
+    resource = FakePipelineTemplateResource(list_response=templates)
+    client = FakeClient(resource)
+    model = FakeModel()
+
+    # Search for RAG templates
+    result = await search_pipeline_templates(client, "retrieval augmented generation", model, "test_workspace")
+    assert "rag-pipeline" in result
+    assert "Similarity Score:" in result
+    assert "retrieval-augmented generation" in result
+
+    # Search for chat templates
+    result = await search_pipeline_templates(client, "conversational chat interface", model, "test_workspace")
+    assert "chat-pipeline" in result
+    assert "Similarity Score:" in result
+    assert "chat-based conversational" in result
+
+
+@pytest.mark.asyncio
+async def test_search_pipeline_templates_no_templates() -> None:
+    resource = FakePipelineTemplateResource(list_response=[])
+    client = FakeClient(resource)
+    model = FakeModel()
+
+    result = await search_pipeline_templates(client, "test query", model, "test_workspace")
+    assert "No pipeline templates found" in result
+
+
+@pytest.mark.asyncio
+async def test_search_pipeline_templates_api_error() -> None:
+    resource = FakePipelineTemplateResource(list_exception=UnexpectedAPIError(status_code=500, message="API Error"))
+    client = FakeClient(resource)
+    model = FakeModel()
+
+    result = await search_pipeline_templates(client, "test query", model, "test_workspace")
+    assert "Failed to retrieve pipeline templates" in result
