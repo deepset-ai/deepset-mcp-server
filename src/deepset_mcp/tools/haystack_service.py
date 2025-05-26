@@ -7,6 +7,7 @@ from deepset_mcp.tools.component_helper import (
     extract_component_texts,
     format_io_info,
 )
+from deepset_mcp.tools.formatting_utils import pipeline_template_to_llm_readable_string
 from deepset_mcp.tools.model_protocol import ModelProtocol
 
 
