@@ -202,7 +202,7 @@ async def test_get_component_definition_success() -> None:
 async def test_get_component_definition_not_found() -> None:
     response: dict[str, Any] = {"component_schema": {"definitions": {"Components": {}}}}
     resource = FakeHaystackServiceResource(get_component_schemas_response=response)
-    client = FakeClient(resource)
+    client = FakeClient(resource=resource)
     result = await get_component_definition(client, "nonexistent.component")
     assert "Component not found" in result
 
