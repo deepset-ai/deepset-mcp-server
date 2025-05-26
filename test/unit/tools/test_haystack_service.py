@@ -296,7 +296,7 @@ async def test_search_component_definition_api_error() -> None:
 async def test_list_component_families_no_families() -> None:
     response: dict[str, Any] = {"component_schema": {"definitions": {"Components": {}}}}
     resource = FakeHaystackServiceResource(get_component_schemas_response=response)
-    client = FakeClient(resource)
+    client = FakeClient(resource=resource)
     result = await list_component_families(client)
     assert "No component families found" in result
 
