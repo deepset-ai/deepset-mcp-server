@@ -320,7 +320,7 @@ async def test_list_component_families_success() -> None:
         }
     }
     resource = FakeHaystackServiceResource(get_component_schemas_response=response)
-    client = FakeClient(resource)
+    client = FakeClient(resource=resource)
     result = await list_component_families(client)
 
     assert "Available Haystack component families" in result
