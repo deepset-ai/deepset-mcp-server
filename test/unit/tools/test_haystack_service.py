@@ -11,6 +11,7 @@ from deepset_mcp.tools.haystack_service import (
     search_pipeline_templates,
 )
 from deepset_mcp.tools.model_protocol import ModelProtocol
+from deepset_mcp.api.pipeline_template.models import PipelineTemplate, PipelineType
 from test.unit.conftest import BaseFakeClient
 
 
