@@ -1,5 +1,4 @@
 from typing import Any
-from uuid import uuid4
 
 import numpy as np
 import pytest
@@ -11,7 +10,6 @@ from deepset_mcp.tools.haystack_service import (
     search_component_definition,
 )
 from deepset_mcp.tools.model_protocol import ModelProtocol
-
 from test.unit.conftest import BaseFakeClient
 
 
@@ -35,9 +33,6 @@ class FakeModel(ModelProtocol):
             else:
                 embeddings[i] = [0, 0, 1]
         return embeddings
-
-
-
 
 
 class FakeHaystackServiceResource:
@@ -320,6 +315,3 @@ async def test_list_component_families_api_error() -> None:
     result = await list_component_families(client)
     assert "Failed to retrieve component families" in result
     assert "API Error" in result
-
-
-

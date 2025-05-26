@@ -6,8 +6,12 @@ import pytest
 
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.pipeline_template.models import PipelineTemplate, PipelineTemplateTag, PipelineType
-from deepset_mcp.tools.pipeline_template import get_pipeline_template, list_pipeline_templates, search_pipeline_templates
 from deepset_mcp.tools.model_protocol import ModelProtocol
+from deepset_mcp.tools.pipeline_template import (
+    get_pipeline_template,
+    list_pipeline_templates,
+    search_pipeline_templates,
+)
 from test.unit.conftest import BaseFakeClient
 
 
@@ -312,9 +316,7 @@ async def test_search_pipeline_templates_no_templates() -> None:
 
 @pytest.mark.asyncio
 async def test_search_pipeline_templates_api_error() -> None:
-    resource = FakePipelineTemplateResource(
-        list_exception=UnexpectedAPIError(status_code=500, message="API Error")
-    )
+    resource = FakePipelineTemplateResource(list_exception=UnexpectedAPIError(status_code=500, message="API Error"))
     client = FakeClient(resource)
     model = FakeModel()
 

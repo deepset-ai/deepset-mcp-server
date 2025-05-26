@@ -7,7 +7,6 @@ from deepset_mcp.tools.component_helper import (
     extract_component_texts,
     format_io_info,
 )
-from deepset_mcp.tools.formatting_utils import pipeline_template_to_llm_readable_string
 from deepset_mcp.tools.model_protocol import ModelProtocol
 
 
@@ -109,9 +108,6 @@ async def search_component_definition(
         results.append(f"Similarity Score: {sim:.3f}\n{definition}\n{'-' * 80}\n")
 
     return "\n".join(results)
-
-
-
 
 
 async def list_component_families(client: AsyncClientProtocol) -> str:

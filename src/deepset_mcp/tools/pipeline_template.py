@@ -64,9 +64,7 @@ async def search_pipeline_templates(
         A formatted string containing the matched pipeline template definitions
     """
     try:
-        response = await client.pipeline_templates(workspace=workspace).list_templates(
-            limit=100, field="created_at", order="DESC", filter='pipeline_type eq "QUERY"'
-        )
+        response = await client.pipeline_templates(workspace=workspace).list_templates()
     except UnexpectedAPIError as e:
         return f"Failed to retrieve pipeline templates: {e}"
 
@@ -75,8 +73,7 @@ async def search_pipeline_templates(
 
     # Extract text for embedding from all templates
     template_texts: list[tuple[str, str]] = [
-        (template.template_name, f"{template.template_name} {template.description}")
-        for template in response
+        (template.template_name, f"{template.template_name} {template.description}") for template in response
     ]
     template_names: list[str] = [t[0] for t in template_texts]
 
