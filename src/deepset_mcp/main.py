@@ -27,6 +27,7 @@ from deepset_mcp.tools.pipeline import (
 from deepset_mcp.tools.pipeline_template import (
     get_pipeline_template as get_pipeline_template_tool,
     list_pipeline_templates as list_pipeline_templates_tool,
+    search_pipeline_templates as search_pipeline_templates_tool,
 )
 
 INITIALIZED_MODEL = StaticModel.from_pretrained("minishlab/potion-base-2M")
@@ -198,6 +199,24 @@ async def search_component_definitions(query: str) -> str:
     """
     async with AsyncDeepsetClient() as client:
         response = await search_component_definition_tool(client=client, query=query, model=INITIALIZED_MODEL)
+
+    return response
+
+
+@mcp.tool()
+async def search_pipeline_templates(query: str) -> str:
+    """Use this to search for pipeline templates in deepset.
+
+    You can use full natural language queries to find templates.
+    You can also use simple keywords.
+    Use this if you want to find pipeline templates for specific use cases,
+    but you are not sure what the exact name of the template is.
+    """
+    workspace = get_workspace()
+    async with AsyncDeepsetClient() as client:
+        response = await search_pipeline_templates_tool(
+            client=client, query=query, model=INITIALIZED_MODEL, workspace=workspace
+        )
 
     return response
 

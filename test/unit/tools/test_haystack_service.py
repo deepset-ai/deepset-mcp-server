@@ -26,6 +26,10 @@ class FakeModel(ModelProtocol):
                 embeddings[i] = [0, 0, 0.9]
             elif "reader" in sentence.lower():
                 embeddings[i] = [0, 1, 0]
+            elif "rag" in sentence.lower() or "retrieval" in sentence.lower():
+                embeddings[i] = [1, 0, 0]
+            elif "chat" in sentence.lower() or "conversation" in sentence.lower():
+                embeddings[i] = [0.8, 0.2, 0]
             else:
                 embeddings[i] = [0, 0, 1]
         return embeddings
@@ -58,11 +62,16 @@ class FakeHaystackServiceResource:
 
 
 class FakeClient(BaseFakeClient):
-    def __init__(self, resource: FakeHaystackServiceResource):
+    def __init__(
+        self,
+        resource: FakeHaystackServiceResource | None = None,
+    ):
         self._resource = resource
         super().__init__()
 
     def haystack_service(self) -> FakeHaystackServiceResource:
+        if self._resource is None:
+            raise ValueError("Haystack service resource not configured")
         return self._resource
 
 
@@ -139,7 +148,7 @@ async def test_get_component_definition_success() -> None:
     resource = FakeHaystackServiceResource(
         get_component_schemas_response=schema_response, get_component_io_response=io_response
     )
-    client = FakeClient(resource)
+    client = FakeClient(resource=resource)
     result = await get_component_definition(client, component_type)
 
     # Check that all required information is present
@@ -169,7 +178,7 @@ async def test_get_component_definition_success() -> None:
 async def test_get_component_definition_not_found() -> None:
     response: dict[str, Any] = {"component_schema": {"definitions": {"Components": {}}}}
     resource = FakeHaystackServiceResource(get_component_schemas_response=response)
-    client = FakeClient(resource)
+    client = FakeClient(resource=resource)
     result = await get_component_definition(client, "nonexistent.component")
     assert "Component not found" in result
 
@@ -213,7 +222,7 @@ async def test_search_component_definition_success() -> None:
     resource = FakeHaystackServiceResource(
         get_component_schemas_response=schema_response, get_component_io_response=io_response
     )
-    client = FakeClient(resource)
+    client = FakeClient(resource=resource)
     model = FakeModel()
 
     # Search for converters
@@ -232,7 +241,7 @@ async def test_search_component_definition_success() -> None:
 @pytest.mark.asyncio
 async def test_get_component_definition_api_error() -> None:
     resource = FakeHaystackServiceResource(exception=UnexpectedAPIError(status_code=500, message="API Error"))
-    client = FakeClient(resource)
+    client = FakeClient(resource=resource)
     result = await get_component_definition(client, "some.component")
     assert "Failed to retrieve component definition" in result
     assert "API Error" in result
@@ -242,7 +251,7 @@ async def test_get_component_definition_api_error() -> None:
 async def test_search_component_definition_no_components() -> None:
     schema_response: dict[str, Any] = {"component_schema": {"definitions": {"Components": {}}}}
     resource = FakeHaystackServiceResource(get_component_schemas_response=schema_response)
-    client = FakeClient(resource)
+    client = FakeClient(resource=resource)
     model = FakeModel()
 
     result = await search_component_definition(client, "test query", model)
@@ -252,7 +261,7 @@ async def test_search_component_definition_no_components() -> None:
 @pytest.mark.asyncio
 async def test_search_component_definition_api_error() -> None:
     resource = FakeHaystackServiceResource(exception=UnexpectedAPIError(status_code=500, message="API Error"))
-    client = FakeClient(resource)
+    client = FakeClient(resource=resource)
     model = FakeModel()
 
     result = await search_component_definition(client, "test query", model)
@@ -263,7 +272,7 @@ async def test_search_component_definition_api_error() -> None:
 async def test_list_component_families_no_families() -> None:
     response: dict[str, Any] = {"component_schema": {"definitions": {"Components": {}}}}
     resource = FakeHaystackServiceResource(get_component_schemas_response=response)
-    client = FakeClient(resource)
+    client = FakeClient(resource=resource)
     result = await list_component_families(client)
     assert "No component families found" in result
 
@@ -287,7 +296,7 @@ async def test_list_component_families_success() -> None:
         }
     }
     resource = FakeHaystackServiceResource(get_component_schemas_response=response)
-    client = FakeClient(resource)
+    client = FakeClient(resource=resource)
     result = await list_component_families(client)
 
     assert "Available Haystack component families" in result
@@ -302,7 +311,7 @@ async def test_list_component_families_success() -> None:
 @pytest.mark.asyncio
 async def test_list_component_families_api_error() -> None:
     resource = FakeHaystackServiceResource(exception=UnexpectedAPIError(status_code=500, message="API Error"))
-    client = FakeClient(resource)
+    client = FakeClient(resource=resource)
     result = await list_component_families(client)
     assert "Failed to retrieve component families" in result
     assert "API Error" in result
