@@ -33,6 +33,25 @@ class FakeModel(ModelProtocol):
         return embeddings
 
 
+class FakePipelineTemplatesResource:
+    def __init__(
+        self,
+        list_templates_response: list[PipelineTemplate] | None = None,
+        exception: Exception | None = None,
+    ):
+        self._list_templates_response = list_templates_response
+        self._exception = exception
+
+    async def list_templates(
+        self, limit: int = 100, field: str = "created_at", order: str = "DESC", filter: str | None = None
+    ) -> list[PipelineTemplate]:
+        if self._exception:
+            raise self._exception
+        if self._list_templates_response is not None:
+            return self._list_templates_response
+        raise NotImplementedError
+
+
 class FakeHaystackServiceResource:
     def __init__(
         self,
