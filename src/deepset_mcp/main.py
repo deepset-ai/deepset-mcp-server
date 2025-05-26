@@ -10,6 +10,7 @@ from deepset_mcp.tools.haystack_service import (
     get_component_definition as get_component_definition_tool,
     list_component_families as list_component_families_tool,
     search_component_definition as search_component_definition_tool,
+    search_pipeline_templates as search_pipeline_templates_tool,
 )
 from deepset_mcp.tools.indexes import (
     create_index as create_index_tool,
