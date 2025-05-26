@@ -204,6 +204,24 @@ async def search_component_definitions(query: str) -> str:
 
 
 @mcp.tool()
+async def search_pipeline_templates(query: str) -> str:
+    """Use this to search for pipeline templates in deepset.
+
+    You can use full natural language queries to find templates.
+    You can also use simple keywords.
+    Use this if you want to find pipeline templates for specific use cases,
+    but you are not sure what the exact name of the template is.
+    """
+    workspace = get_workspace()
+    async with AsyncDeepsetClient() as client:
+        response = await search_pipeline_templates_tool(
+            client=client, query=query, model=INITIALIZED_MODEL, workspace=workspace
+        )
+
+    return response
+
+
+@mcp.tool()
 async def list_indexes() -> str:
     """Retrieves a list of all indexes available in the deepset workspace.
 
