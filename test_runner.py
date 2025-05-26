@@ -9,7 +9,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from deepset_mcp.tools.haystack_service import search_pipeline_templates
-from test.unit.tools.test_haystack_service import FakeModel, FakePipelineTemplatesResource, FakeClient
+try:
+    from test.unit.tools.test_haystack_service import FakeModel, FakePipelineTemplatesResource, FakeClient
+except ImportError:
+    print("Failed to import test modules - let's test imports directly")
+    from deepset_mcp.api.pipeline_template.models import PipelineTemplate as PT
+    print(f"PipelineTemplate imported: {PT}")
+    sys.exit(1)
 from deepset_mcp.api.pipeline_template.models import PipelineTemplate, PipelineType
 from uuid import uuid4
 
