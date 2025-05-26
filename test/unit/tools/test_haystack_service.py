@@ -246,7 +246,7 @@ async def test_search_component_definition_success() -> None:
     resource = FakeHaystackServiceResource(
         get_component_schemas_response=schema_response, get_component_io_response=io_response
     )
-    client = FakeClient(resource)
+    client = FakeClient(resource=resource)
     model = FakeModel()
 
     # Search for converters
