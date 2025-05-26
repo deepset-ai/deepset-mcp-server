@@ -251,3 +251,76 @@ async def test_list_pipeline_templates_with_filter_and_sorting() -> None:
     assert resource.last_list_call_params["field"] == "name"
     assert resource.last_list_call_params["order"] == "ASC"
     assert resource.last_list_call_params["filter"] == filter_value
+
+
+@pytest.mark.asyncio
+async def test_search_pipeline_templates_success() -> None:
+    # Create sample pipeline templates
+    templates = [
+        PipelineTemplate(
+            pipeline_name="rag-pipeline",
+            name="rag-pipeline",
+            author="Deepset",
+            best_for=["Document Q&A"],
+            description="A retrieval-augmented generation template for answering questions",
+            template_name="rag-pipeline",
+            display_name="RAG Pipeline",
+            pipeline_template_id=uuid4(),
+            potential_applications=["FAQ systems", "Document search"],
+            query_yaml="components:\n  retriever: ...\n  generator: ...",
+            tags=[],
+            pipeline_type=PipelineType.QUERY,
+        ),
+        PipelineTemplate(
+            pipeline_name="chat-pipeline",
+            name="chat-pipeline",
+            author="Deepset",
+            best_for=["Conversational AI"],
+            description="A chat-based conversational pipeline for interactive responses",
+            template_name="chat-pipeline",
+            display_name="Chat Pipeline",
+            pipeline_template_id=uuid4(),
+            potential_applications=["Chatbots", "Virtual assistants"],
+            query_yaml="components:\n  chat_generator: ...\n  memory: ...",
+            tags=[],
+            pipeline_type=PipelineType.QUERY,
+        ),
+    ]
+
+    resource = FakePipelineTemplateResource(list_response=templates)
+    client = FakeClient(resource)
+    model = FakeModel()
+
+    # Search for RAG templates
+    result = await search_pipeline_templates(client, "retrieval augmented generation", model, "test_workspace")
+    assert "rag-pipeline" in result
+    assert "Similarity Score:" in result
+    assert "retrieval-augmented generation" in result
+
+    # Search for chat templates
+    result = await search_pipeline_templates(client, "conversational chat interface", model, "test_workspace")
+    assert "chat-pipeline" in result
+    assert "Similarity Score:" in result
+    assert "chat-based conversational" in result
+
+
+@pytest.mark.asyncio
+async def test_search_pipeline_templates_no_templates() -> None:
+    resource = FakePipelineTemplateResource(list_response=[])
+    client = FakeClient(resource)
+    model = FakeModel()
+
+    result = await search_pipeline_templates(client, "test query", model, "test_workspace")
+    assert "No pipeline templates found" in result
+
+
+@pytest.mark.asyncio
+async def test_search_pipeline_templates_api_error() -> None:
+    resource = FakePipelineTemplateResource(
+        list_exception=UnexpectedAPIError(status_code=500, message="API Error")
+    )
+    client = FakeClient(resource)
+    model = FakeModel()
+
+    result = await search_pipeline_templates(client, "test query", model, "test_workspace")
+    assert "Failed to retrieve pipeline templates" in result
