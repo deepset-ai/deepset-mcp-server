@@ -265,7 +265,7 @@ async def test_search_component_definition_success() -> None:
 @pytest.mark.asyncio
 async def test_get_component_definition_api_error() -> None:
     resource = FakeHaystackServiceResource(exception=UnexpectedAPIError(status_code=500, message="API Error"))
-    client = FakeClient(resource)
+    client = FakeClient(resource=resource)
     result = await get_component_definition(client, "some.component")
     assert "Failed to retrieve component definition" in result
     assert "API Error" in result
