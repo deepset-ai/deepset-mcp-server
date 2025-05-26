@@ -111,6 +111,66 @@ async def search_component_definition(
     return "\n".join(results)
 
 
+async def search_pipeline_templates(
+    client: AsyncClientProtocol, query: str, model: ModelProtocol, workspace: str, top_k: int = 5
+) -> str:
+    """Searches for pipeline templates based on name or description using semantic similarity.
+
+    Args:
+        client: The API client to use
+        query: The search query
+        model: The model to use for computing embeddings
+        workspace: The workspace to search templates from
+        top_k: Maximum number of results to return (default: 5)
+
+    Returns:
+        A formatted string containing the matched pipeline template definitions
+    """
+    try:
+        response = await client.pipeline_templates(workspace=workspace).list_templates(
+            limit=100, field="created_at", order="DESC", filter='pipeline_type eq "QUERY"'
+        )
+    except UnexpectedAPIError as e:
+        return f"Failed to retrieve pipeline templates: {e}"
+
+    if not response:
+        return "No pipeline templates found"
+
+    # Extract text for embedding from all templates
+    template_texts: list[tuple[str, str]] = [
+        (template.template_name, f"{template.template_name} {template.description}")
+        for template in response
+    ]
+    template_names: list[str] = [t[0] for t in template_texts]
+
+    # Compute embeddings
+    query_embedding = model.encode(query)
+    template_embeddings = model.encode([text for _, text in template_texts])
+
+    query_embedding_reshaped = query_embedding.reshape(1, -1)
+
+    # Calculate dot product between target and all templates
+    # This gives us a similarity score for each template
+    similarities = np.dot(template_embeddings, query_embedding_reshaped.T).flatten()
+
+    # Create (template_name, similarity) pairs
+    template_similarities = list(zip(template_names, similarities, strict=False))
+
+    # Sort by similarity score in descending order
+    template_similarities.sort(key=lambda x: x[1], reverse=True)
+
+    top_templates = template_similarities[:top_k]
+    results = []
+    for template_name, sim in top_templates:
+        # Find the template object by name
+        template = next((t for t in response if t.template_name == template_name), None)
+        if template:
+            template_str = pipeline_template_to_llm_readable_string(template)
+            results.append(f"Similarity Score: {sim:.3f}\n{template_str}\n{'-' * 80}\n")
+
+    return "\n".join(results)
+
+
 async def list_component_families(client: AsyncClientProtocol) -> str:
     """Lists all Haystack component families that are available on deepset."""
     haystack_service = client.haystack_service()
