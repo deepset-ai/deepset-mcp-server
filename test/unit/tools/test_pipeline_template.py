@@ -11,6 +11,24 @@ from deepset_mcp.tools.model_protocol import ModelProtocol
 from test.unit.conftest import BaseFakeClient
 
 
+class FakeModel(ModelProtocol):
+    def encode(self, sentences: list[str] | str) -> np.ndarray[Any, Any]:
+        # Convert input to list if it's a single string
+        if isinstance(sentences, str):
+            sentences = [sentences]
+
+        # Create fake embeddings with consistent similarities
+        embeddings = np.zeros((len(sentences), 3))
+        for i, sentence in enumerate(sentences):
+            if "rag" in sentence.lower() or "retrieval" in sentence.lower():
+                embeddings[i] = [1, 0, 0]
+            elif "chat" in sentence.lower() or "conversation" in sentence.lower():
+                embeddings[i] = [0.8, 0.2, 0]
+            else:
+                embeddings[i] = [0, 0, 1]
+        return embeddings
+
+
 class FakePipelineTemplateResource:
     def __init__(
         self,
