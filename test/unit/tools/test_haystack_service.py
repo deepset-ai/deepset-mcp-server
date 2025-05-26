@@ -29,6 +29,10 @@ class FakeModel(ModelProtocol):
                 embeddings[i] = [0, 0, 0.9]
             elif "reader" in sentence.lower():
                 embeddings[i] = [0, 1, 0]
+            elif "rag" in sentence.lower() or "retrieval" in sentence.lower():
+                embeddings[i] = [1, 0, 0]
+            elif "chat" in sentence.lower() or "conversation" in sentence.lower():
+                embeddings[i] = [0.8, 0.2, 0]
             else:
                 embeddings[i] = [0, 0, 1]
         return embeddings
