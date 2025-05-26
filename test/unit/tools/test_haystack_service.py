@@ -8,6 +8,7 @@ from deepset_mcp.tools.haystack_service import (
     get_component_definition,
     list_component_families,
     search_component_definition,
+    search_pipeline_templates,
 )
 from deepset_mcp.tools.model_protocol import ModelProtocol
 from test.unit.conftest import BaseFakeClient
