@@ -285,7 +285,7 @@ async def test_search_component_definition_no_components() -> None:
 @pytest.mark.asyncio
 async def test_search_component_definition_api_error() -> None:
     resource = FakeHaystackServiceResource(exception=UnexpectedAPIError(status_code=500, message="API Error"))
-    client = FakeClient(resource)
+    client = FakeClient(resource=resource)
     model = FakeModel()
 
     result = await search_component_definition(client, "test query", model)
