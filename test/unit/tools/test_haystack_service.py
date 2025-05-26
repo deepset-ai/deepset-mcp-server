@@ -70,21 +70,14 @@ class FakeClient(BaseFakeClient):
     def __init__(
         self,
         resource: FakeHaystackServiceResource | None = None,
-        templates_resource: FakePipelineTemplatesResource | None = None,
     ):
         self._resource = resource
-        self._templates_resource = templates_resource
         super().__init__()
 
     def haystack_service(self) -> FakeHaystackServiceResource:
         if self._resource is None:
             raise ValueError("Haystack service resource not configured")
         return self._resource
-
-    def pipeline_templates(self, workspace: str) -> FakePipelineTemplatesResource:
-        if self._templates_resource is None:
-            raise ValueError("Pipeline templates resource not configured")
-        return self._templates_resource
 
 
 @pytest.mark.asyncio
