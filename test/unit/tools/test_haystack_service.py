@@ -275,7 +275,7 @@ async def test_get_component_definition_api_error() -> None:
 async def test_search_component_definition_no_components() -> None:
     schema_response: dict[str, Any] = {"component_schema": {"definitions": {"Components": {}}}}
     resource = FakeHaystackServiceResource(get_component_schemas_response=schema_response)
-    client = FakeClient(resource)
+    client = FakeClient(resource=resource)
     model = FakeModel()
 
     result = await search_component_definition(client, "test query", model)
