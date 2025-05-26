@@ -258,13 +258,11 @@ async def test_search_pipeline_templates_success() -> None:
     # Create sample pipeline templates
     templates = [
         PipelineTemplate(
-            pipeline_name="rag-pipeline",
-            name="rag-pipeline",
             author="Deepset",
             best_for=["Document Q&A"],
             description="A retrieval-augmented generation template for answering questions",
-            template_name="rag-pipeline",
-            display_name="RAG Pipeline",
+            pipeline_name="rag-pipeline",
+            name="RAG Pipeline",
             pipeline_template_id=uuid4(),
             potential_applications=["FAQ systems", "Document search"],
             query_yaml="components:\n  retriever: ...\n  generator: ...",
@@ -272,13 +270,11 @@ async def test_search_pipeline_templates_success() -> None:
             pipeline_type=PipelineType.QUERY,
         ),
         PipelineTemplate(
-            pipeline_name="chat-pipeline",
-            name="chat-pipeline",
             author="Deepset",
             best_for=["Conversational AI"],
             description="A chat-based conversational pipeline for interactive responses",
-            template_name="chat-pipeline",
-            display_name="Chat Pipeline",
+            pipeline_name="chat-pipeline",
+            name="Chat Pipeline",
             pipeline_template_id=uuid4(),
             potential_applications=["Chatbots", "Virtual assistants"],
             query_yaml="components:\n  chat_generator: ...\n  memory: ...",
