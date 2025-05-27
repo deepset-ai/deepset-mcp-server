@@ -126,6 +126,10 @@ class AsyncClientProtocol(Protocol):
         """Access custom components in the specified workspace."""
         ...
 
+    def users(self) -> "UserResourceProtocol":
+        """Access users."""
+        ...
+
 
 class IndexResourceProtocol(Protocol):
     """Protocol defining the implementation for IndexResource."""
