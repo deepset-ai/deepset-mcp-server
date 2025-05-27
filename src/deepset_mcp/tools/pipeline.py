@@ -117,7 +117,7 @@ async def get_pipeline_logs(
     workspace: str,
     pipeline_name: str,
     limit: int = 30,
-    level: str | None = None,
+    level: LogLevel | None = None,
 ) -> str:
     """Fetches logs for a specific pipeline.
 
@@ -128,7 +128,7 @@ async def get_pipeline_logs(
     :param workspace: The workspace name.
     :param pipeline_name: Name of the pipeline to fetch logs for.
     :param limit: Maximum number of log entries to return (default: 30).
-    :param level: Filter logs by level (info, warning, error). If None, returns all levels.
+    :param level: Filter logs by level. If None, returns all levels.
 
     :returns: A formatted string containing the pipeline logs.
     """
