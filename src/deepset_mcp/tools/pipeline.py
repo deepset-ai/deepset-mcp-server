@@ -110,3 +110,52 @@ async def update_pipeline(
         return f"Failed to update the pipeline '{pipeline_name}': {e}"
 
     return f"The pipeline '{pipeline_name}' was successfully updated."
+
+
+async def get_pipeline_logs(
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    limit: int = 30,
+    level: LogLevel | None = None,
+) -> str:
+    """Retrieves logs for a specific pipeline with optional filtering by log level.
+    
+    :param client: The async client to use for API requests.
+    :param workspace: The workspace containing the pipeline.
+    :param pipeline_name: Name of the pipeline to fetch logs for.
+    :param limit: Maximum number of log entries to return.
+    :param level: Filter logs by level using LogLevel enum (INFO, WARNING, ERROR). If None, returns all levels.
+    
+    :returns: A formatted string containing the log entries.
+    """
+    try:
+        response = await client.pipelines(workspace=workspace).get_logs(
+            pipeline_name=pipeline_name,
+            limit=limit,
+            level=level,
+        )
+    except ResourceNotFoundError:
+        return f"There is no pipeline named '{pipeline_name}'. Did you mean to create it?"
+    except UnexpectedAPIError as e:
+        return f"Failed to retrieve logs for pipeline '{pipeline_name}': {e}"
+    
+    if not response.data:
+        level_filter = f" with level '{level.value}'" if level else ""
+        return f"No logs found for pipeline '{pipeline_name}'{level_filter}."
+    
+    # Format the logs for LLM consumption
+    log_lines = []
+    log_lines.append(f"# Logs for pipeline '{pipeline_name}'")
+    if level:
+        log_lines.append(f"Filtered by level: {level.value}")
+    log_lines.append(f"Total logs returned: {len(response.data)} (showing up to {limit})")
+    log_lines.append(f"More logs available: {response.has_more}")
+    log_lines.append("")
+    
+    for log_entry in response.data:
+        log_lines.append(f"[{log_entry.level.upper()}] {log_entry.logged_at}: {log_entry.message}")
+        if log_entry.exceptions:
+            log_lines.append(f"  Exception: {log_entry.exceptions}")
+    
+    return "\n".join(log_lines)
