@@ -3,6 +3,7 @@ from typing import Any
 import pytest
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
+from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     PipelineLog,
