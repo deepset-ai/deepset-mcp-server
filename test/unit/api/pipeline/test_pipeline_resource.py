@@ -890,3 +890,37 @@ class TestPipelineResource:
         # Verify extra fields are preserved
         assert "custom_field" in result.data[0].extra_fields
         assert result.data[0].extra_fields["custom_field"] == "custom_value"
+
+    @pytest.mark.asyncio
+    async def test_get_logs_with_loglevel_enum_values(self) -> None:
+        """Test getting logs with all LogLevel enum values."""
+        # Test each LogLevel enum value
+        for level in LogLevel:
+            sample_logs = [
+                create_sample_log(log_id=f"{level.value}1", message=f"First {level.value} log", level=level.value),
+            ]
+
+            # Create client with predefined response
+            client = DummyClient(
+                responses={
+                    "test-workspace/pipelines/test-pipeline/logs": {
+                        "data": sample_logs,
+                        "has_more": False,
+                        "total": 1,
+                    }
+                }
+            )
+
+            # Create resource and call get_logs method with enum value
+            resource = PipelineResource(client=client, workspace="test-workspace")
+            result = await resource.get_logs(pipeline_name="test-pipeline", level=level)
+
+            # Verify results
+            assert len(result.data) == 1
+            assert result.data[0].level == level.value
+
+            # Verify request with proper level filter
+            assert client.requests[0]["params"] == {
+                "limit": 30,
+                "filter": f"level eq '{level.value}' and origin eq 'querypipeline'",
+            }
