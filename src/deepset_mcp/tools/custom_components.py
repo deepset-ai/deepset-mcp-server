@@ -10,6 +10,7 @@ async def list_custom_component_installations(client: AsyncClientProtocol, works
     :returns: A formatted string containing installation information.
     """
     custom_components = client.custom_components(workspace)
+    users = client.users()
     
     try:
         installations = await custom_components.list_installations()
@@ -27,7 +28,7 @@ async def list_custom_component_installations(client: AsyncClientProtocol, works
         user_info = "Unknown"
         if install.created_by_user_id:
             try:
-                user = await custom_components.get_user(install.created_by_user_id)
+                user = await users.get(install.created_by_user_id)
                 given_name = user.given_name or ""
                 family_name = user.family_name or ""
                 email = user.email or ""
