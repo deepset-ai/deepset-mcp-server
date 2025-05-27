@@ -147,3 +147,11 @@ class BaseFakeClient(AsyncClientProtocol):
     def indexes(self, workspace: str) -> IndexResourceProtocol:
         """Overwrite this method when testing IndexResource."""
         raise NotImplementedError
+
+    def custom_components(self, workspace: str) -> CustomComponentsProtocol:
+        """Overwrite this method when testing CustomComponentsResource."""
+        raise NotImplementedError
+
+    def users(self) -> UserResourceProtocol:
+        """Overwrite this method when testing UserResource."""
+        raise NotImplementedError
