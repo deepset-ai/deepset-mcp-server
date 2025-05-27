@@ -136,19 +136,19 @@ async def test_list_custom_component_installations_user_fetch_error() -> None:
     )
 
     class FakeCustomComponentsResource(CustomComponentsResource):
-        async def list_installations(self, limit=20, page_number=1, field="created_at", order="DESC"):
+        async def list_installations(self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC") -> CustomComponentInstallationList:
             return mock_installations
 
-        async def get_latest_installation_logs(self):
+        async def get_latest_installation_logs(self) -> str:
             return "mock logs"
 
     class FakeUserResource(UserResource):
-        async def get(self, user_id):
+        async def get(self, user_id: str) -> DeepsetUser:
             raise Exception("User not found")
 
     fake_client = BaseFakeClient()
-    fake_client.custom_components = lambda workspace: FakeCustomComponentsResource(fake_client)
-    fake_client.users = lambda: FakeUserResource(fake_client)
+    fake_client.custom_components = lambda workspace: FakeCustomComponentsResource(fake_client)  # type: ignore[method-assign]
+    fake_client.users = lambda: FakeUserResource(fake_client)  # type: ignore[method-assign]
 
     result = await list_custom_component_installations(fake_client, "test-workspace")
 
