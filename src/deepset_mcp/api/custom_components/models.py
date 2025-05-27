@@ -20,11 +20,3 @@ class CustomComponentInstallationList(BaseModel):
     data: list[CustomComponentInstallation]
     total: int
     has_more: bool
-
-
-class User(BaseModel):
-    """Model representing a user."""
-    
-    given_name: str | None = None
-    family_name: str | None = None
-    email: str | None = None
