@@ -2,6 +2,7 @@ from types import TracebackType
 from typing import Any, Protocol, Self, TypeVar, overload
 
 from deepset_mcp.api.indexes.models import Index, IndexList
+from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     NoContentResponse,
@@ -182,7 +183,7 @@ class PipelineResourceProtocol(Protocol):
         self,
         pipeline_name: str,
         limit: int = 30,
-        level: str | None = None,
+        level: LogLevel | None = None,
     ) -> PipelineLogList:
         """Fetch logs for a specific pipeline."""
         ...

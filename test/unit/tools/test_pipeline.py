@@ -7,6 +7,7 @@ from deepset_mcp.api.exceptions import (
     ResourceNotFoundError,
     UnexpectedAPIError,
 )
+from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     NoContentResponse,
@@ -96,7 +97,7 @@ class FakePipelineResource:
         self,
         pipeline_name: str,
         limit: int = 30,
-        level: str | None = None,
+        level: LogLevel | None = None,
     ) -> PipelineLogList:
         if self._logs_exception:
             raise self._logs_exception
@@ -471,7 +472,7 @@ async def test_get_pipeline_logs_with_level_filter() -> None:
     resource = FakePipelineResource(logs_response=logs)
     client = FakeClient(resource)
 
-    result = await get_pipeline_logs(client, workspace="ws", pipeline_name="test-pipeline", level="error")
+    result = await get_pipeline_logs(client, workspace="ws", pipeline_name="test-pipeline", level=LogLevel.ERROR)
 
     assert "No logs found for pipeline 'test-pipeline' (filtered by level: error)" in result
 
