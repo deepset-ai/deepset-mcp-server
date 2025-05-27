@@ -7,10 +7,11 @@ from deepset_mcp.api.exceptions import (
     ResourceNotFoundError,
     UnexpectedAPIError,
 )
-from deepset_mcp.api.pipeline import PipelineLogList
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     NoContentResponse,
+    PipelineLog,
+    PipelineLogList,
     PipelineServiceLevel,
     PipelineValidationResult,
     ValidationError,
