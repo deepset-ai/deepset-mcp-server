@@ -241,3 +241,37 @@ components:
 
     assert resp.valid is False
     assert resp.errors[0].code == "YAML_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_deploy_pipeline_success(
+    pipeline_resource: PipelineResource,
+    sample_yaml_config: str,
+) -> None:
+    """Test successful pipeline deployment."""
+    pipeline_name = "test-deploy-pipeline"
+
+    # Create a pipeline to deploy
+    await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
+
+    # Deploy the pipeline
+    result = await pipeline_resource.deploy(pipeline_name=pipeline_name)
+
+    # Verify deployment was successful
+    assert result.valid is True
+    assert len(result.errors) == 0
+
+
+@pytest.mark.asyncio
+async def test_deploy_nonexistent_pipeline(
+    pipeline_resource: PipelineResource,
+) -> None:
+    """Test deploying a non-existent pipeline."""
+    non_existent_name = "non-existent-deploy-pipeline"
+
+    # Deploy a non-existent pipeline
+    result = await pipeline_resource.deploy(pipeline_name=non_existent_name)
+
+    # Should return validation errors indicating the pipeline doesn't exist
+    assert result.valid is False
+    assert len(result.errors) > 0
