@@ -9,6 +9,7 @@ from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.tools.haystack_service import (
     get_component_definition as get_component_definition_tool,
+    get_custom_components as get_custom_components_tool,
     list_component_families as list_component_families_tool,
     search_component_definition as search_component_definition_tool,
 )
