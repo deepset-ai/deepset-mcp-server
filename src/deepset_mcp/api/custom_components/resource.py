@@ -1,7 +1,6 @@
 from typing import Any
 
-from deepset_mcp.api.custom_components.models import CustomComponentInstallationList, User
-from deepset_mcp.api.exceptions import ResourceNotFoundError
+from deepset_mcp.api.custom_components.models import CustomComponentInstallationList
 from deepset_mcp.api.protocols import AsyncClientProtocol, CustomComponentsProtocol
 from deepset_mcp.api.transport import raise_for_status
 
@@ -9,14 +8,12 @@ from deepset_mcp.api.transport import raise_for_status
 class CustomComponentsResource(CustomComponentsProtocol):
     """Resource for managing custom components in deepset."""
 
-    def __init__(self, client: AsyncClientProtocol, workspace: str) -> None:
+    def __init__(self, client: AsyncClientProtocol) -> None:
         """Initialize a CustomComponentsResource.
         
         :param client: The API client to use for requests.
-        :param workspace: The workspace to operate in.
         """
         self._client = client
-        self._workspace = workspace
 
     async def list_installations(
         self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC"
