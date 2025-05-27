@@ -22,6 +22,7 @@ from deepset_mcp.api.shared_models import DeepsetUser
 # Adjust the import path below to match your project structure
 from deepset_mcp.tools.pipeline import (
     create_pipeline,
+    deploy_pipeline,
     get_pipeline,
     get_pipeline_logs,
     list_pipelines,
