@@ -36,7 +36,7 @@ class CustomComponentsProtocol(Protocol):
         """List custom component installations."""
         ...
 
-    async def get_latest_installation_logs(self) -> Any:
+    async def get_latest_installation_logs(self) -> str | None:
         """Get the logs from the latest custom component installation."""
         ...
 
