@@ -4,10 +4,12 @@ from typing import Any, Self, TypeVar, overload
 
 from deepset_mcp.api.protocols import (
     AsyncClientProtocol,
+    CustomComponentsProtocol,
     HaystackServiceProtocol,
     IndexResourceProtocol,
     PipelineResourceProtocol,
     PipelineTemplateResourceProtocol,
+    UserResourceProtocol,
 )
 from deepset_mcp.api.transport import TransportResponse
 
