@@ -206,3 +206,35 @@ class PipelineResource:
         else:
             # Return empty log list if no response
             return PipelineLogList(data=[], has_more=False, total=0)
+
+    async def deploy(self, pipeline_name: str) -> PipelineValidationResult:
+        """Deploy a pipeline to production.
+
+        :param pipeline_name: Name of the pipeline to deploy.
+
+        :returns: PipelineValidationResult containing deployment status and any errors.
+
+        :raises: UnexpectedAPIError: If the API returns an unexpected status code.
+        """
+        resp = await self._client.request(
+            endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}/deploy",
+            method="POST",
+        )
+
+        # If successful (status 200), the deployment was successful
+        if resp.success:
+            return PipelineValidationResult(valid=True)
+
+        # Handle validation errors (422)
+        if resp.status_code == 422 and resp.json is not None and isinstance(resp.json, dict) and "details" in resp.json:
+            errors = [ValidationError(code=error["code"], message=error["message"]) for error in resp.json["details"]]
+            return PipelineValidationResult(valid=False, errors=errors)
+
+        # Handle other 4xx errors (400, 404)
+        if 400 <= resp.status_code < 500:
+            # For non-validation errors, create a generic error
+            error_message = resp.text if resp.text else f"HTTP {resp.status_code} error"
+            errors = [ValidationError(code="DEPLOYMENT_ERROR", message=error_message)]
+            return PipelineValidationResult(valid=False, errors=errors)
+
+        raise UnexpectedAPIError(status_code=resp.status_code, message=resp.text, detail=resp.json)
