@@ -335,7 +335,7 @@ async def get_pipeline_logs(pipeline_name: str, limit: int = 30, level: str | No
 async def deploy_pipeline(pipeline_name: str) -> str:
     """Deploys a pipeline to production in the deepset workspace.
 
-    Use this to deploy a pipeline that has been created and validated. 
+    Use this to deploy a pipeline that has been created and validated.
     The deployment process will validate the pipeline configuration and deploy it if valid.
     If deployment fails due to validation errors, you will receive detailed error information.
 

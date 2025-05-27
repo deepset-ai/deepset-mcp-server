@@ -944,7 +944,7 @@ class TestPipelineResource:
     async def test_deploy_pipeline_with_400_error(self) -> None:
         """Test deployment with 400 error."""
         # Create response for 400 error
-        error_response = TransportResponse(text="Bad request", status_code=400, json=None)
+        error_response: TransportResponse[None] = TransportResponse(text="Bad request", status_code=400, json=None)
 
         client = DummyClient(responses={"test-workspace/pipelines/test-pipeline/deploy": error_response})
 
@@ -962,7 +962,9 @@ class TestPipelineResource:
     async def test_deploy_pipeline_with_404_error(self) -> None:
         """Test deployment with 404 error (pipeline not found)."""
         # Create response for 404 error
-        error_response = TransportResponse(text="Pipeline not found", status_code=404, json=None)
+        error_response: TransportResponse[None] = TransportResponse(
+            text="Pipeline not found", status_code=404, json=None
+        )
 
         client = DummyClient(responses={"test-workspace/pipelines/nonexistent-pipeline/deploy": error_response})
 
@@ -980,7 +982,9 @@ class TestPipelineResource:
     async def test_deploy_pipeline_with_500_error(self) -> None:
         """Test deployment with 500 error (unexpected error)."""
         # Create response for 500 error
-        error_response: TransportResponse[None] = TransportResponse(text="Internal server error", status_code=500, json=None)
+        error_response: TransportResponse[None] = TransportResponse(
+            text="Internal server error", status_code=500, json=None
+        )
 
         client = DummyClient(responses={"test-workspace/pipelines/test-pipeline/deploy": error_response})
 
@@ -996,7 +1000,7 @@ class TestPipelineResource:
     async def test_deploy_pipeline_with_empty_error_text(self) -> None:
         """Test deployment with error response but empty text."""
         # Create response for 400 error with empty text
-        error_response = TransportResponse(text="", status_code=400, json=None)
+        error_response: TransportResponse[None] = TransportResponse(text="", status_code=400, json=None)
 
         client = DummyClient(responses={"test-workspace/pipelines/test-pipeline/deploy": error_response})
 

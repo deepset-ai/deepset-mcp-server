@@ -152,7 +152,7 @@ async def deploy_pipeline(client: AsyncClientProtocol, workspace: str, pipeline_
     """Deploys a pipeline to production.
 
     This function attempts to deploy the specified pipeline in the given workspace.
-    If the deployment fails due to validation errors, it returns a readable string 
+    If the deployment fails due to validation errors, it returns a readable string
     describing the validation errors.
 
     :param client: The async client for API communication.

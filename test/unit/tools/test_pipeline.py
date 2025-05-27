@@ -578,7 +578,9 @@ async def test_deploy_pipeline_bad_request() -> None:
 @pytest.mark.asyncio
 async def test_deploy_pipeline_unexpected_error() -> None:
     """Test deployment with unexpected API error."""
-    resource = FakePipelineResource(deploy_exception=UnexpectedAPIError(status_code=500, message="Internal server error"))
+    resource = FakePipelineResource(
+        deploy_exception=UnexpectedAPIError(status_code=500, message="Internal server error")
+    )
     client = FakeClient(resource)
 
     result = await deploy_pipeline(client, workspace="ws", pipeline_name="test-pipeline")
