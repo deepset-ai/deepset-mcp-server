@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
+from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     NoContentResponse,
@@ -173,13 +174,13 @@ class PipelineResource:
         self,
         pipeline_name: str,
         limit: int = 30,
-        level: str | None = None,
+        level: LogLevel | None = None,
     ) -> PipelineLogList:
         """Fetch logs for a specific pipeline.
 
         :param pipeline_name: Name of the pipeline to fetch logs for.
         :param limit: Maximum number of log entries to return.
-        :param level: Filter logs by level (info, warning, error). If None, returns all levels.
+        :param level: Filter logs by level. If None, returns all levels.
 
         :returns: A PipelineLogList containing the log entries.
         """

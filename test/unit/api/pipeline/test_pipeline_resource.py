@@ -3,6 +3,7 @@ from typing import Any
 import pytest
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
+from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     PipelineLog,
@@ -717,7 +718,7 @@ class TestPipelineResource:
 
         # Create resource and call get_logs method with level filter
         resource = PipelineResource(client=client, workspace="test-workspace")
-        result = await resource.get_logs(pipeline_name="test-pipeline", level="error")
+        result = await resource.get_logs(pipeline_name="test-pipeline", level=LogLevel.ERROR)
 
         # Verify results
         assert len(result.data) == 2
@@ -747,7 +748,7 @@ class TestPipelineResource:
 
         # Create resource and call get_logs method with warning level
         resource = PipelineResource(client=client, workspace="test-workspace")
-        result = await resource.get_logs(pipeline_name="test-pipeline", level="warning")
+        result = await resource.get_logs(pipeline_name="test-pipeline", level=LogLevel.WARNING)
 
         # Verify results
         assert len(result.data) == 1
