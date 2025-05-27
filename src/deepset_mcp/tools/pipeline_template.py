@@ -41,7 +41,7 @@ async def get_pipeline_template(client: AsyncClientProtocol, workspace: str, tem
     """Fetches detailed information for a specific pipeline template, identified by its `template_name`."""
     try:
         response = await client.pipeline_templates(workspace=workspace).get_template(template_name)
-        return pipeline_template_to_llm_readable_string(response)
+        return pipeline_template_to_llm_readable_string(response, include_yaml=True)
     except ResourceNotFoundError:
         return f"There is no pipeline template named '{template_name}' in workspace '{workspace}'."
     except UnexpectedAPIError as e:
@@ -49,7 +49,7 @@ async def get_pipeline_template(client: AsyncClientProtocol, workspace: str, tem
 
 
 async def search_pipeline_templates(
-    client: AsyncClientProtocol, query: str, model: ModelProtocol, workspace: str, top_k: int = 5
+    client: AsyncClientProtocol, query: str, model: ModelProtocol, workspace: str, top_k: int = 10
 ) -> str:
     """Searches for pipeline templates based on name or description using semantic similarity.
 
@@ -64,7 +64,9 @@ async def search_pipeline_templates(
         A formatted string containing the matched pipeline template definitions
     """
     try:
-        response = await client.pipeline_templates(workspace=workspace).list_templates()
+        response = await client.pipeline_templates(workspace=workspace).list_templates(
+            filter="pipeline_type eq 'QUERY'"
+        )
     except UnexpectedAPIError as e:
         return f"Failed to retrieve pipeline templates: {e}"
 
