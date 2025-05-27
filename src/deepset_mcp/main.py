@@ -17,6 +17,7 @@ from deepset_mcp.tools.indexes import (
     list_indexes as list_indexes_tool,
     update_index as update_index_tool,
 )
+from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.tools.pipeline import (
     create_pipeline as create_pipeline_tool,
     get_pipeline as get_pipeline_tool,
