@@ -49,10 +49,10 @@ async def test_get_user_partial_data() -> None:
         responses={"v1/users/user_456": mock_user_data}
     )
 
-    def users():
+    def users() -> UserResource:
         return UserResource(client=fake_client)
 
-    fake_client.users = users
+    fake_client.users = users  # type: ignore[method-assign]
 
     resource = fake_client.users()
     result = await resource.get("user_456")
