@@ -40,7 +40,7 @@ class CustomComponentsResource(CustomComponentsProtocol):
 
         return resp.json
 
-    async def get_latest_installation_logs(self) -> Any:
+    async def get_latest_installation_logs(self) -> str | None:
         """Get the logs from the latest custom component installation.
         
         :returns: Latest installation logs.
@@ -52,6 +52,14 @@ class CustomComponentsResource(CustomComponentsProtocol):
 
         raise_for_status(resp)
 
-        return resp.json if resp.json is not None else {}
+        if resp.json is None:
+            return None
+            
+        # If response contains text, return it directly
+        if isinstance(resp.json, str):
+            return resp.json
+            
+        # If response has text field in the response, return it
+        return resp.text
 
 
