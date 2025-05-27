@@ -40,7 +40,11 @@ class CustomComponentsProtocol(Protocol):
         """Get the logs from the latest custom component installation."""
         ...
 
-    async def get_user(self, user_id: str) -> User:
+
+class UserResourceProtocol(Protocol):
+    """Protocol defining the implementation for UserResource."""
+
+    async def get(self, user_id: str) -> DeepsetUser:
         """Get user information by user ID."""
         ...
 
