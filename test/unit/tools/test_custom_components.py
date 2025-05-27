@@ -216,14 +216,14 @@ async def test_get_latest_custom_component_installation_logs_empty() -> None:
 async def test_get_latest_custom_component_installation_logs_api_error() -> None:
     """Test getting latest custom component installation logs when API fails."""
     class FakeCustomComponentsResource(CustomComponentsResource):
-        async def list_installations(self, limit=20, page_number=1, field="created_at", order="DESC"):
+        async def list_installations(self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC") -> CustomComponentInstallationList:
             return CustomComponentInstallationList(data=[], total=0, has_more=False)
 
-        async def get_latest_installation_logs(self):
+        async def get_latest_installation_logs(self) -> str:
             raise Exception("API Error")
 
     fake_client = BaseFakeClient()
-    fake_client.custom_components = lambda workspace: FakeCustomComponentsResource(fake_client)
+    fake_client.custom_components = lambda workspace: FakeCustomComponentsResource(fake_client)  # type: ignore[method-assign]
 
     result = await get_latest_custom_component_installation_logs(fake_client, "test-workspace")
 
