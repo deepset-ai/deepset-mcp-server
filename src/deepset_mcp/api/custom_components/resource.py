@@ -38,7 +38,7 @@ class CustomComponentsResource(CustomComponentsProtocol):
         if resp.json is None:
             return CustomComponentInstallationList(data=[], total=0, has_more=False)
 
-        return resp.json
+        return CustomComponentInstallationList(**resp.json)
 
     async def get_latest_installation_logs(self) -> str | None:
         """Get the logs from the latest custom component installation.
