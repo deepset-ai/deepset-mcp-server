@@ -97,7 +97,7 @@ class FakePipelineResource:
         self,
         pipeline_name: str,
         limit: int = 30,
-        level: str | None = None,
+        level: LogLevel | None = None,
     ) -> PipelineLogList:
         if self._logs_exception:
             raise self._logs_exception
