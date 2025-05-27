@@ -718,7 +718,7 @@ class TestPipelineResource:
 
         # Create resource and call get_logs method with level filter
         resource = PipelineResource(client=client, workspace="test-workspace")
-        result = await resource.get_logs(pipeline_name="test-pipeline", level="error")
+        result = await resource.get_logs(pipeline_name="test-pipeline", level=LogLevel.ERROR)
 
         # Verify results
         assert len(result.data) == 2
