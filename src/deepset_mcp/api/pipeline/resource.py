@@ -180,7 +180,7 @@ class PipelineResource:
 
         :param pipeline_name: Name of the pipeline to fetch logs for.
         :param limit: Maximum number of log entries to return.
-        :param level: Filter logs by level (info, warning, error). If None, returns all levels.
+        :param level: Filter logs by level using LogLevel enum (INFO, WARNING, ERROR). If None, returns all levels.
 
         :returns: A PipelineLogList containing the log entries.
         """
