@@ -20,6 +20,7 @@ from deepset_mcp.tools.indexes import (
 from deepset_mcp.tools.pipeline import (
     create_pipeline as create_pipeline_tool,
     get_pipeline as get_pipeline_tool,
+    get_pipeline_logs as get_pipeline_logs_tool,
     list_pipelines as list_pipelines_tool,
     update_pipeline as update_pipeline_tool,
     validate_pipeline as validate_pipeline_tool,
@@ -292,6 +293,29 @@ async def update_index(
             index_name=index_name,
             updated_index_name=updated_index_name,
             yaml_configuration=yaml_configuration,
+        )
+    return response
+
+
+@mcp.tool()
+async def get_pipeline_logs(pipeline_name: str, limit: int = 30, level: str | None = None) -> str:
+    """Fetches logs for a specific pipeline in the deepset workspace.
+
+    Use this to debug pipeline issues, monitor pipeline execution, or understand what happened during pipeline runs.
+    The logs provide detailed information about pipeline operations, errors, and warnings.
+
+    :param pipeline_name: Name of the pipeline to fetch logs for.
+    :param limit: Maximum number of log entries to return (default: 30, max: 100).
+    :param level: Filter logs by level. Valid values: 'info', 'warning', 'error'. If not specified, returns all levels.
+    """
+    workspace = get_workspace()
+    async with AsyncDeepsetClient() as client:
+        response = await get_pipeline_logs_tool(
+            client=client,
+            workspace=workspace,
+            pipeline_name=pipeline_name,
+            limit=limit,
+            level=level,
         )
     return response
 
