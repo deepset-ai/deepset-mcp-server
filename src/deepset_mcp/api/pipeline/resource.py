@@ -173,7 +173,7 @@ class PipelineResource:
         self,
         pipeline_name: str,
         limit: int = 30,
-        level: str | None = None,
+        level: "LogLevel | None" = None,
     ) -> PipelineLogList:
         """Fetch logs for a specific pipeline.
 
