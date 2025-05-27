@@ -27,7 +27,7 @@ class FakeModel(ModelProtocol):
             if "rag" in sentence.lower() or "retrieval" in sentence.lower():
                 embeddings[i] = [1, 0, 0]
             elif "chat" in sentence.lower() or "conversation" in sentence.lower():
-                embeddings[i] = [0.8, 0.2, 0]
+                embeddings[i] = [0, 1, 0]
             else:
                 embeddings[i] = [0, 0, 1]
         return embeddings
@@ -112,6 +112,9 @@ async def test_list_pipeline_templates_returns_formatted_string() -> None:
     assert "Alice Smith" in result
     assert "Bob Jones" in result
 
+    # We only add the yaml config when getting a single template
+    assert "config2: value2" not in result
+
 
 @pytest.mark.asyncio
 async def test_list_pipeline_templates_handles_resource_not_found() -> None:
@@ -191,6 +194,7 @@ async def test_list_pipeline_templates_with_filter() -> None:
         tags=[PipelineTemplateTag(name="tag1", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
         pipeline_type=PipelineType.QUERY,
     )
+
     resource = FakePipelineTemplateResource(list_response=[template])
     client = FakeClient(resource)
 
@@ -297,11 +301,23 @@ async def test_search_pipeline_templates_success() -> None:
     assert "Similarity Score:" in result
     assert "retrieval-augmented generation" in result
 
+    # We do not add the yaml config to search results
+    assert "components:" not in result
+
+    # RAG pipeline listed before chat
+    assert result.index("rag-pipeline") < result.index("chat-pipeline")
+
     # Search for chat templates
     result = await search_pipeline_templates(client, "conversational chat interface", model, "test_workspace")
     assert "chat-pipeline" in result
     assert "Similarity Score:" in result
     assert "chat-based conversational" in result
+
+    # We do not add the yaml config to search results
+    assert "components:" not in result
+
+    # Chat pipeline listed before RAG
+    assert result.index("chat-pipeline") < result.index("rag-pipeline")
 
 
 @pytest.mark.asyncio

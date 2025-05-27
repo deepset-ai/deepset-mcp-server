@@ -2,7 +2,7 @@ from deepset_mcp.api.pipeline.models import DeepsetPipeline, PipelineValidationR
 from deepset_mcp.api.pipeline_template.models import PipelineTemplate
 
 
-def pipeline_template_to_llm_readable_string(template: PipelineTemplate) -> str:
+def pipeline_template_to_llm_readable_string(template: PipelineTemplate, include_yaml: bool = False) -> str:
     """Creates a string representation of a pipeline template that is readable by LLMs."""
     template_parts = [
         f'''<pipeline_template name="{template.template_name}" id="{template.pipeline_template_id}">
@@ -26,7 +26,7 @@ def pipeline_template_to_llm_readable_string(template: PipelineTemplate) -> str:
     if template.tags:
         template_parts.append("\n### Tags\n" + "\n".join(f"- {tag.name}" for tag in template.tags))
 
-    if template.yaml_config is not None:
+    if template.yaml_config is not None and include_yaml:
         template_parts.append("\n### Template Configuration")
         template_parts.append(f"\n```yaml\n{template.yaml_config}\n```")
 
