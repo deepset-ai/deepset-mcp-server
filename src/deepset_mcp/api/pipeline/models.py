@@ -7,6 +7,14 @@ from pydantic import BaseModel, Field
 from deepset_mcp.api.shared_models import DeepsetUser
 
 
+class LogLevel(StrEnum):
+    """Describes the log level for pipeline logs."""
+
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+
+
 class PipelineServiceLevel(StrEnum):
     """Describes the service level of a pipeline."""
 
