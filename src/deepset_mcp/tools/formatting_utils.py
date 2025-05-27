@@ -124,7 +124,13 @@ def pipeline_logs_to_llm_readable_string(logs: PipelineLogList, pipeline_name: s
         ]
 
         if log.exceptions:
-            log_entry.append(f"- **Exceptions:** {log.exceptions}")
+            log_entry.append("- **Exceptions:**")
+            for exception in log.exceptions:
+                log_entry.append(f"- Type: {exception.type}")
+                log_entry.append(f"- Value: {exception.value}")
+                log_entry.append("- Traceback")
+                for frame in exception.trace:
+                    log_entry.append(f"- {frame.name} in line {frame.line_number} in file {frame.filename}")
 
         if log.extra_fields:
             log_entry.append("- **Extra Fields:")

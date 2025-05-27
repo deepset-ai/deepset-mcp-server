@@ -1,3 +1,4 @@
+import logging
 from typing import TYPE_CHECKING, Any
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
@@ -10,6 +11,8 @@ from deepset_mcp.api.pipeline.models import (
     ValidationError,
 )
 from deepset_mcp.api.transport import raise_for_status
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from deepset_mcp.api.protocols import AsyncClientProtocol
@@ -198,6 +201,8 @@ class PipelineResource:
             method="GET",
             params=params,
         )
+
+        logger.warning(resp.json)
 
         raise_for_status(resp)
 
