@@ -3,15 +3,15 @@ from deepset_mcp.api.protocols import AsyncClientProtocol
 
 async def list_custom_component_installations(client: AsyncClientProtocol, workspace: str) -> str:
     """List custom component installations.
-    
+
     :param client: The API client to use.
     :param workspace: The workspace to operate in.
-    
+
     :returns: A formatted string containing installation information.
     """
     custom_components = client.custom_components(workspace)
     users = client.users()
-    
+
     try:
         installations = await custom_components.list_installations()
     except Exception as e:
@@ -21,7 +21,9 @@ async def list_custom_component_installations(client: AsyncClientProtocol, works
         return "No custom component installations found."
 
     # Format the response
-    formatted_output = [f"# Custom Component Installations (showing {len(installations.data)} of {installations.total})\n"]
+    formatted_output = [
+        f"# Custom Component Installations (showing {len(installations.data)} of {installations.total})\n"
+    ]
 
     for install in installations.data:
         # Try to fetch user information
@@ -72,14 +74,14 @@ async def list_custom_component_installations(client: AsyncClientProtocol, works
 
 async def get_latest_custom_component_installation_logs(client: AsyncClientProtocol, workspace: str) -> str:
     """Get the logs from the latest custom component installation.
-    
+
     :param client: The API client to use.
     :param workspace: The workspace to operate in.
-    
+
     :returns: A formatted string containing the latest installation logs.
     """
     custom_components = client.custom_components(workspace)
-    
+
     try:
         logs = await custom_components.get_latest_installation_logs()
     except Exception as e:

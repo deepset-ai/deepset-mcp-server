@@ -1,4 +1,3 @@
-from typing import Any
 
 from deepset_mcp.api.custom_components.models import CustomComponentInstallationList
 from deepset_mcp.api.protocols import AsyncClientProtocol, CustomComponentsProtocol
@@ -10,7 +9,7 @@ class CustomComponentsResource(CustomComponentsProtocol):
 
     def __init__(self, client: AsyncClientProtocol) -> None:
         """Initialize a CustomComponentsResource.
-        
+
         :param client: The API client to use for requests.
         """
         self._client = client
@@ -19,12 +18,12 @@ class CustomComponentsResource(CustomComponentsProtocol):
         self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC"
     ) -> CustomComponentInstallationList:
         """List custom component installations.
-        
+
         :param limit: Maximum number of installations to return.
         :param page_number: Page number for pagination.
         :param field: Field to sort by.
         :param order: Sort order (ASC or DESC).
-        
+
         :returns: List of custom component installations.
         """
         resp = await self._client.request(
@@ -42,7 +41,7 @@ class CustomComponentsResource(CustomComponentsProtocol):
 
     async def get_latest_installation_logs(self) -> str | None:
         """Get the logs from the latest custom component installation.
-        
+
         :returns: Latest installation logs.
         """
         resp = await self._client.request(
@@ -54,12 +53,10 @@ class CustomComponentsResource(CustomComponentsProtocol):
 
         if resp.json is None:
             return None
-            
+
         # If response contains text, return it directly
         if isinstance(resp.json, str):
             return resp.json
-            
+
         # If response has text field in the response, return it
         return resp.text
-
-

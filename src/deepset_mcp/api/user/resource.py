@@ -1,3 +1,5 @@
+from typing import Any
+
 from deepset_mcp.api.exceptions import ResourceNotFoundError
 from deepset_mcp.api.protocols import AsyncClientProtocol, UserResourceProtocol
 from deepset_mcp.api.shared_models import DeepsetUser
@@ -9,22 +11,22 @@ class UserResource(UserResourceProtocol):
 
     def __init__(self, client: AsyncClientProtocol) -> None:
         """Initialize a UserResource.
-        
+
         :param client: The API client to use for requests.
         """
         self._client = client
 
     async def get(self, user_id: str) -> DeepsetUser:
         """Get user information by user ID.
-        
+
         :param user_id: The ID of the user to fetch.
-        
+
         :returns: User information.
         """
         resp = await self._client.request(
             endpoint=f"v1/users/{user_id}",
             method="GET",
-            response_type=DeepsetUser,
+            response_type=dict[str, Any],
         )
 
         raise_for_status(resp)

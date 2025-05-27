@@ -111,7 +111,9 @@ class BaseFakeClient(AsyncClientProtocol):
                         json=resp_data,
                     )
                 else:
-                    return TransportResponse(text=str(resp_data), status_code=200, json=resp_data if resp_data is not None else None)
+                    return TransportResponse(
+                        text=str(resp_data), status_code=200, json=resp_data if resp_data is not None else None
+                    )
 
         raise ValueError(f"No response defined for endpoint: {endpoint}")
 

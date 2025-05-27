@@ -25,6 +25,7 @@ async def test_list_custom_component_installations() -> None:
                 version="1.0.0",
                 created_by_user_id="user_123",
                 created_at="2024-01-01T00:00:00Z",
+                organization_id="org-123",
                 logs=[{"level": "INFO", "msg": "Installation complete"}],
             ),
             CustomComponentInstallation(
@@ -33,6 +34,7 @@ async def test_list_custom_component_installations() -> None:
                 version="0.9.0",
                 created_by_user_id="user_456",
                 created_at="2024-01-02T00:00:00Z",
+                organization_id="org-456",
                 logs=[
                     {"level": "ERROR", "msg": "Installation failed"},
                     {"level": "DEBUG", "msg": "Debug info"},
@@ -58,7 +60,9 @@ async def test_list_custom_component_installations() -> None:
     )
 
     class FakeCustomComponentsResource(CustomComponentsResource):
-        async def list_installations(self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC") -> CustomComponentInstallationList:
+        async def list_installations(
+            self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC"
+        ) -> CustomComponentInstallationList:
             return mock_installations
 
         async def get_latest_installation_logs(self) -> str:
@@ -102,7 +106,9 @@ async def test_list_custom_component_installations_empty() -> None:
     )
 
     class FakeCustomComponentsResource(CustomComponentsResource):
-        async def list_installations(self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC") -> CustomComponentInstallationList:
+        async def list_installations(
+            self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC"
+        ) -> CustomComponentInstallationList:
             return mock_installations
 
         async def get_latest_installation_logs(self) -> str:
@@ -125,6 +131,7 @@ async def test_list_custom_component_installations_user_fetch_error() -> None:
             CustomComponentInstallation(
                 custom_component_id="comp_123",
                 status="installed",
+                organization_id="org-123",
                 version="1.0.0",
                 created_by_user_id="user_unknown",
                 created_at="2024-01-01T00:00:00Z",
@@ -136,7 +143,9 @@ async def test_list_custom_component_installations_user_fetch_error() -> None:
     )
 
     class FakeCustomComponentsResource(CustomComponentsResource):
-        async def list_installations(self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC") -> CustomComponentInstallationList:
+        async def list_installations(
+            self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC"
+        ) -> CustomComponentInstallationList:
             return mock_installations
 
         async def get_latest_installation_logs(self) -> str:
@@ -158,8 +167,11 @@ async def test_list_custom_component_installations_user_fetch_error() -> None:
 @pytest.mark.asyncio
 async def test_list_custom_component_installations_api_error() -> None:
     """Test listing custom component installations when API fails."""
+
     class FakeCustomComponentsResource(CustomComponentsResource):
-        async def list_installations(self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC") -> CustomComponentInstallationList:
+        async def list_installations(
+            self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC"
+        ) -> CustomComponentInstallationList:
             raise Exception("API Error")
 
         async def get_latest_installation_logs(self) -> str:
@@ -180,7 +192,9 @@ async def test_get_latest_custom_component_installation_logs() -> None:
     mock_logs = "Installation started\nInstalling dependencies\nInstallation complete"
 
     class FakeCustomComponentsResource(CustomComponentsResource):
-        async def list_installations(self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC") -> CustomComponentInstallationList:
+        async def list_installations(
+            self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC"
+        ) -> CustomComponentInstallationList:
             return CustomComponentInstallationList(data=[], total=0, has_more=False)
 
         async def get_latest_installation_logs(self) -> str:
@@ -197,8 +211,11 @@ async def test_get_latest_custom_component_installation_logs() -> None:
 @pytest.mark.asyncio
 async def test_get_latest_custom_component_installation_logs_empty() -> None:
     """Test getting latest custom component installation logs when none exist."""
+
     class FakeCustomComponentsResource(CustomComponentsResource):
-        async def list_installations(self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC") -> CustomComponentInstallationList:
+        async def list_installations(
+            self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC"
+        ) -> CustomComponentInstallationList:
             return CustomComponentInstallationList(data=[], total=0, has_more=False)
 
         async def get_latest_installation_logs(self) -> str | None:
@@ -215,8 +232,11 @@ async def test_get_latest_custom_component_installation_logs_empty() -> None:
 @pytest.mark.asyncio
 async def test_get_latest_custom_component_installation_logs_api_error() -> None:
     """Test getting latest custom component installation logs when API fails."""
+
     class FakeCustomComponentsResource(CustomComponentsResource):
-        async def list_installations(self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC") -> CustomComponentInstallationList:
+        async def list_installations(
+            self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC"
+        ) -> CustomComponentInstallationList:
             return CustomComponentInstallationList(data=[], total=0, has_more=False)
 
         async def get_latest_installation_logs(self) -> str:

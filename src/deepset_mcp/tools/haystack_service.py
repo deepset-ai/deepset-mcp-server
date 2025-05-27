@@ -141,9 +141,9 @@ async def list_component_families(client: AsyncClientProtocol) -> str:
 
 async def get_custom_components(client: AsyncClientProtocol) -> str:
     """Get a list of all installed custom components.
-    
+
     :param client: The API client to use.
-    
+
     :returns: A formatted string containing custom component information.
     """
     haystack_service = client.haystack_service()

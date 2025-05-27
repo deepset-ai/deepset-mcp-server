@@ -7,6 +7,10 @@ from model2vec import StaticModel
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.api.pipeline.log_level import LogLevel
+from deepset_mcp.tools.custom_components import (
+    get_latest_custom_component_installation_logs as get_latest_custom_component_installation_logs_tool,
+    list_custom_component_installations as list_custom_component_installations_tool,
+)
 from deepset_mcp.tools.haystack_service import (
     get_component_definition as get_component_definition_tool,
     get_custom_components as get_custom_components_tool,
@@ -32,10 +36,6 @@ from deepset_mcp.tools.pipeline_template import (
     get_pipeline_template as get_pipeline_template_tool,
     list_pipeline_templates as list_pipeline_templates_tool,
     search_pipeline_templates as search_pipeline_templates_tool,
-)
-from deepset_mcp.tools.custom_components import (
-    get_latest_custom_component_installation_logs as get_latest_custom_component_installation_logs_tool,
-    list_custom_component_installations as list_custom_component_installations_tool,
 )
 
 INITIALIZED_MODEL = StaticModel.from_pretrained("minishlab/potion-base-2M")
@@ -396,9 +396,6 @@ async def get_latest_custom_component_installation_logs() -> str:
         response = await get_latest_custom_component_installation_logs_tool(client, workspace)
 
     return response
-
-
-
 
 
 def main() -> None:

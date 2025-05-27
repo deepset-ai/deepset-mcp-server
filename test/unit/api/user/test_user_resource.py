@@ -16,9 +16,7 @@ async def test_get_user() -> None:
         "email": "john.doe@example.com",
     }
 
-    fake_client = BaseFakeClient(
-        responses={"v1/users/user_123": mock_user_data}
-    )
+    fake_client = BaseFakeClient(responses={"v1/users/user_123": mock_user_data})
 
     def users() -> UserResource:
         return UserResource(client=fake_client)
@@ -45,9 +43,7 @@ async def test_get_user_partial_data() -> None:
         "email": None,
     }
 
-    fake_client = BaseFakeClient(
-        responses={"v1/users/user_456": mock_user_data}
-    )
+    fake_client = BaseFakeClient(responses={"v1/users/user_456": mock_user_data})
 
     def users() -> UserResource:
         return UserResource(client=fake_client)
@@ -67,9 +63,7 @@ async def test_get_user_partial_data() -> None:
 @pytest.mark.asyncio
 async def test_get_user_not_found() -> None:
     """Test getting user information when user doesn't exist."""
-    fake_client = BaseFakeClient(
-        responses={"v1/users/nonexistent": None}
-    )
+    fake_client = BaseFakeClient(responses={"v1/users/nonexistent": None})
 
     def users() -> UserResource:
         return UserResource(client=fake_client)
@@ -77,6 +71,6 @@ async def test_get_user_not_found() -> None:
     fake_client.users = users  # type: ignore[method-assign]
 
     resource = fake_client.users()
-    
+
     with pytest.raises(ResourceNotFoundError, match="User 'nonexistent' not found."):
         await resource.get("nonexistent")

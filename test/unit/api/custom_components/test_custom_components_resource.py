@@ -1,7 +1,6 @@
 import pytest
 
 from deepset_mcp.api.custom_components.models import (
-    CustomComponentInstallation,
     CustomComponentInstallationList,
 )
 from deepset_mcp.api.custom_components.resource import CustomComponentsResource
@@ -114,9 +113,7 @@ async def test_get_latest_installation_logs() -> None:
     """Test getting latest installation logs."""
     mock_logs = "Installation started\nInstalling dependencies\nInstallation complete"
 
-    fake_client = BaseFakeClient(
-        responses={"v2/custom_components/logs": mock_logs}
-    )
+    fake_client = BaseFakeClient(responses={"v2/custom_components/logs": mock_logs})
 
     def custom_components(workspace: str) -> CustomComponentsResource:
         return CustomComponentsResource(client=fake_client)
@@ -132,9 +129,7 @@ async def test_get_latest_installation_logs() -> None:
 @pytest.mark.asyncio
 async def test_get_latest_installation_logs_none() -> None:
     """Test getting latest installation logs when none exist."""
-    fake_client = BaseFakeClient(
-        responses={"v2/custom_components/logs": None}
-    )
+    fake_client = BaseFakeClient(responses={"v2/custom_components/logs": None})
 
     def custom_components(workspace: str) -> CustomComponentsResource:
         return CustomComponentsResource(client=fake_client)
