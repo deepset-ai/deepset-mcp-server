@@ -144,4 +144,8 @@ class AsyncDeepsetClient(AsyncClientProtocol):
 
     def custom_components(self, workspace: str) -> CustomComponentsResource:
         """Resource to interact with custom components in the specified workspace."""
-        return CustomComponentsResource(client=self, workspace=workspace)
+        return CustomComponentsResource(client=self)
+
+    def users(self) -> UserResource:
+        """Resource to interact with users."""
+        return UserResource(client=self)
