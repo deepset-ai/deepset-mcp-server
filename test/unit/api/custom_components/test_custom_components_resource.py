@@ -62,13 +62,13 @@ async def test_list_installations_empty() -> None:
     }
 
     fake_client = BaseFakeClient(
-        responses={"v2/custom_components": mock_data}
+        responses={"v2/custom_components?limit=20&page_number=1&field=created_at&order=DESC": mock_data}
     )
 
-    def custom_components(workspace: str):
+    def custom_components(workspace: str) -> CustomComponentsResource:
         return CustomComponentsResource(client=fake_client)
 
-    fake_client.custom_components = custom_components
+    fake_client.custom_components = custom_components  # type: ignore[method-assign]
 
     resource = fake_client.custom_components("test-workspace")
     result = await resource.list_installations()
