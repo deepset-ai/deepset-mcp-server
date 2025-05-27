@@ -1,4 +1,4 @@
-from deepset_mcp.api.pipeline.models import DeepsetPipeline, PipelineValidationResult
+from deepset_mcp.api.pipeline.models import DeepsetPipeline, PipelineLogList, PipelineValidationResult
 from deepset_mcp.api.pipeline_template.models import PipelineTemplate
 
 
