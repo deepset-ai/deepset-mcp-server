@@ -4,10 +4,12 @@ from typing import Any, Self, TypeVar, overload
 
 from deepset_mcp.api.protocols import (
     AsyncClientProtocol,
+    CustomComponentsProtocol,
     HaystackServiceProtocol,
     IndexResourceProtocol,
     PipelineResourceProtocol,
     PipelineTemplateResourceProtocol,
+    UserResourceProtocol,
 )
 from deepset_mcp.api.transport import TransportResponse
 
@@ -92,7 +94,8 @@ class BaseFakeClient(AsyncClientProtocol):
 
         # Find the appropriate response
         for resp_key, resp_data in self.responses.items():
-            if endpoint.endswith(resp_key):
+            # First try exact match, then fallback to endswith for compatibility
+            if endpoint == resp_key or endpoint.endswith(resp_key):
                 if isinstance(resp_data, Exception):
                     raise resp_data
 
@@ -108,7 +111,9 @@ class BaseFakeClient(AsyncClientProtocol):
                         json=resp_data,
                     )
                 else:
-                    return TransportResponse(text=str(resp_data), status_code=200, json=None)
+                    return TransportResponse(
+                        text=str(resp_data), status_code=200, json=resp_data if resp_data is not None else None
+                    )
 
         raise ValueError(f"No response defined for endpoint: {endpoint}")
 
@@ -144,4 +149,12 @@ class BaseFakeClient(AsyncClientProtocol):
 
     def indexes(self, workspace: str) -> IndexResourceProtocol:
         """Overwrite this method when testing IndexResource."""
+        raise NotImplementedError
+
+    def custom_components(self, workspace: str) -> CustomComponentsProtocol:
+        """Overwrite this method when testing CustomComponentsResource."""
+        raise NotImplementedError
+
+    def users(self) -> UserResourceProtocol:
+        """Overwrite this method when testing UserResource."""
         raise NotImplementedError

@@ -137,3 +137,75 @@ async def list_component_families(client: AsyncClientProtocol) -> str:
         parts.append(f"\n**{family}**\n{description}\n")
 
     return "\n".join(parts)
+
+
+async def get_custom_components(client: AsyncClientProtocol) -> str:
+    """Get a list of all installed custom components.
+
+    :param client: The API client to use.
+
+    :returns: A formatted string containing custom component information.
+    """
+    haystack_service = client.haystack_service()
+
+    try:
+        response = await haystack_service.get_component_schemas()
+    except UnexpectedAPIError as e:
+        return f"Error retrieving component schemas: {e}"
+
+    # Navigate to the components definition section
+    # Typically structured as {definitions: {Components: {<component_name>: <schema>}}}
+    schemas = response.get("component_schema", {})
+    schemas = schemas.get("definitions", {}).get("Components", {})
+
+    if not schemas:
+        return "No component schemas found or unexpected schema format."
+
+    # Filter for custom components (those with package_version key)
+    custom_components = {}
+    for component_name, schema in schemas.items():
+        if "package_version" in schema:
+            custom_components[component_name] = schema
+
+    if not custom_components:
+        return "No custom components found."
+
+    # Format the response
+    formatted_output = [f"# Custom Components ({len(custom_components)} found)\n"]
+
+    for component_name, schema in custom_components.items():
+        # Extract key information
+        package_version = schema.get("package_version", "Unknown")
+        dynamic_params = schema.get("dynamic_params", False)
+
+        # Get component type info
+        type_info = schema.get("properties", {}).get("type", {})
+        const_value = type_info.get("const", "Unknown")
+        family = type_info.get("family", "Unknown")
+        family_description = type_info.get("family_description", "No description")
+
+        # Format component details
+        component_details = [
+            f"## {component_name}",
+            f"- **Type**: `{const_value}`",
+            f"- **Package Version**: {package_version}",
+            f"- **Family**: {family} - {family_description}",
+            f"- **Dynamic Parameters**: {'Yes' if dynamic_params else 'No'}",
+        ]
+
+        # Add init parameters if available
+        init_params = schema.get("properties", {}).get("init_parameters", {}).get("properties", {})
+        if init_params:
+            component_details.append("\n### Init Parameters:")
+            for param_name, param_info in init_params.items():
+                param_type = param_info.get("type", "Unknown")
+                required = param_name in schema.get("properties", {}).get("init_parameters", {}).get("required", [])
+                param_description = param_info.get("description", "No description")
+
+                component_details.append(f"- **{param_name}** ({param_type}{', required' if required else ''}):")
+                component_details.append(f"  {param_description}")
+
+        formatted_output.append("\n".join(component_details) + "\n")
+
+    # Join all sections and return
+    return "\n".join(formatted_output)
