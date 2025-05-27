@@ -331,6 +331,26 @@ async def get_pipeline_logs(pipeline_name: str, limit: int = 30, level: str | No
     return response
 
 
+@mcp.tool()
+async def deploy_pipeline(pipeline_name: str) -> str:
+    """Deploys a pipeline to production in the deepset workspace.
+
+    Use this to deploy a pipeline that has been created and validated. 
+    The deployment process will validate the pipeline configuration and deploy it if valid.
+    If deployment fails due to validation errors, you will receive detailed error information.
+
+    :param pipeline_name: Name of the pipeline to deploy.
+    """
+    workspace = get_workspace()
+    async with AsyncDeepsetClient() as client:
+        response = await deploy_pipeline_tool(
+            client=client,
+            workspace=workspace,
+            pipeline_name=pipeline_name,
+        )
+    return response
+
+
 #
 #
 # @mcp.tool()
