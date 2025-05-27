@@ -1,5 +1,3 @@
-from typing import Any
-
 import pytest
 
 from deepset_mcp.api.custom_components.models import (
