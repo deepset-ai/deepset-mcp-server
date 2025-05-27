@@ -890,3 +890,126 @@ class TestPipelineResource:
         # Verify extra fields are preserved
         assert "custom_field" in result.data[0].extra_fields
         assert result.data[0].extra_fields["custom_field"] == "custom_value"
+
+    @pytest.mark.asyncio
+    async def test_deploy_pipeline_success(self) -> None:
+        """Test successful pipeline deployment."""
+        # Create client with successful response
+        client = DummyClient(responses={"test-workspace/pipelines/test-pipeline/deploy": {"status": "success"}})
+
+        # Create resource and call deploy method
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        result = await resource.deploy(pipeline_name="test-pipeline")
+
+        # Verify results
+        assert isinstance(result, PipelineValidationResult)
+        assert result.valid is True
+        assert len(result.errors) == 0
+
+        # Verify request
+        assert len(client.requests) == 1
+        assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines/test-pipeline/deploy"
+        assert client.requests[0]["method"] == "POST"
+
+    @pytest.mark.asyncio
+    async def test_deploy_pipeline_with_validation_errors(self) -> None:
+        """Test deployment with validation errors (422)."""
+        # Create a response with validation errors
+        validation_errors = {
+            "details": [
+                {"code": "invalid_component", "message": "Component 'invalid_reader' is not available"},
+                {"code": "missing_field", "message": "Required field 'index' is missing"},
+            ]
+        }
+
+        # Create mock client with 422 response containing validation errors
+        client = DummyClient()
+        transport_response = TransportResponse(text="", status_code=422, json=validation_errors)
+        client.responses = {"test-workspace/pipelines/test-pipeline/deploy": transport_response}
+
+        # Run the deployment
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        result = await resource.deploy(pipeline_name="test-pipeline")
+
+        # Check the result
+        assert isinstance(result, PipelineValidationResult)
+        assert result.valid is False
+        assert len(result.errors) == 2
+        assert result.errors[0].code == "invalid_component"
+        assert result.errors[0].message == "Component 'invalid_reader' is not available"
+        assert result.errors[1].code == "missing_field"
+        assert result.errors[1].message == "Required field 'index' is missing"
+
+    @pytest.mark.asyncio
+    async def test_deploy_pipeline_with_400_error(self) -> None:
+        """Test deployment with 400 error."""
+        # Create response for 400 error
+        error_response: TransportResponse[None] = TransportResponse(text="Bad request", status_code=400, json=None)
+
+        client = DummyClient(responses={"test-workspace/pipelines/test-pipeline/deploy": error_response})
+
+        # Run the deployment
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        result = await resource.deploy(pipeline_name="test-pipeline")
+
+        # Check the result
+        assert result.valid is False
+        assert len(result.errors) == 1
+        assert result.errors[0].code == "DEPLOYMENT_ERROR"
+        assert result.errors[0].message == "Bad request"
+
+    @pytest.mark.asyncio
+    async def test_deploy_pipeline_with_404_error(self) -> None:
+        """Test deployment with 404 error (pipeline not found)."""
+        # Create response for 404 error
+        error_response: TransportResponse[None] = TransportResponse(
+            text="Pipeline not found", status_code=404, json=None
+        )
+
+        client = DummyClient(responses={"test-workspace/pipelines/nonexistent-pipeline/deploy": error_response})
+
+        # Run the deployment
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        result = await resource.deploy(pipeline_name="nonexistent-pipeline")
+
+        # Check the result
+        assert result.valid is False
+        assert len(result.errors) == 1
+        assert result.errors[0].code == "DEPLOYMENT_ERROR"
+        assert result.errors[0].message == "Pipeline not found"
+
+    @pytest.mark.asyncio
+    async def test_deploy_pipeline_with_500_error(self) -> None:
+        """Test deployment with 500 error (unexpected error)."""
+        # Create response for 500 error
+        error_response: TransportResponse[None] = TransportResponse(
+            text="Internal server error", status_code=500, json=None
+        )
+
+        client = DummyClient(responses={"test-workspace/pipelines/test-pipeline/deploy": error_response})
+
+        # Run the deployment and expect an exception
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        with pytest.raises(UnexpectedAPIError) as exc_info:
+            await resource.deploy(pipeline_name="test-pipeline")
+
+        assert exc_info.value.status_code == 500
+        assert "Internal server error" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_deploy_pipeline_with_empty_error_text(self) -> None:
+        """Test deployment with error response but empty text."""
+        # Create response for 400 error with empty text
+        error_response: TransportResponse[None] = TransportResponse(text="", status_code=400, json=None)
+
+        client = DummyClient(responses={"test-workspace/pipelines/test-pipeline/deploy": error_response})
+
+        # Run the deployment
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        result = await resource.deploy(pipeline_name="test-pipeline")
+
+        # Check the result
+        assert result.valid is False
+        assert len(result.errors) == 1
+        assert result.errors[0].code == "DEPLOYMENT_ERROR"
+        assert result.errors[0].message == "HTTP 400 error"
