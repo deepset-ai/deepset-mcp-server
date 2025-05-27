@@ -98,6 +98,10 @@ class FakePipelineResource:
         limit: int = 30,
         level: str | None = None,
     ) -> PipelineLogList:
+        if self._logs_exception:
+            raise self._logs_exception
+        if self._logs_response is not None:
+            return self._logs_response
         raise NotImplementedError
 
 
