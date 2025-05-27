@@ -1,3 +1,4 @@
+from typing import Any
 
 from deepset_mcp.api.custom_components.models import CustomComponentInstallationList
 from deepset_mcp.api.protocols import AsyncClientProtocol, CustomComponentsProtocol
@@ -29,7 +30,7 @@ class CustomComponentsResource(CustomComponentsProtocol):
         resp = await self._client.request(
             endpoint=f"v2/custom_components?limit={limit}&page_number={page_number}&field={field}&order={order}",
             method="GET",
-            response_type=CustomComponentInstallationList,
+            response_type=dict[str, Any],
         )
 
         raise_for_status(resp)
@@ -51,12 +52,4 @@ class CustomComponentsResource(CustomComponentsProtocol):
 
         raise_for_status(resp)
 
-        if resp.json is None:
-            return None
-
-        # If response contains text, return it directly
-        if isinstance(resp.json, str):
-            return resp.json
-
-        # If response has text field in the response, return it
         return resp.text

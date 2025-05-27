@@ -15,9 +15,9 @@ async def test_list_installations() -> None:
             {
                 "custom_component_id": "comp_123",
                 "status": "installed",
+                "organization_id": "org-123",
                 "version": "1.0.0",
                 "created_by_user_id": "user_123",
-                "created_at": "2024-01-01T00:00:00Z",
                 "logs": [{"level": "INFO", "msg": "Installation complete"}],
             }
         ],
@@ -45,7 +45,6 @@ async def test_list_installations() -> None:
     assert result.data[0].status == "installed"
     assert result.data[0].version == "1.0.0"
     assert result.data[0].created_by_user_id == "user_123"
-    assert result.data[0].created_at == "2024-01-01T00:00:00Z"
     assert len(result.data[0].logs) == 1
     assert result.data[0].logs[0]["level"] == "INFO"
     assert result.data[0].logs[0]["msg"] == "Installation complete"
@@ -124,19 +123,3 @@ async def test_get_latest_installation_logs() -> None:
     result = await resource.get_latest_installation_logs()
 
     assert result == mock_logs
-
-
-@pytest.mark.asyncio
-async def test_get_latest_installation_logs_none() -> None:
-    """Test getting latest installation logs when none exist."""
-    fake_client = BaseFakeClient(responses={"v2/custom_components/logs": None})
-
-    def custom_components(workspace: str) -> CustomComponentsResource:
-        return CustomComponentsResource(client=fake_client)
-
-    fake_client.custom_components = custom_components  # type: ignore[method-assign]
-
-    resource = fake_client.custom_components("test-workspace")
-    result = await resource.get_latest_installation_logs()
-
-    assert result is None

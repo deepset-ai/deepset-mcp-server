@@ -10,7 +10,6 @@ class CustomComponentInstallation(BaseModel):
     status: str
     version: str
     created_by_user_id: str
-    created_at: str
     logs: list[dict[str, Any]]
     organization_id: str
 

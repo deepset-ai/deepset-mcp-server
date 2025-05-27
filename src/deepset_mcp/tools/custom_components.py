@@ -47,7 +47,6 @@ async def list_custom_component_installations(client: AsyncClientProtocol, works
             f"- **Status**: {install.status}",
             f"- **Version**: {install.version}",
             f"- **Installed by**: {user_info}",
-            f"- **Created at**: {install.created_at}",
         ]
 
         # Add logs if available
@@ -82,10 +81,7 @@ async def get_latest_custom_component_installation_logs(client: AsyncClientProto
     """
     custom_components = client.custom_components(workspace)
 
-    try:
-        logs = await custom_components.get_latest_installation_logs()
-    except Exception as e:
-        return f"Failed to retrieve latest installation logs: {e}"
+    logs = await custom_components.get_latest_installation_logs()
 
     if not logs:
         return "No installation logs found."
