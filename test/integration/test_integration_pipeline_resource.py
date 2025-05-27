@@ -241,3 +241,33 @@ components:
 
     assert resp.valid is False
     assert resp.errors[0].code == "YAML_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_get_logs_with_enum_levels(
+    pipeline_resource: PipelineResource,
+    sample_yaml_config: str,
+) -> None:
+    """Test getting logs with LogLevel enum values."""
+    pipeline_name = "test-logs-pipeline"
+
+    # Create a pipeline first
+    await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
+
+    # Test fetching logs without filter
+    all_logs = await pipeline_resource.get_logs(pipeline_name=pipeline_name, limit=5)
+    assert isinstance(all_logs, PipelineLogList)
+    assert all_logs.total >= 0
+
+    # Test fetching logs with each LogLevel enum value
+    for level in LogLevel:
+        filtered_logs = await pipeline_resource.get_logs(
+            pipeline_name=pipeline_name, 
+            level=level, 
+            limit=5
+        )
+        assert isinstance(filtered_logs, PipelineLogList)
+        
+        # All returned logs should match the filtered level
+        for log in filtered_logs.data:
+            assert log.level == level.value
