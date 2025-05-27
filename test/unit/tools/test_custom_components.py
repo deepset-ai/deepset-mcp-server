@@ -58,14 +58,14 @@ async def test_list_custom_component_installations() -> None:
     )
 
     class FakeCustomComponentsResource(CustomComponentsResource):
-        async def list_installations(self, limit=20, page_number=1, field="created_at", order="DESC"):
+        async def list_installations(self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC") -> CustomComponentInstallationList:
             return mock_installations
 
-        async def get_latest_installation_logs(self):
+        async def get_latest_installation_logs(self) -> str:
             return "mock logs"
 
     class FakeUserResource(UserResource):
-        async def get(self, user_id):
+        async def get(self, user_id: str) -> DeepsetUser:
             if user_id == "user_123":
                 return mock_user_123
             elif user_id == "user_456":
