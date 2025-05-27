@@ -6,6 +6,7 @@ from mcp.server.fastmcp import FastMCP
 from model2vec import StaticModel
 
 from deepset_mcp.api.client import AsyncDeepsetClient
+from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.tools.haystack_service import (
     get_component_definition as get_component_definition_tool,
     list_component_families as list_component_families_tool,
@@ -17,7 +18,6 @@ from deepset_mcp.tools.indexes import (
     list_indexes as list_indexes_tool,
     update_index as update_index_tool,
 )
-from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.tools.pipeline import (
     create_pipeline as create_pipeline_tool,
     get_pipeline as get_pipeline_tool,
@@ -310,7 +310,7 @@ async def get_pipeline_logs(pipeline_name: str, limit: int = 30, level: str | No
     :param level: Filter logs by level. Valid values: 'info', 'warning', 'error'. If not specified, returns all levels.
     """
     workspace = get_workspace()
-    
+
     # Convert string level to LogLevel enum if provided
     log_level: LogLevel | None = None
     if level is not None:
@@ -318,7 +318,7 @@ async def get_pipeline_logs(pipeline_name: str, limit: int = 30, level: str | No
             log_level = LogLevel(level)
         except ValueError:
             return f"Invalid log level '{level}'. Valid values are: 'info', 'warning', 'error'."
-    
+
     async with AsyncDeepsetClient() as client:
         response = await get_pipeline_logs_tool(
             client=client,
