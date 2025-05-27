@@ -437,12 +437,12 @@ async def test_get_pipeline_logs_success() -> None:
         extra_fields={"component": "reader"},
     )
     logs = PipelineLogList(data=[log1, log2], has_more=False, total=2)
-    
+
     resource = FakePipelineResource(logs_response=logs)
     client = FakeClient(resource)
-    
+
     result = await get_pipeline_logs(client, workspace="ws", pipeline_name="test-pipeline")
-    
+
     assert "Logs for Pipeline 'test-pipeline'" in result
     assert "Pipeline started" in result
     assert "Error occurred" in result
@@ -455,24 +455,24 @@ async def test_get_pipeline_logs_success() -> None:
 @pytest.mark.asyncio
 async def test_get_pipeline_logs_empty() -> None:
     logs = PipelineLogList(data=[], has_more=False, total=0)
-    
+
     resource = FakePipelineResource(logs_response=logs)
     client = FakeClient(resource)
-    
+
     result = await get_pipeline_logs(client, workspace="ws", pipeline_name="test-pipeline")
-    
+
     assert "No logs found for pipeline 'test-pipeline'" in result
 
 
 @pytest.mark.asyncio
 async def test_get_pipeline_logs_with_level_filter() -> None:
     logs = PipelineLogList(data=[], has_more=False, total=0)
-    
+
     resource = FakePipelineResource(logs_response=logs)
     client = FakeClient(resource)
-    
+
     result = await get_pipeline_logs(client, workspace="ws", pipeline_name="test-pipeline", level="error")
-    
+
     assert "No logs found for pipeline 'test-pipeline' (filtered by level: error)" in result
 
 
@@ -480,9 +480,9 @@ async def test_get_pipeline_logs_with_level_filter() -> None:
 async def test_get_pipeline_logs_resource_not_found() -> None:
     resource = FakePipelineResource(logs_exception=ResourceNotFoundError())
     client = FakeClient(resource)
-    
+
     result = await get_pipeline_logs(client, workspace="ws", pipeline_name="missing-pipeline")
-    
+
     assert "There is no pipeline named 'missing-pipeline' in workspace 'ws'" in result
 
 
@@ -490,19 +490,17 @@ async def test_get_pipeline_logs_resource_not_found() -> None:
 async def test_get_pipeline_logs_bad_request() -> None:
     resource = FakePipelineResource(logs_exception=BadRequestError("Invalid level filter"))
     client = FakeClient(resource)
-    
+
     result = await get_pipeline_logs(client, workspace="ws", pipeline_name="test-pipeline")
-    
+
     assert "Failed to fetch logs for pipeline 'test-pipeline': Invalid level filter" in result
 
 
 @pytest.mark.asyncio
 async def test_get_pipeline_logs_unexpected_error() -> None:
-    resource = FakePipelineResource(
-        logs_exception=UnexpectedAPIError(status_code=500, message="Internal server error")
-    )
+    resource = FakePipelineResource(logs_exception=UnexpectedAPIError(status_code=500, message="Internal server error"))
     client = FakeClient(resource)
-    
+
     result = await get_pipeline_logs(client, workspace="ws", pipeline_name="test-pipeline")
-    
+
     assert "Failed to fetch logs for pipeline 'test-pipeline': Internal server error" in result

@@ -298,14 +298,12 @@ async def update_index(
 
 
 @mcp.tool()
-async def get_pipeline_logs(
-    pipeline_name: str, limit: int = 30, level: str | None = None
-) -> str:
+async def get_pipeline_logs(pipeline_name: str, limit: int = 30, level: str | None = None) -> str:
     """Fetches logs for a specific pipeline in the deepset workspace.
-    
+
     Use this to debug pipeline issues, monitor pipeline execution, or understand what happened during pipeline runs.
     The logs provide detailed information about pipeline operations, errors, and warnings.
-    
+
     :param pipeline_name: Name of the pipeline to fetch logs for.
     :param limit: Maximum number of log entries to return (default: 30, max: 100).
     :param level: Filter logs by level. Valid values: 'info', 'warning', 'error'. If not specified, returns all levels.

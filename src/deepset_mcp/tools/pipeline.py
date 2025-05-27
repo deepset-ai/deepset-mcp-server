@@ -119,23 +119,21 @@ async def get_pipeline_logs(
     level: str | None = None,
 ) -> str:
     """Fetches logs for a specific pipeline.
-    
+
     Retrieves log entries for the specified pipeline, with optional filtering by log level.
     This is useful for debugging pipeline issues or monitoring pipeline execution.
-    
+
     :param client: The async client for API communication.
     :param workspace: The workspace name.
     :param pipeline_name: Name of the pipeline to fetch logs for.
     :param limit: Maximum number of log entries to return (default: 30).
     :param level: Filter logs by level (info, warning, error). If None, returns all levels.
-    
+
     :returns: A formatted string containing the pipeline logs.
     """
     try:
         logs = await client.pipelines(workspace=workspace).get_logs(
-            pipeline_name=pipeline_name,
-            limit=limit,
-            level=level
+            pipeline_name=pipeline_name, limit=limit, level=level
         )
     except ResourceNotFoundError:
         return f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}'."
@@ -143,7 +141,7 @@ async def get_pipeline_logs(
         return f"Failed to fetch logs for pipeline '{pipeline_name}': {e}"
     except UnexpectedAPIError as e:
         return f"Failed to fetch logs for pipeline '{pipeline_name}': {e}"
-    
+
     from deepset_mcp.tools.formatting_utils import pipeline_logs_to_llm_readable_string
-    
+
     return pipeline_logs_to_llm_readable_string(logs, pipeline_name, level)

@@ -89,55 +89,55 @@ def validation_result_to_llm_readable_string(validation_result: PipelineValidati
 
 def pipeline_logs_to_llm_readable_string(logs: PipelineLogList, pipeline_name: str, level: str | None = None) -> str:
     """Creates a string representation of pipeline logs that is readable by LLMs.
-    
+
     :param logs: The PipelineLogList containing log entries.
     :param pipeline_name: The name of the pipeline the logs are from.
     :param level: The log level filter that was applied, if any.
-    
+
     :returns: A formatted string representation of the logs.
     """
     if not logs.data:
         filter_info = f" (filtered by level: {level})" if level else ""
         return f"No logs found for pipeline '{pipeline_name}'{filter_info}."
-    
-    log_parts = [
-        f"### Logs for Pipeline '{pipeline_name}'"
-    ]
-    
+
+    log_parts = [f"### Logs for Pipeline '{pipeline_name}'"]
+
     if level:
         log_parts.append(f"**Filter Applied:** Level = {level}")
-    
-    log_parts.extend([
-        f"**Total Logs:** {logs.total}",
-        f"**Showing:** {len(logs.data)} entries",
-        f"**Has More:** {'Yes' if logs.has_more else 'No'}",
-        "\n---\n"
-    ])
-    
+
+    log_parts.extend(
+        [
+            f"**Total Logs:** {logs.total}",
+            f"**Showing:** {len(logs.data)} entries",
+            f"**Has More:** {'Yes' if logs.has_more else 'No'}",
+            "\n---\n",
+        ]
+    )
+
     for i, log in enumerate(logs.data, 1):
         log_entry = [
             f"**Log Entry {i}**",
             f"- **Timestamp:** {log.logged_at.strftime('%B %d, %Y %I:%M:%S %p')}",
             f"- **Level:** {log.level}",
             f"- **Origin:** {log.origin}",
-            f"- **Message:** {log.message}"
+            f"- **Message:** {log.message}",
         ]
-        
+
         if log.exceptions:
             log_entry.append(f"- **Exceptions:** {log.exceptions}")
-        
+
         if log.extra_fields:
             log_entry.append("- **Extra Fields:")
             for key, value in log.extra_fields.items():
                 log_entry.append(f"  - {key}: {value}")
-        
+
         log_parts.append("\n".join(log_entry))
-        
+
         # Add separator between log entries (except for the last one)
         if i < len(logs.data):
             log_parts.append("")
-    
+
     if logs.has_more:
         log_parts.append("\n*Note: There are more log entries available. Adjust the limit parameter to see more.*")
-    
+
     return "\n".join(log_parts)
