@@ -517,3 +517,70 @@ async def test_get_pipeline_logs_unexpected_error() -> None:
     result = await get_pipeline_logs(client, workspace="ws", pipeline_name="test-pipeline")
 
     assert "Failed to fetch logs for pipeline 'test-pipeline': Internal server error" in result
+
+
+@pytest.mark.asyncio
+async def test_deploy_pipeline_success() -> None:
+    """Test successful pipeline deployment."""
+    success_result = PipelineValidationResult(valid=True, errors=[])
+    resource = FakePipelineResource(deploy_response=success_result)
+    client = FakeClient(resource)
+
+    result = await deploy_pipeline(client, workspace="ws", pipeline_name="test-pipeline")
+
+    assert "Pipeline 'test-pipeline' deployed successfully." == result
+
+
+@pytest.mark.asyncio
+async def test_deploy_pipeline_with_validation_errors() -> None:
+    """Test deployment with validation errors."""
+    error_result = PipelineValidationResult(
+        valid=False,
+        errors=[
+            ValidationError(code="INVALID_COMPONENT", message="Component 'invalid_reader' is not available"),
+            ValidationError(code="MISSING_FIELD", message="Required field 'index' is missing"),
+        ],
+    )
+    resource = FakePipelineResource(deploy_response=error_result)
+    client = FakeClient(resource)
+
+    result = await deploy_pipeline(client, workspace="ws", pipeline_name="test-pipeline")
+
+    assert "configuration is invalid" in result
+    assert "Error 1" in result
+    assert "Error 2" in result
+    assert "INVALID_COMPONENT" in result
+    assert "MISSING_FIELD" in result
+
+
+@pytest.mark.asyncio
+async def test_deploy_pipeline_not_found() -> None:
+    """Test deployment of non-existent pipeline."""
+    resource = FakePipelineResource(deploy_exception=ResourceNotFoundError())
+    client = FakeClient(resource)
+
+    result = await deploy_pipeline(client, workspace="ws", pipeline_name="missing-pipeline")
+
+    assert "There is no pipeline named 'missing-pipeline' in workspace 'ws'." == result
+
+
+@pytest.mark.asyncio
+async def test_deploy_pipeline_bad_request() -> None:
+    """Test deployment with bad request error."""
+    resource = FakePipelineResource(deploy_exception=BadRequestError("Pipeline is not ready for deployment"))
+    client = FakeClient(resource)
+
+    result = await deploy_pipeline(client, workspace="ws", pipeline_name="test-pipeline")
+
+    assert "Failed to deploy pipeline 'test-pipeline': Pipeline is not ready for deployment" in result
+
+
+@pytest.mark.asyncio
+async def test_deploy_pipeline_unexpected_error() -> None:
+    """Test deployment with unexpected API error."""
+    resource = FakePipelineResource(deploy_exception=UnexpectedAPIError(status_code=500, message="Internal server error"))
+    client = FakeClient(resource)
+
+    result = await deploy_pipeline(client, workspace="ws", pipeline_name="test-pipeline")
+
+    assert "Failed to deploy pipeline 'test-pipeline': Internal server error" in result
