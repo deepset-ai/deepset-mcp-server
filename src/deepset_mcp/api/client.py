@@ -140,3 +140,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
     def indexes(self, workspace: str) -> IndexResource:
         """Resource to interact with indexes in the specified workspace."""
         return IndexResource(client=self, workspace=workspace)
+
+    def custom_components(self, workspace: str) -> CustomComponentsResource:
+        """Resource to interact with custom components in the specified workspace."""
+        return CustomComponentsResource(client=self, workspace=workspace)
