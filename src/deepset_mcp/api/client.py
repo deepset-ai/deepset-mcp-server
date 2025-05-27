@@ -2,6 +2,7 @@ import os
 from types import TracebackType
 from typing import Any, Self, TypeVar, overload
 
+from deepset_mcp.api.custom_components.resource import CustomComponentsResource
 from deepset_mcp.api.haystack_service.resource import HaystackServiceResource
 from deepset_mcp.api.indexes.resource import IndexResource
 from deepset_mcp.api.pipeline.resource import PipelineResource
