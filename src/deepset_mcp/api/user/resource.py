@@ -32,4 +32,4 @@ class UserResource(UserResourceProtocol):
         if resp.json is None:
             raise ResourceNotFoundError(f"User '{user_id}' not found.")
 
-        return resp.json
+        return DeepsetUser(**resp.json)
