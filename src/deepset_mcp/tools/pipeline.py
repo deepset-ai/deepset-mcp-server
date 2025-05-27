@@ -146,3 +146,31 @@ async def get_pipeline_logs(
     from deepset_mcp.tools.formatting_utils import pipeline_logs_to_llm_readable_string
 
     return pipeline_logs_to_llm_readable_string(logs, pipeline_name, level)
+
+
+async def deploy_pipeline(client: AsyncClientProtocol, workspace: str, pipeline_name: str) -> str:
+    """Deploys a pipeline to production.
+
+    This function attempts to deploy the specified pipeline in the given workspace.
+    If the deployment fails due to validation errors, it returns a readable string
+    describing the validation errors.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline to deploy.
+
+    :returns: A string indicating the deployment result.
+    """
+    try:
+        deployment_result = await client.pipelines(workspace=workspace).deploy(pipeline_name=pipeline_name)
+    except ResourceNotFoundError:
+        return f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}'."
+    except BadRequestError as e:
+        return f"Failed to deploy pipeline '{pipeline_name}': {e}"
+    except UnexpectedAPIError as e:
+        return f"Failed to deploy pipeline '{pipeline_name}': {e}"
+
+    if deployment_result.valid:
+        return f"Pipeline '{pipeline_name}' deployed successfully."
+    else:
+        return validation_result_to_llm_readable_string(deployment_result)
