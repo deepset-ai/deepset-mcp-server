@@ -71,10 +71,10 @@ async def test_get_user_not_found() -> None:
         responses={"v1/users/nonexistent": None}
     )
 
-    def users():
+    def users() -> UserResource:
         return UserResource(client=fake_client)
 
-    fake_client.users = users
+    fake_client.users = users  # type: ignore[method-assign]
 
     resource = fake_client.users()
     
