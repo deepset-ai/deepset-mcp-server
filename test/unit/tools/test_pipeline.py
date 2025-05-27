@@ -21,6 +21,7 @@ from deepset_mcp.api.shared_models import DeepsetUser
 from deepset_mcp.tools.pipeline import (
     create_pipeline,
     get_pipeline,
+    get_pipeline_logs,
     list_pipelines,
     update_pipeline,
     validate_pipeline,
