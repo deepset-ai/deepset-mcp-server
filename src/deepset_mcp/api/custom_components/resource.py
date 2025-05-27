@@ -54,22 +54,4 @@ class CustomComponentsResource(CustomComponentsProtocol):
 
         return resp.json if resp.json is not None else {}
 
-    async def get_user(self, user_id: str) -> User:
-        """Get user information by user ID.
-        
-        :param user_id: The ID of the user to fetch.
-        
-        :returns: User information.
-        """
-        resp = await self._client.request(
-            endpoint=f"v1/users/{user_id}",
-            method="GET",
-            response_type=User,
-        )
 
-        raise_for_status(resp)
-
-        if resp.json is None:
-            raise ResourceNotFoundError(f"User '{user_id}' not found.")
-
-        return resp.json
