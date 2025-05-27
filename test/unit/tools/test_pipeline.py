@@ -10,6 +10,7 @@ from deepset_mcp.api.exceptions import (
 from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
+    ExceptionInfo,
     NoContentResponse,
     PipelineLog,
     PipelineLogList,
@@ -446,7 +447,7 @@ async def test_get_pipeline_logs_success() -> None:
         logged_at=datetime(2023, 1, 1, 12, 1, 0),
         level="error",
         origin="querypipeline",
-        exceptions="ValueError: test error",
+        exceptions=[ExceptionInfo(type="bla", value="bla", trace=[])],
         extra_fields={"component": "reader"},
     )
     logs = PipelineLogList(data=[log1, log2], has_more=False, total=2)
@@ -461,7 +462,7 @@ async def test_get_pipeline_logs_success() -> None:
     assert "Error occurred" in result
     assert "**Level:** info" in result
     assert "**Level:** error" in result
-    assert "**Exceptions:** ValueError: test error" in result
+    assert "**Exceptions:**" in result
     assert "component: reader" in result
 
 
