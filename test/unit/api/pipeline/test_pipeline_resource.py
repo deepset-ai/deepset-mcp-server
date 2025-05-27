@@ -748,7 +748,7 @@ class TestPipelineResource:
 
         # Create resource and call get_logs method with warning level
         resource = PipelineResource(client=client, workspace="test-workspace")
-        result = await resource.get_logs(pipeline_name="test-pipeline", level="warning")
+        result = await resource.get_logs(pipeline_name="test-pipeline", level=LogLevel.WARNING)
 
         # Verify results
         assert len(result.data) == 1
