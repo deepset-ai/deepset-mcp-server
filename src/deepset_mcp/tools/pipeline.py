@@ -1,6 +1,7 @@
 import yaml
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
+from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.tools.formatting_utils import pipeline_to_llm_readable_string, validation_result_to_llm_readable_string
 
