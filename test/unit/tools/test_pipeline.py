@@ -472,7 +472,7 @@ async def test_get_pipeline_logs_with_level_filter() -> None:
     resource = FakePipelineResource(logs_response=logs)
     client = FakeClient(resource)
 
-    result = await get_pipeline_logs(client, workspace="ws", pipeline_name="test-pipeline", level="error")
+    result = await get_pipeline_logs(client, workspace="ws", pipeline_name="test-pipeline", level=LogLevel.ERROR)
 
     assert "No logs found for pipeline 'test-pipeline' (filtered by level: error)" in result
 
