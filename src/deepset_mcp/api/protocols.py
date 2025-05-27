@@ -117,6 +117,10 @@ class AsyncClientProtocol(Protocol):
         """Access indexes in the specified workspace."""
         ...
 
+    def custom_components(self, workspace: str) -> "CustomComponentsProtocol":
+        """Access custom components in the specified workspace."""
+        ...
+
 
 class IndexResourceProtocol(Protocol):
     """Protocol defining the implementation for IndexResource."""
