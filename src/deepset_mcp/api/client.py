@@ -2,12 +2,14 @@ import os
 from types import TracebackType
 from typing import Any, Self, TypeVar, overload
 
+from deepset_mcp.api.custom_components.resource import CustomComponentsResource
 from deepset_mcp.api.haystack_service.resource import HaystackServiceResource
 from deepset_mcp.api.indexes.resource import IndexResource
 from deepset_mcp.api.pipeline.resource import PipelineResource
 from deepset_mcp.api.pipeline_template.resource import PipelineTemplateResource
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.transport import AsyncTransport, TransportProtocol, TransportResponse
+from deepset_mcp.api.user.resource import UserResource
 
 T = TypeVar("T")
 
@@ -139,3 +141,11 @@ class AsyncDeepsetClient(AsyncClientProtocol):
     def indexes(self, workspace: str) -> IndexResource:
         """Resource to interact with indexes in the specified workspace."""
         return IndexResource(client=self, workspace=workspace)
+
+    def custom_components(self, workspace: str) -> CustomComponentsResource:
+        """Resource to interact with custom components in the specified workspace."""
+        return CustomComponentsResource(client=self)
+
+    def users(self) -> UserResource:
+        """Resource to interact with users."""
+        return UserResource(client=self)

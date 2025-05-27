@@ -1,6 +1,7 @@
 from types import TracebackType
 from typing import Any, Protocol, Self, TypeVar, overload
 
+from deepset_mcp.api.custom_components.models import CustomComponentInstallationList
 from deepset_mcp.api.indexes.models import Index, IndexList
 from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.api.pipeline.models import (
@@ -10,6 +11,7 @@ from deepset_mcp.api.pipeline.models import (
     PipelineValidationResult,
 )
 from deepset_mcp.api.pipeline_template.models import PipelineTemplate
+from deepset_mcp.api.shared_models import DeepsetUser
 from deepset_mcp.api.transport import TransportResponse
 
 
@@ -22,6 +24,28 @@ class HaystackServiceProtocol(Protocol):
 
     async def get_component_input_output(self, component_name: str) -> dict[str, Any]:
         """Fetch input and output schema for a component from the API."""
+        ...
+
+
+class CustomComponentsProtocol(Protocol):
+    """Protocol defining the implementation for CustomComponentsResource."""
+
+    async def list_installations(
+        self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC"
+    ) -> CustomComponentInstallationList:
+        """List custom component installations."""
+        ...
+
+    async def get_latest_installation_logs(self) -> str | None:
+        """Get the logs from the latest custom component installation."""
+        ...
+
+
+class UserResourceProtocol(Protocol):
+    """Protocol defining the implementation for UserResource."""
+
+    async def get(self, user_id: str) -> DeepsetUser:
+        """Get user information by user ID."""
         ...
 
 
@@ -96,6 +120,14 @@ class AsyncClientProtocol(Protocol):
 
     def indexes(self, workspace: str) -> "IndexResourceProtocol":
         """Access indexes in the specified workspace."""
+        ...
+
+    def custom_components(self, workspace: str) -> "CustomComponentsProtocol":
+        """Access custom components in the specified workspace."""
+        ...
+
+    def users(self) -> "UserResourceProtocol":
+        """Access users."""
         ...
 
 
