@@ -237,7 +237,9 @@ async def test_get_latest_custom_component_installation_logs_empty() -> None:
 @pytest.mark.asyncio
 async def test_get_latest_custom_component_installation_logs_api_error() -> None:
     """Test getting latest custom component installation logs when API fails."""
-    custom_components_resource = FakeCustomComponentsResource(exception=UnexpectedAPIError("API Error"))
+    custom_components_resource = FakeCustomComponentsResource(
+        exception=UnexpectedAPIError(status_code=500, message="API Error")
+    )
     client = FakeClient(custom_components_resource=custom_components_resource)
 
     with pytest.raises(UnexpectedAPIError):
