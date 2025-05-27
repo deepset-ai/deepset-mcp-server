@@ -44,14 +44,14 @@ async def test_list_custom_component_installations() -> None:
     )
 
     mock_user_123 = DeepsetUser(
-        id="user_123",
+        user_id="user_123",
         given_name="John",
         family_name="Doe",
         email="john.doe@example.com",
     )
 
     mock_user_456 = DeepsetUser(
-        id="user_456",
+        user_id="user_456",
         given_name="Jane",
         family_name="Smith",
         email="jane.smith@example.com",
