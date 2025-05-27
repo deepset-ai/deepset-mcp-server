@@ -45,7 +45,8 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
 markers = [
-    "integration: marks tests that interact with external resources (e.g. deepset API)."
+    "integration: marks tests that interact with external resources (e.g. deepset API).",
+    "extra_slow: marks tests that take a long time to run (e.g. pipeline deployment)."
 ]
 
 [tool.ruff]
