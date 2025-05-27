@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any
 from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
+    LogLevel,
     NoContentResponse,
     PipelineLogList,
     PipelineValidationResult,
