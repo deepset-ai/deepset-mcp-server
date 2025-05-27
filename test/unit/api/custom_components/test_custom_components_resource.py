@@ -136,12 +136,12 @@ async def test_get_latest_installation_logs_none() -> None:
         responses={"v2/custom_components/logs": None}
     )
 
-    def custom_components(workspace: str):
+    def custom_components(workspace: str) -> CustomComponentsResource:
         return CustomComponentsResource(client=fake_client)
 
-    fake_client.custom_components = custom_components
+    fake_client.custom_components = custom_components  # type: ignore[method-assign]
 
     resource = fake_client.custom_components("test-workspace")
     result = await resource.get_latest_installation_logs()
 
-    assert result == {}
+    assert result is None
