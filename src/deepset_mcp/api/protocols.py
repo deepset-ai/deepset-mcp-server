@@ -26,6 +26,24 @@ class HaystackServiceProtocol(Protocol):
         ...
 
 
+class CustomComponentsProtocol(Protocol):
+    """Protocol defining the implementation for CustomComponentsResource."""
+
+    async def list_installations(
+        self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC"
+    ) -> CustomComponentInstallationList:
+        """List custom component installations."""
+        ...
+
+    async def get_latest_installation_logs(self) -> Any:
+        """Get the logs from the latest custom component installation."""
+        ...
+
+    async def get_user(self, user_id: str) -> User:
+        """Get user information by user ID."""
+        ...
+
+
 T = TypeVar("T")
 
 
