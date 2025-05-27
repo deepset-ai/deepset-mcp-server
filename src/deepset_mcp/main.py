@@ -20,6 +20,7 @@ from deepset_mcp.tools.indexes import (
 from deepset_mcp.tools.pipeline import (
     create_pipeline as create_pipeline_tool,
     get_pipeline as get_pipeline_tool,
+    get_pipeline_logs as get_pipeline_logs_tool,
     list_pipelines as list_pipelines_tool,
     update_pipeline as update_pipeline_tool,
     validate_pipeline as validate_pipeline_tool,
