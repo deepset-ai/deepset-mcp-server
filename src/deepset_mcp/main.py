@@ -33,6 +33,10 @@ from deepset_mcp.tools.pipeline_template import (
     list_pipeline_templates as list_pipeline_templates_tool,
     search_pipeline_templates as search_pipeline_templates_tool,
 )
+from deepset_mcp.tools.custom_components import (
+    get_latest_custom_component_installation_logs as get_latest_custom_component_installation_logs_tool,
+    list_custom_component_installations as list_custom_component_installations_tool,
+)
 
 INITIALIZED_MODEL = StaticModel.from_pretrained("minishlab/potion-base-2M")
 
