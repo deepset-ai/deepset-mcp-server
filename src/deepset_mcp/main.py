@@ -356,6 +356,48 @@ async def deploy_pipeline(pipeline_name: str) -> str:
     return response
 
 
+@mcp.tool()
+async def get_custom_components() -> str:
+    """Retrieves a list of all installed custom components.
+
+    Use this when you need to know what custom components are available in the workspace.
+    Custom components are identified by having a package_version in their schema.
+    This returns detailed information about each custom component including version, type, and parameters.
+    """
+    async with AsyncDeepsetClient() as client:
+        response = await get_custom_components_tool(client)
+
+    return response
+
+
+@mcp.tool()
+async def list_custom_component_installations() -> str:
+    """Retrieves a list of recent custom component installations.
+
+    Use this to see the installation history of custom components, including status,
+    version information, and who installed them. This also includes installation logs.
+    """
+    workspace = get_workspace()
+    async with AsyncDeepsetClient() as client:
+        response = await list_custom_component_installations_tool(client, workspace)
+
+    return response
+
+
+@mcp.tool()
+async def get_latest_custom_component_installation_logs() -> str:
+    """Retrieves the logs from the latest custom component installation.
+
+    Use this to debug custom component installation issues or to understand
+    what happened during the most recent installation.
+    """
+    workspace = get_workspace()
+    async with AsyncDeepsetClient() as client:
+        response = await get_latest_custom_component_installation_logs_tool(client, workspace)
+
+    return response
+
+
 #
 #
 # @mcp.tool()
