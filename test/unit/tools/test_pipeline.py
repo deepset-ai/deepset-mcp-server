@@ -38,9 +38,11 @@ class FakePipelineResource:
         validate_response: PipelineValidationResult | None = None,
         create_response: NoContentResponse | None = None,
         update_response: NoContentResponse | None = None,
+        logs_response: PipelineLogList | None = None,
         get_exception: Exception | None = None,
         update_exception: Exception | None = None,
         create_exception: Exception | None = None,
+        logs_exception: Exception | None = None,
     ) -> None:
         self._list_response = list_response
         self._get_response = get_response
@@ -50,6 +52,8 @@ class FakePipelineResource:
         self._update_response = update_response
         self._get_exception = get_exception
         self._update_exception = update_exception
+        self._logs_response = logs_response
+        self._logs_exception = logs_exception
 
     async def list(self, page_number: int = 1, limit: int = 10) -> list[DeepsetPipeline]:
         if self._list_response is not None:
