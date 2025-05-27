@@ -5,6 +5,7 @@ import pytest
 from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
+    LogLevel,
     PipelineLog,
     PipelineLogList,
     PipelineServiceLevel,
