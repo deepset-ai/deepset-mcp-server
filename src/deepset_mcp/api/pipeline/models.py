@@ -62,6 +62,22 @@ class NoContentResponse(BaseModel):
     message: str = "No content"
 
 
+class TraceFrame(BaseModel):
+    """Model representing a single frame in a stack trace."""
+
+    filename: str
+    line_number: int
+    name: str
+
+
+class ExceptionInfo(BaseModel):
+    """Model representing exception information."""
+
+    type: str
+    value: str
+    trace: list[TraceFrame]
+
+
 class PipelineLog(BaseModel):
     """Model representing a single log entry from a pipeline."""
 
@@ -70,7 +86,7 @@ class PipelineLog(BaseModel):
     logged_at: datetime
     level: str
     origin: str
-    exceptions: str | None = None
+    exceptions: list[ExceptionInfo] | None = None
     extra_fields: dict[str, Any] = Field(default_factory=dict)
 
 

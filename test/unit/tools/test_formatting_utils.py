@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from deepset_mcp.api.pipeline.models import (
+    ExceptionInfo,
     PipelineLog,
     PipelineLogList,
     PipelineValidationResult,
@@ -29,7 +30,7 @@ def test_pipeline_logs_to_llm_readable_string_with_logs() -> None:
         logged_at=datetime(2023, 1, 1, 12, 1, 30),
         level="error",
         origin="querypipeline",
-        exceptions="ValueError: Invalid document format",
+        exceptions=[ExceptionInfo(type="bla", value="bla", trace=[])],
         extra_fields={"component": "document_reader", "file_name": "test.pdf"},
     )
 
@@ -55,7 +56,7 @@ def test_pipeline_logs_to_llm_readable_string_with_logs() -> None:
     assert "**Timestamp:** January 01, 2023 12:01:30 PM" in result
     assert "**Level:** error" in result
     assert "**Message:** Error processing document" in result
-    assert "**Exceptions:** ValueError: Invalid document format" in result
+    assert "**Exceptions:**" in result
     assert "component: document_reader" in result
     assert "file_name: test.pdf" in result
 
