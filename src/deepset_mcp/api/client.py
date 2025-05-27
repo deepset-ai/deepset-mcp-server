@@ -9,6 +9,7 @@ from deepset_mcp.api.pipeline.resource import PipelineResource
 from deepset_mcp.api.pipeline_template.resource import PipelineTemplateResource
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.transport import AsyncTransport, TransportProtocol, TransportResponse
+from deepset_mcp.api.user.resource import UserResource
 
 T = TypeVar("T")
 
