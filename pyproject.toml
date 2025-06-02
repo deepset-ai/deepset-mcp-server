@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 deepset-mcp = "deepset_mcp.main:main"
+mcp-benchmark = "deepset_mcp.benchmark.runner.cli:main"
 
 [project.optional-dependencies]
 analysis = [
@@ -23,6 +24,9 @@ analysis = [
     "pandas",
     "matplotlib",
     "seaborn"
+]
+benchmark = [
+    "typer",
 ]
 
 [build-system]
