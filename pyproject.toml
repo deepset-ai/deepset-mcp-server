@@ -17,6 +17,14 @@ dependencies = [
 [project.scripts]
 deepset-mcp = "deepset_mcp.main:main"
 
+[project.optional-dependencies]
+analysis = [
+    "jupyterlab",
+    "pandas",
+    "matplotlib",
+    "seaborn"
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -37,6 +45,7 @@ lint = [
 types = [
     "mypy",
     "types-PyYAML",
+    "pandas-stubs",
 ]
 
 [tool.pytest.ini_options]
