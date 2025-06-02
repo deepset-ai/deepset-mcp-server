@@ -252,9 +252,7 @@ class TestIndexResource:
         with pytest.raises(BadRequestError):
             await resource.update(index_name="invalid-index", yaml_config="invalid: yaml")
 
-    async def test_delete_index_successful(
-        self, fake_client: BaseFakeClient, workspace: str
-    ) -> None:
+    async def test_delete_index_successful(self, fake_client: BaseFakeClient, workspace: str) -> None:
         """Test deleting an index successfully."""
         fake_client.responses[f"/v1/workspaces/{workspace}/indexes/test-index"] = TransportResponse(
             status_code=204, json={}, text=""
@@ -268,9 +266,7 @@ class TestIndexResource:
         assert last_request["method"] == "DELETE"
         assert last_request["endpoint"] == f"/v1/workspaces/{workspace}/indexes/test-index"
 
-    async def test_delete_nonexistent_index_raises_404(
-        self, fake_client: BaseFakeClient, workspace: str
-    ) -> None:
+    async def test_delete_nonexistent_index_raises_404(self, fake_client: BaseFakeClient, workspace: str) -> None:
         """Test that deleting a nonexistent index raises ResourceNotFoundError."""
         fake_client.responses[f"/v1/workspaces/{workspace}/indexes/nonexistent-index"] = TransportResponse(
             status_code=404,
@@ -282,9 +278,7 @@ class TestIndexResource:
         with pytest.raises(ResourceNotFoundError):
             await resource.delete("nonexistent-index")
 
-    async def test_delete_server_error_raises_500(
-        self, fake_client: BaseFakeClient, workspace: str
-    ) -> None:
+    async def test_delete_server_error_raises_500(self, fake_client: BaseFakeClient, workspace: str) -> None:
         """Test that server error during delete raises UnexpectedAPIError."""
         fake_client.responses[f"/v1/workspaces/{workspace}/indexes/server-error-index"] = TransportResponse(
             status_code=500,
