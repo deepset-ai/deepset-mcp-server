@@ -17,7 +17,7 @@ help:
 
 # Install dependencies
 install:
-	uv sync --locked --all-extras --dev
+	uv sync --locked --all-extras --all-groups
 
 # Test commands
 test-unit:
