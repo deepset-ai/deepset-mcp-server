@@ -1,0 +1,167 @@
+# If you need help with the YAML format, have a look at https://docs.cloud.deepset.ai/v2.0/docs/create-a-pipeline#create-a-pipeline-using-pipeline-editor.
+# This section defines components that you want to use in your pipelines. Each component must have a name and a type. You can also set the component's parameters here.
+# The name is up to you, you can give your component a friendly name. You then use components' names when specifying the connections in the pipeline.
+# Type is the class path of the component. You can check the type on the component's documentation page.
+components:
+  file_classifier:
+    type: haystack.components.routers.file_type_router.FileTypeRouter
+    init_parameters:
+      mime_types:
+      - text/plain
+      - application/pdf
+      - text/markdown
+      - text/html
+      - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+      - application/vnd.openxmlformats-officedocument.presentationml.presentation
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      - text/csv
+
+  text_converter:
+    type: haystack.components.converters.txt.TextFileToDocument
+    init_parameters:
+      encoding: utf-8
+
+  pdf_converter:
+    type: haystack.components.converters.pdfminer.PDFMinerToDocument
+    init_parameters:
+      line_overlap: 0.5
+      char_margin: 2
+      line_margin: 0.5
+      word_margin: 0.1
+      boxes_flow: 0.5
+      detect_vertical: true
+      all_texts: false
+      store_full_path: false
+
+  markdown_converter:
+    type: haystack.components.converters.txt.TextFileToDocument
+    init_parameters:
+      encoding: utf-8
+
+  html_converter:
+    type: haystack.components.converters.html.HTMLToDocument
+    init_parameters:
+      # A dictionary of keyword arguments to customize how you want to extract content from your HTML files.
+      # For the full list of available arguments, see
+      # the [Trafilatura documentation](https://trafilatura.readthedocs.io/en/latest/corefunctions.html#extract).
+      extraction_kwargs:
+        output_format: markdown # Extract text from HTML. You can also also choose "txt"
+        target_language:       # You can define a language (using the ISO 639-1 format) to discard documents that don't match that language.
+        include_tables: true  # If true, includes tables in the output
+        include_links: true  # If true, keeps links along with their targets
+
+  docx_converter:
+    type: haystack.components.converters.docx.DOCXToDocument
+    init_parameters:
+      link_format: markdown
+
+  pptx_converter:
+    type: haystack.components.converters.pptx.PPTXToDocument
+    init_parameters: {}
+
+  xlsx_converter:
+    type: haystack.components.converters.xlsx.XLSXToDocument
+    init_parameters: {}
+
+  csv_converter:
+    type: haystack.components.converters.csv.CSVToDocument
+    init_parameters:
+      encoding: utf-8
+
+  joiner:
+    type: haystack.components.joiners.document_joiner.DocumentJoiner
+    init_parameters:
+      join_mode: concatenate
+      sort_by_score: false
+
+  joiner_xlsx:  # merge split documents with non-split xlsx documents
+    type: haystack.components.joiners.document_joiner.DocumentJoiner
+    init_parameters:
+      join_mode: concatenate
+      sort_by_score: false
+
+  splitter:
+    type: haystack.components.preprocessors.document_splitter.DocumentSplitter
+    init_parameters:
+      split_by: word
+      split_length: 250
+      split_overlap: 30
+      respect_sentence_boundary: true
+      language: en
+
+  document_embedder:
+    type: haystack.components.embedders.sentence_transformers_document_embedder.SentenceTransformersDocumentEmbedder
+    init_parameters:
+      normalize_embeddings: true
+      model: intfloat/e5-base-v2
+
+  writer:
+    type: haystack.components.writers.document_writer.DocumentWriter
+    init_parameters:
+      document_store:
+        type: haystack_integrations.document_stores.opensearch.document_store.OpenSearchDocumentStore
+        init_parameters:
+          hosts:
+          index: ''
+          max_chunk_bytes: 104857600
+          embedding_dim: 768
+          return_embedding: false
+          method:
+          mappings:
+          settings:
+          create_index: true
+          http_auth:
+          use_ssl:
+          verify_certs:
+          timeout:
+      policy: OVERWRITE
+
+connections:  # Defines how the components are connected
+- sender: file_classifier.text/plain
+  receiver: text_converter.sources
+- sender: file_classifier.application/pdf
+  receiver: pdf_converter.sources
+- sender: file_classifier.text/markdown
+  receiver: markdown_converter.sources
+- sender: file_classifier.text/html
+  receiver: html_converter.sources
+- sender: file_classifier.application/vnd.openxmlformats-officedocument.wordprocessingml.document
+  receiver: docx_converter.sources
+- sender: file_classifier.application/vnd.openxmlformats-officedocument.presentationml.presentation
+  receiver: pptx_converter.sources
+- sender: file_classifier.application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+  receiver: xlsx_converter.sources
+- sender: file_classifier.text/csv
+  receiver: csv_converter.sources
+- sender: text_converter.documents
+  receiver: joiner.documents
+- sender: pdf_converter.documents
+  receiver: joiner.documents
+- sender: markdown_converter.documents
+  receiver: joiner.documents
+- sender: html_converter.documents
+  receiver: joiner.documents
+- sender: docx_converter.documents
+  receiver: joiner.documents
+- sender: pptx_converter.documents
+  receiver: joiner.documents
+- sender: joiner.documents
+  receiver: splitter.documents
+- sender: splitter.documents
+  receiver: joiner_xlsx.documents
+- sender: xlsx_converter.documents
+  receiver: joiner_xlsx.documents
+- sender: csv_converter.documents
+  receiver: joiner_xlsx.documents
+- sender: joiner_xlsx.documents
+  receiver: document_embedder.documents
+- sender: document_embedder.documents
+  receiver: writer.documents
+
+inputs:  # Define the inputs for your pipeline
+  files:                            # This component will receive the files to index as input
+  - file_classifier.sources
+
+max_runs_per_component: 100
+
+metadata: {}
