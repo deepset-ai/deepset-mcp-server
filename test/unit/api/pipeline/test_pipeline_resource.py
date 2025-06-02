@@ -1013,3 +1013,65 @@ class TestPipelineResource:
         assert len(result.errors) == 1
         assert result.errors[0].code == "DEPLOYMENT_ERROR"
         assert result.errors[0].message == "HTTP 400 error"
+
+    @pytest.mark.asyncio
+    async def test_delete_pipeline_success(self) -> None:
+        """Test successfully deleting a pipeline."""
+        # Create client with successful response
+        client = DummyClient(responses={"test-workspace/pipelines/test-pipeline": {"status": "success"}})
+
+        # Create resource and call delete method
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        result = await resource.delete(pipeline_name="test-pipeline")
+
+        # Verify response
+        assert result.success is True
+        assert result.message == "Pipeline deleted successfully."
+
+        # Verify request
+        assert len(client.requests) == 1
+        assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines/test-pipeline"
+        assert client.requests[0]["method"] == "DELETE"
+
+    @pytest.mark.asyncio
+    async def test_delete_pipeline_not_found(self) -> None:
+        """Test deleting a non-existent pipeline."""
+        # Create client that raises an exception for 404
+        client = DummyClient(responses={"test-workspace/pipelines/nonexistent": ValueError("Pipeline not found")})
+
+        # Create resource
+        resource = PipelineResource(client=client, workspace="test-workspace")
+
+        # Verify exception is raised
+        with pytest.raises(ValueError, match="Pipeline not found"):
+            await resource.delete(pipeline_name="nonexistent")
+
+    @pytest.mark.asyncio
+    async def test_delete_pipeline_error(self) -> None:
+        """Test error handling when deleting a pipeline."""
+        # Create client that raises an exception
+        client = DummyClient(responses={"test-workspace/pipelines/test-pipeline": ValueError("API Error")})
+
+        # Create resource
+        resource = PipelineResource(client=client, workspace="test-workspace")
+
+        # Verify exception is raised
+        with pytest.raises(ValueError, match="API Error"):
+            await resource.delete(pipeline_name="test-pipeline")
+
+    @pytest.mark.asyncio
+    async def test_delete_pipeline_with_special_characters(self) -> None:
+        """Test deleting a pipeline with special characters in name."""
+        # Create client with successful response
+        client = DummyClient(responses={"test-workspace/pipelines/pipeline with spaces": {"status": "success"}})
+
+        # Create resource and call delete method
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        result = await resource.delete(pipeline_name="pipeline with spaces")
+
+        # Verify response
+        assert result.success is True
+        assert result.message == "Pipeline deleted successfully."
+
+        # Verify request
+        assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines/pipeline with spaces"
