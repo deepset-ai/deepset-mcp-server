@@ -7,15 +7,13 @@ from deepset_mcp.benchmark.runner.config_loader import (
 )
 from deepset_mcp.benchmark.runner.models import TestCaseConfig
 from deepset_mcp.benchmark.runner.setup_actions import (
+    setup_all,
     setup_index,
     setup_pipeline,
     setup_test_case,
-    setup_all,
 )
 
-app = typer.Typer(
-    help="Short commands for listing/creating test cases, pipelines, and indexes."
-)
+app = typer.Typer(help="Short commands for listing/creating test cases, pipelines, and indexes.")
 
 
 @app.command("list-cases")
@@ -23,11 +21,9 @@ def list_cases(
     task_dir: str | None = typer.Option(
         None,
         help="Directory where all test-case YAMLs live (`benchmark/tasks/*.yml`).",
-    )
-):
-    """
-    List all test-case files (base names) under `task_dir`.
-    """
+    ),
+) -> None:
+    """List all test-case files (base names) under `task_dir`."""
     paths = find_all_test_case_paths(task_dir)
     if not paths:
         typer.secho(f"No test-case files found in {task_dir}", fg=typer.colors.RED)
@@ -53,10 +49,8 @@ def create_case(
         None,
         help="Directory where test-case YAMLs are stored.",
     ),
-):
-    """
-    Load a single test-case by name and create its pipeline + index (if any) in `workspace_name`.
-    """
+) -> None:
+    """Load a single test-case by name and create its pipeline + index (if any) in `workspace_name`."""
     try:
         test_cfg = load_test_case_by_name(name=test_name, task_dir=task_dir)
     except FileNotFoundError:
@@ -97,10 +91,8 @@ def create_all(
         None,
         help="Directory where test-case YAMLs are stored.",
     ),
-):
-    """
-    Load every test-case under `task_dir` and create pipelines + indexes in `workspace_name` in parallel.
-    """
+) -> None:
+    """Load every test-case under `task_dir` and create pipelines + indexes in `workspace_name` in parallel."""
     paths = find_all_test_case_paths(task_dir)
     if not paths:
         typer.secho(f"No test-case files found in {task_dir}", fg=typer.colors.RED)
@@ -120,8 +112,7 @@ def create_all(
         raise typer.Exit(code=1)
 
     typer.secho(
-        f"→ Creating {len(test_cfgs)} test-cases in '{workspace_name}' "
-        f"(concurrency={concurrency})…",
+        f"→ Creating {len(test_cfgs)} test-cases in '{workspace_name}' (concurrency={concurrency})…",
         fg=typer.colors.GREEN,
     )
     try:
@@ -140,28 +131,20 @@ def create_all(
 
 @app.command("create-pipe")
 def create_pipe(
-    yaml_path: str | None = typer.Option(
-        None, "--path", "-p", help="Path to a pipeline YAML file."
-    ),
+    yaml_path: str | None = typer.Option(None, "--path", "-p", help="Path to a pipeline YAML file."),
     yaml_content: str | None = typer.Option(
         None, "--content", "-c", help="Raw YAML string for the pipeline (instead of a file)."
     ),
-    pipeline_name: str = typer.Option(
-        ..., "--name", "-n", help="Name to assign to the new pipeline."
-    ),
-    workspace_name: str = typer.Option(
-        ..., "--workspace", "-w", help="Workspace in which to create the pipeline."
-    ),
+    pipeline_name: str = typer.Option(..., "--name", "-n", help="Name to assign to the new pipeline."),
+    workspace_name: str = typer.Option(..., "--workspace", "-w", help="Workspace in which to create the pipeline."),
     api_key: str | None = typer.Option(
         None,
         "--api-key",
         "-k",
         help="Explicit DP_API_KEY to use (overrides environment).",
     ),
-):
-    """
-    Create a single pipeline in `workspace_name`.
-    """
+) -> None:
+    """Create a single pipeline in `workspace_name`."""
     if (yaml_path and yaml_content) or (not yaml_path and not yaml_content):
         typer.secho("Error: exactly one of `--path` or `--content` must be provided.", fg=typer.colors.RED)
         raise typer.Exit(code=1)
@@ -182,31 +165,19 @@ def create_pipe(
 
 @app.command("create-index")
 def create_index(
-    yaml_path: str | None = typer.Option(
-        None, "--path", "-p", help="Path to an index YAML file."
-    ),
-    yaml_content: str | None = typer.Option(
-        None, "--content", "-c", help="Raw YAML string for the index."
-    ),
-    index_name: str = typer.Option(
-        ..., "--name", "-n", help="Name to assign to the new index."
-    ),
-    workspace_name: str = typer.Option(
-        ..., "--workspace", "-w", help="Workspace in which to create the index."
-    ),
+    yaml_path: str | None = typer.Option(None, "--path", "-p", help="Path to an index YAML file."),
+    yaml_content: str | None = typer.Option(None, "--content", "-c", help="Raw YAML string for the index."),
+    index_name: str = typer.Option(..., "--name", "-n", help="Name to assign to the new index."),
+    workspace_name: str = typer.Option(..., "--workspace", "-w", help="Workspace in which to create the index."),
     api_key: str | None = typer.Option(
         None,
         "--api-key",
         "-k",
         help="Explicit DP_API_KEY to use (overrides environment).",
     ),
-    description: str | None = typer.Option(
-        None, "--desc", help="Optional description for the index."
-    ),
-):
-    """
-    Create a single index in `workspace_name`.
-    """
+    description: str | None = typer.Option(None, "--desc", help="Optional description for the index."),
+) -> None:
+    """Create a single index in `workspace_name`."""
     if (yaml_path and yaml_content) or (not yaml_path and not yaml_content):
         typer.secho("Error: exactly one of `--path` or `--content` must be provided.", fg=typer.colors.RED)
         raise typer.Exit(code=1)
@@ -225,8 +196,11 @@ def create_index(
         typer.secho(f"✘ Failed to create index '{index_name}': {e}", fg=typer.colors.RED)
         raise typer.Exit(code=1)
 
-def main() -> None:
+
+def cli() -> None:
+    """Entrypoint for the benchmark CLI."""
     app()
 
+
 if __name__ == "__main__":
-    main()
+    cli()

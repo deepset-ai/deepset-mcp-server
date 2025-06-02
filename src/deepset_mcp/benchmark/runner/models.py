@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, PrivateAttr, ValidationError, model_valid
 class TestCaseConfig(BaseModel):
     """
     Pydantic v2 model for a single “benchmark/tasks/<test>.yml” file.
+
     Provides a `from_file()` constructor that:
     - Reads the YAML from disk.
     - Resolves `query_yaml`, `index_yaml`, `expected_query` as paths relative to the YAML file’s directory.
@@ -22,18 +23,12 @@ class TestCaseConfig(BaseModel):
     )
     objective: str = Field(..., description="A short description of what this test is about.")
     prompt: str = Field(..., description="The prompt text to send to the Agent.")
-    query_yaml: str | None = Field(
-        None, description="Relative or absolute path to a query pipeline YAML."
-    )
+    query_yaml: str | None = Field(None, description="Relative or absolute path to a query pipeline YAML.")
     query_name: str | None = Field(
         None, description="Name to assign to the ‘query’ pipeline if `query_yaml` is present."
     )
-    index_yaml: str | None = Field(
-        None, description="Relative or absolute path to an indexing pipeline YAML."
-    )
-    index_name: str | None = Field(
-        None, description="Name to assign to the Index if `index_yaml` is present."
-    )
+    index_yaml: str | None = Field(None, description="Relative or absolute path to an indexing pipeline YAML.")
+    index_name: str | None = Field(None, description="Name to assign to the Index if `index_yaml` is present.")
     expected_query: str | None = Field(
         None, description="(Optional) Relative or absolute path to a 'gold' query pipeline YAML."
     )
@@ -51,10 +46,8 @@ class TestCaseConfig(BaseModel):
     _expected_index_text: str | None = PrivateAttr(default=None)
 
     @model_validator(mode="before")
-    def _check_at_least_one(cls, values: dict) -> dict:
-        """
-        Before any field‐level validation, ensure at least one of `query_yaml` or `index_yaml` is provided.
-        """
+    def _check_at_least_one(cls, values: dict[str, str]) -> dict[str, str]:
+        """Before any field‐level validation, ensure at least one of `query_yaml` or `index_yaml` is provided."""
         if not values.get("query_yaml") and not values.get("index_yaml"):
             raise ValueError("At least one of `query_yaml` or `index_yaml` must be provided.")
         return values
@@ -62,7 +55,10 @@ class TestCaseConfig(BaseModel):
     @model_validator(mode="after")
     def _load_yaml_files(self) -> Self:
         """
+        Hook to load YAML contents from disk.
+
         After all standard field validation has passed, this hook:
+
         1) If `query_yaml` is set:
            - Ensures `query_name` is also set.
            - Reads the file from disk into `_query_yaml_text`.
@@ -121,9 +117,7 @@ class TestCaseConfig(BaseModel):
     @classmethod
     def from_file(cls, cfg_path: Path) -> Self:
         """
-        Read a test-case YAML from `cfg_path`, resolve any relative paths
-        (query_yaml, index_yaml, expected_query) against `cfg_path.parent`,
-        then initialize and return a TestCaseConfig instance.
+        Read a test-case YAML from `cfg_path`, then initialize and return a TestCaseConfig instance.
 
         Raises:
           - FileNotFoundError if cfg_path doesn’t exist.

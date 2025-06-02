@@ -7,16 +7,14 @@ from deepset_mcp.benchmark.runner.models import TestCaseConfig
 
 
 def _default_task_dir() -> Path:
-    """
-    Return the path to the `benchmark/tasks` directory, resolved relative
-    to this file (`benchmark/runner/config_loader.py`).
-    """
+    """Return the path to the `benchmark/tasks` directory, resolved relative to this file."""
     return Path(__file__).parent.parent / "tasks"
 
 
 def find_all_test_case_paths(task_dir: str | Path | None = None) -> list[Path]:
     """
     Return a list of all `.yml` or `.yaml` files under `task_dir`.
+
     If `task_dir` is None, we resolve to `benchmark/tasks` (relative to this file).
     """
     if task_dir is None:
@@ -32,6 +30,7 @@ def find_all_test_case_paths(task_dir: str | Path | None = None) -> list[Path]:
 def load_test_case_from_path(path: Path) -> TestCaseConfig:
     """
     Read a single test-case YAML at `path` using TestCaseConfig.from_file().
+
     Raises RuntimeError if validation or loading fails.
     """
     try:
@@ -42,8 +41,9 @@ def load_test_case_from_path(path: Path) -> TestCaseConfig:
 
 def load_test_case_by_name(name: str, task_dir: str | Path | None = None) -> TestCaseConfig:
     """
-    Given a test‐case “name” (without extension), locate the corresponding `.yml` or `.yaml`
-    under `task_dir`. If `task_dir` is None, defaults to `benchmark/tasks` relative to this file.
+    Given a test‐case “name” (without extension), locate the corresponding `.yml` or `.yaml`under `task_dir`.
+
+    If `task_dir` is None, defaults to `benchmark/tasks` relative to this file.
     Returns a loaded TestCaseConfig or raises FileNotFoundError if not found.
     """
     if task_dir is None:
