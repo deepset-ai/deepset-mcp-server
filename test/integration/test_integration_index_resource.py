@@ -316,3 +316,27 @@ async def test_get_nonexistent_index(
     # Trying to get a non-existent index should raise an exception
     with pytest.raises(ResourceNotFoundError):
         await index_resource.get(index_name=non_existent_name)
+
+
+@pytest.mark.asyncio
+async def test_delete_index(
+    index_resource: IndexResource,
+    valid_index_config: str,
+) -> None:
+    """Test deleting an index."""
+    index_name = "test-delete-index"
+
+    # Create an index to delete
+    config = json.loads(valid_index_config)
+    await index_resource.create(name=index_name, yaml_config=config["config_yaml"])
+
+    # Verify the index exists
+    index: Index = await index_resource.get(index_name=index_name)
+    assert index.name == index_name
+
+    # Delete the index
+    await index_resource.delete(index_name=index_name)
+
+    # Verify the index no longer exists
+    with pytest.raises(ResourceNotFoundError):
+        await index_resource.get(index_name=index_name)
