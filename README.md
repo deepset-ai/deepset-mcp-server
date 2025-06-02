@@ -122,18 +122,16 @@ Claude will ask for your permission before a tool call is executed. You can opt 
 
 Unfortunately, you need to set the workspace and organization (through the API key) in the `claude_desktop_config.json`.
 There is no way to pass the API key dynamically to Claude in a secure way.
-The workspace could be passed into the tool call, it's an easy enhancement but I'd like to get feedback first.
+The workspace could be passed into the tool call, it's an easy enhancement, but I'd like to get feedback first.
 
 
 
 
 ## Further improvements ideas
 
-- remove hardcoded workspace
 - expose standard prompts via MCP e.g., for debugging, fixing pipelines, reading logs etc
 - fix the docker run command to clear cache
 - the ability to dump the conversation of improving the copilot
-- test with different models not just Claude Sonnet 3.7
 - test with different clients other than Claude Desktop app
 
 
