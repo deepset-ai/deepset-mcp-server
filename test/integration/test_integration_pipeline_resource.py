@@ -275,3 +275,40 @@ async def test_deploy_nonexistent_pipeline(
     # Should return validation errors indicating the pipeline doesn't exist
     assert result.valid is False
     assert len(result.errors) > 0
+
+
+@pytest.mark.asyncio
+async def test_delete_pipeline(
+    pipeline_resource: PipelineResource,
+    sample_yaml_config: str,
+) -> None:
+    """Test deleting a pipeline."""
+    pipeline_name = "test-delete-pipeline"
+
+    # Create a pipeline to delete
+    await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
+
+    # Verify the pipeline exists
+    pipeline = await pipeline_resource.get(pipeline_name=pipeline_name)
+    assert pipeline.name == pipeline_name
+
+    # Delete the pipeline
+    result = await pipeline_resource.delete(pipeline_name=pipeline_name)
+    assert result.success is True
+    assert result.message == "Pipeline deleted successfully."
+
+    # Verify the pipeline no longer exists
+    with pytest.raises(ResourceNotFoundError):
+        await pipeline_resource.get(pipeline_name=pipeline_name)
+
+
+@pytest.mark.asyncio
+async def test_delete_nonexistent_pipeline(
+    pipeline_resource: PipelineResource,
+) -> None:
+    """Test deleting a non-existent pipeline."""
+    non_existent_name = "non-existent-delete-pipeline"
+
+    # Trying to delete a non-existent pipeline should raise an exception
+    with pytest.raises(ResourceNotFoundError):
+        await pipeline_resource.delete(pipeline_name=non_existent_name)
