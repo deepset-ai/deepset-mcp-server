@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 deepset-mcp = "deepset_mcp.main:main"
+mcp-benchmark = "deepset_mcp.benchmark.runner.cli:cli"
 
 [project.optional-dependencies]
 analysis = [
@@ -23,6 +24,9 @@ analysis = [
     "pandas",
     "matplotlib",
     "seaborn"
+]
+benchmark = [
+    "typer",
 ]
 
 [build-system]
@@ -83,6 +87,7 @@ isort = { combine-as-imports = true, known-first-party = ["deepset_mcp"] }
 
 [tool.ruff.lint.per-file-ignores]
 "test/*" = ["D"]
+"src/deepset_mcp/benchmark/runner/cli.py" = ["B904"] # Allow to raise Typer errors without attaching full stack trace.
 
 [tool.ruff.lint.pydocstyle]
 convention = "pep257"
