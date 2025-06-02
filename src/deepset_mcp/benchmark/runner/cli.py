@@ -136,7 +136,9 @@ def create_pipe(
         None, "--content", "-c", help="Raw YAML string for the pipeline (instead of a file)."
     ),
     pipeline_name: str = typer.Option(..., "--name", "-n", help="Name to assign to the new pipeline."),
-    workspace_name: str = typer.Option("default", "--workspace", "-w", help="Workspace in which to create the pipeline."),
+    workspace_name: str = typer.Option(
+        "default", "--workspace", "-w", help="Workspace in which to create the pipeline."
+    ),
     api_key: str | None = typer.Option(
         None,
         "--api-key",
