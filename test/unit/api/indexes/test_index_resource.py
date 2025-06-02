@@ -266,7 +266,7 @@ class TestIndexResource:
         # Verify request
         last_request = fake_client.requests[-1]
         assert last_request["method"] == "DELETE"
-        assert last_request["url"] == f"/v1/workspaces/{workspace}/indexes/test-index"
+        assert last_request["endpoint"] == f"/v1/workspaces/{workspace}/indexes/test-index"
 
     async def test_delete_nonexistent_index_raises_404(
         self, fake_client: BaseFakeClient, workspace: str
