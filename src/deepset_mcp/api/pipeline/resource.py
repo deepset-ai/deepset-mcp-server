@@ -243,3 +243,21 @@ class PipelineResource:
             return PipelineValidationResult(valid=False, errors=errors)
 
         raise UnexpectedAPIError(status_code=resp.status_code, message=resp.text, detail=resp.json)
+
+    async def delete(self, pipeline_name: str) -> NoContentResponse:
+        """Delete a pipeline.
+
+        :param pipeline_name: Name of the pipeline to delete.
+
+        :returns: NoContentResponse indicating successful deletion.
+
+        :raises: UnexpectedAPIError: If the API returns an unexpected status code.
+        """
+        resp = await self._client.request(
+            endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}",
+            method="DELETE",
+        )
+
+        raise_for_status(resp)
+
+        return NoContentResponse(message="Pipeline deleted successfully.")
