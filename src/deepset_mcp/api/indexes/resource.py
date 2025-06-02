@@ -94,3 +94,12 @@ class IndexResource:
         raise_for_status(response)
 
         return Index.model_validate(response.json)
+
+    async def delete(self, index_name: str) -> None:
+        """Delete an index.
+
+        :param index_name: Name of the index to delete.
+        """
+        response = await self._client.request(f"/v1/workspaces/{self._workspace}/indexes/{index_name}", method="DELETE")
+
+        raise_for_status(response)
