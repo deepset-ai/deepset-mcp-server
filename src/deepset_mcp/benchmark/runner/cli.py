@@ -37,7 +37,7 @@ def list_cases(
 def create_case(
     test_name: str = typer.Argument(..., help="Test-case name (without .yml)."),
     workspace_name: str = typer.Option(
-        ..., "--workspace", "-w", help="Workspace in which to create pipelines and indexes."
+        "default", "--workspace", "-w", help="Workspace in which to create pipelines and indexes."
     ),
     api_key: str | None = typer.Option(
         None,
@@ -136,7 +136,7 @@ def create_pipe(
         None, "--content", "-c", help="Raw YAML string for the pipeline (instead of a file)."
     ),
     pipeline_name: str = typer.Option(..., "--name", "-n", help="Name to assign to the new pipeline."),
-    workspace_name: str = typer.Option(..., "--workspace", "-w", help="Workspace in which to create the pipeline."),
+    workspace_name: str = typer.Option("default", "--workspace", "-w", help="Workspace in which to create the pipeline."),
     api_key: str | None = typer.Option(
         None,
         "--api-key",
@@ -168,7 +168,7 @@ def create_index(
     yaml_path: str | None = typer.Option(None, "--path", "-p", help="Path to an index YAML file."),
     yaml_content: str | None = typer.Option(None, "--content", "-c", help="Raw YAML string for the index."),
     index_name: str = typer.Option(..., "--name", "-n", help="Name to assign to the new index."),
-    workspace_name: str = typer.Option(..., "--workspace", "-w", help="Workspace in which to create the index."),
+    workspace_name: str = typer.Option("default", "--workspace", "-w", help="Workspace in which to create the index."),
     api_key: str | None = typer.Option(
         None,
         "--api-key",
