@@ -12,6 +12,12 @@ from deepset_mcp.benchmark.runner.setup_actions import (
     setup_pipeline,
     setup_test_case,
 )
+from deepset_mcp.benchmark.runner.teardown_actions import (
+    teardown_all,
+    teardown_index,
+    teardown_pipeline,
+    teardown_test_case,
+)
 
 app = typer.Typer(help="Short commands for listing/creating test cases, pipelines, and indexes.")
 
@@ -196,6 +202,154 @@ def create_index(
         typer.secho(f"✔ Index '{index_name}' created in '{workspace_name}'.", fg=typer.colors.GREEN)
     except Exception as e:
         typer.secho(f"✘ Failed to create index '{index_name}': {e}", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+
+@app.command("delete-case")
+def delete_case(
+    test_name: str = typer.Argument(..., help="Test-case name (without .yml)."),
+    workspace_name: str = typer.Option(
+        "default", "--workspace", "-w", help="Workspace from which to delete pipelines and indexes."
+    ),
+    api_key: str | None = typer.Option(
+        None,
+        "--api-key",
+        "-k",
+        help="Explicit DP_API_KEY to use (overrides environment).",
+    ),
+    task_dir: str | None = typer.Option(
+        None,
+        help="Directory where test-case YAMLs are stored.",
+    ),
+) -> None:
+    """Load a single test-case by name and delete its pipeline + index (if any) from `workspace_name`."""
+    try:
+        test_cfg = load_test_case_by_name(name=test_name, task_dir=task_dir)
+    except FileNotFoundError:
+        typer.secho(f"Test-case '{test_name}' not found under {task_dir}.", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+    except Exception as e:
+        typer.secho(f"Failed to load test-case '{test_name}': {e}", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    typer.secho(f"→ Deleting resources for '{test_name}' from '{workspace_name}'…", fg=typer.colors.GREEN)
+    try:
+        teardown_test_case(test_cfg=test_cfg, workspace_name=workspace_name, api_key=api_key)
+    except Exception as e:
+        typer.secho(f"✘ Failed to teardown '{test_name}': {e}", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    typer.secho(f"✔ '{test_name}' resources deleted.", fg=typer.colors.GREEN)
+
+
+@app.command("delete-all")
+def delete_all(
+    workspace_name: str = typer.Option(
+        "default", "--workspace", "-w", help="Workspace from which to delete pipelines and indexes."
+    ),
+    api_key: str | None = typer.Option(
+        None,
+        "--api-key",
+        "-k",
+        help="Explicit DP_API_KEY to use (overrides environment).",
+    ),
+    concurrency: int = typer.Option(
+        5,
+        "--concurrency",
+        "-c",
+        help="Maximum number of test-cases to teardown in parallel.",
+    ),
+    task_dir: str | None = typer.Option(
+        None,
+        help="Directory where test-case YAMLs are stored.",
+    ),
+) -> None:
+    """Load every test-case under `task_dir` and delete pipelines + indexes from `workspace_name` in parallel."""
+    paths = find_all_test_case_paths(task_dir)
+    if not paths:
+        typer.secho(f"No test-case files found in {task_dir}", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    # 1) Load all configs
+    test_cfgs: list[TestCaseConfig] = []
+    for p in paths:
+        try:
+            cfg = load_test_case_from_path(path=p)
+            test_cfgs.append(cfg)
+        except Exception as e:
+            typer.secho(f"Skipping '{p.stem}' (load error: {e})", fg=typer.colors.YELLOW)
+
+    if not test_cfgs:
+        typer.secho("No valid test-case configs to delete.", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    typer.secho(
+        f"→ Deleting {len(test_cfgs)} test-cases from '{workspace_name}' (concurrency={concurrency})…",
+        fg=typer.colors.GREEN,
+    )
+    try:
+        teardown_all(
+            test_cfgs=test_cfgs,
+            workspace_name=workspace_name,
+            api_key=api_key,
+            concurrency=concurrency,
+        )
+    except Exception as e:
+        typer.secho(f"✘ Some test-cases failed during deletion: {e}", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    typer.secho("✔ All test-cases teardown attempted.", fg=typer.colors.GREEN)
+
+
+@app.command("delete-pipe")
+def delete_pipe(
+    pipeline_name: str = typer.Option(..., "--name", "-n", help="Name of the pipeline to delete."),
+    workspace_name: str = typer.Option(
+        "default", "--workspace", "-w", help="Workspace from which to delete the pipeline."
+    ),
+    api_key: str | None = typer.Option(
+        None,
+        "--api-key",
+        "-k",
+        help="Explicit DP_API_KEY to use (overrides environment).",
+    ),
+) -> None:
+    """Delete a single pipeline from `workspace_name`."""
+    try:
+        teardown_pipeline(
+            pipeline_name=pipeline_name,
+            workspace_name=workspace_name,
+            api_key=api_key,
+        )
+        typer.secho(f"✔ Pipeline '{pipeline_name}' deleted from '{workspace_name}'.", fg=typer.colors.GREEN)
+    except Exception as e:
+        typer.secho(f"✘ Failed to delete pipeline '{pipeline_name}': {e}", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+
+@app.command("delete-index")
+def delete_index(
+    index_name: str = typer.Option(..., "--name", "-n", help="Name of the index to delete."),
+    workspace_name: str = typer.Option(
+        "default", "--workspace", "-w", help="Workspace from which to delete the index."
+    ),
+    api_key: str | None = typer.Option(
+        None,
+        "--api-key",
+        "-k",
+        help="Explicit DP_API_KEY to use (overrides environment).",
+    ),
+) -> None:
+    """Delete a single index from `workspace_name`."""
+    try:
+        teardown_index(
+            index_name=index_name,
+            workspace_name=workspace_name,
+            api_key=api_key,
+        )
+        typer.secho(f"✔ Index '{index_name}' deleted from '{workspace_name}'.", fg=typer.colors.GREEN)
+    except Exception as e:
+        typer.secho(f"✘ Failed to delete index '{index_name}': {e}", fg=typer.colors.RED)
         raise typer.Exit(code=1)
 
 
