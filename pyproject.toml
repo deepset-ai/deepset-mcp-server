@@ -28,6 +28,11 @@ analysis = [
 benchmark = [
     "typer",
 ]
+agents = [
+    "haystack-ai",
+    "mcp-haystack",
+    "anthropic-haystack",
+]
 
 [build-system]
 requires = ["hatchling"]
