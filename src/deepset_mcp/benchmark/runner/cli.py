@@ -12,6 +12,12 @@ from deepset_mcp.benchmark.runner.setup_actions import (
     setup_pipeline,
     setup_test_case,
 )
+from deepset_mcp.benchmark.runner.teardown_actions import (
+    teardown_all,
+    teardown_index,
+    teardown_pipeline,
+    teardown_test_case,
+)
 
 app = typer.Typer(help="Short commands for listing/creating test cases, pipelines, and indexes.")
 
