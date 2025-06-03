@@ -330,7 +330,9 @@ def delete_pipe(
 @app.command("delete-index")
 def delete_index(
     index_name: str = typer.Option(..., "--name", "-n", help="Name of the index to delete."),
-    workspace_name: str = typer.Option("default", "--workspace", "-w", help="Workspace from which to delete the index."),
+    workspace_name: str = typer.Option(
+        "default", "--workspace", "-w", help="Workspace from which to delete the index."
+    ),
     api_key: str | None = typer.Option(
         None,
         "--api-key",
