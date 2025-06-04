@@ -1,7 +1,3 @@
-# <test-case>
-# This pipeline is missing an AnswerBuilder and connects the list[str]-output of the Generator instead.
-# </test-case>
-
 components:
   chat_summary_prompt_builder:
     type: haystack.components.builders.prompt_builder.PromptBuilder
@@ -171,13 +167,14 @@ inputs:  # Define the inputs for your pipeline
   query:  # These components will receive the query as input
   - "chat_summary_prompt_builder.question"
 
+  filters: # These components will receive a potential query filter as input
+  - "bm25_retriever.filters"
+  - "embedding_retriever.filters"
+
 outputs:
   documents: "ranker.documents"
   answers: "qa_llm.replies"
 
-  filters:  # These components will receive a potential query filter as input
-  - "bm25_retriever.filters"
-  - "embedding_retriever.filters"
 
 max_runs_per_component: 100
 

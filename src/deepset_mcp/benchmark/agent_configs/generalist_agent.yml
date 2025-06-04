@@ -1,0 +1,6 @@
+agent_factory_function: "deepset_mcp.agents.generalist.generalist_agent.get_agent"
+display_name: "generalist-agent"
+required_env_vars:
+  - DEEPSET_API_KEY
+  - DEEPSET_WORKSPACE
+  - ANTHROPIC_API_KEY
