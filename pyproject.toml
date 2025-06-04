@@ -16,7 +16,7 @@ dependencies = [
 
 [project.scripts]
 deepset-mcp = "deepset_mcp.main:main"
-mcp-benchmark = "deepset_mcp.benchmark.runner.cli:cli"
+deepset = "deepset_mcp.benchmark.runner.cli:app"
 
 [project.optional-dependencies]
 analysis = [
@@ -27,6 +27,12 @@ analysis = [
 ]
 benchmark = [
     "typer",
+]
+agents = [
+    "haystack-ai",
+    "mcp-haystack",
+    "anthropic-haystack",
+    "langfuse-haystack"
 ]
 
 [build-system]
@@ -87,13 +93,17 @@ isort = { combine-as-imports = true, known-first-party = ["deepset_mcp"] }
 
 [tool.ruff.lint.per-file-ignores]
 "test/*" = ["D"]
-"src/deepset_mcp/benchmark/runner/cli.py" = ["B904"] # Allow to raise Typer errors without attaching full stack trace.
+"src/deepset_mcp/benchmark/runner/cli*.py" = ["B904"] # Allow to raise Typer errors without attaching full stack trace.
 
 [tool.ruff.lint.pydocstyle]
 convention = "pep257"
 
 [tool.mypy]
 strict = true
+
+[[tool.mypy.overrides]]
+module = ["haystack_integrations.*"]
+ignore_missing_imports = true
 
 
 
