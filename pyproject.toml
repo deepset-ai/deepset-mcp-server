@@ -102,7 +102,7 @@ convention = "pep257"
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["haystack_integrations.*"]
+module = ["haystack_integrations.*", "langfuse.*"]
 ignore_missing_imports = true
 
 
