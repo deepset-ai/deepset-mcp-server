@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Self
+from typing import Any, Self
 
 import yaml
 from pydantic import BaseModel, Field, PrivateAttr, ValidationError, model_validator
@@ -114,6 +114,10 @@ class TestCaseConfig(BaseModel):
         """Return the raw text of the expected “gold” pipeline YAML (or None)."""
         return self._expected_query_text
 
+    def get_expected_index_text(self) -> str | None:
+        """Return the raw text of the expected 'gold' index YAML (or None)."""
+        return self._expected_index_text
+
     @classmethod
     def from_file(cls, cfg_path: Path) -> Self:
         """
@@ -140,5 +144,58 @@ class TestCaseConfig(BaseModel):
                 candidate = Path(p)
                 if not candidate.is_absolute():
                     raw[field_name] = str((base_dir / candidate).resolve())
+
+        return cls(**raw)
+
+
+class AgentConfig(BaseModel):
+    """Agent configuration with flexible loading patterns."""
+
+    agent_json: str | None = Field(None, description="Relative or absolute path to an agent JSON file.")
+
+    agent_factory_function: str | None = Field(None, description="Qualified name of Agent factory function.")
+
+    display_name: str = Field(..., description="Display name for the agent.")
+
+    required_env_vars: list[str] = Field(
+        default_factory=list, description="Required environment variables to run the agent."
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def check_mutually_exclusive(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Ensure exactly one loading method is specified."""
+        methods = [values.get("agent_json"), values.get("agent_factory_function")]
+
+        if sum(bool(m) for m in methods) != 1:
+            raise ValueError("Exactly one of agent_json or agent_factory_function must be provided")
+        return values
+
+    @model_validator(mode="after")
+    def validate_files_exist(self) -> Self:
+        """Validate that referenced files exist."""
+        if self.agent_json:
+            json_path = Path(self.agent_json)
+            if not json_path.is_file():
+                raise FileNotFoundError(f"Agent JSON file not found: {self.agent_json}")
+        return self
+
+    @classmethod
+    def from_file(cls, cfg_path: Path) -> Self:
+        """Read agent config from YAML file."""
+        if not cfg_path.is_file():
+            raise FileNotFoundError(f"Agent config not found: {cfg_path}")
+
+        raw = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            raise ValueError(f"Invalid agent config YAML at {cfg_path}; expected a mapping.")
+
+        base_dir = cfg_path.parent
+
+        # Resolve relative paths for agent_json
+        if "agent_json" in raw and raw["agent_json"]:
+            json_path = Path(raw["agent_json"])
+            if not json_path.is_absolute():
+                raw["agent_json"] = str((base_dir / json_path).resolve())
 
         return cls(**raw)

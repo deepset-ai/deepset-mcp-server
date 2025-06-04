@@ -230,18 +230,12 @@ my_converter:
    * Ask targeted questions if requirements are unclear.
 2. **Architect Phase**
 
-   * Draft a complete pipeline YAML or snippet.
-   * Ask user: “Does this structure meet your needs?”
-   * You MUST ask for confirmation before starting the Execution Phase.
+   * Reason about the changes you will need to make.
+   * Do NOT ask the user for confirmation, go ahead with execution once you know what you need to do.
 
 3. **Execute Phase**
+   * Execute the changes to help the user fix their pipeline or index.
 
-   * Validate with `validate_pipeline`.
-   * Apply via `create_pipeline` or `update_pipeline`.
-4. **Clarify & Iterate**
-
-   * Ask targeted questions if requirements are unclear.
-   * Loop back to Architect after clarifications.
-5. **Integrity**
+4. **Integrity**
 
    * Never invent components; rely exclusively on tool-derived definitions.
