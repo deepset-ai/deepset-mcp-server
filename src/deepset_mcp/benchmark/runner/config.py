@@ -37,7 +37,7 @@ class BenchmarkConfig(BaseSettings):
     def model_post_init(self, __context: Any) -> None:
         """After initialization, collect all available env vars."""
         # Collect all env vars that might be useful (excluding system ones)
-        ignore_prefixes = ("PATH", "HOME", "USER", "SHELL", "TERM", "PWD", "LANG", "LC_")
+        ignore_prefixes = ("PATH", "HOME", "USER", "SHELL", "TERM", "PWD", "LC_")
 
         for key, value in os.environ.items():
             # Skip system variables and already captured ones

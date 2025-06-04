@@ -24,7 +24,7 @@ def load_env_file(env_file: str | None) -> None:
         default_env_path = Path(__file__).parent / ".env"
         if default_env_path.exists():
             load_dotenv()
-            typer.secho("Loaded default .env file", fg=typer.colors.BLUE)
+            typer.secho("Loaded default .env file.", fg=typer.colors.BLUE)
 
 
 agent_app = typer.Typer(help="Commands for running agents against test cases.")

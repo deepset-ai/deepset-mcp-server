@@ -16,6 +16,7 @@ from deepset_mcp.benchmark.runner.config_loader import (
 )
 from deepset_mcp.benchmark.runner.models import AgentConfig, TestCaseConfig
 from deepset_mcp.benchmark.runner.teardown_actions import teardown_test_case_async
+from deepset_mcp.benchmark.runner.tracing import enable_tracing
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,14 @@ class AgentBenchmarkRunner:
         """
         self.agent_config = agent_config
         self.benchmark_config = benchmark_config
+
+        try:
+            secret_key = self.benchmark_config.get_env_var("LANGFUSE_SECRET_KEY")
+            public_key = self.benchmark_config.get_env_var("LANGFUSE_PUBLIC_KEY")
+            logger.info("Langfuse environment variables detected. Enabling tracing with Langfuse.")
+            enable_tracing(secret_key=secret_key, public_key=public_key, name="deepset-mcp")
+        except KeyError:
+            pass
 
         agent, commit_hash = load_agent(config=agent_config, benchmark_config=benchmark_config)
 
