@@ -265,3 +265,89 @@ class PipelineResource:
         raise_for_status(resp)
 
         return NoContentResponse(message="Pipeline deleted successfully.")
+
+    async def search(
+        self,
+        pipeline_name: str,
+        query: str,
+        debug: bool = False,
+        view_prompts: bool = False,
+        params: Optional[Dict[str, str]] = None,
+        filters: Optional[SearchFilters] = None,
+        streaming: bool = False,
+    ) -> SearchResponse | AsyncIterator[StreamEvent]:
+        """Search using a pipeline.
+
+        :param pipeline_name: Name of the pipeline to use for search.
+        :param query: Search query.
+        :param debug: Whether to include debug information.
+        :param view_prompts: Whether to include prompts in the response.
+        :param params: Additional parameters for pipeline components.
+        :param filters: Search filters to apply.
+        :param streaming: Whether to stream the response.
+
+        :returns: SearchResponse or AsyncIterator of StreamEvent (if streaming).
+        """
+        # Prepare request data
+        data: Dict[str, Any] = {
+            "queries": [query],  # API expects a list but we only send one query
+            "debug": debug,
+            "view_prompts": view_prompts,
+        }
+
+        if params:
+            data["params"] = params
+
+        if filters:
+            data["filters"] = filters.model_dump()
+
+        # Choose endpoint based on streaming
+        if streaming:
+            return self._search_stream(pipeline_name, data)
+        else:
+            return await self._search_non_stream(pipeline_name, data)
+
+    async def _search_non_stream(self, pipeline_name: str, data: Dict[str, Any]) -> SearchResponse:
+        """Perform non-streaming search."""
+        resp = await self._client.request(
+            endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}/search",
+            method="POST",
+            data=data,
+        )
+
+        raise_for_status(resp)
+
+        if resp.json is not None:
+            return SearchResponse.model_validate(resp.json)
+        else:
+            # Return empty response if no JSON data
+            return SearchResponse()
+
+    async def _search_stream(self, pipeline_name: str, data: Dict[str, Any]) -> AsyncIterator[StreamEvent]:
+        """Perform streaming search."""
+        # For streaming, we need to add include_result flag
+        stream_data = {**data, "include_result": True}
+        # Convert queries list to single query for streaming endpoint
+        stream_data["query"] = data["queries"][0]
+        del stream_data["queries"]
+
+        resp = await self._client.request(
+            endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}/search-stream",
+            method="POST",
+            data=stream_data,
+            stream=True,
+        )
+
+        raise_for_status(resp)
+
+        if resp.stream is not None:
+            async for line in resp.stream:
+                # Parse server-sent events format
+                if line.startswith("data: "):
+                    event_data = line[6:]  # Remove "data: " prefix
+                    try:
+                        event_dict = json.loads(event_data)
+                        yield StreamEvent.model_validate(event_dict)
+                    except (json.JSONDecodeError, ValueError):
+                        # Skip malformed events
+                        continue
