@@ -69,7 +69,7 @@ class TransportProtocol(Protocol):
     ) -> TransportResponse[Any]: ...
 
     async def request(
-        self, method: str, url: str, *, response_type: type[T] | None = None, **kwargs: Any
+        self, method: str, url: str, *, response_type: type[T] | None = None, stream: bool = False, **kwargs: Any
     ) -> TransportResponse[Any]:
         """Send an HTTP request and return the response."""
         ...
