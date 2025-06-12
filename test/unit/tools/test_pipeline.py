@@ -332,6 +332,7 @@ async def test_update_pipeline_validation_failure() -> None:
         pipeline_name="np",
         original_config_snippet="foo: 1",
         replacement_config_snippet="foo: 2",
+        skip_validation_errors=False,
     )
     assert "invalid" in res.lower()
     assert "Error 1" in res
