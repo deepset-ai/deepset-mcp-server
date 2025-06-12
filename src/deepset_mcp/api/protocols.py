@@ -226,3 +226,16 @@ class PipelineResourceProtocol(Protocol):
     async def deploy(self, pipeline_name: str) -> PipelineValidationResult:
         """Deploy a pipeline."""
         ...
+
+    async def search(
+        self,
+        pipeline_name: str,
+        query: str,
+        debug: bool = False,
+        view_prompts: bool = False,
+        params: Optional[Dict[str, str]] = None,
+        filters: Optional[SearchFilters] = None,
+        streaming: bool = False,
+    ) -> SearchResponse | AsyncIterator[StreamEvent]:
+        """Search using a pipeline."""
+        ...
