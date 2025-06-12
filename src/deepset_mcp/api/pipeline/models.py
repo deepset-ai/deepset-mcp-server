@@ -180,8 +180,8 @@ class StreamDelta(BaseModel):
 class StreamEvent(BaseModel):
     """Model representing a stream event."""
 
-    query_id: Optional[UUID] = None
+    query_id: UUID | None = None
     type: str  # "delta", "result", or "error"
-    delta: Optional[StreamDelta] = None
-    result: Optional[SearchResponse] = None
-    error: Optional[str] = None
+    delta: StreamDelta | None = None
+    result: SearchResponse | None = None
+    error: str | None = None
