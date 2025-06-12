@@ -1083,3 +1083,286 @@ class TestPipelineResource:
 
         # Verify request
         assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines/pipeline with spaces"
+
+
+class TestPipelineSearchResource:
+    """Tests for the search functionality of the PipelineResource class."""
+
+    @pytest.mark.asyncio
+    async def test_search_basic_query(self) -> None:
+        """Test basic search with a simple query."""
+        # Create sample search response
+        search_response = {
+            "query_id": "123e4567-e89b-12d3-a456-426614174000",
+            "results": [
+                {
+                    "query": "test query",
+                    "query_id": "123e4567-e89b-12d3-a456-426614174000",
+                    "answers": [
+                        {
+                            "answer": "This is a test answer",
+                            "score": 0.95,
+                        }
+                    ],
+                    "documents": [
+                        {
+                            "content": "This is test content",
+                            "meta": {"source": "test.txt"},
+                            "score": 0.9,
+                        }
+                    ],
+                }
+            ],
+        }
+
+        # Create client with predefined response
+        client = DummyClient(responses={"test-workspace/pipelines/test-pipeline/search": search_response})
+
+        # Create resource and call search method
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        result = await resource.search(pipeline_name="test-pipeline", query="test query")
+
+        # Verify results
+        assert isinstance(result, SearchResponse)
+        assert len(result.results) == 1
+        assert len(result.results[0].answers) == 1
+        assert result.results[0].answers[0].answer == "This is a test answer"
+        assert len(result.results[0].documents) == 1
+        assert result.results[0].documents[0].content == "This is test content"
+        assert result.results[0].documents[0].meta == {"source": "test.txt"}
+
+        # Verify request
+        assert len(client.requests) == 1
+        assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines/test-pipeline/search"
+        assert client.requests[0]["method"] == "POST"
+        assert client.requests[0]["data"] == {
+            "queries": ["test query"],
+            "debug": False,
+            "view_prompts": False,
+        }
+
+    @pytest.mark.asyncio
+    async def test_search_with_debug_and_prompts(self) -> None:
+        """Test search with debug and view_prompts enabled."""
+        # Create sample search response with debug and prompts
+        search_response = {
+            "query_id": "123e4567-e89b-12d3-a456-426614174000",
+            "results": [
+                {
+                    "query": "debug query",
+                    "query_id": "123e4567-e89b-12d3-a456-426614174000",
+                    "answers": [],
+                    "documents": [],
+                    "prompts": {"llm": "Answer the question: {query}"},
+                    "_debug": {"llm": {"input": "debug info"}},
+                }
+            ],
+        }
+
+        # Create client with predefined response
+        client = DummyClient(responses={"test-workspace/pipelines/test-pipeline/search": search_response})
+
+        # Create resource and call search method with debug and prompts
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        result = await resource.search(
+            pipeline_name="test-pipeline", query="debug query", debug=True, view_prompts=True
+        )
+
+        # Verify results
+        assert isinstance(result, SearchResponse)
+        assert len(result.results) == 1
+        assert result.results[0].prompts == {"llm": "Answer the question: {query}"}
+        assert result.results[0]._debug == {"llm": {"input": "debug info"}}
+
+        # Verify request
+        assert client.requests[0]["data"] == {
+            "queries": ["debug query"],
+            "debug": True,
+            "view_prompts": True,
+        }
+
+    @pytest.mark.asyncio
+    async def test_search_with_params(self) -> None:
+        """Test search with additional parameters."""
+        # Create sample search response
+        search_response = {
+            "query_id": "123e4567-e89b-12d3-a456-426614174000",
+            "results": [{"query": "param query", "answers": [], "documents": []}],
+        }
+
+        # Create client with predefined response
+        client = DummyClient(responses={"test-workspace/pipelines/test-pipeline/search": search_response})
+
+        # Create resource and call search method with params
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        params = {"retriever": '{"top_k": 5}', "llm": '{"temperature": 0.1}'}
+        result = await resource.search(pipeline_name="test-pipeline", query="param query", params=params)
+
+        # Verify results
+        assert isinstance(result, SearchResponse)
+
+        # Verify request includes params
+        assert client.requests[0]["data"] == {
+            "queries": ["param query"],
+            "debug": False,
+            "view_prompts": False,
+            "params": params,
+        }
+
+    @pytest.mark.asyncio
+    async def test_search_with_filters(self) -> None:
+        """Test search with filters."""
+        # Create sample search response
+        search_response = {
+            "query_id": "123e4567-e89b-12d3-a456-426614174000",
+            "results": [{"query": "filtered query", "answers": [], "documents": []}],
+        }
+
+        # Create client with predefined response
+        client = DummyClient(responses={"test-workspace/pipelines/test-pipeline/search": search_response})
+
+        # Create resource and call search method with filters
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        filters = SearchFilters(
+            conditions=[
+                FilterCondition(field="filename", value="test.txt"),
+                FilterCondition(field="date_created", operator="<=", value="22.12.2023"),
+            ]
+        )
+        result = await resource.search(pipeline_name="test-pipeline", query="filtered query", filters=filters)
+
+        # Verify results
+        assert isinstance(result, SearchResponse)
+
+        # Verify request includes filters
+        expected_filters = {
+            "conditions": [
+                {"field": "filename", "value": "test.txt", "operator": None},
+                {"field": "date_created", "operator": "<=", "value": "22.12.2023"},
+            ]
+        }
+        assert client.requests[0]["data"] == {
+            "queries": ["filtered query"],
+            "debug": False,
+            "view_prompts": False,
+            "filters": expected_filters,
+        }
+
+    @pytest.mark.asyncio
+    async def test_search_empty_response(self) -> None:
+        """Test search with empty response."""
+        # Create empty search response
+        search_response = {"query_id": "123e4567-e89b-12d3-a456-426614174000", "results": []}
+
+        # Create client with predefined response
+        client = DummyClient(responses={"test-workspace/pipelines/test-pipeline/search": search_response})
+
+        # Create resource and call search method
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        result = await resource.search(pipeline_name="test-pipeline", query="empty query")
+
+        # Verify results
+        assert isinstance(result, SearchResponse)
+        assert len(result.results) == 0
+
+    @pytest.mark.asyncio
+    async def test_search_null_response(self) -> None:
+        """Test search with null response."""
+        # Create client with null response
+        client = DummyClient()
+        client.responses = {
+            "test-workspace/pipelines/test-pipeline/search": TransportResponse(
+                text="", status_code=200, json=None
+            )
+        }
+
+        # Create resource and call search method
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        result = await resource.search(pipeline_name="test-pipeline", query="null query")
+
+        # Verify empty response
+        assert isinstance(result, SearchResponse)
+        assert len(result.results) == 0
+
+    @pytest.mark.asyncio
+    async def test_search_error(self) -> None:
+        """Test handling of errors during search."""
+        # Create client that raises an exception
+        client = DummyClient(responses={"test-workspace/pipelines/test-pipeline/search": ValueError("Search error")})
+
+        # Create resource
+        resource = PipelineResource(client=client, workspace="test-workspace")
+
+        # Verify exception is raised
+        with pytest.raises(ValueError, match="Search error"):
+            await resource.search(pipeline_name="test-pipeline", query="error query")
+
+    @pytest.mark.asyncio
+    async def test_search_with_all_parameters(self) -> None:
+        """Test search with all parameters combined."""
+        # Create comprehensive search response
+        search_response = {
+            "query_id": "123e4567-e89b-12d3-a456-426614174000",
+            "results": [
+                {
+                    "query": "comprehensive query",
+                    "query_id": "123e4567-e89b-12d3-a456-426614174000",
+                    "answers": [
+                        {
+                            "answer": "Comprehensive answer",
+                            "context": "Some context",
+                            "score": 0.98,
+                            "meta": {"confidence": "high"},
+                        }
+                    ],
+                    "documents": [
+                        {
+                            "content": "Comprehensive content",
+                            "meta": {"source": "comprehensive.txt", "author": "test"},
+                            "score": 0.95,
+                        }
+                    ],
+                    "prompts": {"llm": "Comprehensive prompt: {query}"},
+                    "_debug": {"retriever": {"retrieved_docs": 10}},
+                }
+            ],
+        }
+
+        # Create client with predefined response
+        client = DummyClient(responses={"test-workspace/pipelines/test-pipeline/search": search_response})
+
+        # Create resource and call search method with all parameters
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        params = {"retriever": '{"top_k": 10}'}
+        filters = SearchFilters(conditions=[FilterCondition(field="author", value="test")])
+        result = await resource.search(
+            pipeline_name="test-pipeline",
+            query="comprehensive query",
+            debug=True,
+            view_prompts=True,
+            params=params,
+            filters=filters,
+        )
+
+        # Verify results
+        assert isinstance(result, SearchResponse)
+        assert len(result.results) == 1
+        search_result = result.results[0]
+        assert len(search_result.answers) == 1
+        assert search_result.answers[0].answer == "Comprehensive answer"
+        assert search_result.answers[0].context == "Some context"
+        assert len(search_result.documents) == 1
+        assert search_result.documents[0].content == "Comprehensive content"
+        assert search_result.documents[0].meta == {"source": "comprehensive.txt", "author": "test"}
+        assert search_result.prompts == {"llm": "Comprehensive prompt: {query}"}
+        assert search_result._debug == {"retriever": {"retrieved_docs": 10}}
+
+        # Verify request includes all parameters
+        expected_data = {
+            "queries": ["comprehensive query"],
+            "debug": True,
+            "view_prompts": True,
+            "params": params,
+            "filters": {"conditions": [{"field": "author", "value": "test", "operator": None}]},
+        }
+        assert client.requests[0]["data"] == expected_data
