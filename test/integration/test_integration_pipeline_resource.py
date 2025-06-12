@@ -312,3 +312,32 @@ async def test_delete_nonexistent_pipeline(
     # Trying to delete a non-existent pipeline should raise an exception
     with pytest.raises(ResourceNotFoundError):
         await pipeline_resource.delete(pipeline_name=non_existent_name)
+
+
+@pytest.mark.asyncio
+async def test_search_pipeline(
+    pipeline_resource: PipelineResource,
+    sample_yaml_config: str,
+) -> None:
+    """Test basic search functionality with a pipeline."""
+    pipeline_name = "test-search-pipeline"
+
+    # Create a pipeline for search
+    await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
+
+    # Deploy the pipeline so it can be used for search
+    await pipeline_resource.deploy(pipeline_name=pipeline_name)
+
+    # Perform a basic search
+    result = await pipeline_resource.search(
+        pipeline_name=pipeline_name,
+        query="What is artificial intelligence?",
+    )
+
+    # Verify results
+    from deepset_mcp.api.pipeline.models import SearchResponse
+    assert isinstance(result, SearchResponse)
+    # The actual content depends on the pipeline configuration and available data
+    # We just verify the structure is correct
+    assert hasattr(result, "results")
+    assert isinstance(result.results, list)
