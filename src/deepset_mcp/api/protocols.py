@@ -67,6 +67,7 @@ class AsyncClientProtocol(Protocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        stream: bool = False,
         **kwargs: Any,
     ) -> TransportResponse[T]: ...
 
@@ -79,6 +80,7 @@ class AsyncClientProtocol(Protocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        stream: bool = False,
         **kwargs: Any,
     ) -> TransportResponse[Any]: ...
 
@@ -90,6 +92,7 @@ class AsyncClientProtocol(Protocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        stream: bool = False,
         **kwargs: Any,
     ) -> TransportResponse[Any]:
         """Make a request to the API."""
