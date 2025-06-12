@@ -60,6 +60,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        stream: bool = False,
         **kwargs: Any,
     ) -> TransportResponse[T]: ...
 
@@ -72,6 +73,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        stream: bool = False,
         **kwargs: Any,
     ) -> TransportResponse[Any]: ...
 
@@ -83,6 +85,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         response_type: type[T] | None = None,
+        stream: bool = False,
         **kwargs: Any,
     ) -> TransportResponse[Any]:
         """Make a request to the deepset API."""
