@@ -474,6 +474,63 @@ async def test_update_pipeline_success_response() -> None:
 
 
 @pytest.mark.asyncio
+async def test_update_pipeline_skip_validation_errors_true() -> None:
+    """Test that update_pipeline updates the pipeline despite validation errors when skip_validation_errors=True (default)."""
+    user = DeepsetUser(user_id="u1", given_name="A", family_name="B")
+    orig_yaml = "foo: 1"
+    original = DeepsetPipeline(
+        pipeline_id="p",
+        name="np",
+        status="S",
+        service_level=PipelineServiceLevel.DEVELOPMENT,
+        created_at=datetime.now(),
+        last_edited_at=None,
+        created_by=user,
+        last_edited_by=None,
+        yaml_config=orig_yaml,
+    )
+    invalid_result = PipelineValidationResult(
+        valid=False, 
+        errors=[ValidationError(code="E1", message="Test error message")]
+    )
+    
+    resource = FakePipelineResource(
+        get_response=original,
+        validate_response=invalid_result,
+        update_response=NoContentResponse(message="successfully updated"),
+    )
+    client = FakeClient(resource)
+    
+    # Test with explicit True
+    result = await update_pipeline(
+        client,
+        workspace="ws",
+        pipeline_name="np",
+        original_config_snippet="foo: 1",
+        replacement_config_snippet="foo: 2",
+        skip_validation_errors=True
+    )
+    
+    assert "The pipeline 'np' was successfully updated." in result
+    assert "Note: Pipeline was updated despite validation issues:" in result
+    assert "configuration is invalid" in result
+    assert "Error 1" in result
+    assert "Test error message" in result
+    
+    # Test with default (should behave the same as True)
+    result_default = await update_pipeline(
+        client,
+        workspace="ws",
+        pipeline_name="np",
+        original_config_snippet="foo: 1",
+        replacement_config_snippet="foo: 2"
+    )
+    
+    assert "The pipeline 'np' was successfully updated." in result_default
+    assert "Note: Pipeline was updated despite validation issues:" in result_default
+
+
+@pytest.mark.asyncio
 async def test_get_pipeline_logs_success() -> None:
     log1 = PipelineLog(
         log_id="log1",
