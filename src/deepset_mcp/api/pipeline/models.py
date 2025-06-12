@@ -141,12 +141,12 @@ class Document(BaseModel):
 class SearchResult(BaseModel):
     """Model representing a single search result."""
 
-    _debug: Optional[Dict[str, Any]] = None
-    answers: List[Answer] = Field(default_factory=list)
-    documents: List[Document] = Field(default_factory=list)
-    prompts: Optional[Dict[str, str]] = None
-    query: Optional[str] = None
-    query_id: Optional[UUID] = None
+    _debug: dict[str, Any] | None = None
+    answers: list[Answer] = Field(default_factory=list)
+    documents: list[Document] = Field(default_factory=list)
+    prompts: dict[str, str] | None = None
+    query: str | None = None
+    query_id: UUID | None = None
 
 
 class SearchResponse(BaseModel):
