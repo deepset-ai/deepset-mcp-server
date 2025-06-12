@@ -174,7 +174,7 @@ class StreamDelta(BaseModel):
     """Model representing a streaming delta."""
 
     text: str
-    meta: Optional[Dict[str, Any]] = None
+    meta: dict[str, Any] | None = None
 
 
 class StreamEvent(BaseModel):
