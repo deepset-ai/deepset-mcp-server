@@ -254,6 +254,46 @@ async def test_create_pipeline_handles_success_and_failure_response() -> None:
 
 
 @pytest.mark.asyncio
+async def test_create_pipeline_skip_validation_errors_true() -> None:
+    """Test that create_pipeline creates the pipeline despite validation errors when skip_validation_errors=True (default)."""
+    invalid_result = PipelineValidationResult(
+        valid=False, 
+        errors=[ValidationError(code="E1", message="Test error message")]
+    )
+    resource = FakePipelineResource(
+        validate_response=invalid_result,
+        create_response=NoContentResponse(message="created successfully"),
+    )
+    client = FakeClient(resource)
+    
+    # Test with explicit True
+    result = await create_pipeline(
+        client, 
+        workspace="ws", 
+        pipeline_name="test_pipeline", 
+        yaml_configuration="config: test",
+        skip_validation_errors=True
+    )
+    
+    assert "Pipeline 'test_pipeline' created successfully." in result
+    assert "Note: Pipeline was created despite validation issues:" in result
+    assert "configuration is invalid" in result
+    assert "Error 1" in result
+    assert "Test error message" in result
+    
+    # Test with default (should behave the same as True)
+    result_default = await create_pipeline(
+        client, 
+        workspace="ws", 
+        pipeline_name="test_pipeline", 
+        yaml_configuration="config: test"
+    )
+    
+    assert "Pipeline 'test_pipeline' created successfully." in result_default
+    assert "Note: Pipeline was created despite validation issues:" in result_default
+
+
+@pytest.mark.asyncio
 async def test_update_pipeline_not_found_on_get() -> None:
     resource = FakePipelineResource(get_exception=ResourceNotFoundError())
     client = FakeClient(resource)
