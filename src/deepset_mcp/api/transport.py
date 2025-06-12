@@ -123,9 +123,19 @@ class AsyncTransport:
     ) -> TransportResponse[Any]: ...
 
     async def request(
-        self, method: str, url: str, *, response_type: type[T] | None = None, **kwargs: Any
+        self, method: str, url: str, *, response_type: type[T] | None = None, stream: bool = False, **kwargs: Any
     ) -> TransportResponse[Any]:
         """Send an HTTP request and return the response."""
+        if stream:
+            # Handle streaming responses differently
+            response = await self._client.stream(method, url, **kwargs)
+            return TransportResponse(
+                text="",
+                status_code=response.status_code,
+                json=None,
+                stream=response.aiter_lines()
+            )
+        
         response = await self._client.request(method, url, **kwargs)
 
         if response_type is not None:
