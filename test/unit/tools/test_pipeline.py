@@ -223,7 +223,9 @@ async def test_create_pipeline_handles_validation_failure() -> None:
     invalid_result = PipelineValidationResult(valid=False, errors=[ValidationError(code="E", message="Err")])
     resource = FakePipelineResource(validate_response=invalid_result)
     client = FakeClient(resource)
-    result = await create_pipeline(client, workspace="ws", pipeline_name="pname", yaml_configuration="cfg")
+    result = await create_pipeline(
+        client, workspace="ws", pipeline_name="pname", yaml_configuration="cfg", skip_validation_errors=False
+    )
     assert "invalid" in result.lower()
     assert "Error 1" in result
 
