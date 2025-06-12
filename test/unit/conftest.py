@@ -41,6 +41,7 @@ class BaseFakeClient(AsyncClientProtocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        stream: bool = False,
         **kwargs: Any,
     ) -> TransportResponse[T]: ...
 
@@ -53,6 +54,7 @@ class BaseFakeClient(AsyncClientProtocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        stream: bool = False,
         **kwargs: Any,
     ) -> TransportResponse[Any]: ...
 
@@ -64,6 +66,7 @@ class BaseFakeClient(AsyncClientProtocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        stream: bool = False,
         **kwargs: Any,
     ) -> TransportResponse[Any]:
         """
