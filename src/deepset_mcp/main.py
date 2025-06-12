@@ -129,18 +129,14 @@ async def create_pipeline(pipeline_name: str, yaml_configuration: str) -> str:
     """
     workspace = get_workspace()
     async with AsyncDeepsetClient() as client:
-        response = await create_pipeline_tool(
-            client, workspace, pipeline_name, yaml_configuration
-        )
+        response = await create_pipeline_tool(client, workspace, pipeline_name, yaml_configuration)
 
     return response
 
 
 @mcp.tool()
 async def update_pipeline(
-    pipeline_name: str,
-    original_configuration_snippet: str,
-    replacement_configuration_snippet: str
+    pipeline_name: str, original_configuration_snippet: str, replacement_configuration_snippet: str
 ) -> str:
     """Updates an existing pipeline in deepset.
 
@@ -160,7 +156,7 @@ async def update_pipeline(
             workspace=workspace,
             pipeline_name=pipeline_name,
             original_config_snippet=original_configuration_snippet,
-            replacement_config_snippet=replacement_configuration_snippet
+            replacement_config_snippet=replacement_configuration_snippet,
         )
 
     return response
