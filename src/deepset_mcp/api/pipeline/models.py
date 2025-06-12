@@ -161,7 +161,7 @@ class FilterCondition(BaseModel):
 
     field: str
     value: Any
-    operator: Optional[str] = None
+    operator: str | None = None
 
 
 class SearchFilters(BaseModel):
