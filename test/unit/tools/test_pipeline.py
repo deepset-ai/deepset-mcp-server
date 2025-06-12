@@ -223,7 +223,9 @@ async def test_create_pipeline_handles_validation_failure() -> None:
     invalid_result = PipelineValidationResult(valid=False, errors=[ValidationError(code="E", message="Err")])
     resource = FakePipelineResource(validate_response=invalid_result)
     client = FakeClient(resource)
-    result = await create_pipeline(client, workspace="ws", pipeline_name="pname", yaml_configuration="cfg")
+    result = await create_pipeline(
+        client, workspace="ws", pipeline_name="pname", yaml_configuration="cfg", skip_validation_errors=False
+    )
     assert "invalid" in result.lower()
     assert "Error 1" in result
 
@@ -249,6 +251,42 @@ async def test_create_pipeline_handles_success_and_failure_response() -> None:
     client_fail = FakeClient(resource_fail)
     res_fail = await create_pipeline(client_fail, workspace="ws", pipeline_name="p1", yaml_configuration="a: b")
     assert "Failed to create pipeline 'p1': bad things (Status Code: 400)" == res_fail
+
+
+@pytest.mark.asyncio
+async def test_create_pipeline_skip_validation_errors_true() -> None:
+    """Test that create_pipeline creates the pipeline despite validation errors."""
+    invalid_result = PipelineValidationResult(
+        valid=False, errors=[ValidationError(code="E1", message="Test error message")]
+    )
+    resource = FakePipelineResource(
+        validate_response=invalid_result,
+        create_response=NoContentResponse(message="created successfully"),
+    )
+    client = FakeClient(resource)
+
+    # Test with explicit True
+    result = await create_pipeline(
+        client,
+        workspace="ws",
+        pipeline_name="test_pipeline",
+        yaml_configuration="config: test",
+        skip_validation_errors=True,
+    )
+
+    assert "Pipeline 'test_pipeline' created successfully." in result
+    assert "Note: Pipeline was created despite validation issues:" in result
+    assert "configuration is invalid" in result
+    assert "Error 1" in result
+    assert "Test error message" in result
+
+    # Test with default (should behave the same as True)
+    result_default = await create_pipeline(
+        client, workspace="ws", pipeline_name="test_pipeline", yaml_configuration="config: test"
+    )
+
+    assert "Pipeline 'test_pipeline' created successfully." in result_default
+    assert "Note: Pipeline was created despite validation issues:" in result_default
 
 
 @pytest.mark.asyncio
@@ -330,6 +368,7 @@ async def test_update_pipeline_validation_failure() -> None:
         pipeline_name="np",
         original_config_snippet="foo: 1",
         replacement_config_snippet="foo: 2",
+        skip_validation_errors=False,
     )
     assert "invalid" in res.lower()
     assert "Error 1" in res
@@ -428,6 +467,62 @@ async def test_update_pipeline_success_response() -> None:
         replacement_config_snippet="foo: 2",
     )
     assert "successfully updated" in r_success.lower()
+
+
+@pytest.mark.asyncio
+async def test_update_pipeline_skip_validation_errors_true() -> None:
+    """Test that update_pipeline updates the pipeline despite validation errors."""
+    user = DeepsetUser(user_id="u1", given_name="A", family_name="B")
+    orig_yaml = "foo: 1"
+    original = DeepsetPipeline(
+        pipeline_id="p",
+        name="np",
+        status="S",
+        service_level=PipelineServiceLevel.DEVELOPMENT,
+        created_at=datetime.now(),
+        last_edited_at=None,
+        created_by=user,
+        last_edited_by=None,
+        yaml_config=orig_yaml,
+    )
+    invalid_result = PipelineValidationResult(
+        valid=False, errors=[ValidationError(code="E1", message="Test error message")]
+    )
+
+    resource = FakePipelineResource(
+        get_response=original,
+        validate_response=invalid_result,
+        update_response=NoContentResponse(message="successfully updated"),
+    )
+    client = FakeClient(resource)
+
+    # Test with explicit True
+    result = await update_pipeline(
+        client,
+        workspace="ws",
+        pipeline_name="np",
+        original_config_snippet="foo: 1",
+        replacement_config_snippet="foo: 2",
+        skip_validation_errors=True,
+    )
+
+    assert "The pipeline 'np' was successfully updated." in result
+    assert "Note: Pipeline was updated despite validation issues:" in result
+    assert "configuration is invalid" in result
+    assert "Error 1" in result
+    assert "Test error message" in result
+
+    # Test with default (should behave the same as True)
+    result_default = await update_pipeline(
+        client,
+        workspace="ws",
+        pipeline_name="np",
+        original_config_snippet="foo: 1",
+        replacement_config_snippet="foo: 2",
+    )
+
+    assert "The pipeline 'np' was successfully updated." in result_default
+    assert "Note: Pipeline was updated despite validation issues:" in result_default
 
 
 @pytest.mark.asyncio
