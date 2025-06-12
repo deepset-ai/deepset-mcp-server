@@ -16,6 +16,7 @@ class TransportResponse(Generic[T]):
     text: str
     status_code: int
     json: T | None = None
+    stream: Any | None = None  # For streaming responses
 
     @property
     def success(self) -> bool:
