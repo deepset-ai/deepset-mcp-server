@@ -152,8 +152,8 @@ class SearchResult(BaseModel):
 class SearchResponse(BaseModel):
     """Model representing the response from a pipeline search."""
 
-    query_id: Optional[UUID] = None
-    results: List[SearchResult] = Field(default_factory=list)
+    query_id: UUID | None = None
+    results: list[SearchResult] = Field(default_factory=list)
 
 
 class FilterCondition(BaseModel):
