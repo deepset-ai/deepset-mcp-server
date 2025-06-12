@@ -111,6 +111,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
             json=data,
             headers=request_headers,
             response_type=response_type,
+            stream=stream,
             **kwargs,
         )
 
