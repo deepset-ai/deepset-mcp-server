@@ -36,12 +36,25 @@ async def validate_pipeline(client: AsyncClientProtocol, workspace: str, yaml_co
 
 
 async def create_pipeline(
-    client: AsyncClientProtocol, workspace: str, pipeline_name: str, yaml_configuration: str
+    client: AsyncClientProtocol, 
+    workspace: str, 
+    pipeline_name: str, 
+    yaml_configuration: str,
+    skip_validation_errors: bool = True
 ) -> str:
-    """Creates a new pipeline within the currently configured deepset workspace."""
+    """Creates a new pipeline within the currently configured deepset workspace.
+    
+    Args:
+        client: The async client for API communication
+        workspace: The workspace name
+        pipeline_name: Name of the pipeline to create
+        yaml_configuration: YAML configuration for the pipeline
+        skip_validation_errors: If True (default), creates the pipeline even if validation fails.
+                               If False, stops creation when validation fails.
+    """
     validation_response = await client.pipelines(workspace=workspace).validate(yaml_configuration)
 
-    if not validation_response.valid:
+    if not validation_response.valid and not skip_validation_errors:
         return validation_result_to_llm_readable_string(validation_response)
 
     try:
@@ -53,7 +66,14 @@ async def create_pipeline(
     except UnexpectedAPIError as e:
         return f"Failed to create pipeline '{pipeline_name}': {e}"
 
-    return f"Pipeline '{pipeline_name}' created successfully."
+    success_message = f"Pipeline '{pipeline_name}' created successfully."
+    
+    # If validation failed but we created anyway, include validation errors
+    if not validation_response.valid:
+        validation_errors = validation_result_to_llm_readable_string(validation_response)
+        return f"{success_message}\n\n**Note: Pipeline was created despite validation issues:**\n{validation_errors}"
+    
+    return success_message
 
 
 async def update_pipeline(
