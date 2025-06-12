@@ -167,7 +167,7 @@ class FilterCondition(BaseModel):
 class SearchFilters(BaseModel):
     """Model representing search filters."""
 
-    conditions: List[FilterCondition] = Field(default_factory=list)
+    conditions: list[FilterCondition] = Field(default_factory=list)
 
 
 class StreamDelta(BaseModel):
