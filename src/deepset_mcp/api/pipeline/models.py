@@ -97,3 +97,91 @@ class PipelineLogList(BaseModel):
     data: list[PipelineLog]
     has_more: bool
     total: int
+
+
+# Search-related models
+
+class OffsetRange(BaseModel):
+    """Model representing an offset range."""
+    
+    start: int
+    end: int
+
+
+class Answer(BaseModel):
+    """Model representing a search answer."""
+
+    answer: str  # Required field
+    context: Optional[str] = None
+    document_id: Optional[str] = None
+    document_ids: Optional[List[str]] = None
+    file: Optional[Dict[str, Any]] = None
+    files: Optional[List[Dict[str, Any]]] = None
+    meta: Optional[Dict[str, Any]] = None
+    offsets_in_context: Optional[List[OffsetRange]] = None
+    offsets_in_document: Optional[List[OffsetRange]] = None
+    prompt: Optional[str] = None
+    result_id: Optional[UUID] = None
+    score: Optional[float] = None
+    type: Optional[str] = None
+
+
+class Document(BaseModel):
+    """Model representing a search document."""
+
+    content: str  # Required field
+    meta: Dict[str, Any]  # Required field - can hold any value
+    embedding: Optional[List[float]] = None
+    file: Optional[Dict[str, Any]] = None
+    id: Optional[str] = None
+    result_id: Optional[UUID] = None
+    score: Optional[float] = None
+
+
+class SearchResult(BaseModel):
+    """Model representing a single search result."""
+
+    _debug: Optional[Dict[str, Any]] = None
+    answers: List[Answer] = Field(default_factory=list)
+    documents: List[Document] = Field(default_factory=list)
+    prompts: Optional[Dict[str, str]] = None
+    query: Optional[str] = None
+    query_id: Optional[UUID] = None
+
+
+class SearchResponse(BaseModel):
+    """Model representing the response from a pipeline search."""
+
+    query_id: Optional[UUID] = None
+    results: List[SearchResult] = Field(default_factory=list)
+
+
+class FilterCondition(BaseModel):
+    """Model representing a single filter condition."""
+
+    field: str
+    value: Any
+    operator: Optional[str] = None
+
+
+class SearchFilters(BaseModel):
+    """Model representing search filters."""
+
+    conditions: List[FilterCondition] = Field(default_factory=list)
+
+
+class StreamDelta(BaseModel):
+    """Model representing a streaming delta."""
+
+    text: str
+    meta: Optional[Dict[str, Any]] = None
+
+
+class StreamEvent(BaseModel):
+    """Model representing a stream event."""
+
+    query_id: Optional[UUID] = None
+    type: str  # "delta", "result", or "error"
+    delta: Optional[StreamDelta] = None
+    result: Optional[SearchResponse] = None
+    error: Optional[str] = None
