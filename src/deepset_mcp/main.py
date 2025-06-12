@@ -121,7 +121,12 @@ async def get_pipeline(pipeline_name: str) -> str:
 
 @mcp.tool()
 async def create_pipeline(pipeline_name: str, yaml_configuration: str) -> str:
-    """Creates a new pipeline in deepset."""
+    """Creates a new pipeline in deepset.
+
+    Args:
+        pipeline_name: Name of the pipeline to create
+        yaml_configuration: YAML configuration for the pipeline
+    """
     workspace = get_workspace()
     async with AsyncDeepsetClient() as client:
         response = await create_pipeline_tool(client, workspace, pipeline_name, yaml_configuration)
@@ -138,6 +143,11 @@ async def update_pipeline(
     The update is performed by replacing the original configuration snippet with the new one.
     Make sure that your original snippet only has a single exact match in the pipeline configuration.
     Respect whitespace and formatting.
+
+    Args:
+        pipeline_name: Name of the pipeline to update
+        original_configuration_snippet: The configuration snippet to replace
+        replacement_configuration_snippet: The new configuration snippet
     """
     workspace = get_workspace()
     async with AsyncDeepsetClient() as client:
