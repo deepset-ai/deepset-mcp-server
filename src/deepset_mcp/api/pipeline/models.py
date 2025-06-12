@@ -130,12 +130,12 @@ class Document(BaseModel):
     """Model representing a search document."""
 
     content: str  # Required field
-    meta: Dict[str, Any]  # Required field - can hold any value
-    embedding: Optional[List[float]] = None
-    file: Optional[Dict[str, Any]] = None
-    id: Optional[str] = None
-    result_id: Optional[UUID] = None
-    score: Optional[float] = None
+    meta: dict[str, Any]  # Required field - can hold any value
+    embedding: list[float] | None = None
+    file: dict[str, Any] | None = None
+    id: str | None = None
+    result_id: UUID | None = None
+    score: float | None = None
 
 
 class SearchResult(BaseModel):
