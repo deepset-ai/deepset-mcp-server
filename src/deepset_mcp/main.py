@@ -138,13 +138,23 @@ async def create_pipeline(pipeline_name: str, yaml_configuration: str, skip_vali
 
 @mcp.tool()
 async def update_pipeline(
-    pipeline_name: str, original_configuration_snippet: str, replacement_configuration_snippet: str
+    pipeline_name: str, 
+    original_configuration_snippet: str, 
+    replacement_configuration_snippet: str,
+    skip_validation_errors: bool = True
 ) -> str:
     """Updates an existing pipeline in deepset.
 
     The update is performed by replacing the original configuration snippet with the new one.
     Make sure that your original snippet only has a single exact match in the pipeline configuration.
     Respect whitespace and formatting.
+    
+    Args:
+        pipeline_name: Name of the pipeline to update
+        original_configuration_snippet: The configuration snippet to replace
+        replacement_configuration_snippet: The new configuration snippet
+        skip_validation_errors: If True (default), updates the pipeline even if validation fails.
+                               If False, stops update when validation fails.
     """
     workspace = get_workspace()
     async with AsyncDeepsetClient() as client:
@@ -154,6 +164,7 @@ async def update_pipeline(
             pipeline_name=pipeline_name,
             original_config_snippet=original_configuration_snippet,
             replacement_config_snippet=replacement_configuration_snippet,
+            skip_validation_errors=skip_validation_errors,
         )
 
     return response
