@@ -112,18 +112,18 @@ class Answer(BaseModel):
     """Model representing a search answer."""
 
     answer: str  # Required field
-    context: Optional[str] = None
-    document_id: Optional[str] = None
-    document_ids: Optional[List[str]] = None
-    file: Optional[Dict[str, Any]] = None
-    files: Optional[List[Dict[str, Any]]] = None
-    meta: Optional[Dict[str, Any]] = None
-    offsets_in_context: Optional[List[OffsetRange]] = None
-    offsets_in_document: Optional[List[OffsetRange]] = None
-    prompt: Optional[str] = None
-    result_id: Optional[UUID] = None
-    score: Optional[float] = None
-    type: Optional[str] = None
+    context: str | None = None
+    document_id: str | None = None
+    document_ids: list[str] | None = None
+    file: dict[str, Any] | None = None
+    files: list[dict[str, Any]] | None = None
+    meta: dict[str, Any] | None = None
+    offsets_in_context: list[OffsetRange] | None = None
+    offsets_in_document: list[OffsetRange] | None = None
+    prompt: str | None = None
+    result_id: UUID | None = None
+    score: float | None = None
+    type: str | None = None
 
 
 class Document(BaseModel):
