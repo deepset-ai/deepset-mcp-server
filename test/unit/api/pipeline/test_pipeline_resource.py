@@ -1366,3 +1366,147 @@ class TestPipelineSearchResource:
             "filters": {"conditions": [{"field": "author", "value": "test", "operator": None}]},
         }
         assert client.requests[0]["data"] == expected_data
+
+    @pytest.mark.asyncio
+    async def test_search_streaming_basic(self) -> None:
+        """Test basic streaming search."""
+        # Mock stream lines
+        async def mock_stream():
+            yield 'data: {"query_id": "123e4567-e89b-12d3-a456-426614174000", "type": "delta", "delta": {"text": "Hello"}}'
+            yield 'data: {"query_id": "123e4567-e89b-12d3-a456-426614174000", "type": "delta", "delta": {"text": " world"}}'
+            yield 'data: {"query_id": "123e4567-e89b-12d3-a456-426614174000", "type": "result", "result": {"results": []}}'
+
+        # Create client with streaming response
+        client = DummyClient()
+        stream_response = TransportResponse(
+            text="",
+            status_code=200,
+            json=None,
+            stream=mock_stream()
+        )
+        client.responses = {"test-workspace/pipelines/test-pipeline/search-stream": stream_response}
+
+        # Create resource and call search with streaming
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        result = await resource.search(
+            pipeline_name="test-pipeline",
+            query="streaming query",
+            streaming=True
+        )
+
+        # Verify result is an async iterator
+        assert hasattr(result, '__aiter__')
+
+        # Collect stream events
+        events = []
+        async for event in result:
+            events.append(event)
+
+        # Verify events
+        assert len(events) == 3
+        assert all(isinstance(event, StreamEvent) for event in events)
+        assert events[0].type == "delta"
+        assert events[0].delta is not None
+        assert events[0].delta.text == "Hello"
+        assert events[1].type == "delta"
+        assert events[1].delta is not None
+        assert events[1].delta.text == " world"
+        assert events[2].type == "result"
+        assert events[2].result is not None
+
+        # Verify request
+        assert len(client.requests) == 1
+        assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines/test-pipeline/search-stream"
+        assert client.requests[0]["method"] == "POST"
+        assert client.requests[0]["stream"] is True
+        assert client.requests[0]["data"] == {
+            "query": "streaming query",  # Note: single query for streaming
+            "debug": False,
+            "view_prompts": False,
+            "include_result": True,
+        }
+
+    @pytest.mark.asyncio
+    async def test_search_streaming_with_params(self) -> None:
+        """Test streaming search with additional parameters."""
+        # Mock stream lines
+        async def mock_stream():
+            yield 'data: {"query_id": "123e4567-e89b-12d3-a456-426614174000", "type": "delta", "delta": {"text": "Test"}}'
+
+        # Create client with streaming response
+        client = DummyClient()
+        stream_response = TransportResponse(
+            text="",
+            status_code=200,
+            json=None,
+            stream=mock_stream()
+        )
+        client.responses = {"test-workspace/pipelines/test-pipeline/search-stream": stream_response}
+
+        # Create resource and call search with streaming and parameters
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        params = {"retriever": '{"top_k": 5}'}
+        filters = SearchFilters(conditions=[FilterCondition(field="test", value="value")])
+        
+        result = await resource.search(
+            pipeline_name="test-pipeline",
+            query="param stream query",
+            debug=True,
+            view_prompts=True,
+            params=params,
+            filters=filters,
+            streaming=True
+        )
+
+        # Consume the stream to trigger the request
+        events = []
+        async for event in result:
+            events.append(event)
+
+        # Verify request includes all parameters
+        expected_data = {
+            "query": "param stream query",
+            "debug": True,
+            "view_prompts": True,
+            "params": params,
+            "filters": {"conditions": [{"field": "test", "value": "value", "operator": None}]},
+            "include_result": True,
+        }
+        assert client.requests[0]["data"] == expected_data
+
+    @pytest.mark.asyncio
+    async def test_search_streaming_malformed_events(self) -> None:
+        """Test streaming search with malformed events (should be skipped)."""
+        # Mock stream lines with malformed JSON
+        async def mock_stream():
+            yield 'data: {"query_id": "123e4567-e89b-12d3-a456-426614174000", "type": "delta", "delta": {"text": "Good"}}'
+            yield 'data: {malformed json'
+            yield 'data: {"query_id": "123e4567-e89b-12d3-a456-426614174000", "type": "delta", "delta": {"text": "Also good"}}'
+
+        # Create client with streaming response
+        client = DummyClient()
+        stream_response = TransportResponse(
+            text="",
+            status_code=200,
+            json=None,
+            stream=mock_stream()
+        )
+        client.responses = {"test-workspace/pipelines/test-pipeline/search-stream": stream_response}
+
+        # Create resource and call search with streaming
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        result = await resource.search(
+            pipeline_name="test-pipeline",
+            query="malformed test",
+            streaming=True
+        )
+
+        # Collect stream events (malformed should be skipped)
+        events = []
+        async for event in result:
+            events.append(event)
+
+        # Verify only good events were processed
+        assert len(events) == 2
+        assert events[0].delta.text == "Good"
+        assert events[1].delta.text == "Also good"
