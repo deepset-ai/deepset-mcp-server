@@ -120,11 +120,18 @@ async def get_pipeline(pipeline_name: str) -> str:
 
 
 @mcp.tool()
-async def create_pipeline(pipeline_name: str, yaml_configuration: str) -> str:
-    """Creates a new pipeline in deepset."""
+async def create_pipeline(pipeline_name: str, yaml_configuration: str, skip_validation_errors: bool = True) -> str:
+    """Creates a new pipeline in deepset.
+    
+    Args:
+        pipeline_name: Name of the pipeline to create
+        yaml_configuration: YAML configuration for the pipeline
+        skip_validation_errors: If True (default), creates the pipeline even if validation fails.
+                               If False, stops creation when validation fails.
+    """
     workspace = get_workspace()
     async with AsyncDeepsetClient() as client:
-        response = await create_pipeline_tool(client, workspace, pipeline_name, yaml_configuration)
+        response = await create_pipeline_tool(client, workspace, pipeline_name, yaml_configuration, skip_validation_errors)
 
     return response
 
