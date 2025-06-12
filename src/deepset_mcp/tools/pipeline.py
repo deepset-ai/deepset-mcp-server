@@ -82,13 +82,23 @@ async def update_pipeline(
     pipeline_name: str,
     original_config_snippet: str,
     replacement_config_snippet: str,
+    skip_validation_errors: bool = True
 ) -> str:
     """
     Updates a pipeline configuration in the specified workspace with a replacement configuration snippet.
 
     This function validates the replacement configuration snippet before applying it to the pipeline.
-    If the validation fails, it returns a readable string describing validation errors. Otherwise, the
-    replacement snippet is used to update the pipeline's configuration in the target workspace.
+    If the validation fails and skip_validation_errors is False, it returns a readable string describing 
+    validation errors. Otherwise, the replacement snippet is used to update the pipeline's configuration.
+    
+    Args:
+        client: The async client for API communication
+        workspace: The workspace name
+        pipeline_name: Name of the pipeline to update
+        original_config_snippet: The configuration snippet to replace
+        replacement_config_snippet: The new configuration snippet
+        skip_validation_errors: If True (default), updates the pipeline even if validation fails.
+                               If False, stops update when validation fails.
     """
     try:
         original_pipeline = await client.pipelines(workspace=workspace).get(pipeline_name=pipeline_name)
@@ -115,7 +125,7 @@ async def update_pipeline(
 
     validation_response = await client.pipelines(workspace=workspace).validate(updated_yaml_configuration)
 
-    if not validation_response.valid:
+    if not validation_response.valid and not skip_validation_errors:
         return validation_result_to_llm_readable_string(validation_response)
 
     try:
@@ -129,7 +139,14 @@ async def update_pipeline(
     except UnexpectedAPIError as e:
         return f"Failed to update the pipeline '{pipeline_name}': {e}"
 
-    return f"The pipeline '{pipeline_name}' was successfully updated."
+    success_message = f"The pipeline '{pipeline_name}' was successfully updated."
+    
+    # If validation failed but we updated anyway, include validation errors
+    if not validation_response.valid:
+        validation_errors = validation_result_to_llm_readable_string(validation_response)
+        return f"{success_message}\n\n**Note: Pipeline was updated despite validation issues:**\n{validation_errors}"
+    
+    return success_message
 
 
 async def get_pipeline_logs(
