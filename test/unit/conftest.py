@@ -93,7 +93,7 @@ class BaseFakeClient(AsyncClientProtocol):
         ValueError
             If no response is predefined for the endpoint.
         """
-        self.requests.append({"endpoint": endpoint, "method": method, "data": data, "headers": headers, **kwargs})
+        self.requests.append({"endpoint": endpoint, "method": method, "data": data, "headers": headers, "stream": stream, **kwargs})
 
         # Find the appropriate response
         for resp_key, resp_data in self.responses.items():
