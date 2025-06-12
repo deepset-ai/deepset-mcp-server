@@ -120,41 +120,38 @@ async def get_pipeline(pipeline_name: str) -> str:
 
 
 @mcp.tool()
-async def create_pipeline(pipeline_name: str, yaml_configuration: str, skip_validation_errors: bool = True) -> str:
+async def create_pipeline(pipeline_name: str, yaml_configuration: str) -> str:
     """Creates a new pipeline in deepset.
-    
+
     Args:
         pipeline_name: Name of the pipeline to create
         yaml_configuration: YAML configuration for the pipeline
-        skip_validation_errors: If True (default), creates the pipeline even if validation fails.
-                               If False, stops creation when validation fails.
     """
     workspace = get_workspace()
     async with AsyncDeepsetClient() as client:
-        response = await create_pipeline_tool(client, workspace, pipeline_name, yaml_configuration, skip_validation_errors)
+        response = await create_pipeline_tool(
+            client, workspace, pipeline_name, yaml_configuration
+        )
 
     return response
 
 
 @mcp.tool()
 async def update_pipeline(
-    pipeline_name: str, 
-    original_configuration_snippet: str, 
-    replacement_configuration_snippet: str,
-    skip_validation_errors: bool = True
+    pipeline_name: str,
+    original_configuration_snippet: str,
+    replacement_configuration_snippet: str
 ) -> str:
     """Updates an existing pipeline in deepset.
 
     The update is performed by replacing the original configuration snippet with the new one.
     Make sure that your original snippet only has a single exact match in the pipeline configuration.
     Respect whitespace and formatting.
-    
+
     Args:
         pipeline_name: Name of the pipeline to update
         original_configuration_snippet: The configuration snippet to replace
         replacement_configuration_snippet: The new configuration snippet
-        skip_validation_errors: If True (default), updates the pipeline even if validation fails.
-                               If False, stops update when validation fails.
     """
     workspace = get_workspace()
     async with AsyncDeepsetClient() as client:
@@ -163,8 +160,7 @@ async def update_pipeline(
             workspace=workspace,
             pipeline_name=pipeline_name,
             original_config_snippet=original_configuration_snippet,
-            replacement_config_snippet=replacement_configuration_snippet,
-            skip_validation_errors=skip_validation_errors,
+            replacement_config_snippet=replacement_configuration_snippet
         )
 
     return response

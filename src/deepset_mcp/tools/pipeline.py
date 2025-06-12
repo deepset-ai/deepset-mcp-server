@@ -36,14 +36,14 @@ async def validate_pipeline(client: AsyncClientProtocol, workspace: str, yaml_co
 
 
 async def create_pipeline(
-    client: AsyncClientProtocol, 
-    workspace: str, 
-    pipeline_name: str, 
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
     yaml_configuration: str,
-    skip_validation_errors: bool = True
+    skip_validation_errors: bool = True,
 ) -> str:
     """Creates a new pipeline within the currently configured deepset workspace.
-    
+
     Args:
         client: The async client for API communication
         workspace: The workspace name
@@ -67,12 +67,12 @@ async def create_pipeline(
         return f"Failed to create pipeline '{pipeline_name}': {e}"
 
     success_message = f"Pipeline '{pipeline_name}' created successfully."
-    
-    # If validation failed but we created anyway, include validation errors
+
+    # If validation failed, but we created anyway, include validation errors
     if not validation_response.valid:
         validation_errors = validation_result_to_llm_readable_string(validation_response)
         return f"{success_message}\n\n**Note: Pipeline was created despite validation issues:**\n{validation_errors}"
-    
+
     return success_message
 
 
@@ -82,15 +82,15 @@ async def update_pipeline(
     pipeline_name: str,
     original_config_snippet: str,
     replacement_config_snippet: str,
-    skip_validation_errors: bool = True
+    skip_validation_errors: bool = True,
 ) -> str:
     """
     Updates a pipeline configuration in the specified workspace with a replacement configuration snippet.
 
     This function validates the replacement configuration snippet before applying it to the pipeline.
-    If the validation fails and skip_validation_errors is False, it returns a readable string describing 
+    If the validation fails and skip_validation_errors is False, it returns a readable string describing
     validation errors. Otherwise, the replacement snippet is used to update the pipeline's configuration.
-    
+
     Args:
         client: The async client for API communication
         workspace: The workspace name
@@ -140,12 +140,12 @@ async def update_pipeline(
         return f"Failed to update the pipeline '{pipeline_name}': {e}"
 
     success_message = f"The pipeline '{pipeline_name}' was successfully updated."
-    
-    # If validation failed but we updated anyway, include validation errors
+
+    # If validation failed, but we updated anyway, include validation errors
     if not validation_response.valid:
         validation_errors = validation_result_to_llm_readable_string(validation_response)
         return f"{success_message}\n\n**Note: Pipeline was updated despite validation issues:**\n{validation_errors}"
-    
+
     return success_message
 
 

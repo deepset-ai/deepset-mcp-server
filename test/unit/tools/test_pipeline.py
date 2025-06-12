@@ -255,40 +255,36 @@ async def test_create_pipeline_handles_success_and_failure_response() -> None:
 
 @pytest.mark.asyncio
 async def test_create_pipeline_skip_validation_errors_true() -> None:
-    """Test that create_pipeline creates the pipeline despite validation errors when skip_validation_errors=True (default)."""
+    """Test that create_pipeline creates the pipeline despite validation errors."""
     invalid_result = PipelineValidationResult(
-        valid=False, 
-        errors=[ValidationError(code="E1", message="Test error message")]
+        valid=False, errors=[ValidationError(code="E1", message="Test error message")]
     )
     resource = FakePipelineResource(
         validate_response=invalid_result,
         create_response=NoContentResponse(message="created successfully"),
     )
     client = FakeClient(resource)
-    
+
     # Test with explicit True
     result = await create_pipeline(
-        client, 
-        workspace="ws", 
-        pipeline_name="test_pipeline", 
+        client,
+        workspace="ws",
+        pipeline_name="test_pipeline",
         yaml_configuration="config: test",
-        skip_validation_errors=True
+        skip_validation_errors=True,
     )
-    
+
     assert "Pipeline 'test_pipeline' created successfully." in result
     assert "Note: Pipeline was created despite validation issues:" in result
     assert "configuration is invalid" in result
     assert "Error 1" in result
     assert "Test error message" in result
-    
+
     # Test with default (should behave the same as True)
     result_default = await create_pipeline(
-        client, 
-        workspace="ws", 
-        pipeline_name="test_pipeline", 
-        yaml_configuration="config: test"
+        client, workspace="ws", pipeline_name="test_pipeline", yaml_configuration="config: test"
     )
-    
+
     assert "Pipeline 'test_pipeline' created successfully." in result_default
     assert "Note: Pipeline was created despite validation issues:" in result_default
 
@@ -475,7 +471,7 @@ async def test_update_pipeline_success_response() -> None:
 
 @pytest.mark.asyncio
 async def test_update_pipeline_skip_validation_errors_true() -> None:
-    """Test that update_pipeline updates the pipeline despite validation errors when skip_validation_errors=True (default)."""
+    """Test that update_pipeline updates the pipeline despite validation errors."""
     user = DeepsetUser(user_id="u1", given_name="A", family_name="B")
     orig_yaml = "foo: 1"
     original = DeepsetPipeline(
@@ -490,17 +486,16 @@ async def test_update_pipeline_skip_validation_errors_true() -> None:
         yaml_config=orig_yaml,
     )
     invalid_result = PipelineValidationResult(
-        valid=False, 
-        errors=[ValidationError(code="E1", message="Test error message")]
+        valid=False, errors=[ValidationError(code="E1", message="Test error message")]
     )
-    
+
     resource = FakePipelineResource(
         get_response=original,
         validate_response=invalid_result,
         update_response=NoContentResponse(message="successfully updated"),
     )
     client = FakeClient(resource)
-    
+
     # Test with explicit True
     result = await update_pipeline(
         client,
@@ -508,24 +503,24 @@ async def test_update_pipeline_skip_validation_errors_true() -> None:
         pipeline_name="np",
         original_config_snippet="foo: 1",
         replacement_config_snippet="foo: 2",
-        skip_validation_errors=True
+        skip_validation_errors=True,
     )
-    
+
     assert "The pipeline 'np' was successfully updated." in result
     assert "Note: Pipeline was updated despite validation issues:" in result
     assert "configuration is invalid" in result
     assert "Error 1" in result
     assert "Test error message" in result
-    
+
     # Test with default (should behave the same as True)
     result_default = await update_pipeline(
         client,
         workspace="ws",
         pipeline_name="np",
         original_config_snippet="foo: 1",
-        replacement_config_snippet="foo: 2"
+        replacement_config_snippet="foo: 2",
     )
-    
+
     assert "The pipeline 'np' was successfully updated." in result_default
     assert "Note: Pipeline was updated despite validation issues:" in result_default
 
