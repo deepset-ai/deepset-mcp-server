@@ -1,5 +1,6 @@
+import json
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.pipeline.log_level import LogLevel
@@ -8,6 +9,9 @@ from deepset_mcp.api.pipeline.models import (
     NoContentResponse,
     PipelineLogList,
     PipelineValidationResult,
+    SearchFilters,
+    SearchResponse,
+    StreamEvent,
     ValidationError,
 )
 from deepset_mcp.api.transport import raise_for_status
