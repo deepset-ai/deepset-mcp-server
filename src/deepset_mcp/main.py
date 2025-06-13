@@ -29,6 +29,7 @@ from deepset_mcp.tools.pipeline import (
     get_pipeline as get_pipeline_tool,
     get_pipeline_logs as get_pipeline_logs_tool,
     list_pipelines as list_pipelines_tool,
+    search_pipeline as search_pipeline_tool,
     update_pipeline as update_pipeline_tool,
     validate_pipeline as validate_pipeline_tool,
 )
