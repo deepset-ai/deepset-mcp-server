@@ -11,6 +11,8 @@ from deepset_mcp.api.exceptions import (
 )
 from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.api.pipeline.models import (
+    DeepsetAnswer,
+    DeepsetDocument,
     DeepsetPipeline,
     DeepsetSearchResponse,
     DeepsetStreamEvent,
@@ -31,6 +33,7 @@ from deepset_mcp.tools.pipeline import (
     get_pipeline,
     get_pipeline_logs,
     list_pipelines,
+    search_pipeline,
     update_pipeline,
     validate_pipeline,
 )
@@ -47,11 +50,13 @@ class FakePipelineResource:
         update_response: NoContentResponse | None = None,
         logs_response: PipelineLogList | None = None,
         deploy_response: PipelineValidationResult | None = None,
+        search_response: DeepsetSearchResponse | None = None,
         get_exception: Exception | None = None,
         update_exception: Exception | None = None,
         create_exception: Exception | None = None,
         logs_exception: Exception | None = None,
         deploy_exception: Exception | None = None,
+        search_exception: Exception | None = None,
     ) -> None:
         self._list_response = list_response
         self._get_response = get_response
@@ -65,6 +70,8 @@ class FakePipelineResource:
         self._logs_exception = logs_exception
         self._deploy_response = deploy_response
         self._deploy_exception = deploy_exception
+        self._search_response = search_response
+        self._search_exception = search_exception
 
     async def list(self, page_number: int = 1, limit: int = 10) -> list[DeepsetPipeline]:
         if self._list_response is not None:
@@ -132,6 +139,10 @@ class FakePipelineResource:
         filters: dict[str, Any] | None = None,
     ) -> DeepsetSearchResponse:
         """Search using a pipeline."""
+        if self._search_exception:
+            raise self._search_exception
+        if self._search_response is not None:
+            return self._search_response
         raise NotImplementedError
 
     def search_stream(
@@ -710,3 +721,188 @@ async def test_deploy_pipeline_unexpected_error() -> None:
     result = await deploy_pipeline(client, workspace="ws", pipeline_name="test-pipeline")
 
     assert "Failed to deploy pipeline 'test-pipeline': Internal server error" in result
+
+
+# Search pipeline tests
+
+
+@pytest.mark.asyncio
+async def test_search_pipeline_success() -> None:
+    """Test successful pipeline search."""
+    user = DeepsetUser(user_id="u1", given_name="Alice", family_name="Smith")
+    pipeline = DeepsetPipeline(
+        pipeline_id="p1",
+        name="test-pipeline",
+        status="DEPLOYED",
+        service_level=PipelineServiceLevel.PRODUCTION,
+        created_at=datetime(2023, 1, 1, 12, 0),
+        last_edited_at=None,
+        created_by=user,
+        last_edited_by=None,
+        yaml_config="config: test",
+    )
+
+    answer = DeepsetAnswer(
+        answer="The answer to your question is 42.",
+        score=0.95,
+        context="Some context about the answer",
+    )
+
+    search_response = DeepsetSearchResponse(
+        query="What is the answer?",
+        answers=[answer],
+        documents=[],
+    )
+
+    resource = FakePipelineResource(
+        get_response=pipeline,
+        search_response=search_response,
+    )
+    client = FakeClient(resource)
+
+    result = await search_pipeline(client, workspace="ws", pipeline_name="test-pipeline", query="What is the answer?")
+
+    assert "Search Results from Pipeline 'test-pipeline'" in result
+    assert "**Query:** What is the answer?" in result
+    assert "The answer to your question is 42." in result
+
+
+@pytest.mark.asyncio
+async def test_search_pipeline_not_deployed() -> None:
+    """Test search with pipeline that is not deployed."""
+    user = DeepsetUser(user_id="u1", given_name="Alice", family_name="Smith")
+    pipeline = DeepsetPipeline(
+        pipeline_id="p1",
+        name="test-pipeline",
+        status="DRAFT",  # Not deployed
+        service_level=PipelineServiceLevel.DEVELOPMENT,
+        created_at=datetime(2023, 1, 1, 12, 0),
+        last_edited_at=None,
+        created_by=user,
+        last_edited_by=None,
+        yaml_config="config: test",
+    )
+
+    resource = FakePipelineResource(get_response=pipeline)
+    client = FakeClient(resource)
+
+    result = await search_pipeline(client, workspace="ws", pipeline_name="test-pipeline", query="test query")
+
+    assert "Pipeline 'test-pipeline' is not deployed (current status: DRAFT)" in result
+    assert "Please deploy the pipeline first" in result
+
+
+@pytest.mark.asyncio
+async def test_search_pipeline_not_found() -> None:
+    """Test search with non-existent pipeline."""
+    resource = FakePipelineResource(get_exception=ResourceNotFoundError())
+    client = FakeClient(resource)
+
+    result = await search_pipeline(client, workspace="ws", pipeline_name="missing-pipeline", query="test query")
+
+    assert "There is no pipeline named 'missing-pipeline' in workspace 'ws'" in result
+
+
+@pytest.mark.asyncio
+async def test_search_pipeline_search_error() -> None:
+    """Test search with API error during search."""
+    user = DeepsetUser(user_id="u1", given_name="Alice", family_name="Smith")
+    pipeline = DeepsetPipeline(
+        pipeline_id="p1",
+        name="test-pipeline",
+        status="DEPLOYED",
+        service_level=PipelineServiceLevel.PRODUCTION,
+        created_at=datetime(2023, 1, 1, 12, 0),
+        last_edited_at=None,
+        created_by=user,
+        last_edited_by=None,
+        yaml_config="config: test",
+    )
+
+    resource = FakePipelineResource(
+        get_response=pipeline,
+        search_exception=BadRequestError("Search failed"),
+    )
+    client = FakeClient(resource)
+
+    result = await search_pipeline(client, workspace="ws", pipeline_name="test-pipeline", query="test query")
+
+    assert "Failed to search using pipeline 'test-pipeline': Search failed" in result
+
+
+@pytest.mark.asyncio
+async def test_search_pipeline_no_results() -> None:
+    """Test search with no results."""
+    user = DeepsetUser(user_id="u1", given_name="Alice", family_name="Smith")
+    pipeline = DeepsetPipeline(
+        pipeline_id="p1",
+        name="test-pipeline",
+        status="DEPLOYED",
+        service_level=PipelineServiceLevel.PRODUCTION,
+        created_at=datetime(2023, 1, 1, 12, 0),
+        last_edited_at=None,
+        created_by=user,
+        last_edited_by=None,
+        yaml_config="config: test",
+    )
+
+    search_response = DeepsetSearchResponse(
+        query="No results query",
+        answers=[],
+        documents=[],
+    )
+
+    resource = FakePipelineResource(
+        get_response=pipeline,
+        search_response=search_response,
+    )
+    client = FakeClient(resource)
+
+    result = await search_pipeline(client, workspace="ws", pipeline_name="test-pipeline", query="No results query")
+
+    assert "No results found for the search query using pipeline 'test-pipeline'" in result
+
+
+@pytest.mark.asyncio
+async def test_search_pipeline_with_documents() -> None:
+    """Test search that returns documents instead of answers."""
+    user = DeepsetUser(user_id="u1", given_name="Alice", family_name="Smith")
+    pipeline = DeepsetPipeline(
+        pipeline_id="p1",
+        name="test-pipeline",
+        status="DEPLOYED",
+        service_level=PipelineServiceLevel.PRODUCTION,
+        created_at=datetime(2023, 1, 1, 12, 0),
+        last_edited_at=None,
+        created_by=user,
+        last_edited_by=None,
+        yaml_config="config: test",
+    )
+
+    document = DeepsetDocument(
+        content="This is a test document with some content that should be displayed.",
+        meta={"title": "Test Document", "source": "test.txt"},
+        score=0.85,
+        id="doc1",
+    )
+
+    search_response = DeepsetSearchResponse(
+        query="test document",
+        answers=[],  # No answers, only documents
+        documents=[document],
+    )
+
+    resource = FakePipelineResource(
+        get_response=pipeline,
+        search_response=search_response,
+    )
+    client = FakeClient(resource)
+
+    result = await search_pipeline(client, workspace="ws", pipeline_name="test-pipeline", query="test document")
+
+    assert "Search Results from Pipeline 'test-pipeline'" in result
+    assert "**Query:** test document" in result
+    assert "### Documents" in result
+    assert "This is a test document with some content" in result
+    assert "title: Test Document" in result
+    assert "source: test.txt" in result
