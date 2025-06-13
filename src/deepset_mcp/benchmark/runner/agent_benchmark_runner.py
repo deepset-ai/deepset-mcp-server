@@ -25,9 +25,9 @@ class AgentBenchmarkRunner:
     """Main class for running agent benchmarks against test cases."""
 
     def __init__(
-        self,
-        agent_config: AgentConfig,
-        benchmark_config: BenchmarkConfig,
+            self,
+            agent_config: AgentConfig,
+            benchmark_config: BenchmarkConfig,
     ):
         """
         Initialize the benchmark runner.
@@ -38,6 +38,9 @@ class AgentBenchmarkRunner:
         """
         self.agent_config = agent_config
         self.benchmark_config = benchmark_config
+
+        # Create a single timestamp for this benchmark run
+        self.run_timestamp = datetime.now()
 
         try:
             secret_key = self.benchmark_config.get_env_var("LANGFUSE_SECRET_KEY")
@@ -51,6 +54,9 @@ class AgentBenchmarkRunner:
 
         self.agent = agent
         self.commit_hash = commit_hash
+
+        # Create the run ID once for all test cases
+        self.run_id = f"{self.agent_config.display_name}-{self.commit_hash}_{self.run_timestamp.strftime('%Y%m%d_%H%M%S')}"
 
     async def run_single_test(self, test_case_name: str) -> dict[str, Any]:
         """
@@ -198,9 +204,9 @@ class AgentBenchmarkRunner:
         return results
 
     async def run_all_tests_async(
-        self,
-        test_case_path: Path,
-        concurrency: int = 1,  # Keep concurrency low to avoid resource conflicts
+            self,
+            test_case_path: Path,
+            concurrency: int = 1,  # Keep concurrency low to avoid resource conflicts
     ) -> list[dict[str, Any]]:
         """
         Run all test cases asynchronously with controlled concurrency.
@@ -247,23 +253,21 @@ class AgentBenchmarkRunner:
         return processed_results
 
     def _format_results(
-        self,
-        agent_output: dict[str, Any],
-        test_config: TestCaseConfig,
-        is_pre_agent_valid: bool | None = None,
-        is_post_agent_valid: bool | None = None,
-        post_yaml: str | None = None,
+            self,
+            agent_output: dict[str, Any],
+            test_config: TestCaseConfig,
+            is_pre_agent_valid: bool | None = None,
+            is_post_agent_valid: bool | None = None,
+            post_yaml: str | None = None,
     ) -> dict[str, Any]:
         """Format the agent output and metadata for saving to file."""
-        timestamp = datetime.now()
-
         return {
             "metadata": {
                 "commit_hash": self.commit_hash,
                 "agent_display_name": self.agent_config.display_name,
                 "test_case_name": test_config.name,
-                "timestamp": timestamp.isoformat(),
-                "run_id": f"{self.agent_config.display_name}-{self.commit_hash}_{timestamp.strftime('%Y%m%d_%H%M%S')}",
+                "timestamp": self.run_timestamp.isoformat(),
+                "run_id": self.run_id,
             },
             "validation": {
                 "pre_validation": "PASS" if is_pre_agent_valid else "FAIL",
@@ -368,10 +372,10 @@ class AgentBenchmarkRunner:
 
 
 def run_agent_benchmark(
-    agent_config: AgentConfig,
-    benchmark_config: BenchmarkConfig,
-    test_case_name: str | None = None,
-    concurrency: int = 1,
+        agent_config: AgentConfig,
+        benchmark_config: BenchmarkConfig,
+        test_case_name: str | None = None,
+        concurrency: int = 1,
 ) -> list[dict[str, Any]]:
     """
     Convenience function to run agent benchmarks.
