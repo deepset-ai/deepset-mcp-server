@@ -1,3 +1,5 @@
+from collections.abc import AsyncIterator
+from contextlib import AbstractAsyncContextManager
 from types import TracebackType
 from typing import Any, Protocol, Self, TypeVar, overload
 
@@ -6,13 +8,15 @@ from deepset_mcp.api.indexes.models import Index, IndexList
 from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
+    DeepsetSearchResponse,
+    DeepsetStreamEvent,
     NoContentResponse,
     PipelineLogList,
     PipelineValidationResult,
 )
 from deepset_mcp.api.pipeline_template.models import PipelineTemplate
 from deepset_mcp.api.shared_models import DeepsetUser
-from deepset_mcp.api.transport import TransportResponse
+from deepset_mcp.api.transport import StreamingResponse, TransportResponse
 
 
 class HaystackServiceProtocol(Protocol):
@@ -90,6 +94,18 @@ class AsyncClientProtocol(Protocol):
         **kwargs: Any,
     ) -> TransportResponse[Any]:
         """Make a request to the API."""
+        ...
+
+    def stream_request(
+        self,
+        endpoint: str,
+        *,
+        method: str = "POST",
+        data: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        **kwargs: Any,
+    ) -> AbstractAsyncContextManager[StreamingResponse]:
+        """Make a streaming request to the API."""
         ...
 
     async def close(self) -> None:
@@ -222,4 +238,28 @@ class PipelineResourceProtocol(Protocol):
 
     async def deploy(self, pipeline_name: str) -> PipelineValidationResult:
         """Deploy a pipeline."""
+        ...
+
+    async def search(
+        self,
+        pipeline_name: str,
+        query: str,
+        debug: bool = False,
+        view_prompts: bool = False,
+        params: dict[str, Any] | None = None,
+        filters: dict[str, Any] | None = None,
+    ) -> DeepsetSearchResponse:
+        """Search using a pipeline."""
+        ...
+
+    def search_stream(
+        self,
+        pipeline_name: str,
+        query: str,
+        debug: bool = False,
+        view_prompts: bool = False,
+        params: dict[str, Any] | None = None,
+        filters: dict[str, Any] | None = None,
+    ) -> AsyncIterator[DeepsetStreamEvent]:
+        """Search using a pipeline with response streaming."""
         ...
