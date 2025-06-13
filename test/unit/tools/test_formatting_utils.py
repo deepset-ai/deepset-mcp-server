@@ -159,3 +159,172 @@ def test_validation_result_to_llm_readable_string_invalid() -> None:
     assert "Error 2" in formatted
     assert "- Code: COMPONENT_ERROR" in formatted
     assert "- Message: Unknown component type" in formatted
+
+
+def test_search_response_to_llm_readable_string_with_answers() -> None:
+    """Test formatting search response with answers."""
+    answer1 = DeepsetAnswer(
+        answer="The capital of France is Paris.",
+        score=0.95,
+        context="France is a country in Europe. Its capital city is Paris.",
+        document_id="doc1",
+        meta={"source": "geography.txt", "page": 42},
+    )
+    answer2 = DeepsetAnswer(
+        answer="Paris has a population of about 2.2 million.",
+        score=0.88,
+        context="Population statistics for major cities.",
+    )
+    
+    query_id = uuid4()
+    response = DeepsetSearchResponse(
+        query="What is the capital of France?",
+        query_id=query_id,
+        answers=[answer1, answer2],
+        documents=[],
+    )
+
+    result = search_response_to_llm_readable_string(response, "geography-pipeline")
+
+    # Check basic structure
+    assert "### Search Results from Pipeline 'geography-pipeline'" in result
+    assert "**Query:** What is the capital of France?" in result
+    assert f"**Query ID:** {query_id}" in result
+    assert "### Answers" in result
+
+    # Check answer 1
+    assert "**Answer 1**" in result
+    assert "- **Text:** The capital of France is Paris." in result
+    assert "- **Score:** 0.9500" in result
+    assert "- **Context:** France is a country in Europe. Its capital city is Paris." in result
+    assert "- **Document ID:** doc1" in result
+    assert "- **Metadata:**" in result
+    assert "  - source: geography.txt" in result
+    assert "  - page: 42" in result
+
+    # Check answer 2
+    assert "**Answer 2**" in result
+    assert "- **Text:** Paris has a population of about 2.2 million." in result
+    assert "- **Score:** 0.8800" in result
+    assert "- **Context:** Population statistics for major cities." in result
+
+
+def test_search_response_to_llm_readable_string_with_documents() -> None:
+    """Test formatting search response with documents but no answers."""
+    doc1 = DeepsetDocument(
+        content="This is a long document with lots of content that should be truncated if it exceeds the character limit set for display purposes.",
+        meta={"title": "Long Document", "author": "John Doe"},
+        score=0.75,
+        id="doc1",
+    )
+    doc2 = DeepsetDocument(
+        content="Short document.",
+        meta={"title": "Short Document"},
+        score=0.60,
+        id="doc2",
+    )
+    
+    response = DeepsetSearchResponse(
+        query="test query",
+        answers=[],  # No answers
+        documents=[doc1, doc2],
+    )
+
+    result = search_response_to_llm_readable_string(response, "doc-search-pipeline")
+
+    # Check basic structure
+    assert "### Search Results from Pipeline 'doc-search-pipeline'" in result
+    assert "**Query:** test query" in result
+    assert "### Documents" in result
+    assert "### Answers" not in result  # Should not show answers section
+
+    # Check document 1 (should be truncated)
+    assert "**Document 1**" in result
+    assert "- **Content:** This is a long document with lots of content that should be truncated if it exceeds the character limit set for display purposes." in result
+    assert "- **Score:** 0.7500" in result
+    assert "- **ID:** doc1" in result
+    assert "  - title: Long Document" in result
+    assert "  - author: John Doe" in result
+
+    # Check document 2
+    assert "**Document 2**" in result
+    assert "- **Content:** Short document." in result
+    assert "- **Score:** 0.6000" in result
+    assert "- **ID:** doc2" in result
+    assert "  - title: Short Document" in result
+
+
+def test_search_response_to_llm_readable_string_truncated_content() -> None:
+    """Test that long document content gets truncated."""
+    long_content = "A" * 600  # 600 characters, should be truncated to 500 + "..."
+    doc = DeepsetDocument(
+        content=long_content,
+        meta={},
+    )
+    
+    response = DeepsetSearchResponse(
+        query="test",
+        answers=[],
+        documents=[doc],
+    )
+
+    result = search_response_to_llm_readable_string(response, "test-pipeline")
+
+    # Should be truncated to 500 chars + "..."
+    assert "A" * 500 + "..." in result
+    assert len([line for line in result.split("\n") if "**Content:**" in line][0]) <= 520  # Account for prefix
+
+
+def test_search_response_to_llm_readable_string_no_results() -> None:
+    """Test formatting search response with no results."""
+    response = DeepsetSearchResponse(
+        query="no results query",
+        answers=[],
+        documents=[],
+    )
+
+    result = search_response_to_llm_readable_string(response, "empty-pipeline")
+
+    assert result == "No results found for the search query using pipeline 'empty-pipeline'."
+
+
+def test_search_response_to_llm_readable_string_minimal_data() -> None:
+    """Test formatting search response with minimal data."""
+    answer = DeepsetAnswer(
+        answer="Simple answer",  # Only required field
+    )
+    
+    response = DeepsetSearchResponse(
+        answers=[answer],
+        documents=[],
+    )
+
+    result = search_response_to_llm_readable_string(response, "minimal-pipeline")
+
+    assert "### Search Results from Pipeline 'minimal-pipeline'" in result
+    assert "**Answer 1**" in result
+    assert "- **Text:** Simple answer" in result
+    # Should not include optional fields that are None
+    assert "- **Score:**" not in result
+    assert "- **Context:**" not in result
+    assert "- **Document ID:**" not in result
+    assert "- **Metadata:**" not in result
+
+
+def test_search_response_to_llm_readable_string_answers_and_documents() -> None:
+    """Test that when both answers and documents are present, only answers are shown."""
+    answer = DeepsetAnswer(answer="Test answer")
+    document = DeepsetDocument(content="Test document", meta={})
+    
+    response = DeepsetSearchResponse(
+        query="test",
+        answers=[answer],
+        documents=[document],
+    )
+
+    result = search_response_to_llm_readable_string(response, "test-pipeline")
+
+    assert "### Answers" in result
+    assert "### Documents" not in result
+    assert "Test answer" in result
+    assert "Test document" not in result
