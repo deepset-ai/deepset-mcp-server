@@ -175,7 +175,7 @@ class AgentBenchmarkRunner:
 
         return result
 
-    def run_all_tests(self, test_case_path: Path) -> list[dict[str, Any]]:
+    def run_all_tests(self, test_case_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """
         Run the agent against all available test cases.
 
@@ -183,14 +183,23 @@ class AgentBenchmarkRunner:
             test_case_path: Directory containing test case files
 
         Returns:
-            List of results for each test case
+            Tuple of (test results list, summary statistics dict)
         """
         # Find all test case files
         test_paths = find_all_test_case_paths(test_case_path)
 
         if not test_paths:
             logger.warning(f"No test cases found in {test_case_path}")
-            return []
+            empty_summary = {
+                "total_prompt_tokens": 0,
+                "total_completion_tokens": 0,
+                "tests_completed": 0,
+                "tests_failed": 0,
+                "avg_tool_calls": 0.0,
+                "pass_rate_percent": 0.0,
+                "fail_rate_percent": 0.0
+            }
+            return [], empty_summary
 
         logger.info(f"Found {len(test_paths)} test cases to run")
 
@@ -201,13 +210,16 @@ class AgentBenchmarkRunner:
             result = asyncio.run(self.run_single_test_with_cleanup(test_name))
             results.append(result)
 
-        return results
+        # Create run summary CSV and get summary data
+        summary_data = self._create_run_summary_csv(results)
+
+        return results, summary_data
 
     async def run_all_tests_async(
             self,
             test_case_path: Path,
             concurrency: int = 1,  # Keep concurrency low to avoid resource conflicts
-    ) -> list[dict[str, Any]]:
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """
         Run all test cases asynchronously with controlled concurrency.
 
@@ -216,14 +228,23 @@ class AgentBenchmarkRunner:
             concurrency: Number of concurrent test runs (default: 1 for safety)
 
         Returns:
-            List of results for each test case
+            Tuple of (test results list, summary statistics dict)
         """
         # Find all test case files
         test_paths = find_all_test_case_paths(test_case_path)
 
         if not test_paths:
             logger.warning(f"No test cases found in {test_case_path}")
-            return []
+            empty_summary = {
+                "total_prompt_tokens": 0,
+                "total_completion_tokens": 0,
+                "tests_completed": 0,
+                "tests_failed": 0,
+                "avg_tool_calls": 0.0,
+                "pass_rate_percent": 0.0,
+                "fail_rate_percent": 0.0
+            }
+            return [], empty_summary
 
         logger.info(f"Found {len(test_paths)} test cases to run with concurrency={concurrency}")
 
@@ -250,7 +271,10 @@ class AgentBenchmarkRunner:
             else:
                 processed_results.append(result)  # type: ignore
 
-        return processed_results
+        # Create run summary CSV and get summary data
+        summary_data = self._create_run_summary_csv(processed_results)
+
+        return processed_results, summary_data
 
     def _format_results(
             self,
@@ -270,8 +294,10 @@ class AgentBenchmarkRunner:
                 "run_id": self.run_id,
             },
             "validation": {
-                "pre_validation": "PASS" if is_pre_agent_valid else "FAIL",
-                "post_validation": "PASS" if is_post_agent_valid else "FAIL",
+                "pre_validation": "PASS" if is_pre_agent_valid is True else (
+                    "FAIL" if is_pre_agent_valid is False else None),
+                "post_validation": "PASS" if is_post_agent_valid is True else (
+                    "FAIL" if is_post_agent_valid is False else None),
             },
             "messages": {
                 "serialized": [message.to_dict() for message in agent_output["messages"]],
@@ -279,6 +305,86 @@ class AgentBenchmarkRunner:
             },
             "pipeline_yaml": post_yaml,
         }
+
+    def _create_run_summary_csv(self, results: list[dict[str, Any]]) -> dict[str, Any]:
+        """
+        Create a summary CSV file for the entire benchmark run.
+
+        Args:
+            results: List of test results from the benchmark run
+
+        Returns:
+            Dictionary containing the summary statistics
+        """
+        # Initialize counters
+        total_prompt_tokens = 0
+        total_completion_tokens = 0
+        tests_completed = 0
+        tests_failed = 0
+        total_tool_calls = 0
+        tests_with_validation = 0
+        validation_passes = 0
+
+        for result in results:
+            if result["status"] == "success":
+                tests_completed += 1
+                processed_data = result["processed_data"]
+
+                # Sum token counts
+                stats = processed_data["messages"]["stats"]
+                total_prompt_tokens += stats["total_prompt_tokens"]
+                total_completion_tokens += stats["total_completion_tokens"]
+                total_tool_calls += stats["total_tool_calls"]
+
+                # Check validation results (exclude cases where pre or post validation is None)
+                validation = processed_data["validation"]
+                pre_val = validation["pre_validation"]
+                post_val = validation["post_validation"]
+
+                # Only count validation if both pre and post validation exist
+                if pre_val is not None and post_val is not None:
+                    tests_with_validation += 1
+
+                    # Expected pattern: pre_validation should FAIL, post_validation should PASS
+                    # This indicates the agent successfully fixed the broken pipeline
+                    if pre_val == "FAIL" and post_val == "PASS":
+                        validation_passes += 1
+            else:
+                tests_failed += 1
+
+        # Calculate averages and rates
+        avg_tool_calls = total_tool_calls / tests_completed if tests_completed > 0 else 0
+        pass_rate = (validation_passes / tests_with_validation * 100) if tests_with_validation > 0 else 0
+        fail_rate = 100 - pass_rate if tests_with_validation > 0 else 0
+
+        # Create summary dict
+        summary_data = {
+            "total_prompt_tokens": total_prompt_tokens,
+            "total_completion_tokens": total_completion_tokens,
+            "tests_completed": tests_completed,
+            "tests_failed": tests_failed,
+            "avg_tool_calls": round(avg_tool_calls, 2),
+            "pass_rate_percent": round(pass_rate, 2),
+            "fail_rate_percent": round(fail_rate, 2)
+        }
+
+        # Create CSV content
+        csv_data = [
+            "total_prompt_tokens,total_completion_tokens,tests_completed,tests_failed,avg_tool_calls,pass_rate_percent,fail_rate_percent",
+            f"{total_prompt_tokens},{total_completion_tokens},{tests_completed},{tests_failed},{avg_tool_calls:.2f},{pass_rate:.2f},{fail_rate:.2f}"
+        ]
+
+        # Save to main run directory
+        run_dir = self.benchmark_config.output_dir / "agent_runs" / self.run_id
+        run_dir.mkdir(exist_ok=True, parents=True)
+        summary_file = run_dir / "run_summary.csv"
+
+        with open(summary_file, "w", encoding="utf-8") as f:
+            f.write("\n".join(csv_data))
+
+        logger.info(f"Run summary saved to: {summary_file}")
+
+        return summary_data
 
     @staticmethod
     def _extract_assistant_message_stats(messages: list[ChatMessage]) -> dict[str, str | int]:
@@ -348,6 +454,8 @@ class AgentBenchmarkRunner:
 
         # Save test_results.csv
         csv_file = test_case_dir / "test_results.csv"
+        pre_validation = processed_data['validation']['pre_validation'] or "N/A"
+        post_validation = processed_data['validation']['post_validation'] or "N/A"
         csv_data = [
             "commit,test_case,agent,prompt_tokens,completion_tokens,tool_calls,model,pre_validation,post_validation",
             f"{metadata['commit_hash']},{test_case_name},{metadata['agent_display_name']},"
@@ -355,8 +463,8 @@ class AgentBenchmarkRunner:
             f"{processed_data['messages']['stats']['total_completion_tokens']},"
             f"{processed_data['messages']['stats']['total_tool_calls']},"
             f"{processed_data['messages']['stats']['model']},"
-            f"{processed_data['validation']['pre_validation']},"
-            f"{processed_data['validation']['post_validation']}",
+            f"{pre_validation},"
+            f"{post_validation}",
         ]
 
         with open(csv_file, "w", encoding="utf-8") as f:
@@ -376,7 +484,7 @@ def run_agent_benchmark(
         benchmark_config: BenchmarkConfig,
         test_case_name: str | None = None,
         concurrency: int = 1,
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """
     Convenience function to run agent benchmarks.
 
@@ -398,7 +506,10 @@ def run_agent_benchmark(
     if test_case_name:
         # Run single test case
         result = asyncio.run(runner.run_single_test_with_cleanup(test_case_name))
-        return [result]
+        results = [result]
+        # Create run summary CSV for single test case
+        summary_data = runner._create_run_summary_csv(results)
+        return results, summary_data
     else:
         # Run all test cases
         if concurrency == 1:
