@@ -1,6 +1,10 @@
 from datetime import datetime
+from uuid import uuid4
 
 from deepset_mcp.api.pipeline.models import (
+    DeepsetAnswer,
+    DeepsetDocument,
+    DeepsetSearchResponse,
     ExceptionInfo,
     PipelineLog,
     PipelineLogList,
@@ -9,6 +13,7 @@ from deepset_mcp.api.pipeline.models import (
 )
 from deepset_mcp.tools.formatting_utils import (
     pipeline_logs_to_llm_readable_string,
+    search_response_to_llm_readable_string,
     validation_result_to_llm_readable_string,
 )
 
@@ -153,3 +158,104 @@ def test_validation_result_to_llm_readable_string_invalid() -> None:
     assert "Error 2" in formatted
     assert "- Code: COMPONENT_ERROR" in formatted
     assert "- Message: Unknown component type" in formatted
+
+
+def test_search_response_to_llm_readable_string_with_answers() -> None:
+    """Test formatting search response with answers."""
+    answer1 = DeepsetAnswer(
+        answer="The capital of France is Paris.",
+        score=0.95,
+        document_id="doc1",
+        meta={"source": "geography.txt", "page": 42},
+    )
+
+    query_id = uuid4()
+    response = DeepsetSearchResponse(
+        query="What is the capital of France?",
+        query_id=query_id,
+        answers=[answer1],
+        documents=[],
+    )
+
+    result = search_response_to_llm_readable_string(response, "geography-pipeline")
+
+    # Check basic structure
+    assert "### Search Results from Pipeline 'geography-pipeline'" in result
+    assert "**Query:** What is the capital of France?" in result
+    assert "### Answer" in result
+
+    # Check answer
+    assert "The capital of France is Paris." in result
+
+
+def test_search_response_to_llm_readable_string_with_documents() -> None:
+    """Test formatting search response with documents but no answers."""
+    doc1 = DeepsetDocument(
+        content="This is a document.",
+        meta={"title": "Long Document", "author": "John Doe"},
+        score=0.75,
+        id="doc1",
+    )
+    doc2 = DeepsetDocument(
+        content="Short document.",
+        meta={"title": "Short Document"},
+        score=0.60,
+        id="doc2",
+    )
+
+    response = DeepsetSearchResponse(
+        query="test query",
+        answers=[],  # No answers
+        documents=[doc1, doc2],
+    )
+
+    result = search_response_to_llm_readable_string(response, "doc-search-pipeline")
+
+    # Check basic structure
+    assert "### Search Results from Pipeline 'doc-search-pipeline'" in result
+    assert "**Query:** test query" in result
+    assert "### Documents" in result
+    assert "### Answer" not in result  # Should not show answers section
+
+    # Check document 1 (should be truncated)
+    assert "**Document [1]**" in result
+    assert "- **Content:** This is a document." in result
+    assert "  - title: Long Document" in result
+    assert "  - author: John Doe" in result
+
+    # Check document 2
+    assert "**Document [2]**" in result
+    assert "- **Content:** Short document." in result
+    assert "  - title: Short Document" in result
+
+
+def test_search_response_to_llm_readable_string_no_results() -> None:
+    """Test formatting search response with no results."""
+    response = DeepsetSearchResponse(
+        query="no results query",
+        answers=[],
+        documents=[],
+    )
+
+    result = search_response_to_llm_readable_string(response, "empty-pipeline")
+
+    assert result == "No results found for the search query using pipeline 'empty-pipeline'."
+
+
+def test_search_response_to_llm_readable_string_answers_and_documents() -> None:
+    """Test that when both answers and documents are present, both are shown."""
+    answer = DeepsetAnswer(answer="Test answer")
+    document = DeepsetDocument(content="Test document", meta={})
+
+    response = DeepsetSearchResponse(
+        query="test",
+        answers=[answer],
+        documents=[document],
+    )
+
+    result = search_response_to_llm_readable_string(response, "test-pipeline")
+
+    assert "### Answer" in result
+    assert "### Documents" in result
+    assert "Test answer" in result
+    assert "Test document" in result

@@ -29,6 +29,7 @@ from deepset_mcp.tools.pipeline import (
     get_pipeline as get_pipeline_tool,
     get_pipeline_logs as get_pipeline_logs_tool,
     list_pipelines as list_pipelines_tool,
+    search_pipeline as search_pipeline_tool,
     update_pipeline as update_pipeline_tool,
     validate_pipeline as validate_pipeline_tool,
 )
@@ -405,6 +406,33 @@ async def get_latest_custom_component_installation_logs() -> str:
     async with AsyncDeepsetClient() as client:
         response = await get_latest_custom_component_installation_logs_tool(client, workspace)
 
+    return response
+
+
+@mcp.tool()
+async def search_pipeline(pipeline_name: str, query: str) -> str:
+    """Search using a deployed pipeline in the deepset workspace.
+
+    This tool allows you to execute a search query using a specific pipeline.
+    The pipeline must already be deployed (status = DEPLOYED) for the search to work.
+    If the pipeline is not deployed, you will receive an error message instructing you to deploy it first.
+
+    Use this tool when you want to:
+    - Test a deployed pipeline with a specific query
+    - Get search results from a knowledge base using a specific pipeline
+    - Retrieve answers or documents based on a search query
+
+    :param pipeline_name: Name of the deployed pipeline to use for search.
+    :param query: The search query to execute.
+    """
+    workspace = get_workspace()
+    async with AsyncDeepsetClient() as client:
+        response = await search_pipeline_tool(
+            client=client,
+            workspace=workspace,
+            pipeline_name=pipeline_name,
+            query=query,
+        )
     return response
 
 
