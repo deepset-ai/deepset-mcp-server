@@ -11,6 +11,8 @@ from deepset_mcp.api.exceptions import (
 )
 from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.api.pipeline.models import (
+    DeepsetAnswer,
+    DeepsetDocument,
     DeepsetPipeline,
     DeepsetSearchResponse,
     DeepsetStreamEvent,
