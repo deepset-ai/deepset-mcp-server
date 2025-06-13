@@ -1,7 +1,3 @@
-# <test-case>
-# This pipeline is wrongly connecting the prompt builder output to the documents output.
-#</test-case>
-
 components:
   chat_summary_prompt_builder:
     type: haystack.components.builders.prompt_builder.PromptBuilder
@@ -43,7 +39,7 @@ components:
         type: haystack_integrations.document_stores.opensearch.document_store.OpenSearchDocumentStore
         init_parameters:
           hosts:
-          index: ''
+          index: 'standard-index'
           max_chunk_bytes: 104857600
           embedding_dim: 768
           return_embedding: false
@@ -71,7 +67,7 @@ components:
         type: haystack_integrations.document_stores.opensearch.document_store.OpenSearchDocumentStore
         init_parameters:
           hosts:
-          index: ''
+          index: 'standard-index'
           max_chunk_bytes: 104857600
           embedding_dim: 768
           return_embedding: false

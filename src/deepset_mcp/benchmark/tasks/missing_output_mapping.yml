@@ -1,0 +1,14 @@
+name: "missing_output_mapping"
+objective: "Add pipeline inputs and outputs."
+prompt: "Can you check why my chat rag pipeline doesn't work."
+query_yaml: "pipelines/chat_rag_missing_output_mapping.yml"
+query_name: "rag-chat-test"
+index_yaml: "pipelines/standard_index.yml"
+index_name: "standard-index"
+tags:
+  - "debug"
+  - "pipeline-outputs"
+judge_prompt: |
+  The Agent has:
+  - successfully added an outputs key
+  - connected the document and answer outputs
