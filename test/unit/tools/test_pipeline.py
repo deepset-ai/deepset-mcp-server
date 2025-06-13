@@ -70,6 +70,8 @@ class FakePipelineResource:
         self._logs_exception = logs_exception
         self._deploy_response = deploy_response
         self._deploy_exception = deploy_exception
+        self._search_response = search_response
+        self._search_exception = search_exception
 
     async def list(self, page_number: int = 1, limit: int = 10) -> list[DeepsetPipeline]:
         if self._list_response is not None:
