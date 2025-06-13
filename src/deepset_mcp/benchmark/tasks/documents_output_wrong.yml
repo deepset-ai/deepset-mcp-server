@@ -1,0 +1,13 @@
+name: "documents_output_wrong"
+objective: "Connect the retrieved documents to the documents output."
+prompt: "Can you check why my rag pipeline doesn't work."
+query_yaml: "pipelines/rag_documents_wrong_format.yml"
+query_name: "rag"
+index_yaml: "pipelines/standard_index.yml"
+index_name: "standard-index"
+tags:
+  - "debug"
+  - "pipeline-outputs"
+judge_prompt: |
+  The Agent has:
+  - successfully connected retrieved documents to the document output
