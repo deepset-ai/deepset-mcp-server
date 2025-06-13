@@ -139,6 +139,10 @@ class FakePipelineResource:
         filters: dict[str, Any] | None = None,
     ) -> DeepsetSearchResponse:
         """Search using a pipeline."""
+        if self._search_exception:
+            raise self._search_exception
+        if self._search_response is not None:
+            return self._search_response
         raise NotImplementedError
 
     def search_stream(
