@@ -1,11 +1,14 @@
 import asyncio
 import json
 import logging
+import sys
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from haystack.dataclasses.chat_message import ChatMessage
+from haystack.dataclasses.streaming_chunk import StreamingChunk
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.benchmark.runner.agent_loader import load_agent
@@ -28,6 +31,7 @@ class AgentBenchmarkRunner:
         self,
         agent_config: AgentConfig,
         benchmark_config: BenchmarkConfig,
+        streaming: bool = False,
     ):
         """
         Initialize the benchmark runner.
@@ -35,9 +39,14 @@ class AgentBenchmarkRunner:
         Args:
             agent_config: Configuration for the agent to test.
             benchmark_config: Benchmark configuration.
+            streaming: Whether to enable streaming output during agent execution.
         """
         self.agent_config = agent_config
         self.benchmark_config = benchmark_config
+        self.streaming = streaming
+
+        # Create a single timestamp for this benchmark run
+        self.run_timestamp = datetime.now()
 
         try:
             secret_key = self.benchmark_config.get_env_var("LANGFUSE_SECRET_KEY")
@@ -51,6 +60,52 @@ class AgentBenchmarkRunner:
 
         self.agent = agent
         self.commit_hash = commit_hash
+
+        # Create the run ID once for all test cases
+        self.run_id = (
+            f"{self.agent_config.display_name}-{self.commit_hash}_{self.run_timestamp.strftime('%Y%m%d_%H%M%S')}"
+        )
+
+    # TODO: streaming is WIP; wait until https://github.com/deepset-ai/haystack-core-integrations/issues/1947 is fixed
+    def _create_streaming_callback(self, test_case_name: str) -> Callable[[StreamingChunk], Any]:
+        """
+        Create a streaming callback function for a specific test case.
+
+        Args:
+            test_case_name: Name of the test case for logging context
+
+        Returns:
+            Callback function for streaming
+        """
+
+        async def streaming_callback(chunk: StreamingChunk) -> None:
+            """Handle streaming chunks from the agent."""
+            if hasattr(chunk, "content") and chunk.content:
+                # meta content_block type=tool_use
+                # meta type (content_block_start)
+                # meta delta type=input_json_delta
+                # meta delta message_delta
+                # meta delta stop_reason=tool_use
+                # Print with test case context, using a subtle prefix
+                content = chunk.content
+                # Handle newlines by adding the prefix to each new line
+                lines = content.split("\n")
+                for i, line in enumerate(lines):
+                    if i == 0:
+                        print(f"{line}", end="")
+                    elif line.strip():  # Only print non-empty lines with prefix
+                        print(f"\n[{test_case_name}] {line}", end="")
+                    else:
+                        print()  # Just print the newline for empty lines
+
+                # If the content ends with a newline, print it
+                if content.endswith("\n"):
+                    print()
+
+                # Ensure output is flushed immediately
+                sys.stdout.flush()
+
+        return streaming_callback
 
     async def run_single_test(self, test_case_name: str) -> dict[str, Any]:
         """
@@ -93,7 +148,18 @@ class AgentBenchmarkRunner:
                         workspace=self.benchmark_config.deepset_workspace
                     ).validate(yaml_config=query_yaml_config)
 
-            agent_output = await self.agent.run_async(messages=[ChatMessage.from_user(test_config.prompt)])
+            # Prepare streaming callback if streaming is enabled
+            streaming_callback = None
+            if self.streaming:
+                streaming_callback = self._create_streaming_callback(test_case_name)
+                print(f"\n🤖 [{test_case_name}] Agent starting...\n")
+
+            agent_output = await self.agent.run_async(
+                messages=[ChatMessage.from_user(test_config.prompt)], streaming_callback=streaming_callback
+            )
+
+            if self.streaming:
+                print(f"\n\n✅ [{test_case_name}] Agent completed.\n")
 
             post_agent_validation = None
             if query_name:
@@ -169,7 +235,7 @@ class AgentBenchmarkRunner:
 
         return result
 
-    def run_all_tests(self, test_case_path: Path) -> list[dict[str, Any]]:
+    def run_all_tests(self, test_case_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """
         Run the agent against all available test cases.
 
@@ -177,14 +243,23 @@ class AgentBenchmarkRunner:
             test_case_path: Directory containing test case files
 
         Returns:
-            List of results for each test case
+            Tuple of (test results list, summary statistics dict)
         """
         # Find all test case files
         test_paths = find_all_test_case_paths(test_case_path)
 
         if not test_paths:
             logger.warning(f"No test cases found in {test_case_path}")
-            return []
+            empty_summary = {
+                "total_prompt_tokens": 0,
+                "total_completion_tokens": 0,
+                "tests_completed": 0,
+                "tests_failed": 0,
+                "avg_tool_calls": 0.0,
+                "pass_rate_percent": 0.0,
+                "fail_rate_percent": 0.0,
+            }
+            return [], empty_summary
 
         logger.info(f"Found {len(test_paths)} test cases to run")
 
@@ -195,13 +270,16 @@ class AgentBenchmarkRunner:
             result = asyncio.run(self.run_single_test_with_cleanup(test_name))
             results.append(result)
 
-        return results
+        # Create run summary CSV and get summary data
+        summary_data = self._create_run_summary_csv(results)
+
+        return results, summary_data
 
     async def run_all_tests_async(
         self,
         test_case_path: Path,
         concurrency: int = 1,  # Keep concurrency low to avoid resource conflicts
-    ) -> list[dict[str, Any]]:
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """
         Run all test cases asynchronously with controlled concurrency.
 
@@ -210,14 +288,23 @@ class AgentBenchmarkRunner:
             concurrency: Number of concurrent test runs (default: 1 for safety)
 
         Returns:
-            List of results for each test case
+            Tuple of (test results list, summary statistics dict)
         """
         # Find all test case files
         test_paths = find_all_test_case_paths(test_case_path)
 
         if not test_paths:
             logger.warning(f"No test cases found in {test_case_path}")
-            return []
+            empty_summary = {
+                "total_prompt_tokens": 0,
+                "total_completion_tokens": 0,
+                "tests_completed": 0,
+                "tests_failed": 0,
+                "avg_tool_calls": 0.0,
+                "pass_rate_percent": 0.0,
+                "fail_rate_percent": 0.0,
+            }
+            return [], empty_summary
 
         logger.info(f"Found {len(test_paths)} test cases to run with concurrency={concurrency}")
 
@@ -244,7 +331,10 @@ class AgentBenchmarkRunner:
             else:
                 processed_results.append(result)  # type: ignore
 
-        return processed_results
+        # Create run summary CSV and get summary data
+        summary_data = self._create_run_summary_csv(processed_results)
+
+        return processed_results, summary_data
 
     def _format_results(
         self,
@@ -255,19 +345,21 @@ class AgentBenchmarkRunner:
         post_yaml: str | None = None,
     ) -> dict[str, Any]:
         """Format the agent output and metadata for saving to file."""
-        timestamp = datetime.now()
-
         return {
             "metadata": {
                 "commit_hash": self.commit_hash,
                 "agent_display_name": self.agent_config.display_name,
                 "test_case_name": test_config.name,
-                "timestamp": timestamp.isoformat(),
-                "run_id": f"{self.agent_config.display_name}-{self.commit_hash}_{timestamp.strftime('%Y%m%d_%H%M%S')}",
+                "timestamp": self.run_timestamp.isoformat(),
+                "run_id": self.run_id,
             },
             "validation": {
-                "pre_validation": "PASS" if is_pre_agent_valid else "FAIL",
-                "post_validation": "PASS" if is_post_agent_valid else "FAIL",
+                "pre_validation": "PASS"
+                if is_pre_agent_valid is True
+                else ("FAIL" if is_pre_agent_valid is False else None),
+                "post_validation": "PASS"
+                if is_post_agent_valid is True
+                else ("FAIL" if is_post_agent_valid is False else None),
             },
             "messages": {
                 "serialized": [message.to_dict() for message in agent_output["messages"]],
@@ -275,6 +367,86 @@ class AgentBenchmarkRunner:
             },
             "pipeline_yaml": post_yaml,
         }
+
+    def _create_run_summary_csv(self, results: list[dict[str, Any]]) -> dict[str, Any]:
+        """
+        Create a summary CSV file for the entire benchmark run.
+
+        Args:
+            results: List of test results from the benchmark run
+
+        Returns:
+            Dictionary containing the summary statistics
+        """
+        # Initialize counters
+        total_prompt_tokens = 0
+        total_completion_tokens = 0
+        tests_completed = 0
+        tests_failed = 0
+        total_tool_calls = 0
+        tests_with_validation = 0
+        validation_passes = 0
+
+        for result in results:
+            if result["status"] == "success":
+                tests_completed += 1
+                processed_data = result["processed_data"]
+
+                # Sum token counts
+                stats = processed_data["messages"]["stats"]
+                total_prompt_tokens += stats["total_prompt_tokens"]
+                total_completion_tokens += stats["total_completion_tokens"]
+                total_tool_calls += stats["total_tool_calls"]
+
+                # Check validation results (exclude cases where pre or post validation is None)
+                validation = processed_data["validation"]
+                pre_val = validation["pre_validation"]
+                post_val = validation["post_validation"]
+
+                # Only count validation if both pre and post validation exist
+                if pre_val is not None and post_val is not None:
+                    tests_with_validation += 1
+
+                    # Expected pattern: pre_validation should FAIL, post_validation should PASS
+                    # This indicates the agent successfully fixed the broken pipeline
+                    if pre_val == "FAIL" and post_val == "PASS":
+                        validation_passes += 1
+            else:
+                tests_failed += 1
+
+        # Calculate averages and rates
+        avg_tool_calls = total_tool_calls / tests_completed if tests_completed > 0 else 0
+        pass_rate = (validation_passes / tests_with_validation * 100) if tests_with_validation > 0 else 0
+        fail_rate = 100 - pass_rate if tests_with_validation > 0 else 0
+
+        # Create summary dict
+        summary_data = {
+            "total_prompt_tokens": total_prompt_tokens,
+            "total_completion_tokens": total_completion_tokens,
+            "tests_completed": tests_completed,
+            "tests_failed": tests_failed,
+            "avg_tool_calls": round(avg_tool_calls, 2),
+            "pass_rate_percent": round(pass_rate, 2),
+            "fail_rate_percent": round(fail_rate, 2),
+        }
+
+        # Create CSV content
+        csv_data = [
+            "total_prompt_tokens,total_completion_tokens,tests_completed,tests_failed,avg_tool_calls,pass_rate_percent,fail_rate_percent",
+            f"{total_prompt_tokens},{total_completion_tokens},{tests_completed},{tests_failed},{avg_tool_calls:.2f},{pass_rate:.2f},{fail_rate:.2f}",
+        ]
+
+        # Save to main run directory
+        run_dir = self.benchmark_config.output_dir / "agent_runs" / self.run_id
+        run_dir.mkdir(exist_ok=True, parents=True)
+        summary_file = run_dir / "run_summary.csv"
+
+        with open(summary_file, "w", encoding="utf-8") as f:
+            f.write("\n".join(csv_data))
+
+        logger.info(f"Run summary saved to: {summary_file}")
+
+        return summary_data
 
     @staticmethod
     def _extract_assistant_message_stats(messages: list[ChatMessage]) -> dict[str, str | int]:
@@ -344,6 +516,8 @@ class AgentBenchmarkRunner:
 
         # Save test_results.csv
         csv_file = test_case_dir / "test_results.csv"
+        pre_validation = processed_data["validation"]["pre_validation"] or "N/A"
+        post_validation = processed_data["validation"]["post_validation"] or "N/A"
         csv_data = [
             "commit,test_case,agent,prompt_tokens,completion_tokens,tool_calls,model,pre_validation,post_validation",
             f"{metadata['commit_hash']},{test_case_name},{metadata['agent_display_name']},"
@@ -351,8 +525,8 @@ class AgentBenchmarkRunner:
             f"{processed_data['messages']['stats']['total_completion_tokens']},"
             f"{processed_data['messages']['stats']['total_tool_calls']},"
             f"{processed_data['messages']['stats']['model']},"
-            f"{processed_data['validation']['pre_validation']},"
-            f"{processed_data['validation']['post_validation']}",
+            f"{pre_validation},"
+            f"{post_validation}",
         ]
 
         with open(csv_file, "w", encoding="utf-8") as f:
@@ -372,7 +546,8 @@ def run_agent_benchmark(
     benchmark_config: BenchmarkConfig,
     test_case_name: str | None = None,
     concurrency: int = 1,
-) -> list[dict[str, Any]]:
+    streaming: bool = False,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """
     Convenience function to run agent benchmarks.
 
@@ -381,6 +556,7 @@ def run_agent_benchmark(
         benchmark_config: Benchmark configuration.
         test_case_name: Specific test case to run (if None, runs all)
         concurrency: Number of concurrent test runs
+        streaming: If True, run in streaming mode
 
     Returns:
         List of test results
@@ -389,12 +565,16 @@ def run_agent_benchmark(
     runner = AgentBenchmarkRunner(
         agent_config=agent_config,
         benchmark_config=benchmark_config,
+        streaming=streaming,
     )
 
     if test_case_name:
         # Run single test case
         result = asyncio.run(runner.run_single_test_with_cleanup(test_case_name))
-        return [result]
+        results = [result]
+        # Create run summary CSV for single test case
+        summary_data = runner._create_run_summary_csv(results)
+        return results, summary_data
     else:
         # Run all test cases
         if concurrency == 1:
