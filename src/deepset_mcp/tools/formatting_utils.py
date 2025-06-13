@@ -147,3 +147,78 @@ def pipeline_logs_to_llm_readable_string(logs: PipelineLogList, pipeline_name: s
         log_parts.append("\n*Note: There are more log entries available. Adjust the limit parameter to see more.*")
 
     return "\n".join(log_parts)
+
+
+def search_response_to_llm_readable_string(search_response: DeepsetSearchResponse, pipeline_name: str) -> str:
+    """Creates a string representation of a search response that is readable by LLMs.
+
+    :param search_response: The search response to format.
+    :param pipeline_name: The name of the pipeline that performed the search.
+
+    :returns: A formatted string representation of the search response.
+    """
+    if not search_response.answers and not search_response.documents:
+        return f"No results found for the search query using pipeline '{pipeline_name}'."
+
+    result_parts = [f"### Search Results from Pipeline '{pipeline_name}'"]
+
+    if search_response.query:
+        result_parts.append(f"**Query:** {search_response.query}")
+
+    if search_response.query_id:
+        result_parts.append(f"**Query ID:** {search_response.query_id}")
+    
+    result_parts.append("\n---\n")
+
+    # Format answers
+    if search_response.answers:
+        result_parts.append("### Answers")
+        for i, answer in enumerate(search_response.answers, 1):
+            answer_parts = [f"**Answer {i}**"]
+            answer_parts.append(f"- **Text:** {answer.answer}")
+            
+            if answer.score is not None:
+                answer_parts.append(f"- **Score:** {answer.score:.4f}")
+            
+            if answer.context:
+                answer_parts.append(f"- **Context:** {answer.context}")
+            
+            if answer.document_id:
+                answer_parts.append(f"- **Document ID:** {answer.document_id}")
+            
+            if answer.meta:
+                answer_parts.append("- **Metadata:**")
+                for key, value in answer.meta.items():
+                    answer_parts.append(f"  - {key}: {value}")
+
+            result_parts.append("\n".join(answer_parts))
+            
+            # Add separator between answers (except for the last one)
+            if i < len(search_response.answers):
+                result_parts.append("")
+
+    # Format documents if no answers are present
+    if search_response.documents and not search_response.answers:
+        result_parts.append("### Documents")
+        for i, document in enumerate(search_response.documents, 1):
+            doc_parts = [f"**Document {i}**"]
+            doc_parts.append(f"- **Content:** {document.content[:500]}{'...' if len(document.content) > 500 else ''}")
+            
+            if document.score is not None:
+                doc_parts.append(f"- **Score:** {document.score:.4f}")
+            
+            if document.id:
+                doc_parts.append(f"- **ID:** {document.id}")
+            
+            if document.meta:
+                doc_parts.append("- **Metadata:**")
+                for key, value in document.meta.items():
+                    doc_parts.append(f"  - {key}: {value}")
+
+            result_parts.append("\n".join(doc_parts))
+            
+            # Add separator between documents (except for the last one)
+            if i < len(search_response.documents):
+                result_parts.append("")
+
+    return "\n".join(result_parts)
