@@ -1,4 +1,6 @@
 import json
+from collections.abc import AsyncGenerator, AsyncIterator
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from types import TracebackType
 from typing import Any, Self, TypeVar, overload
 
@@ -11,9 +13,30 @@ from deepset_mcp.api.protocols import (
     PipelineTemplateResourceProtocol,
     UserResourceProtocol,
 )
-from deepset_mcp.api.transport import TransportResponse
+from deepset_mcp.api.transport import StreamingResponse, StreamReaderProtocol, TransportResponse
 
 T = TypeVar("T")
+
+
+class FakeStreamReader(StreamReaderProtocol):
+    """Fake stream reader for testing."""
+
+    def __init__(self, lines: list[str] | None = None, body: str | None = None):
+        self.lines = lines or []
+        self.body = body or "\n".join(self.lines)
+
+    async def aread(self) -> bytes:
+        """Read entire body."""
+        return self.body.encode()
+
+    def aiter_lines(self) -> AsyncIterator[str]:
+        """Iterate over lines."""
+
+        async def generator() -> AsyncGenerator[str, None]:
+            for line in self.lines:
+                yield line
+
+        return generator()
 
 
 class BaseFakeClient(AsyncClientProtocol):
@@ -41,7 +64,6 @@ class BaseFakeClient(AsyncClientProtocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
-        stream: bool = False,
         **kwargs: Any,
     ) -> TransportResponse[T]: ...
 
@@ -54,7 +76,6 @@ class BaseFakeClient(AsyncClientProtocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
-        stream: bool = False,
         **kwargs: Any,
     ) -> TransportResponse[Any]: ...
 
@@ -66,7 +87,6 @@ class BaseFakeClient(AsyncClientProtocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
-        stream: bool = False,
         **kwargs: Any,
     ) -> TransportResponse[Any]:
         """
@@ -93,7 +113,7 @@ class BaseFakeClient(AsyncClientProtocol):
         ValueError
             If no response is predefined for the endpoint.
         """
-        self.requests.append({"endpoint": endpoint, "method": method, "data": data, "headers": headers, "stream": stream, **kwargs})
+        self.requests.append({"endpoint": endpoint, "method": method, "data": data, "headers": headers, **kwargs})
 
         # Find the appropriate response
         for resp_key, resp_data in self.responses.items():
@@ -119,6 +139,88 @@ class BaseFakeClient(AsyncClientProtocol):
                     )
 
         raise ValueError(f"No response defined for endpoint: {endpoint}")
+
+    def stream_request(
+        self,
+        endpoint: str,
+        *,
+        method: str = "POST",
+        data: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        **kwargs: Any,
+    ) -> AbstractAsyncContextManager[StreamingResponse]:
+        """
+        Record the streaming request and return a predefined streaming response.
+
+        Parameters
+        ----------
+        endpoint : str
+            API endpoint.
+        method : str, optional
+            HTTP method.
+        data : Dict[str, Any], optional
+            Request data.
+        headers : Dict[str, str], optional
+            Request headers.
+
+        Yields
+        ------
+        StreamingResponse
+            Streaming response object.
+
+        Raises
+        ------
+        ValueError
+            If no response is predefined for the endpoint.
+        """
+        self.requests.append(
+            {"endpoint": endpoint, "method": method, "data": data, "headers": headers, "streaming": True, **kwargs}
+        )
+
+        @asynccontextmanager
+        async def _stream() -> AsyncIterator[StreamingResponse]:
+            # Find the appropriate response
+            for resp_key, resp_data in self.responses.items():
+                # First try exact match, then fallback to endswith for compatibility
+                if endpoint == resp_key or endpoint.endswith(resp_key):
+                    if isinstance(resp_data, Exception):
+                        raise resp_data
+
+                    if isinstance(resp_data, StreamingResponse):
+                        yield resp_data
+                        return
+
+                    # Handle dict responses for streaming
+                    if isinstance(resp_data, dict):
+                        # Check if it's a streaming-specific response format
+                        if "status_code" in resp_data and ("lines" in resp_data or "body" in resp_data):
+                            reader = FakeStreamReader(lines=resp_data.get("lines", []), body=resp_data.get("body"))
+                            yield StreamingResponse(
+                                status_code=resp_data.get("status_code", 200),
+                                headers=resp_data.get("headers", {}),
+                                _reader=reader,
+                            )
+                            return
+                        else:
+                            # Convert regular dict to streaming response
+                            reader = FakeStreamReader(lines=[json.dumps(resp_data)])
+                            yield StreamingResponse(status_code=200, headers={}, _reader=reader)
+                            return
+
+                    # Handle list responses as lines
+                    if isinstance(resp_data, list):
+                        reader = FakeStreamReader(lines=resp_data)
+                        yield StreamingResponse(status_code=200, headers={}, _reader=reader)
+                        return
+
+                    # Default: convert to single line
+                    reader = FakeStreamReader(lines=[str(resp_data)])
+                    yield StreamingResponse(status_code=200, headers={}, _reader=reader)
+                    return
+
+            raise ValueError(f"No response defined for endpoint: {endpoint}")
+
+        return _stream()
 
     async def close(self) -> None:
         """Close the client."""

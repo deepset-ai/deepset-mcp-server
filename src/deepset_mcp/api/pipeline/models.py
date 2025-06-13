@@ -3,7 +3,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from deepset_mcp.api.shared_models import DeepsetUser
 
@@ -101,14 +101,15 @@ class PipelineLogList(BaseModel):
 
 # Search-related models
 
+
 class OffsetRange(BaseModel):
     """Model representing an offset range."""
-    
+
     start: int
     end: int
 
 
-class Answer(BaseModel):
+class DeepsetAnswer(BaseModel):
     """Model representing a search answer."""
 
     answer: str  # Required field
@@ -126,7 +127,7 @@ class Answer(BaseModel):
     type: str | None = None
 
 
-class Document(BaseModel):
+class DeepsetDocument(BaseModel):
     """Model representing a search document."""
 
     content: str  # Required field
@@ -138,36 +139,45 @@ class Document(BaseModel):
     score: float | None = None
 
 
-class SearchResult(BaseModel):
+class DeepsetSearchResponse(BaseModel):
     """Model representing a single search result."""
 
-    _debug: dict[str, Any] | None = None
-    answers: list[Answer] = Field(default_factory=list)
-    documents: list[Document] = Field(default_factory=list)
+    debug: dict[str, Any] | None = Field(default=None, alias="_debug")
+    answers: list[DeepsetAnswer] = Field(default_factory=list)
+    documents: list[DeepsetDocument] = Field(default_factory=list)
     prompts: dict[str, str] | None = None
     query: str | None = None
     query_id: UUID | None = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_response(cls, data: dict[str, Any]) -> dict[str, Any]:
+        """Normalize the response from the search and search-stream endpoints.
 
-class SearchResponse(BaseModel):
-    """Model representing the response from a pipeline search."""
-
-    query_id: UUID | None = None
-    results: list[SearchResult] = Field(default_factory=list)
-
-
-class FilterCondition(BaseModel):
-    """Model representing a single filter condition."""
-
-    field: str
-    value: Any
-    operator: str | None = None
-
-
-class SearchFilters(BaseModel):
-    """Model representing search filters."""
-
-    conditions: list[FilterCondition] = Field(default_factory=list)
+        The search endpoint returns a list of results, but we only ever use the first result.
+        We are not sending batch queries, so there will never be more than one result.
+        We use this validator to transform the data so that we can use the same response model for search and
+            search-stream endpoints.
+        """
+        # Handle non-stream format with 'results' array
+        if "results" in data and isinstance(data["results"], list):
+            if len(data["results"]) > 0:
+                first_result = data["results"][
+                    0
+                ]  # we only ever care for the first result as we don't use batch queries
+                normalized = {
+                    "query_id": data.get("query_id", first_result.get("query_id")),
+                    "query": first_result.get("query"),
+                    "answers": first_result.get("answers", []),
+                    "documents": first_result.get("documents", []),
+                    "prompts": first_result.get("prompts"),
+                    "_debug": first_result.get("_debug") or first_result.get("debug"),
+                }
+                return normalized
+            else:
+                return {}
+        else:
+            return data
 
 
 class StreamDelta(BaseModel):
@@ -177,11 +187,11 @@ class StreamDelta(BaseModel):
     meta: dict[str, Any] | None = None
 
 
-class StreamEvent(BaseModel):
+class DeepsetStreamEvent(BaseModel):
     """Model representing a stream event."""
 
-    query_id: UUID | None = None
+    query_id: str | UUID | None = None
     type: str  # "delta", "result", or "error"
     delta: StreamDelta | None = None
-    result: SearchResponse | None = None
+    result: DeepsetSearchResponse | None = None
     error: str | None = None

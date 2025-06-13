@@ -1,4 +1,6 @@
+from collections.abc import AsyncIterator
 from datetime import datetime
+from typing import Any
 
 import pytest
 
@@ -10,6 +12,8 @@ from deepset_mcp.api.exceptions import (
 from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
+    DeepsetSearchResponse,
+    DeepsetStreamEvent,
     ExceptionInfo,
     NoContentResponse,
     PipelineLog,
@@ -116,6 +120,30 @@ class FakePipelineResource:
             raise self._deploy_exception
         if self._deploy_response is not None:
             return self._deploy_response
+        raise NotImplementedError
+
+    async def search(
+        self,
+        pipeline_name: str,
+        query: str,
+        debug: bool = False,
+        view_prompts: bool = False,
+        params: dict[str, Any] | None = None,
+        filters: dict[str, Any] | None = None,
+    ) -> DeepsetSearchResponse:
+        """Search using a pipeline."""
+        raise NotImplementedError
+
+    def search_stream(
+        self,
+        pipeline_name: str,
+        query: str,
+        debug: bool = False,
+        view_prompts: bool = False,
+        params: dict[str, Any] | None = None,
+        filters: dict[str, Any] | None = None,
+    ) -> AsyncIterator[DeepsetStreamEvent]:
+        """Search using a pipeline with response streaming."""
         raise NotImplementedError
 
 

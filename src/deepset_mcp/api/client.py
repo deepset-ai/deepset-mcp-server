@@ -1,4 +1,6 @@
 import os
+from collections.abc import AsyncIterator
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from types import TracebackType
 from typing import Any, Self, TypeVar, overload
 
@@ -8,7 +10,12 @@ from deepset_mcp.api.indexes.resource import IndexResource
 from deepset_mcp.api.pipeline.resource import PipelineResource
 from deepset_mcp.api.pipeline_template.resource import PipelineTemplateResource
 from deepset_mcp.api.protocols import AsyncClientProtocol
-from deepset_mcp.api.transport import AsyncTransport, TransportProtocol, TransportResponse
+from deepset_mcp.api.transport import (
+    AsyncTransport,
+    StreamingResponse,
+    TransportProtocol,
+    TransportResponse,
+)
 from deepset_mcp.api.user.resource import UserResource
 
 T = TypeVar("T")
@@ -60,7 +67,6 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
-        stream: bool = False,
         **kwargs: Any,
     ) -> TransportResponse[T]: ...
 
@@ -73,7 +79,6 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
-        stream: bool = False,
         **kwargs: Any,
     ) -> TransportResponse[Any]: ...
 
@@ -85,10 +90,31 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         response_type: type[T] | None = None,
-        stream: bool = False,
         **kwargs: Any,
     ) -> TransportResponse[Any]:
-        """Make a request to the deepset API."""
+        """
+        Make a regular (non-streaming) request to the deepset API.
+
+        Parameters
+        ----------
+        endpoint : str
+            API endpoint path
+        method : str, default="GET"
+            HTTP method
+        data : dict, optional
+            JSON data to send in request body
+        headers : dict, optional
+            Additional headers to include
+        response_type : type[T], optional
+            Expected response type for type checking
+        **kwargs : Any
+            Additional arguments to pass to transport
+
+        Returns
+        -------
+        TransportResponse[T]
+            Response with parsed JSON if available
+        """
         if not endpoint.startswith("/"):
             endpoint = f"/{endpoint}"
         url = self.base_url + endpoint
@@ -111,9 +137,83 @@ class AsyncDeepsetClient(AsyncClientProtocol):
             json=data,
             headers=request_headers,
             response_type=response_type,
-            stream=stream,
             **kwargs,
         )
+
+    def stream_request(
+        self,
+        endpoint: str,
+        *,
+        method: str = "POST",
+        data: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        **kwargs: Any,
+    ) -> AbstractAsyncContextManager[StreamingResponse]:
+        """
+        Make a streaming request to the deepset API.
+
+        Must be used as an async context manager to ensure proper cleanup.
+
+        Parameters
+        ----------
+        endpoint : str
+            API endpoint path
+        method : str, default="POST"
+            HTTP method (usually POST for streaming)
+        data : dict, optional
+            JSON data to send in request body
+        headers : dict, optional
+            Additional headers to include
+        **kwargs : Any
+            Additional arguments to pass to transport
+
+        Yields
+        ------
+        StreamingResponse
+            Response object with streaming capabilities
+
+        Examples
+        --------
+        async with client.stream_request("/pipelines/search-stream", data={"query": "AI"}) as response:
+            if response.success:
+                async for line in response.iter_lines():
+                    # Process each line of the stream
+                    data = json.loads(line)
+                    print(data)
+            else:
+                # Handle error
+                error_body = await response.read_body()
+                print(f"Error {response.status_code}: {error_body}")
+        """
+
+        @asynccontextmanager
+        async def _stream() -> AsyncIterator[StreamingResponse]:
+            if not endpoint.startswith("/"):
+                full_endpoint = f"/{endpoint}"
+            url = self.base_url + full_endpoint
+
+            # Default headers for streaming
+            request_headers: dict[str, str] = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Accept": "text/event-stream,application/json,text/plain,*/*",
+            }
+            if data is not None:
+                request_headers["Content-Type"] = "application/json"
+            # Merge custom headers
+            if headers:
+                headers.setdefault("Authorization", request_headers["Authorization"])
+                request_headers.update(headers)
+
+            async with self._transport.stream(
+                method,
+                url,
+                json=data,
+                headers=request_headers,
+                **kwargs,
+            ) as response:
+                yield response
+
+        return _stream()
 
     async def close(self) -> None:
         """Close underlying transport resources."""
