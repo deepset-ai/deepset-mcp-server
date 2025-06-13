@@ -1,10 +1,14 @@
+import json
 import logging
+from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
+    DeepsetSearchResponse,
+    DeepsetStreamEvent,
     NoContentResponse,
     PipelineLogList,
     PipelineValidationResult,
@@ -261,3 +265,103 @@ class PipelineResource:
         raise_for_status(resp)
 
         return NoContentResponse(message="Pipeline deleted successfully.")
+
+    async def search(
+        self,
+        pipeline_name: str,
+        query: str,
+        debug: bool = False,
+        view_prompts: bool = False,
+        params: dict[str, Any] | None = None,
+        filters: dict[str, Any] | None = None,
+    ) -> DeepsetSearchResponse:
+        """Search using a pipeline.
+
+        :param pipeline_name: Name of the pipeline to use for search.
+        :param query: Search query.
+        :param debug: Whether to include debug information.
+        :param view_prompts: Whether to include prompts in the response.
+        :param params: Additional parameters for pipeline components.
+        :param filters: Search filters to apply.
+
+        :returns: SearchResponse containing search results.
+        """
+        # Prepare request data
+        data: dict[str, Any] = {
+            "queries": [query],  # API expects a list but we only send one query
+            "debug": debug,
+            "view_prompts": view_prompts,
+        }
+
+        if params:
+            data["params"] = params
+
+        if filters:
+            data["filters"] = filters
+
+        resp = await self._client.request(
+            endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}/search",
+            method="POST",
+            data=data,
+            response_type=dict[str, Any],
+        )
+
+        raise_for_status(resp)
+
+        if resp.json is not None:
+            return DeepsetSearchResponse.model_validate(resp.json)
+        else:
+            # Return empty response if no JSON data
+            return DeepsetSearchResponse()
+
+    async def search_stream(
+        self,
+        pipeline_name: str,
+        query: str,
+        debug: bool = False,
+        view_prompts: bool = False,
+        params: dict[str, Any] | None = None,
+        filters: dict[str, Any] | None = None,
+    ) -> AsyncIterator[DeepsetStreamEvent]:
+        """Search using a pipeline with response streaming.
+
+        :param pipeline_name: Name of the pipeline to use for search.
+        :param query: Search query.
+        :param debug: Whether to include debug information.
+        :param view_prompts: Whether to include prompts in the response.
+        :param params: Additional parameters for pipeline components.
+        :param filters: Search filters to apply.
+
+        :returns: AsyncIterator streaming the result.
+        """
+        # For streaming, we need to add include_result flag
+        # Prepare request data
+        data: dict[str, Any] = {
+            "query": query,
+            "debug": debug,
+            "view_prompts": view_prompts,
+            "include_result": True,
+        }
+
+        if params:
+            data["params"] = params
+
+        if filters:
+            data["filters"] = filters
+
+        async with self._client.stream_request(
+            endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}/search-stream",
+            method="POST",
+            data=data,
+        ) as resp:
+            async for line in resp.iter_lines():
+                try:
+                    event_dict = json.loads(line)
+                    event = DeepsetStreamEvent.model_validate(event_dict)
+
+                    if event.error is not None:
+                        raise UnexpectedAPIError(message=event.error)
+                    yield event
+                except (json.JSONDecodeError, ValueError):
+                    # Skip malformed events
+                    continue
