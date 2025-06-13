@@ -1,11 +1,14 @@
 import asyncio
 import json
 import logging
+import sys
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from haystack.dataclasses.chat_message import ChatMessage
+from haystack.dataclasses.streaming_chunk import StreamingChunk
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.benchmark.runner.agent_loader import load_agent
@@ -28,6 +31,7 @@ class AgentBenchmarkRunner:
         self,
         agent_config: AgentConfig,
         benchmark_config: BenchmarkConfig,
+        streaming: bool = False,
     ):
         """
         Initialize the benchmark runner.
@@ -35,9 +39,11 @@ class AgentBenchmarkRunner:
         Args:
             agent_config: Configuration for the agent to test.
             benchmark_config: Benchmark configuration.
+            streaming: Whether to enable streaming output during agent execution.
         """
         self.agent_config = agent_config
         self.benchmark_config = benchmark_config
+        self.streaming = streaming
 
         # Create a single timestamp for this benchmark run
         self.run_timestamp = datetime.now()
@@ -59,6 +65,47 @@ class AgentBenchmarkRunner:
         self.run_id = (
             f"{self.agent_config.display_name}-{self.commit_hash}_{self.run_timestamp.strftime('%Y%m%d_%H%M%S')}"
         )
+
+    # TODO: streaming is WIP; wait until https://github.com/deepset-ai/haystack-core-integrations/issues/1947 is fixed
+    def _create_streaming_callback(self, test_case_name: str) -> Callable[[StreamingChunk], Any]:
+        """
+        Create a streaming callback function for a specific test case.
+
+        Args:
+            test_case_name: Name of the test case for logging context
+
+        Returns:
+            Callback function for streaming
+        """
+
+        async def streaming_callback(chunk: StreamingChunk) -> None:
+            """Handle streaming chunks from the agent."""
+            if hasattr(chunk, "content") and chunk.content:
+                # meta content_block type=tool_use
+                # meta type (content_block_start)
+                # meta delta type=input_json_delta
+                # meta delta message_delta
+                # meta delta stop_reason=tool_use
+                # Print with test case context, using a subtle prefix
+                content = chunk.content
+                # Handle newlines by adding the prefix to each new line
+                lines = content.split("\n")
+                for i, line in enumerate(lines):
+                    if i == 0:
+                        print(f"{line}", end="")
+                    elif line.strip():  # Only print non-empty lines with prefix
+                        print(f"\n[{test_case_name}] {line}", end="")
+                    else:
+                        print()  # Just print the newline for empty lines
+
+                # If the content ends with a newline, print it
+                if content.endswith("\n"):
+                    print()
+
+                # Ensure output is flushed immediately
+                sys.stdout.flush()
+
+        return streaming_callback
 
     async def run_single_test(self, test_case_name: str) -> dict[str, Any]:
         """
@@ -101,7 +148,18 @@ class AgentBenchmarkRunner:
                         workspace=self.benchmark_config.deepset_workspace
                     ).validate(yaml_config=query_yaml_config)
 
-            agent_output = await self.agent.run_async(messages=[ChatMessage.from_user(test_config.prompt)])
+            # Prepare streaming callback if streaming is enabled
+            streaming_callback = None
+            if self.streaming:
+                streaming_callback = self._create_streaming_callback(test_case_name)
+                print(f"\n🤖 [{test_case_name}] Agent starting...\n")
+
+            agent_output = await self.agent.run_async(
+                messages=[ChatMessage.from_user(test_config.prompt)], streaming_callback=streaming_callback
+            )
+
+            if self.streaming:
+                print(f"\n\n✅ [{test_case_name}] Agent completed.\n")
 
             post_agent_validation = None
             if query_name:
@@ -488,6 +546,7 @@ def run_agent_benchmark(
     benchmark_config: BenchmarkConfig,
     test_case_name: str | None = None,
     concurrency: int = 1,
+    streaming: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """
     Convenience function to run agent benchmarks.
@@ -497,6 +556,7 @@ def run_agent_benchmark(
         benchmark_config: Benchmark configuration.
         test_case_name: Specific test case to run (if None, runs all)
         concurrency: Number of concurrent test runs
+        streaming: If True, run in streaming mode
 
     Returns:
         List of test results
@@ -505,6 +565,7 @@ def run_agent_benchmark(
     runner = AgentBenchmarkRunner(
         agent_config=agent_config,
         benchmark_config=benchmark_config,
+        streaming=streaming,
     )
 
     if test_case_name:

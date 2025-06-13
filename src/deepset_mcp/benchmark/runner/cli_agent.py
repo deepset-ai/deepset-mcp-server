@@ -53,9 +53,7 @@ def run_agent_single(
 
     try:
         results, _ = run_agent_benchmark(
-            agent_config=agent_cfg,
-            test_case_name=test_case,
-            benchmark_config=benchmark_cfg,
+            agent_config=agent_cfg, test_case_name=test_case, benchmark_config=benchmark_cfg, streaming=False
         )
 
         result = results[0]
@@ -119,6 +117,7 @@ def run_agent_all(
             test_case_name=None,  # Run all
             benchmark_config=benchmark_cfg,
             concurrency=concurrency,
+            streaming=False,
         )
 
         # Display summary statistics
@@ -162,7 +161,10 @@ def run_agent_all(
             typer.secho("=" * 120, fg=typer.colors.BLUE)
 
             # Table header
-            header = f"{'Test Case':<25} {'Status':<8} {'Pre':<5} {'Post':<5} {'Tools':<6} {'P.Tokens':<9} {'C.Tokens':<9} {'Cleanup':<8}"
+            header = (
+                f"{'Test Case':<25} {'Status':<8} {'Pre':<5} {'Post':<5} {'Tools':<6} {'P.Tokens':<9} "
+                f"{'C.Tokens':<9} {'Cleanup':<8}"
+            )
             typer.secho(header, fg=typer.colors.BRIGHT_WHITE, bold=True)
             typer.secho("-" * 120, fg=typer.colors.BLUE)
 
@@ -217,7 +219,7 @@ def run_agent_all(
 
                 else:
                     # Error case
-                    result.get("error", "Unknown error")[:30]
+                    error_msg = result.get("error", "Unknown error")[:30]
                     cleanup_status = result.get("cleanup_status", "N/A")
                     cleanup_color = (
                         typer.colors.GREEN
@@ -229,7 +231,7 @@ def run_agent_all(
 
                     row = f"{test_case:<25} "
                     typer.echo(row, nl=False)
-                    typer.secho("ERROR   ", fg=typer.colors.RED, nl=False)
+                    typer.secho(f"ERROR   {error_msg}", fg=typer.colors.RED, nl=False)
                     typer.echo(f"{'N/A':<5} {'N/A':<5} {'N/A':<6} {'N/A':<9} {'N/A':<9} ", nl=False)
                     typer.secho(f"{cleanup_status:<8}", fg=cleanup_color)
 
