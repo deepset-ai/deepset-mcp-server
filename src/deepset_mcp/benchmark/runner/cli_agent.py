@@ -91,13 +91,13 @@ def run_agent_single(
 
 @agent_app.command("run-all")
 def run_agent_all(
-        agent_config: str = typer.Argument(..., help="Path to agent configuration file (YAML)."),
-        workspace: str | None = typer.Option(None, "--workspace", "-w", help="Override Deepset workspace."),
-        api_key: str | None = typer.Option(None, "--api-key", "-k", help="Override Deepset API key."),
-        env_file: str | None = typer.Option(None, "--env-file", "-e", help="Path to environment file."),
-        output_dir: str | None = typer.Option(None, "--output-dir", "-o", help="Directory to save results."),
-        test_case_base_dir: str | None = typer.Option(None, "--test-base-dir", help="Base directory for test cases."),
-        concurrency: int = typer.Option(1, "--concurrency", "-c", help="Number of concurrent test runs."),
+    agent_config: str = typer.Argument(..., help="Path to agent configuration file (YAML)."),
+    workspace: str | None = typer.Option(None, "--workspace", "-w", help="Override Deepset workspace."),
+    api_key: str | None = typer.Option(None, "--api-key", "-k", help="Override Deepset API key."),
+    env_file: str | None = typer.Option(None, "--env-file", "-e", help="Path to environment file."),
+    output_dir: str | None = typer.Option(None, "--output-dir", "-o", help="Directory to save results."),
+    test_case_base_dir: str | None = typer.Option(None, "--test-base-dir", help="Base directory for test cases."),
+    concurrency: int = typer.Option(1, "--concurrency", "-c", help="Number of concurrent test runs."),
 ) -> None:
     """Run an agent against all available test cases."""
     load_env_file(env_file)
@@ -126,25 +126,39 @@ def run_agent_all(
         typer.secho("=" * 50, fg=typer.colors.BLUE)
 
         typer.secho(f"Tests Completed: {summary['tests_completed']}", fg=typer.colors.GREEN)
-        typer.secho(f"Tests Failed: {summary['tests_failed']}",
-                    fg=typer.colors.RED if summary['tests_failed'] > 0 else typer.colors.GREEN)
-        typer.secho(f"Pass Rate: {summary['pass_rate_percent']:.1f}%",
-                    fg=typer.colors.GREEN if summary['pass_rate_percent'] > 80 else typer.colors.YELLOW if summary[
-                                                                                                               'pass_rate_percent'] > 50 else typer.colors.RED)
-        typer.secho(f"Fail Rate: {summary['fail_rate_percent']:.1f}%",
-                    fg=typer.colors.RED if summary['fail_rate_percent'] > 20 else typer.colors.YELLOW if summary[
-                                                                                                             'fail_rate_percent'] > 0 else typer.colors.GREEN)
+        typer.secho(
+            f"Tests Failed: {summary['tests_failed']}",
+            fg=typer.colors.RED if summary["tests_failed"] > 0 else typer.colors.GREEN,
+        )
+        typer.secho(
+            f"Pass Rate: {summary['pass_rate_percent']:.1f}%",
+            fg=typer.colors.GREEN
+            if summary["pass_rate_percent"] > 80
+            else typer.colors.YELLOW
+            if summary["pass_rate_percent"] > 50
+            else typer.colors.RED,
+        )
+        typer.secho(
+            f"Fail Rate: {summary['fail_rate_percent']:.1f}%",
+            fg=typer.colors.RED
+            if summary["fail_rate_percent"] > 20
+            else typer.colors.YELLOW
+            if summary["fail_rate_percent"] > 0
+            else typer.colors.GREEN,
+        )
 
-        typer.secho(f"\nToken Usage:", fg=typer.colors.CYAN)
+        typer.secho("\nToken Usage:", fg=typer.colors.CYAN)
         typer.secho(f"  Prompt Tokens: {summary['total_prompt_tokens']:,}", fg=typer.colors.CYAN)
         typer.secho(f"  Completion Tokens: {summary['total_completion_tokens']:,}", fg=typer.colors.CYAN)
-        typer.secho(f"  Total Tokens: {summary['total_prompt_tokens'] + summary['total_completion_tokens']:,}",
-                    fg=typer.colors.CYAN)
+        typer.secho(
+            f"  Total Tokens: {summary['total_prompt_tokens'] + summary['total_completion_tokens']:,}",
+            fg=typer.colors.CYAN,
+        )
         typer.secho(f"  Avg Tool Calls: {summary['avg_tool_calls']:.1f}", fg=typer.colors.CYAN)
 
         # Display detailed results table
         if results:
-            typer.secho(f"\n📋 DETAILED RESULTS", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.secho("\n📋 DETAILED RESULTS", fg=typer.colors.BRIGHT_BLUE, bold=True)
             typer.secho("=" * 120, fg=typer.colors.BLUE)
 
             # Table header
@@ -154,25 +168,43 @@ def run_agent_all(
 
             # Table rows
             for result in results:
-                test_case = result['test_case'][:24]  # Truncate long names
-                status = result['status']
+                test_case = result["test_case"][:24]  # Truncate long names
+                status = result["status"]
 
                 if status == "success":
-                    processed_data = result['processed_data']
-                    stats = processed_data['messages']['stats']
-                    validation = processed_data['validation']
+                    processed_data = result["processed_data"]
+                    stats = processed_data["messages"]["stats"]
+                    validation = processed_data["validation"]
 
-                    pre_val = validation['pre_validation'] or 'N/A'
-                    post_val = validation['post_validation'] or 'N/A'
-                    tool_calls = stats['total_tool_calls']
-                    prompt_tokens = stats['total_prompt_tokens']
-                    completion_tokens = stats['total_completion_tokens']
-                    cleanup_status = result.get('cleanup_status', 'N/A')
+                    pre_val = validation["pre_validation"] or "N/A"
+                    post_val = validation["post_validation"] or "N/A"
+                    tool_calls = stats["total_tool_calls"]
+                    prompt_tokens = stats["total_prompt_tokens"]
+                    completion_tokens = stats["total_completion_tokens"]
+                    cleanup_status = result.get("cleanup_status", "N/A")
 
                     # Color coding for validation
-                    pre_color = typer.colors.RED if pre_val == 'FAIL' else typer.colors.GREEN if pre_val == 'PASS' else typer.colors.WHITE
-                    post_color = typer.colors.GREEN if post_val == 'PASS' else typer.colors.RED if post_val == 'FAIL' else typer.colors.WHITE
-                    cleanup_color = typer.colors.GREEN if cleanup_status == 'success' else typer.colors.RED if cleanup_status == 'error' else typer.colors.WHITE
+                    pre_color = (
+                        typer.colors.RED
+                        if pre_val == "FAIL"
+                        else typer.colors.GREEN
+                        if pre_val == "PASS"
+                        else typer.colors.WHITE
+                    )
+                    post_color = (
+                        typer.colors.GREEN
+                        if post_val == "PASS"
+                        else typer.colors.RED
+                        if post_val == "FAIL"
+                        else typer.colors.WHITE
+                    )
+                    cleanup_color = (
+                        typer.colors.GREEN
+                        if cleanup_status == "success"
+                        else typer.colors.RED
+                        if cleanup_status == "error"
+                        else typer.colors.WHITE
+                    )
 
                     # Format the row
                     row = f"{test_case:<25} "
@@ -185,9 +217,15 @@ def run_agent_all(
 
                 else:
                     # Error case
-                    error_msg = result.get('error', 'Unknown error')[:30]
-                    cleanup_status = result.get('cleanup_status', 'N/A')
-                    cleanup_color = typer.colors.GREEN if cleanup_status == 'success' else typer.colors.RED if cleanup_status == 'error' else typer.colors.WHITE
+                    result.get("error", "Unknown error")[:30]
+                    cleanup_status = result.get("cleanup_status", "N/A")
+                    cleanup_color = (
+                        typer.colors.GREEN
+                        if cleanup_status == "success"
+                        else typer.colors.RED
+                        if cleanup_status == "error"
+                        else typer.colors.WHITE
+                    )
 
                     row = f"{test_case:<25} "
                     typer.echo(row, nl=False)
@@ -196,32 +234,34 @@ def run_agent_all(
                     typer.secho(f"{cleanup_status:<8}", fg=cleanup_color)
 
         # Show output directory
-        if results and results[0].get('output_dir'):
-            example_output = results[0]['output_dir']
+        if results and results[0].get("output_dir"):
+            example_output = results[0]["output_dir"]
             base_dir = str(Path(example_output).parent)
             typer.secho(f"\n💾 Results saved to: {base_dir}", fg=typer.colors.MAGENTA)
 
         # Show failed test details if any
-        failed_results = [r for r in results if r['status'] == 'error']
+        failed_results = [r for r in results if r["status"] == "error"]
         if failed_results:
-            typer.secho(f"\n❌ FAILED TESTS DETAILS", fg=typer.colors.RED, bold=True)
+            typer.secho("\n❌ FAILED TESTS DETAILS", fg=typer.colors.RED, bold=True)
             typer.secho("-" * 50, fg=typer.colors.RED)
             for result in failed_results:
                 typer.secho(f"  • {result['test_case']}: {result.get('error', 'Unknown error')}", fg=typer.colors.RED)
 
         # Check for cleanup issues
-        cleanup_issues = [r for r in results if r.get('cleanup_status') == 'error']
+        cleanup_issues = [r for r in results if r.get("cleanup_status") == "error"]
         if cleanup_issues:
-            typer.secho(f"\n⚠️  CLEANUP ISSUES", fg=typer.colors.YELLOW, bold=True)
+            typer.secho("\n⚠️  CLEANUP ISSUES", fg=typer.colors.YELLOW, bold=True)
             typer.secho("-" * 50, fg=typer.colors.YELLOW)
             for result in cleanup_issues:
-                typer.secho(f"  • {result['test_case']}: {result.get('cleanup_error', 'Unknown cleanup error')}",
-                            fg=typer.colors.YELLOW)
+                typer.secho(
+                    f"  • {result['test_case']}: {result.get('cleanup_error', 'Unknown cleanup error')}",
+                    fg=typer.colors.YELLOW,
+                )
 
-        typer.secho(f"\n✅ Benchmark completed successfully!", fg=typer.colors.GREEN, bold=True)
+        typer.secho("\n✅ Benchmark completed successfully!", fg=typer.colors.GREEN, bold=True)
 
         # Exit with error code if any tests failed
-        if summary['tests_failed'] > 0:
+        if summary["tests_failed"] > 0:
             raise typer.Exit(code=1)
 
     except Exception as e:

@@ -25,9 +25,9 @@ class AgentBenchmarkRunner:
     """Main class for running agent benchmarks against test cases."""
 
     def __init__(
-            self,
-            agent_config: AgentConfig,
-            benchmark_config: BenchmarkConfig,
+        self,
+        agent_config: AgentConfig,
+        benchmark_config: BenchmarkConfig,
     ):
         """
         Initialize the benchmark runner.
@@ -56,7 +56,9 @@ class AgentBenchmarkRunner:
         self.commit_hash = commit_hash
 
         # Create the run ID once for all test cases
-        self.run_id = f"{self.agent_config.display_name}-{self.commit_hash}_{self.run_timestamp.strftime('%Y%m%d_%H%M%S')}"
+        self.run_id = (
+            f"{self.agent_config.display_name}-{self.commit_hash}_{self.run_timestamp.strftime('%Y%m%d_%H%M%S')}"
+        )
 
     async def run_single_test(self, test_case_name: str) -> dict[str, Any]:
         """
@@ -197,7 +199,7 @@ class AgentBenchmarkRunner:
                 "tests_failed": 0,
                 "avg_tool_calls": 0.0,
                 "pass_rate_percent": 0.0,
-                "fail_rate_percent": 0.0
+                "fail_rate_percent": 0.0,
             }
             return [], empty_summary
 
@@ -216,9 +218,9 @@ class AgentBenchmarkRunner:
         return results, summary_data
 
     async def run_all_tests_async(
-            self,
-            test_case_path: Path,
-            concurrency: int = 1,  # Keep concurrency low to avoid resource conflicts
+        self,
+        test_case_path: Path,
+        concurrency: int = 1,  # Keep concurrency low to avoid resource conflicts
     ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """
         Run all test cases asynchronously with controlled concurrency.
@@ -242,7 +244,7 @@ class AgentBenchmarkRunner:
                 "tests_failed": 0,
                 "avg_tool_calls": 0.0,
                 "pass_rate_percent": 0.0,
-                "fail_rate_percent": 0.0
+                "fail_rate_percent": 0.0,
             }
             return [], empty_summary
 
@@ -277,12 +279,12 @@ class AgentBenchmarkRunner:
         return processed_results, summary_data
 
     def _format_results(
-            self,
-            agent_output: dict[str, Any],
-            test_config: TestCaseConfig,
-            is_pre_agent_valid: bool | None = None,
-            is_post_agent_valid: bool | None = None,
-            post_yaml: str | None = None,
+        self,
+        agent_output: dict[str, Any],
+        test_config: TestCaseConfig,
+        is_pre_agent_valid: bool | None = None,
+        is_post_agent_valid: bool | None = None,
+        post_yaml: str | None = None,
     ) -> dict[str, Any]:
         """Format the agent output and metadata for saving to file."""
         return {
@@ -294,10 +296,12 @@ class AgentBenchmarkRunner:
                 "run_id": self.run_id,
             },
             "validation": {
-                "pre_validation": "PASS" if is_pre_agent_valid is True else (
-                    "FAIL" if is_pre_agent_valid is False else None),
-                "post_validation": "PASS" if is_post_agent_valid is True else (
-                    "FAIL" if is_post_agent_valid is False else None),
+                "pre_validation": "PASS"
+                if is_pre_agent_valid is True
+                else ("FAIL" if is_pre_agent_valid is False else None),
+                "post_validation": "PASS"
+                if is_post_agent_valid is True
+                else ("FAIL" if is_post_agent_valid is False else None),
             },
             "messages": {
                 "serialized": [message.to_dict() for message in agent_output["messages"]],
@@ -365,13 +369,13 @@ class AgentBenchmarkRunner:
             "tests_failed": tests_failed,
             "avg_tool_calls": round(avg_tool_calls, 2),
             "pass_rate_percent": round(pass_rate, 2),
-            "fail_rate_percent": round(fail_rate, 2)
+            "fail_rate_percent": round(fail_rate, 2),
         }
 
         # Create CSV content
         csv_data = [
             "total_prompt_tokens,total_completion_tokens,tests_completed,tests_failed,avg_tool_calls,pass_rate_percent,fail_rate_percent",
-            f"{total_prompt_tokens},{total_completion_tokens},{tests_completed},{tests_failed},{avg_tool_calls:.2f},{pass_rate:.2f},{fail_rate:.2f}"
+            f"{total_prompt_tokens},{total_completion_tokens},{tests_completed},{tests_failed},{avg_tool_calls:.2f},{pass_rate:.2f},{fail_rate:.2f}",
         ]
 
         # Save to main run directory
@@ -454,8 +458,8 @@ class AgentBenchmarkRunner:
 
         # Save test_results.csv
         csv_file = test_case_dir / "test_results.csv"
-        pre_validation = processed_data['validation']['pre_validation'] or "N/A"
-        post_validation = processed_data['validation']['post_validation'] or "N/A"
+        pre_validation = processed_data["validation"]["pre_validation"] or "N/A"
+        post_validation = processed_data["validation"]["post_validation"] or "N/A"
         csv_data = [
             "commit,test_case,agent,prompt_tokens,completion_tokens,tool_calls,model,pre_validation,post_validation",
             f"{metadata['commit_hash']},{test_case_name},{metadata['agent_display_name']},"
@@ -480,10 +484,10 @@ class AgentBenchmarkRunner:
 
 
 def run_agent_benchmark(
-        agent_config: AgentConfig,
-        benchmark_config: BenchmarkConfig,
-        test_case_name: str | None = None,
-        concurrency: int = 1,
+    agent_config: AgentConfig,
+    benchmark_config: BenchmarkConfig,
+    test_case_name: str | None = None,
+    concurrency: int = 1,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """
     Convenience function to run agent benchmarks.
