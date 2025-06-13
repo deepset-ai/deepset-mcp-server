@@ -1,6 +1,11 @@
 from datetime import datetime
 
+from uuid import uuid4
+
 from deepset_mcp.api.pipeline.models import (
+    DeepsetAnswer,
+    DeepsetDocument,
+    DeepsetSearchResponse,
     ExceptionInfo,
     PipelineLog,
     PipelineLogList,
@@ -9,6 +14,7 @@ from deepset_mcp.api.pipeline.models import (
 )
 from deepset_mcp.tools.formatting_utils import (
     pipeline_logs_to_llm_readable_string,
+    search_response_to_llm_readable_string,
     validation_result_to_llm_readable_string,
 )
 
