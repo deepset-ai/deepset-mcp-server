@@ -50,11 +50,13 @@ class FakePipelineResource:
         update_response: NoContentResponse | None = None,
         logs_response: PipelineLogList | None = None,
         deploy_response: PipelineValidationResult | None = None,
+        search_response: DeepsetSearchResponse | None = None,
         get_exception: Exception | None = None,
         update_exception: Exception | None = None,
         create_exception: Exception | None = None,
         logs_exception: Exception | None = None,
         deploy_exception: Exception | None = None,
+        search_exception: Exception | None = None,
     ) -> None:
         self._list_response = list_response
         self._get_response = get_response
