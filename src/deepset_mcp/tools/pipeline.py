@@ -4,9 +4,9 @@ from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, U
 from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.tools.formatting_utils import (
-    pipeline_to_llm_readable_string, 
-    validation_result_to_llm_readable_string,
+    pipeline_to_llm_readable_string,
     search_response_to_llm_readable_string,
+    validation_result_to_llm_readable_string,
 )
 
 
@@ -234,22 +234,19 @@ async def search_pipeline(client: AsyncClientProtocol, workspace: str, pipeline_
     try:
         # First, check if the pipeline exists and get its status
         pipeline = await client.pipelines(workspace=workspace).get(pipeline_name=pipeline_name)
-        
+
         # Check if pipeline is deployed
         if pipeline.status != "DEPLOYED":
             return (
                 f"Pipeline '{pipeline_name}' is not deployed (current status: {pipeline.status}). "
                 f"Please deploy the pipeline first using the deploy_pipeline tool before attempting to search."
             )
-        
+
         # Execute the search
-        search_response = await client.pipelines(workspace=workspace).search(
-            pipeline_name=pipeline_name,
-            query=query
-        )
-        
+        search_response = await client.pipelines(workspace=workspace).search(pipeline_name=pipeline_name, query=query)
+
         return search_response_to_llm_readable_string(search_response, pipeline_name)
-    
+
     except ResourceNotFoundError:
         return f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}'."
     except BadRequestError as e:

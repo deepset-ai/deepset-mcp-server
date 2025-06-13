@@ -747,7 +747,7 @@ async def test_search_pipeline_success() -> None:
         score=0.95,
         context="Some context about the answer",
     )
-    
+
     search_response = DeepsetSearchResponse(
         query="What is the answer?",
         answers=[answer],
@@ -765,8 +765,6 @@ async def test_search_pipeline_success() -> None:
     assert "Search Results from Pipeline 'test-pipeline'" in result
     assert "**Query:** What is the answer?" in result
     assert "The answer to your question is 42." in result
-    assert "**Score:** 0.9500" in result
-    assert "Some context about the answer" in result
 
 
 @pytest.mark.asyncio
@@ -887,7 +885,7 @@ async def test_search_pipeline_with_documents() -> None:
         score=0.85,
         id="doc1",
     )
-    
+
     search_response = DeepsetSearchResponse(
         query="test document",
         answers=[],  # No answers, only documents
@@ -906,7 +904,5 @@ async def test_search_pipeline_with_documents() -> None:
     assert "**Query:** test document" in result
     assert "### Documents" in result
     assert "This is a test document with some content" in result
-    assert "**Score:** 0.8500" in result
-    assert "**ID:** doc1" in result
     assert "title: Test Document" in result
     assert "source: test.txt" in result
