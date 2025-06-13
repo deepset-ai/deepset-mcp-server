@@ -2,8 +2,9 @@ import pytest
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.api.exceptions import ResourceNotFoundError
-from deepset_mcp.api.pipeline.models import DeepsetPipeline
+from deepset_mcp.api.pipeline.models import DeepsetPipeline, DeepsetSearchResponse, DeepsetStreamEvent
 from deepset_mcp.api.pipeline.resource import PipelineResource
+from test.integration.test_integration_pipeline_logs import wait_for_pipeline_deployment
 
 pytestmark = pytest.mark.integration
 
@@ -312,3 +313,66 @@ async def test_delete_nonexistent_pipeline(
     # Trying to delete a non-existent pipeline should raise an exception
     with pytest.raises(ResourceNotFoundError):
         await pipeline_resource.delete(pipeline_name=non_existent_name)
+
+
+@pytest.mark.asyncio
+@pytest.mark.extra_slow
+async def test_search_pipeline(
+    pipeline_resource: PipelineResource,
+    sample_yaml_config: str,
+) -> None:
+    """Test basic search functionality with a pipeline."""
+    pipeline_name = "test-search-pipeline"
+
+    # Create a pipeline for search
+    await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
+
+    # Deploy the pipeline so it can be used for search
+    await pipeline_resource.deploy(pipeline_name=pipeline_name)
+
+    # We need to wait for the deployment to finish before we can proceed
+    await wait_for_pipeline_deployment(pipeline_name=pipeline_name, pipeline_resource=pipeline_resource)
+
+    # Perform a basic search
+    result = await pipeline_resource.search(
+        pipeline_name=pipeline_name,
+        query="What is artificial intelligence?",
+    )
+
+    # Verify the structure of results
+    assert isinstance(result, DeepsetSearchResponse)
+    assert isinstance(result.answers, list)
+
+
+@pytest.mark.asyncio
+@pytest.mark.extra_slow
+async def test_search_pipeline_with_stream(
+    pipeline_resource: PipelineResource,
+    sample_yaml_config: str,
+) -> None:
+    """Test basic search functionality with a pipeline."""
+    pipeline_name = "test-search-pipeline"
+
+    # Create a pipeline for search
+    await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
+
+    # Deploy the pipeline so it can be used for search
+    await pipeline_resource.deploy(pipeline_name=pipeline_name)
+
+    await wait_for_pipeline_deployment(pipeline_name=pipeline_name, pipeline_resource=pipeline_resource)
+
+    # Perform a basic search
+    result = pipeline_resource.search_stream(pipeline_name=pipeline_name, query="What is artificial intelligence?")
+    events = []
+    async for event in result:
+        events.append(event)
+        assert isinstance(event, DeepsetStreamEvent)
+
+    # Check if the last event contains the full response
+    assert len(events) > 1
+    last_event = events[-1]
+    assert last_event.result is not None
+    full_result = last_event.result
+    assert isinstance(full_result, DeepsetSearchResponse)
+    assert len(full_result.answers) == 1
+    assert full_result.answers[0].answer != ""

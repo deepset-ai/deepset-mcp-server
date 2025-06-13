@@ -1,11 +1,13 @@
 import json
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any, TypeVar, overload
 
 import pytest
 import pytest_asyncio
 
 from deepset_mcp.api.client import AsyncDeepsetClient
-from deepset_mcp.api.transport import AsyncTransport, TransportProtocol, TransportResponse
+from deepset_mcp.api.transport import AsyncTransport, StreamingResponse, TransportProtocol, TransportResponse
 
 T = TypeVar("T")
 
@@ -34,6 +36,15 @@ class DummyProtocol(TransportProtocol):
         dummy_response = {"dummy": "response"}
 
         return TransportResponse(status_code=200, text=json.dumps(dummy_response), json=dummy_response)
+
+    @asynccontextmanager
+    def stream(self, method: str, url: str, **kwargs: Any) -> AsyncIterator[StreamingResponse]:
+        """
+        Open a streaming HTTP connection.
+
+        Must be used as an async context manager to ensure proper cleanup.
+        """
+        raise NotImplementedError()
 
     async def close(self) -> None:
         self.closed = True
