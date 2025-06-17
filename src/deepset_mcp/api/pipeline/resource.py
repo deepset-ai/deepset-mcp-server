@@ -30,22 +30,20 @@ class PipelineResource:
         client: "AsyncClientProtocol",
         workspace: str,
     ) -> None:
-        """Initializes a PipelineResource instance."""
+        """Initializes a PipelineResource instance.
+
+        :param client: The async client protocol instance.
+        :param workspace: The workspace identifier.
+        """
         self._client = client
         self._workspace = workspace
 
     async def validate(self, yaml_config: str) -> PipelineValidationResult:
-        """
-        Validate a pipeline's YAML configuration against the API.
+        """Validate a pipeline's YAML configuration against the API.
 
-        Args:
-            yaml_config: The YAML configuration string to validate
-
-        Returns:
-            PipelineValidationResult containing validation status and any errors
-
-        Raises:
-            ValueError: If the YAML is not valid (422 error) or contains syntax errors
+        :param yaml_config: The YAML configuration string to validate.
+        :returns: PipelineValidationResult containing validation status and any errors.
+        :raises ValueError: If the YAML is not valid (422 error) or contains syntax errors.
         """
         data = {"query_yaml": yaml_config}
 
@@ -76,12 +74,11 @@ class PipelineResource:
         page_number: int = 1,
         limit: int = 10,
     ) -> list[DeepsetPipeline]:
-        """
-        Retrieve pipeline in the configured workspace with optional pagination.
+        """Retrieve pipeline in the configured workspace with optional pagination.
 
         :param page_number: Page number for paging.
         :param limit: Max number of items to return.
-        :return: List of DeepsetPipeline instances.
+        :returns: List of DeepsetPipeline instances.
         """
         params: dict[str, Any] = {
             "page_number": page_number,
@@ -106,7 +103,12 @@ class PipelineResource:
         return pipelines
 
     async def get(self, pipeline_name: str, include_yaml: bool = True) -> DeepsetPipeline:
-        """Fetch a single pipeline by its name."""
+        """Fetch a single pipeline by its name.
+
+        :param pipeline_name: Name of the pipeline to fetch.
+        :param include_yaml: Whether to include YAML configuration in the response.
+        :returns: DeepsetPipeline instance.
+        """
         resp = await self._client.request(endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}")
         raise_for_status(resp)
 
@@ -125,7 +127,12 @@ class PipelineResource:
         return pipeline
 
     async def create(self, name: str, yaml_config: str) -> NoContentResponse:
-        """Create a new pipeline with a name and YAML config."""
+        """Create a new pipeline with a name and YAML config.
+
+        :param name: Name of the new pipeline.
+        :param yaml_config: YAML configuration for the pipeline.
+        :returns: NoContentResponse indicating successful creation.
+        """
         data = {"name": name, "query_yaml": yaml_config}
         resp = await self._client.request(
             endpoint=f"v1/workspaces/{self._workspace}/pipelines",
@@ -143,7 +150,14 @@ class PipelineResource:
         updated_pipeline_name: str | None = None,
         yaml_config: str | None = None,
     ) -> NoContentResponse:
-        """Update name and/or YAML config of an existing pipeline."""
+        """Update name and/or YAML config of an existing pipeline.
+
+        :param pipeline_name: Current name of the pipeline.
+        :param updated_pipeline_name: New name for the pipeline (optional).
+        :param yaml_config: New YAML configuration (optional).
+        :returns: NoContentResponse indicating successful update.
+        :raises ValueError: If neither updated_pipeline_name nor yaml_config is provided.
+        """
         # Handle name update first if any
         if updated_pipeline_name is not None:
             name_resp = await self._client.request(
@@ -188,7 +202,6 @@ class PipelineResource:
         :param pipeline_name: Name of the pipeline to fetch logs for.
         :param limit: Maximum number of log entries to return.
         :param level: Filter logs by level. If None, returns all levels.
-
         :returns: A PipelineLogList containing the log entries.
         """
         params: dict[str, Any] = {
@@ -220,10 +233,8 @@ class PipelineResource:
         """Deploy a pipeline to production.
 
         :param pipeline_name: Name of the pipeline to deploy.
-
         :returns: PipelineValidationResult containing deployment status and any errors.
-
-        :raises: UnexpectedAPIError: If the API returns an unexpected status code.
+        :raises UnexpectedAPIError: If the API returns an unexpected status code.
         """
         resp = await self._client.request(
             endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}/deploy",
@@ -252,10 +263,8 @@ class PipelineResource:
         """Delete a pipeline.
 
         :param pipeline_name: Name of the pipeline to delete.
-
         :returns: NoContentResponse indicating successful deletion.
-
-        :raises: UnexpectedAPIError: If the API returns an unexpected status code.
+        :raises UnexpectedAPIError: If the API returns an unexpected status code.
         """
         resp = await self._client.request(
             endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}",
@@ -283,7 +292,6 @@ class PipelineResource:
         :param view_prompts: Whether to include prompts in the response.
         :param params: Additional parameters for pipeline components.
         :param filters: Search filters to apply.
-
         :returns: SearchResponse containing search results.
         """
         # Prepare request data
@@ -331,7 +339,6 @@ class PipelineResource:
         :param view_prompts: Whether to include prompts in the response.
         :param params: Additional parameters for pipeline components.
         :param filters: Search filters to apply.
-
         :returns: AsyncIterator streaming the result.
         """
         # For streaming, we need to add include_result flag
