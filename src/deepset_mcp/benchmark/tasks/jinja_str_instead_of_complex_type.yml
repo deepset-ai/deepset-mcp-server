@@ -1,0 +1,11 @@
+name: "jinja_str_instead_of_complex_type"
+objective: "Add parentheses after the filter in the OutputAdapter to get correct attribute access."
+prompt: "Can you check why my chat agent pipeline doesn't work."
+query_yaml: "pipelines/chat_agent_jinja_syntax.yml"
+query_name: "chat-agent"
+tags:
+  - "debug"
+  - "jinja"
+judge_prompt: |
+  The Agent has:
+  - added parentheses around messages|last so that attribute access works correctly
