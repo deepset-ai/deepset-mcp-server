@@ -360,9 +360,7 @@ async def deploy_pipeline(pipeline_name: str) -> str:
     workspace = get_workspace()
     async with AsyncDeepsetClient() as client:
         response = await deploy_pipeline_tool(
-            client=client,
-            workspace=workspace,
-            pipeline_name=pipeline_name,
+            client=client, workspace=workspace, pipeline_name=pipeline_name, wait_for_deployment=True
         )
     return response
 
