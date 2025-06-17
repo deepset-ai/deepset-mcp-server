@@ -1,0 +1,141 @@
+# If you need help with the YAML format, have a look at https://docs.cloud.deepset.ai/v2.0/docs/create-a-pipeline#create-a-pipeline-using-pipeline-editor.
+# This section defines components that you want to use in your pipelines. Each component must have a name and a type. You can also set the component's parameters here.
+# The name is up to you, you can give your component a friendly name. You then use components' names when specifying the connections in the pipeline.
+# Type is the class path of the component. You can check the type on the component's documentation page.
+components:
+  adapter:
+    init_parameters:
+      custom_filters: {}
+      output_type: List[str]
+      template: ' {{ [(messages|last).text] }} '
+      unsafe: false
+    type: haystack.components.converters.output_adapter.OutputAdapter
+  agent:
+    init_parameters:
+      chat_generator:
+        init_parameters:
+          api_base_url:
+          api_key:
+            env_vars:
+            - OPENAI_API_KEY
+            strict: false
+            type: env_var
+          generation_kwargs: {}
+          max_retries:
+          model: gpt-4o
+          organization:
+          streaming_callback:
+          timeout:
+          tools:
+          tools_strict: false
+        type: haystack.components.generators.chat.openai.OpenAIChatGenerator
+      exit_conditions:
+      - text
+      max_agent_steps: 100
+      raise_on_tool_invocation_failure: false
+      state_schema: {}
+      streaming_callback:
+      system_prompt: |-
+        You are a deep research assistant.
+        You create comprehensive research reports to answer the user's questions.
+        You use the 'search'-tool to answer any questions.
+        You perform multiple searches until you have the information you need to answer the question.
+        Make sure you research different aspects of the question.
+        Use markdown to format your response.
+        When you use information from the websearch results, cite your sources using markdown links.
+        It is important that you cite accurately.
+      tools:
+      - data:
+          component:
+            init_parameters:
+              input_mapping:
+                query:
+                - search.query
+              output_mapping:
+                builder.prompt: result
+              pipeline:
+                components:
+                  builder:
+                    init_parameters:
+                      required_variables: "*"
+                      template: |-
+                        {% for doc in docs %}
+                          {% if doc.content and doc.meta.url|length > 0 %}
+                          <search-result url="{{ doc.meta.url }}">
+                              {{ doc.content|truncate(25000) }}
+                          </search-result>
+                          {% endif %}
+                        {% endfor %}
+                      variables:
+                    type: haystack.components.builders.prompt_builder.PromptBuilder
+                  converter:
+                    init_parameters:
+                      extraction_kwargs: {}
+                      store_full_path: false
+                    type: haystack.components.converters.html.HTMLToDocument
+                  fetcher:
+                    init_parameters:
+                      raise_on_failure: false
+                      retry_attempts: 2
+                      timeout: 3
+                      user_agents:
+                      - haystack/LinkContentFetcher/2.11.1
+                    type: haystack.components.fetchers.link_content.LinkContentFetcher
+                  search:
+                    init_parameters:
+                      api_key:
+                        env_vars:
+                        - SERPERDEV_API_KEY
+                        strict: false
+                        type: env_var
+                      search_params: {}
+                      top_k: 10
+                    type: haystack.components.websearch.serper_dev.SerperDevWebSearch
+                connection_type_validation: true
+                connections:
+                - receiver: fetcher.urls
+                  sender: search.links
+                - receiver: converter.sources
+                  sender: fetcher.streams
+                - receiver: builder.docs
+                  sender: converter.documents
+                max_runs_per_component: 100
+                metadata: {}
+            type: haystack.core.super_component.super_component.SuperComponent
+          description: Use this tool to search for information on the internet.
+          inputs_from_state:
+          name: search
+          parameters:
+        type: haystack.tools.component_tool.ComponentTool
+    type: haystack.components.agents.agent.Agent
+  answer_builder:
+    init_parameters:
+      pattern:
+      reference_pattern:
+    type: haystack.components.builders.answer_builder.AnswerBuilder
+  history_parser:
+    init_parameters: {}
+    type: dc_custom_component.components.parsers.chat_history_parser.DeepsetChatHistoryParser
+
+
+connections:
+- receiver: agent.messages
+  sender: history_parser.messages
+- receiver: adapter.messages
+  sender: agent.messages
+- receiver: answer_builder.replies
+  sender: adapter.output
+
+inputs:
+  query:
+  - answer_builder.query
+  - history_parser.history_and_query
+
+outputs:
+  answers: answer_builder.answers
+
+pipeline_output_type: chat
+
+max_runs_per_component: 100
+
+metadata: {}

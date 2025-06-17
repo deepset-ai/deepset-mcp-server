@@ -1,0 +1,11 @@
+name: "jinja_syntax_error"
+objective: "Add double braces to the OutputAdapter to fix the syntax error."
+prompt: "Can you check why my chat agent pipeline doesn't work."
+query_yaml: "pipelines/chat_agent_jinja_str.yml"
+query_name: "chat-agent"
+tags:
+  - "debug"
+  - "jinja"
+judge_prompt: |
+  The Agent has:
+  - successfully fixed the template on the OutputAdapter to not contain additional whitespace
