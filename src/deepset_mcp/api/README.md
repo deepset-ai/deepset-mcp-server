@@ -35,6 +35,8 @@ The SDK provides access to six main resources, each designed for specific aspect
 Pipelines are the core building blocks of your AI applications. They define how data flows through different components to produce results.
 
 ```python
+from deepset_mcp.api.client import AsyncDeepsetClient
+
 async with AsyncDeepsetClient() as client:
     # Access pipeline resource for a specific workspace
     pipelines = client.pipelines(workspace="your-workspace")
@@ -65,26 +67,35 @@ async with AsyncDeepsetClient() as client:
 The SDK provides comprehensive pipeline lifecycle management:
 
 ```python
-# Validate a pipeline configuration before deployment
-validation_result = await pipelines.validate(yaml_config)
-if validation_result.valid:
-    print("Pipeline configuration is valid")
-else:
-    for error in validation_result.errors:
-        print(f"Error {error.code}: {error.message}")
+from deepset_mcp.api.client import AsyncDeepsetClient
 
-# Update an existing pipeline
-await pipelines.update(
-    pipeline_name="my-pipeline",
-    updated_pipeline_name="my-renamed-pipeline",  # Optional
-    yaml_config=updated_yaml_config  # Optional
-)
+yaml_config = "some: yaml"
+updated_yaml_config = "some: other yaml"
 
-# Deploy a pipeline to production
-deployment_result = await pipelines.deploy("my-pipeline")
+async with AsyncDeepsetClient() as client:
+    # Access pipeline resource for a specific workspace
+    pipelines = client.pipelines(workspace="your-workspace")
 
-# Delete a pipeline
-await pipelines.delete("my-pipeline")
+    # Validate a pipeline configuration before deployment
+    validation_result = await pipelines.validate(yaml_config)
+    if validation_result.valid:
+        print("Pipeline configuration is valid")
+    else:
+        for error in validation_result.errors:
+            print(f"Error {error.code}: {error.message}")
+    
+    # Update an existing pipeline
+    await pipelines.update(
+        pipeline_name="my-pipeline",
+        updated_pipeline_name="my-renamed-pipeline",  # Optional
+        yaml_config=updated_yaml_config  # Optional
+    )
+    
+    # Deploy a pipeline to production
+    deployment_result = await pipelines.deploy("my-pipeline")
+    
+    # Delete a pipeline
+    await pipelines.delete("my-pipeline")
 ```
 
 ### Search and Streaming
@@ -92,26 +103,31 @@ await pipelines.delete("my-pipeline")
 Execute searches using deployed pipelines:
 
 ```python
-# Basic search
-search_response = await pipelines.search(
-    pipeline_name="my-pipeline",
-    query="What is artificial intelligence?",
-    debug=True,  # Include debug information
-    view_prompts=True,  # Include prompts in response
-    params={"top_k": 5},  # Pipeline-specific parameters
-    filters={"category": "AI"}  # Search filters
-)
+from deepset_mcp.api.client import AsyncDeepsetClient
 
-# Streaming search for real-time results
-async for event in pipelines.search_stream(
-    pipeline_name="my-pipeline",
-    query="What is artificial intelligence?",
-    debug=True
-):
-    if event.type == "delta":
-        print(event.delta.text, end="")
-    elif event.type == "result":
-        print(f"\nFinal result: {event.result}")
+async with AsyncDeepsetClient() as client:
+    pipelines = client.pipelines(workspace="your-workspace")
+    
+    # Basic search
+    search_response = await pipelines.search(
+        pipeline_name="my-pipeline",
+        query="What is artificial intelligence?",
+        debug=True,  # Include debug information
+        view_prompts=True,  # Include prompts in response
+        params={"top_k": 5},  # Pipeline-specific parameters
+        filters={"category": "AI"}  # Search filters
+    )
+    
+    # Streaming search for real-time results
+    async for event in pipelines.search_stream(
+        pipeline_name="my-pipeline",
+        query="What is artificial intelligence?",
+        debug=True
+    ):
+        if event.type == "delta":
+            print(event.delta.text, end="")
+        elif event.type == "result":
+            print(f"\nFinal result: {event.result}")
 ```
 
 ### Pipeline Monitoring
@@ -120,16 +136,20 @@ Monitor pipeline performance and troubleshoot issues:
 
 ```python
 from deepset_mcp.api.pipeline.log_level import LogLevel
+from deepset_mcp.api.client import AsyncDeepsetClient
 
-# Get pipeline logs
-logs = await pipelines.get_logs(
-    pipeline_name="my-pipeline",
-    limit=50,
-    level=LogLevel.ERROR  # Filter by log level
-)
 
-for log_entry in logs.data:
-    print(f"[{log_entry.level}] {log_entry.message}")
+async with AsyncDeepsetClient() as client:
+    pipelines = client.pipelines(workspace="your-workspace")
+    # Get pipeline logs
+    logs = await pipelines.get_logs(
+        pipeline_name="my-pipeline",
+        limit=50,
+        level=LogLevel.ERROR  # Filter by log level
+    )
+    
+    for log_entry in logs.data:
+        print(f"[{log_entry.level}] {log_entry.message}")
 ```
 
 ### Indexes
@@ -137,6 +157,8 @@ for log_entry in logs.data:
 Indexes store and organize your data for efficient retrieval:
 
 ```python
+from deepset_mcp.api.client import AsyncDeepsetClient
+
 async with AsyncDeepsetClient() as client:
     indexes = client.indexes(workspace="your-workspace")
     
@@ -163,6 +185,16 @@ async with AsyncDeepsetClient() as client:
         description="My document index"
     )
     
+        updated_yaml = """
+    document_store:
+      type: OpenSearchDocumentStore
+    indexing_pipeline:
+      type: Pipeline
+      components:
+        converter:
+          type: TextFileToDocument
+    """
+    
     # Update an existing index
     await indexes.update(
         index_name="my-index",
@@ -176,6 +208,8 @@ async with AsyncDeepsetClient() as client:
 Templates provide pre-built pipeline configurations for common use cases:
 
 ```python
+from deepset_mcp.api.client import AsyncDeepsetClient
+
 async with AsyncDeepsetClient() as client:
     templates = client.pipeline_templates(workspace="your-workspace")
     
@@ -204,6 +238,8 @@ async with AsyncDeepsetClient() as client:
 Access Haystack component definitions and schemas:
 
 ```python
+from deepset_mcp.api.client import AsyncDeepsetClient
+
 async with AsyncDeepsetClient() as client:
     haystack = client.haystack_service()
     
@@ -222,6 +258,8 @@ async with AsyncDeepsetClient() as client:
 Manage custom component installations:
 
 ```python
+from deepset_mcp.api.client import AsyncDeepsetClient
+
 async with AsyncDeepsetClient() as client:
     custom_components = client.custom_components(workspace="your-workspace")
     
@@ -239,6 +277,9 @@ async with AsyncDeepsetClient() as client:
 Access user information and manage user-related operations:
 
 ```python
+from deepset_mcp.api.client import AsyncDeepsetClient
+
+
 async with AsyncDeepsetClient() as client:
     users = client.users()
     
@@ -255,6 +296,8 @@ async with AsyncDeepsetClient() as client:
 For advanced use cases, you can provide custom transport configuration:
 
 ```python
+from deepset_mcp.api.client import AsyncDeepsetClient
+
 transport_config = {
     "timeout": 30,  # Request timeout in seconds
     "retries": 3,   # Number of retries
@@ -278,14 +321,20 @@ from deepset_mcp.api.exceptions import (
     UnexpectedAPIError
 )
 
-try:
-    pipeline = await pipelines.get("non-existent-pipeline")
-except ResourceNotFoundError:
-    print("Pipeline not found")
-except BadRequestError as e:
-    print(f"Bad request: {e}")
-except UnexpectedAPIError as e:
-    print(f"Unexpected error: {e}")
+from deepset_mcp.api.client import AsyncDeepsetClient
+
+
+async with AsyncDeepsetClient() as client:
+    pipelines = client.pipelines(workspace="your-workspace")
+
+    try:
+        pipeline = await pipelines.get("non-existent-pipeline")
+    except ResourceNotFoundError:
+        print("Pipeline not found")
+    except BadRequestError as e:
+        print(f"Bad request: {e}")
+    except UnexpectedAPIError as e:
+        print(f"Unexpected error: {e}")
 ```
 
 ## Best Practices
@@ -295,6 +344,8 @@ except UnexpectedAPIError as e:
 Always use the client as an async context manager to ensure proper cleanup:
 
 ```python
+from deepset_mcp.api.client import AsyncDeepsetClient
+
 # Good - automatically handles resource cleanup
 async with AsyncDeepsetClient() as client:
     result = await client.pipelines("workspace").list()
@@ -312,6 +363,8 @@ finally:
 Organize your resources by workspace for better management:
 
 ```python
+from deepset_mcp.api.client import AsyncDeepsetClient
+
 async with AsyncDeepsetClient() as client:
     # Development workspace
     dev_pipelines = client.pipelines("development")
@@ -327,20 +380,26 @@ async with AsyncDeepsetClient() as client:
 Always validate pipeline configurations before deployment:
 
 ```python
-# Validate configuration
-validation_result = await pipelines.validate(yaml_config)
+from deepset_mcp.api.client import AsyncDeepsetClient
 
-if validation_result.valid:
-    # Create and deploy pipeline
-    await pipelines.create(name="my-pipeline", yaml_config=yaml_config)
-    deployment_result = await pipelines.deploy("my-pipeline")
+
+async with AsyncDeepsetClient() as client:
+    pipelines = client.pipelines(workspace="your-workspace")
+
+    # Validate configuration
+    validation_result = await pipelines.validate(yaml_config)
     
-    if deployment_result.valid:
-        print("Pipeline deployed successfully")
+    if validation_result.valid:
+        # Create and deploy pipeline
+        await pipelines.create(name="my-pipeline", yaml_config=yaml_config)
+        deployment_result = await pipelines.deploy("my-pipeline")
+        
+        if deployment_result.valid:
+            print("Pipeline deployed successfully")
+        else:
+            print("Deployment failed:", deployment_result.errors)
     else:
-        print("Deployment failed:", deployment_result.errors)
-else:
-    print("Configuration invalid:", validation_result.errors)
+        print("Configuration invalid:", validation_result.errors)
 ```
 
 ### Streaming for Real-Time Applications
