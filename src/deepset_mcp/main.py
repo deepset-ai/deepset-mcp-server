@@ -363,6 +363,7 @@ async def deploy_pipeline(pipeline_name: str) -> str:
             client=client,
             workspace=workspace,
             pipeline_name=pipeline_name,
+            wait_for_deployment=True
         )
     return response
 
