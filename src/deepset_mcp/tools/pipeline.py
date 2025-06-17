@@ -1,3 +1,5 @@
+import asyncio
+
 import yaml
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
@@ -189,7 +191,14 @@ async def get_pipeline_logs(
     return pipeline_logs_to_llm_readable_string(logs, pipeline_name, level)
 
 
-async def deploy_pipeline(client: AsyncClientProtocol, workspace: str, pipeline_name: str) -> str:
+async def deploy_pipeline(
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    wait_for_deployment: bool = False,
+    timeout_seconds: float = 600,
+    poll_interval: float = 10,
+) -> str:
     """Deploys a pipeline to production.
 
     This function attempts to deploy the specified pipeline in the given workspace.
@@ -199,6 +208,9 @@ async def deploy_pipeline(client: AsyncClientProtocol, workspace: str, pipeline_
     :param client: The async client for API communication.
     :param workspace: The workspace name.
     :param pipeline_name: Name of the pipeline to deploy.
+    :param wait_for_deployment: If True, waits for the pipeline to reach DEPLOYED status.
+    :param timeout_seconds: Maximum time to wait for deployment when wait_for_deployment is True (default: 600.0).
+    :param poll_interval: Time between status checks in seconds when wait_for_deployment is True (default: 10.0).
 
     :returns: A string indicating the deployment result.
     """
@@ -211,10 +223,37 @@ async def deploy_pipeline(client: AsyncClientProtocol, workspace: str, pipeline_
     except UnexpectedAPIError as e:
         return f"Failed to deploy pipeline '{pipeline_name}': {e}"
 
-    if deployment_result.valid:
-        return f"Pipeline '{pipeline_name}' deployed successfully."
-    else:
+    if not deployment_result.valid:
         return validation_result_to_llm_readable_string(deployment_result)
+
+    # If not waiting for deployment, return success immediately
+    if not wait_for_deployment:
+        return f"Pipeline '{pipeline_name}' deployed successfully."
+
+    start_time = asyncio.get_event_loop().time()
+
+    while True:
+        current_time = asyncio.get_event_loop().time()
+        if current_time - start_time > timeout_seconds:
+            return (
+                f"Pipeline '{pipeline_name}' deployment initiated successfully, but did not reach DEPLOYED status "
+                f"within {timeout_seconds} seconds. You can check the pipeline status manually."
+            )
+
+        try:
+            # Get the current pipeline status
+            pipeline = await client.pipelines(workspace=workspace).get(pipeline_name=pipeline_name, include_yaml=False)
+
+            if pipeline.status == "DEPLOYED":
+                return f"Pipeline '{pipeline_name}' deployed successfully and is now DEPLOYED."
+            elif pipeline.status == "FAILED":
+                return f"Pipeline '{pipeline_name}' deployment failed. Current status: FAILED."
+
+            # Wait before next poll
+            await asyncio.sleep(poll_interval)
+
+        except Exception as e:
+            return f"Pipeline '{pipeline_name}' deployment initiated, but failed to check deployment status: {e}"
 
 
 async def search_pipeline(client: AsyncClientProtocol, workspace: str, pipeline_name: str, query: str) -> str:

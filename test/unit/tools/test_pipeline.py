@@ -45,6 +45,7 @@ class FakePipelineResource:
         self,
         list_response: list[DeepsetPipeline] | None = None,
         get_response: DeepsetPipeline | None = None,
+        get_responses: list[DeepsetPipeline] | None = None,  # For sequential responses during waiting
         validate_response: PipelineValidationResult | None = None,
         create_response: NoContentResponse | None = None,
         update_response: NoContentResponse | None = None,
@@ -60,6 +61,8 @@ class FakePipelineResource:
     ) -> None:
         self._list_response = list_response
         self._get_response = get_response
+        self._get_responses = get_responses or []
+        self._get_call_count = 0
         self._validate_response = validate_response
         self._create_response = create_response
         self._create_exception = create_exception
@@ -82,6 +85,17 @@ class FakePipelineResource:
     async def get(self, pipeline_name: str, include_yaml: bool = True) -> DeepsetPipeline:
         if self._get_exception:
             raise self._get_exception
+
+        # If we have multiple responses for sequential calls (used for waiting tests)
+        if self._get_responses:
+            if self._get_call_count < len(self._get_responses):
+                response = self._get_responses[self._get_call_count]
+                self._get_call_count += 1
+                return response
+            else:
+                # Return the last response if we've exhausted the list
+                return self._get_responses[-1]
+
         if self._get_response is not None:
             return self._get_response
         raise NotImplementedError
@@ -721,6 +735,193 @@ async def test_deploy_pipeline_unexpected_error() -> None:
     result = await deploy_pipeline(client, workspace="ws", pipeline_name="test-pipeline")
 
     assert "Failed to deploy pipeline 'test-pipeline': Internal server error" in result
+
+
+@pytest.mark.asyncio
+async def test_deploy_pipeline_wait_for_deployment_success() -> None:
+    """Test deployment with wait_for_deployment=True that succeeds."""
+    user = DeepsetUser(user_id="u1", given_name="Alice", family_name="Smith")
+
+    # Create pipeline responses showing progression from DEPLOYING to DEPLOYED
+    pipeline_deploying = DeepsetPipeline(
+        pipeline_id="p1",
+        name="test-pipeline",
+        status="DEPLOYING",
+        service_level=PipelineServiceLevel.PRODUCTION,
+        created_at=datetime(2023, 1, 1, 12, 0),
+        last_edited_at=None,
+        created_by=user,
+        last_edited_by=None,
+        yaml_config="config: test",
+    )
+
+    pipeline_deployed = DeepsetPipeline(
+        pipeline_id="p1",
+        name="test-pipeline",
+        status="DEPLOYED",
+        service_level=PipelineServiceLevel.PRODUCTION,
+        created_at=datetime(2023, 1, 1, 12, 0),
+        last_edited_at=None,
+        created_by=user,
+        last_edited_by=None,
+        yaml_config="config: test",
+    )
+
+    success_result = PipelineValidationResult(valid=True, errors=[])
+    resource = FakePipelineResource(
+        deploy_response=success_result,
+        get_responses=[pipeline_deploying, pipeline_deployed],  # First call returns DEPLOYING, second returns DEPLOYED
+    )
+    client = FakeClient(resource)
+
+    result = await deploy_pipeline(
+        client,
+        workspace="ws",
+        pipeline_name="test-pipeline",
+        wait_for_deployment=True,
+        timeout_seconds=60,  # Short timeout for test
+        poll_interval=0.1,  # Short interval for test
+    )
+
+    assert "Pipeline 'test-pipeline' deployed successfully and is now DEPLOYED." == result
+
+
+@pytest.mark.asyncio
+async def test_deploy_pipeline_wait_for_deployment_failed() -> None:
+    """Test deployment with wait_for_deployment=True where deployment fails."""
+    user = DeepsetUser(user_id="u1", given_name="Alice", family_name="Smith")
+
+    # Create pipeline responses showing progression from DEPLOYING to FAILED
+    pipeline_deploying = DeepsetPipeline(
+        pipeline_id="p1",
+        name="test-pipeline",
+        status="DEPLOYING",
+        service_level=PipelineServiceLevel.PRODUCTION,
+        created_at=datetime(2023, 1, 1, 12, 0),
+        last_edited_at=None,
+        created_by=user,
+        last_edited_by=None,
+        yaml_config="config: test",
+    )
+
+    pipeline_failed = DeepsetPipeline(
+        pipeline_id="p1",
+        name="test-pipeline",
+        status="FAILED",
+        service_level=PipelineServiceLevel.PRODUCTION,
+        created_at=datetime(2023, 1, 1, 12, 0),
+        last_edited_at=None,
+        created_by=user,
+        last_edited_by=None,
+        yaml_config="config: test",
+    )
+
+    success_result = PipelineValidationResult(valid=True, errors=[])
+    resource = FakePipelineResource(
+        deploy_response=success_result,
+        get_responses=[pipeline_deploying, pipeline_failed],  # First call returns DEPLOYING, second returns FAILED
+    )
+    client = FakeClient(resource)
+
+    result = await deploy_pipeline(
+        client,
+        workspace="ws",
+        pipeline_name="test-pipeline",
+        wait_for_deployment=True,
+        timeout_seconds=60,
+        poll_interval=0.1,
+    )
+
+    assert "Pipeline 'test-pipeline' deployment failed. Current status: FAILED." == result
+
+
+@pytest.mark.asyncio
+async def test_deploy_pipeline_wait_for_deployment_timeout() -> None:
+    """Test deployment with wait_for_deployment=True that times out."""
+    user = DeepsetUser(user_id="u1", given_name="Alice", family_name="Smith")
+
+    # Create pipeline that stays in DEPLOYING state
+    pipeline_deploying = DeepsetPipeline(
+        pipeline_id="p1",
+        name="test-pipeline",
+        status="DEPLOYING",
+        service_level=PipelineServiceLevel.PRODUCTION,
+        created_at=datetime(2023, 1, 1, 12, 0),
+        last_edited_at=None,
+        created_by=user,
+        last_edited_by=None,
+        yaml_config="config: test",
+    )
+
+    success_result = PipelineValidationResult(valid=True, errors=[])
+    resource = FakePipelineResource(
+        deploy_response=success_result,
+        get_response=pipeline_deploying,  # Always returns DEPLOYING
+    )
+    client = FakeClient(resource)
+
+    result = await deploy_pipeline(
+        client,
+        workspace="ws",
+        pipeline_name="test-pipeline",
+        wait_for_deployment=True,
+        timeout_seconds=0.2,  # Very short timeout for test
+        poll_interval=0.1,
+    )
+
+    assert (
+        "Pipeline 'test-pipeline' deployment initiated successfully, but did not reach DEPLOYED status "
+        "within 0.2 seconds" in result
+    )
+    assert "You can check the pipeline status manually." in result
+
+
+@pytest.mark.asyncio
+async def test_deploy_pipeline_wait_for_deployment_get_error() -> None:
+    """Test deployment with wait_for_deployment=True where get() fails during polling."""
+    success_result = PipelineValidationResult(valid=True, errors=[])
+    resource = FakePipelineResource(
+        deploy_response=success_result,
+        get_exception=BadRequestError("Pipeline status unavailable"),
+    )
+    client = FakeClient(resource)
+
+    result = await deploy_pipeline(
+        client,
+        workspace="ws",
+        pipeline_name="test-pipeline",
+        wait_for_deployment=True,
+        timeout_seconds=60,
+        poll_interval=0.1,
+    )
+
+    assert "Pipeline 'test-pipeline' deployment initiated, but failed to check deployment status" in result
+    assert "Pipeline status unavailable" in result
+
+
+@pytest.mark.asyncio
+async def test_deploy_pipeline_no_wait_backwards_compatibility() -> None:
+    """Test that the function maintains backwards compatibility when wait_for_deployment is not specified."""
+    success_result = PipelineValidationResult(valid=True, errors=[])
+    resource = FakePipelineResource(deploy_response=success_result)
+    client = FakeClient(resource)
+
+    # Test with default parameters (should not wait)
+    result = await deploy_pipeline(client, workspace="ws", pipeline_name="test-pipeline")
+
+    assert "Pipeline 'test-pipeline' deployed successfully." == result
+
+
+@pytest.mark.asyncio
+async def test_deploy_pipeline_wait_false_explicit() -> None:
+    """Test deployment with explicit wait_for_deployment=False."""
+    success_result = PipelineValidationResult(valid=True, errors=[])
+    resource = FakePipelineResource(deploy_response=success_result)
+    client = FakeClient(resource)
+
+    result = await deploy_pipeline(client, workspace="ws", pipeline_name="test-pipeline", wait_for_deployment=False)
+
+    assert "Pipeline 'test-pipeline' deployed successfully." == result
 
 
 # Search pipeline tests
