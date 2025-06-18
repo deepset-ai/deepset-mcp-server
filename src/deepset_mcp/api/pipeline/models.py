@@ -56,13 +56,6 @@ class PipelineValidationResult(BaseModel):
     errors: list[ValidationError] = []
 
 
-class NoContentResponse(BaseModel):
-    """Response model for an empty response."""
-
-    success: bool = True
-    message: str = "No content"
-
-
 class TraceFrame(BaseModel):
     """Model representing a single frame in a stack trace."""
 

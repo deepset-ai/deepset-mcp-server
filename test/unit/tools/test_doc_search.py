@@ -13,13 +13,12 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     DeepsetSearchResponse,
     DeepsetStreamEvent,
-    NoContentResponse,
     PipelineLogList,
     PipelineServiceLevel,
     PipelineValidationResult,
 )
 from deepset_mcp.api.protocols import PipelineResourceProtocol
-from deepset_mcp.api.shared_models import DeepsetUser
+from deepset_mcp.api.shared_models import DeepsetUser, NoContentResponse
 from deepset_mcp.tools.doc_search import get_docs_config, search_docs
 from test.unit.conftest import BaseFakeClient
 

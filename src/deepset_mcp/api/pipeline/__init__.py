@@ -1,6 +1,5 @@
 from .models import (
     DeepsetPipeline,
-    NoContentResponse,
     PipelineLog,
     PipelineLogList,
     PipelineValidationResult,
@@ -10,7 +9,6 @@ from .resource import PipelineResource
 
 __all__ = [
     "DeepsetPipeline",
-    "NoContentResponse",
     "PipelineValidationResult",
     "ValidationError",
     "PipelineResource",
