@@ -11,6 +11,7 @@ from deepset_mcp.api.protocols import (
     IndexResourceProtocol,
     PipelineResourceProtocol,
     PipelineTemplateResourceProtocol,
+    SecretResourceProtocol,
     UserResourceProtocol,
 )
 from deepset_mcp.api.transport import StreamingResponse, StreamReaderProtocol, TransportResponse
@@ -262,4 +263,8 @@ class BaseFakeClient(AsyncClientProtocol):
 
     def users(self) -> UserResourceProtocol:
         """Overwrite this method when testing UserResource."""
+        raise NotImplementedError
+
+    def secrets(self) -> SecretResourceProtocol:
+        """Overwrite this method when testing SecretResource."""
         raise NotImplementedError
