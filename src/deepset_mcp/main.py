@@ -24,6 +24,7 @@ from deepset_mcp.tools.haystack_service import (
 )
 from deepset_mcp.tools.indexes import (
     create_index as create_index_tool,
+    deploy_index as deploy_index_tool,
     get_index as get_index_tool,
     list_indexes as list_indexes_tool,
     update_index as update_index_tool,
@@ -321,6 +322,22 @@ async def update_index(
             updated_index_name=updated_index_name,
             yaml_configuration=yaml_configuration,
         )
+    return response
+
+
+@mcp.tool()
+async def deploy_index(index_name: str) -> str:
+    """Deploys an index to production in the deepset workspace.
+
+    Use this to deploy an index that has been created and configured.
+    The deployment process will validate the index configuration and deploy it if valid.
+    If deployment fails due to validation errors, you will receive detailed error information.
+
+    :param index_name: Name of the index to deploy.
+    """
+    workspace = get_workspace()
+    async with AsyncDeepsetClient() as client:
+        response = await deploy_index_tool(client=client, workspace=workspace, index_name=index_name)
     return response
 
 

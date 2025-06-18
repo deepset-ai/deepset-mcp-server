@@ -209,6 +209,21 @@ class IndexResourceProtocol(Protocol):
         """
         ...
 
+    async def deploy(self, index_name: str) -> PipelineValidationResult:
+        """Deploy an index to production.
+
+        :param index_name: Name of the index to deploy.
+        :returns: PipelineValidationResult containing deployment status and any errors.
+        """
+        ...
+
+    async def delete(self, index_name: str) -> None:
+        """Delete an index.
+
+        :param index_name: Name of the index to delete.
+        """
+        ...
+
 
 class PipelineTemplateResourceProtocol(Protocol):
     """Protocol defining the implementation for PipelineTemplateResource."""
