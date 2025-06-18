@@ -4,6 +4,7 @@ from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.secrets.models import Secret, SecretList
 from deepset_mcp.api.secrets.resource import SecretResource
+from deepset_mcp.api.shared_models import NoContentResponse
 
 pytestmark = pytest.mark.integration
 
@@ -37,7 +38,9 @@ async def test_create_and_get_secret(
 
     try:
         # Create a new secret
-        await secret_resource.create(name=test_secret_name, secret=test_secret_value)
+        create_result = await secret_resource.create(name=test_secret_name, secret=test_secret_value)
+        assert isinstance(create_result, NoContentResponse)
+        assert create_result.success is True
 
         # List secrets to find our created secret
         secrets: SecretList = await secret_resource.list()
@@ -143,7 +146,9 @@ async def test_delete_secret(
         assert secret_to_delete is not None, f"Secret '{test_secret_name}' not found"
 
         # Delete the secret
-        await secret_resource.delete(secret_to_delete.secret_id)
+        delete_result = await secret_resource.delete(secret_to_delete.secret_id)
+        assert isinstance(delete_result, NoContentResponse)
+        assert delete_result.success is True
 
         # Remove from cleanup list since we already deleted it
         created_secret_ids.remove(secret_to_delete.secret_id)

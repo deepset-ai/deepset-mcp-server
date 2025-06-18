@@ -10,13 +10,12 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     DeepsetSearchResponse,
     DeepsetStreamEvent,
-    NoContentResponse,
     PipelineLogList,
     PipelineValidationResult,
 )
 from deepset_mcp.api.pipeline_template.models import PipelineTemplate
 from deepset_mcp.api.secrets.models import Secret, SecretList
-from deepset_mcp.api.shared_models import DeepsetUser
+from deepset_mcp.api.shared_models import DeepsetUser, NoContentResponse
 from deepset_mcp.api.transport import StreamingResponse, TransportResponse
 
 
@@ -66,7 +65,7 @@ class SecretResourceProtocol(Protocol):
         """List secrets with pagination."""
         ...
 
-    async def create(self, name: str, secret: str) -> None:
+    async def create(self, name: str, secret: str) -> NoContentResponse:
         """Create a new secret."""
         ...
 
@@ -74,7 +73,7 @@ class SecretResourceProtocol(Protocol):
         """Get a specific secret by ID."""
         ...
 
-    async def delete(self, secret_id: str) -> None:
+    async def delete(self, secret_id: str) -> NoContentResponse:
         """Delete a secret by ID."""
         ...
 

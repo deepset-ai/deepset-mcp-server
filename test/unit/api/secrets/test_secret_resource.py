@@ -3,6 +3,7 @@ import pytest
 from deepset_mcp.api.exceptions import ResourceNotFoundError
 from deepset_mcp.api.secrets.models import Secret, SecretList
 from deepset_mcp.api.secrets.resource import SecretResource
+from deepset_mcp.api.shared_models import NoContentResponse
 from deepset_mcp.api.transport import TransportResponse
 from test.unit.conftest import BaseFakeClient
 
@@ -121,7 +122,12 @@ async def test_create_secret() -> None:
     fake_client.secrets = secrets  # type: ignore[method-assign]
 
     resource = fake_client.secrets()
-    await resource.create("my-secret", "secret-value")
+    result = await resource.create("my-secret", "secret-value")
+
+    # Verify the response is a NoContentResponse
+    assert isinstance(result, NoContentResponse)
+    assert result.success is True
+    assert result.message == "Secret created successfully."
 
     # Verify request was made correctly
     assert len(fake_client.requests) == 1
@@ -186,7 +192,12 @@ async def test_delete_secret() -> None:
     fake_client.secrets = secrets  # type: ignore[method-assign]
 
     resource = fake_client.secrets()
-    await resource.delete("secret-123")
+    result = await resource.delete("secret-123")
+
+    # Verify the response is a NoContentResponse
+    assert isinstance(result, NoContentResponse)
+    assert result.success is True
+    assert result.message == "Secret deleted successfully."
 
     # Verify request was made correctly
     assert len(fake_client.requests) == 1

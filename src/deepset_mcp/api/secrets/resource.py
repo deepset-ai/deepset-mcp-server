@@ -3,6 +3,7 @@ from typing import Any
 from deepset_mcp.api.exceptions import ResourceNotFoundError
 from deepset_mcp.api.protocols import AsyncClientProtocol, SecretResourceProtocol
 from deepset_mcp.api.secrets.models import Secret, SecretList
+from deepset_mcp.api.shared_models import NoContentResponse
 from deepset_mcp.api.transport import raise_for_status
 
 
@@ -50,11 +51,13 @@ class SecretResource(SecretResourceProtocol):
 
         return SecretList(**resp.json)
 
-    async def create(self, name: str, secret: str) -> None:
+    async def create(self, name: str, secret: str) -> NoContentResponse:
         """Create a new secret.
 
         :param name: The name of the secret.
         :param secret: The secret value.
+
+        :returns: NoContentResponse indicating successful creation.
         """
         data = {
             "name": name,
@@ -69,6 +72,7 @@ class SecretResource(SecretResourceProtocol):
         )
 
         raise_for_status(resp)
+        return NoContentResponse(message="Secret created successfully.")
 
     async def get(self, secret_id: str) -> Secret:
         """Get a specific secret by ID.
@@ -90,10 +94,12 @@ class SecretResource(SecretResourceProtocol):
 
         return Secret(**resp.json)
 
-    async def delete(self, secret_id: str) -> None:
+    async def delete(self, secret_id: str) -> NoContentResponse:
         """Delete a secret by ID.
 
         :param secret_id: The ID of the secret to delete.
+
+        :returns: NoContentResponse indicating successful deletion.
         """
         resp = await self._client.request(
             endpoint=f"v2/secrets/{secret_id}",
@@ -102,3 +108,4 @@ class SecretResource(SecretResourceProtocol):
         )
 
         raise_for_status(resp)
+        return NoContentResponse(message="Secret deleted successfully.")
