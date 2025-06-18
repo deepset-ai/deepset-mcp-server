@@ -17,14 +17,13 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetSearchResponse,
     DeepsetStreamEvent,
     ExceptionInfo,
-    NoContentResponse,
     PipelineLog,
     PipelineLogList,
     PipelineServiceLevel,
     PipelineValidationResult,
     ValidationError,
 )
-from deepset_mcp.api.shared_models import DeepsetUser
+from deepset_mcp.api.shared_models import DeepsetUser, NoContentResponse
 
 # Adjust the import path below to match your project structure
 from deepset_mcp.tools.pipeline import (

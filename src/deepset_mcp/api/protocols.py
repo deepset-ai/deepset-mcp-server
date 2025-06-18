@@ -10,12 +10,12 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     DeepsetSearchResponse,
     DeepsetStreamEvent,
-    NoContentResponse,
     PipelineLogList,
     PipelineValidationResult,
 )
 from deepset_mcp.api.pipeline_template.models import PipelineTemplate
-from deepset_mcp.api.shared_models import DeepsetUser
+from deepset_mcp.api.secrets.models import Secret, SecretList
+from deepset_mcp.api.shared_models import DeepsetUser, NoContentResponse
 from deepset_mcp.api.transport import StreamingResponse, TransportResponse
 
 
@@ -50,6 +50,31 @@ class UserResourceProtocol(Protocol):
 
     async def get(self, user_id: str) -> DeepsetUser:
         """Get user information by user ID."""
+        ...
+
+
+class SecretResourceProtocol(Protocol):
+    """Protocol defining the implementation for SecretResource."""
+
+    async def list(
+        self,
+        limit: int = 10,
+        field: str = "created_at",
+        order: str = "DESC",
+    ) -> SecretList:
+        """List secrets with pagination."""
+        ...
+
+    async def create(self, name: str, secret: str) -> NoContentResponse:
+        """Create a new secret."""
+        ...
+
+    async def get(self, secret_id: str) -> Secret:
+        """Get a specific secret by ID."""
+        ...
+
+    async def delete(self, secret_id: str) -> NoContentResponse:
+        """Delete a secret by ID."""
         ...
 
 
@@ -144,6 +169,10 @@ class AsyncClientProtocol(Protocol):
 
     def users(self) -> "UserResourceProtocol":
         """Access users."""
+        ...
+
+    def secrets(self) -> "SecretResourceProtocol":
+        """Access secrets."""
         ...
 
 
