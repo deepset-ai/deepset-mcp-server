@@ -9,11 +9,11 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     DeepsetSearchResponse,
     DeepsetStreamEvent,
-    NoContentResponse,
     PipelineLogList,
     PipelineValidationResult,
     ValidationError,
 )
+from deepset_mcp.api.shared_models import NoContentResponse
 from deepset_mcp.api.transport import raise_for_status
 
 logger = logging.getLogger(__name__)

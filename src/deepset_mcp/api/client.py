@@ -10,6 +10,7 @@ from deepset_mcp.api.indexes.resource import IndexResource
 from deepset_mcp.api.pipeline.resource import PipelineResource
 from deepset_mcp.api.pipeline_template.resource import PipelineTemplateResource
 from deepset_mcp.api.protocols import AsyncClientProtocol
+from deepset_mcp.api.secrets.resource import SecretResource
 from deepset_mcp.api.transport import (
     AsyncTransport,
     StreamingResponse,
@@ -253,3 +254,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
     def users(self) -> UserResource:
         """Resource to interact with users."""
         return UserResource(client=self)
+
+    def secrets(self) -> SecretResource:
+        """Resource to interact with secrets."""
+        return SecretResource(client=self)
