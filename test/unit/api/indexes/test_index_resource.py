@@ -6,6 +6,7 @@ import pytest
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.indexes.models import Index, IndexList
 from deepset_mcp.api.indexes.resource import IndexResource
+from deepset_mcp.api.pipeline.models import PipelineValidationResult
 from deepset_mcp.api.transport import TransportResponse
 from test.unit.conftest import BaseFakeClient
 
@@ -289,3 +290,123 @@ class TestIndexResource:
         resource = IndexResource(fake_client, workspace)
         with pytest.raises(UnexpectedAPIError):
             await resource.delete("server-error-index")
+
+    async def test_deploy_index_success(self, fake_client: BaseFakeClient, workspace: str) -> None:
+        """Test successful index deployment."""
+        fake_client.responses[f"{workspace}/indexes/test-index/deploy"] = TransportResponse(
+            status_code=200, json={"status": "success"}, text='{"status": "success"}'
+        )
+
+        resource = IndexResource(fake_client, workspace)
+        result = await resource.deploy(index_name="test-index")
+
+        # Verify results
+        assert isinstance(result, PipelineValidationResult)
+        assert result.valid is True
+        assert len(result.errors) == 0
+
+        # Verify request
+        last_request = fake_client.requests[-1]
+        assert last_request["endpoint"] == f"v1/workspaces/{workspace}/indexes/test-index/deploy"
+        assert last_request["method"] == "POST"
+
+    async def test_deploy_index_with_validation_errors(self, fake_client: BaseFakeClient, workspace: str) -> None:
+        """Test deployment with validation errors (422)."""
+        validation_errors = {
+            "details": [
+                {"code": "invalid_config", "message": "Index configuration is invalid"},
+                {"code": "missing_dependency", "message": "Required dependency not found"},
+            ]
+        }
+
+        transport_response = TransportResponse(text="", status_code=422, json=validation_errors)
+        fake_client.responses[f"{workspace}/indexes/test-index/deploy"] = transport_response
+
+        resource = IndexResource(fake_client, workspace)
+        result = await resource.deploy(index_name="test-index")
+
+        # Verify results
+        assert isinstance(result, PipelineValidationResult)
+        assert result.valid is False
+        assert len(result.errors) == 2
+        assert result.errors[0].code == "invalid_config"
+        assert result.errors[0].message == "Index configuration is invalid"
+        assert result.errors[1].code == "missing_dependency"
+        assert result.errors[1].message == "Required dependency not found"
+
+    async def test_deploy_index_with_400_error(self, fake_client: BaseFakeClient, workspace: str) -> None:
+        """Test deployment with 400 error."""
+        error_response = TransportResponse(
+            text="Bad request: invalid parameters", status_code=400, json={"detail": "Bad request"}
+        )
+        fake_client.responses[f"{workspace}/indexes/test-index/deploy"] = error_response
+
+        resource = IndexResource(fake_client, workspace)
+        result = await resource.deploy(index_name="test-index")
+
+        # Verify results
+        assert isinstance(result, PipelineValidationResult)
+        assert result.valid is False
+        assert len(result.errors) == 1
+        assert result.errors[0].code == "DEPLOYMENT_ERROR"
+        assert result.errors[0].message == "Bad request: invalid parameters"
+
+    async def test_deploy_index_with_404_error(self, fake_client: BaseFakeClient, workspace: str) -> None:
+        """Test deployment with 404 error (index not found)."""
+        error_response = TransportResponse(text="Index not found", status_code=404, json={"detail": "Index not found"})
+        fake_client.responses[f"{workspace}/indexes/nonexistent-index/deploy"] = error_response
+
+        resource = IndexResource(fake_client, workspace)
+        result = await resource.deploy(index_name="nonexistent-index")
+
+        # Verify results
+        assert isinstance(result, PipelineValidationResult)
+        assert result.valid is False
+        assert len(result.errors) == 1
+        assert result.errors[0].code == "DEPLOYMENT_ERROR"
+        assert result.errors[0].message == "Index not found"
+
+    async def test_deploy_index_with_424_error(self, fake_client: BaseFakeClient, workspace: str) -> None:
+        """Test deployment with 424 error (failed dependency)."""
+        error_response = TransportResponse(
+            text="Failed dependency", status_code=424, json={"detail": "Failed dependency"}
+        )
+        fake_client.responses[f"{workspace}/indexes/test-index/deploy"] = error_response
+
+        resource = IndexResource(fake_client, workspace)
+        result = await resource.deploy(index_name="test-index")
+
+        # Verify results
+        assert isinstance(result, PipelineValidationResult)
+        assert result.valid is False
+        assert len(result.errors) == 1
+        assert result.errors[0].code == "DEPLOYMENT_ERROR"
+        assert result.errors[0].message == "Failed dependency"
+
+    async def test_deploy_index_with_500_error(self, fake_client: BaseFakeClient, workspace: str) -> None:
+        """Test deployment with 500 error (unexpected error)."""
+        error_response = TransportResponse(
+            text="Internal server error", status_code=500, json={"detail": "Internal server error"}
+        )
+        fake_client.responses[f"{workspace}/indexes/test-index/deploy"] = error_response
+
+        resource = IndexResource(fake_client, workspace)
+
+        # Run the deployment and expect an exception
+        with pytest.raises(UnexpectedAPIError):
+            await resource.deploy(index_name="test-index")
+
+    async def test_deploy_index_with_empty_error_text(self, fake_client: BaseFakeClient, workspace: str) -> None:
+        """Test deployment with error response but empty text."""
+        error_response = TransportResponse(text="", status_code=400, json={"detail": "Bad request"})
+        fake_client.responses[f"{workspace}/indexes/test-index/deploy"] = error_response
+
+        resource = IndexResource(fake_client, workspace)
+        result = await resource.deploy(index_name="test-index")
+
+        # Verify results
+        assert isinstance(result, PipelineValidationResult)
+        assert result.valid is False
+        assert len(result.errors) == 1
+        assert result.errors[0].code == "DEPLOYMENT_ERROR"
+        assert result.errors[0].message == "HTTP 400 error"

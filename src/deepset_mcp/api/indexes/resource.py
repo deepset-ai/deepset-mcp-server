@@ -1,4 +1,6 @@
+from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.indexes.models import Index, IndexList
+from deepset_mcp.api.pipeline.models import PipelineValidationResult, ValidationError
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.transport import raise_for_status
 
@@ -103,3 +105,33 @@ class IndexResource:
         response = await self._client.request(f"/v1/workspaces/{self._workspace}/indexes/{index_name}", method="DELETE")
 
         raise_for_status(response)
+
+    async def deploy(self, index_name: str) -> PipelineValidationResult:
+        """Deploy an index.
+
+        :param index_name: Name of the index to deploy.
+        :returns: PipelineValidationResult containing deployment status and any errors.
+        :raises UnexpectedAPIError: If the API returns an unexpected status code.
+        """
+        resp = await self._client.request(
+            endpoint=f"v1/workspaces/{self._workspace}/indexes/{index_name}/deploy",
+            method="POST",
+        )
+
+        # If successful (status 200), the deployment was successful
+        if resp.success:
+            return PipelineValidationResult(valid=True)
+
+        # Handle validation errors (422)
+        if resp.status_code == 422 and resp.json is not None and isinstance(resp.json, dict) and "details" in resp.json:
+            errors = [ValidationError(code=error["code"], message=error["message"]) for error in resp.json["details"]]
+            return PipelineValidationResult(valid=False, errors=errors)
+
+        # Handle other 4xx errors (400, 404, 424)
+        if 400 <= resp.status_code < 500:
+            # For non-validation errors, create a generic error
+            error_message = resp.text if resp.text else f"HTTP {resp.status_code} error"
+            errors = [ValidationError(code="DEPLOYMENT_ERROR", message=error_message)]
+            return PipelineValidationResult(valid=False, errors=errors)
+
+        raise UnexpectedAPIError(status_code=resp.status_code, message=resp.text, detail=resp.json)
