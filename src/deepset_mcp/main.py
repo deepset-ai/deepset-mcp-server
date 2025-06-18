@@ -1,4 +1,5 @@
 import argparse
+import logging
 import os
 from pathlib import Path
 
@@ -10,6 +11,10 @@ from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.tools.custom_components import (
     get_latest_custom_component_installation_logs as get_latest_custom_component_installation_logs_tool,
     list_custom_component_installations as list_custom_component_installations_tool,
+)
+from deepset_mcp.tools.doc_search import (
+    get_docs_config,
+    search_docs as search_docs_tool,
 )
 from deepset_mcp.tools.haystack_service import (
     get_component_definition as get_component_definition_tool,
@@ -434,6 +439,41 @@ async def search_pipeline(pipeline_name: str, query: str) -> str:
     return response
 
 
+# Check if docs search should be enabled
+docs_config = get_docs_config()
+if docs_config:
+    docs_workspace, docs_pipeline_name, docs_api_key = docs_config
+
+    async def search_docs(query: str) -> str:
+        """Search the deepset platform documentation.
+
+        This tool allows you to search through deepset's official documentation to find
+        information about features, API usage, best practices, and troubleshooting guides.
+        Use this when you need to look up specific deepset functionality or help users
+        understand how to use deepset features.
+
+        :param query: The search query to execute against the documentation.
+        :returns: The formatted search results from the documentation.
+        """
+        async with AsyncDeepsetClient(api_key=docs_api_key) as client:
+            response = await search_docs_tool(
+                client=client,
+                workspace=docs_workspace,
+                pipeline_name=docs_pipeline_name,
+                query=query,
+            )
+        return response
+
+    # Add the tool to the server
+    mcp.add_tool(search_docs)
+
+else:
+    logging.warning(
+        "Documentation search tool not enabled. To enable, set the following environment variables: "
+        "DEEPSET_DOCS_WORKSPACE, DEEPSET_DOCS_PIPELINE_NAME, DEEPSET_DOCS_API_KEY"
+    )
+
+
 def main() -> None:
     """Entrypoint for the deepset MCP server."""
     parser = argparse.ArgumentParser(description="Run the Deepset MCP server.")
@@ -447,11 +487,27 @@ def main() -> None:
         "-k",
         help="Deepset API key (env DEEPSET_API_KEY)",
     )
+    parser.add_argument(
+        "--docs-workspace",
+        help="Deepset docs search workspace (env DEEPSET_DOCS_WORKSPACE)",
+    )
+    parser.add_argument(
+        "--docs-pipeline-name",
+        help="Deepset docs pipeline name (env DEEPSET_DOCS_PIPELINE_NAME)",
+    )
+    parser.add_argument(
+        "--docs-api-key",
+        help="Deepset docs pipeline API key (env DEEPSET_DOCS_API_KEY)",
+    )
     args = parser.parse_args()
 
     # prefer flags, fallback to env
     workspace = args.workspace or os.getenv("DEEPSET_WORKSPACE")
     api_key = args.api_key or os.getenv("DEEPSET_API_KEY")
+    docs_workspace = args.docs_workspace or os.getenv("DEEPSET_DOCS_WORKSPACE")
+    docs_pipeline_name = args.docs_pipeline_name or os.getenv("DEEPSET_DOCS_PIPELINE_NAME")
+    docs_api_key = args.docs_api_key or os.getenv("DEEPSET_DOCS_API_KEY")
+
     if not workspace:
         parser.error("Missing workspace: set --workspace or DEEPSET_WORKSPACE")
     if not api_key:
@@ -460,6 +516,14 @@ def main() -> None:
     # make sure downstream tools see them
     os.environ["DEEPSET_WORKSPACE"] = workspace
     os.environ["DEEPSET_API_KEY"] = api_key
+
+    # Set docs environment variables if provided
+    if docs_workspace:
+        os.environ["DEEPSET_DOCS_WORKSPACE"] = docs_workspace
+    if docs_pipeline_name:
+        os.environ["DEEPSET_DOCS_PIPELINE_NAME"] = docs_pipeline_name
+    if docs_api_key:
+        os.environ["DEEPSET_DOCS_API_KEY"] = docs_api_key
 
     # run with SSE transport (HTTP+Server-Sent Events)
     mcp.run(transport="stdio")
