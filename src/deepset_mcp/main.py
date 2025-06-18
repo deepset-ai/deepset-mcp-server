@@ -43,6 +43,10 @@ from deepset_mcp.tools.pipeline_template import (
     list_pipeline_templates as list_pipeline_templates_tool,
     search_pipeline_templates as search_pipeline_templates_tool,
 )
+from deepset_mcp.tools.secrets import (
+    get_secret as get_secret_tool,
+    list_secrets as list_secrets_tool,
+)
 
 INITIALIZED_MODEL = StaticModel.from_pretrained("minishlab/potion-base-2M")
 
@@ -436,6 +440,34 @@ async def search_pipeline(pipeline_name: str, query: str) -> str:
             pipeline_name=pipeline_name,
             query=query,
         )
+    return response
+
+
+@mcp.tool()
+async def list_secrets(limit: int = 10) -> str:
+    """Lists all secrets available in the deepset workspace.
+
+    Use this tool to retrieve a list of secrets with their names and IDs.
+    This is useful for getting an overview of all secrets before retrieving specific ones.
+
+    :param limit: Maximum number of secrets to return (default: 10).
+    """
+    async with AsyncDeepsetClient() as client:
+        response = await list_secrets_tool(client, limit)
+    return response
+
+
+@mcp.tool()
+async def get_secret(secret_id: str) -> str:
+    """Retrieves detailed information about a specific secret by its ID.
+
+    Use this tool to get information about a specific secret when you know its ID.
+    The secret value itself is not returned for security reasons, only metadata.
+
+    :param secret_id: The unique identifier of the secret to retrieve.
+    """
+    async with AsyncDeepsetClient() as client:
+        response = await get_secret_tool(client, secret_id)
     return response
 
 
