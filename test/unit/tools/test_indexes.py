@@ -4,9 +4,10 @@ import pytest
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.indexes.models import Index, IndexList, IndexStatus
+from deepset_mcp.api.pipeline.models import PipelineValidationResult, ValidationError
 from deepset_mcp.api.protocols import IndexResourceProtocol
 from deepset_mcp.api.shared_models import DeepsetUser
-from deepset_mcp.tools.indexes import create_index, get_index, list_indexes, update_index
+from deepset_mcp.tools.indexes import create_index, deploy_index, get_index, list_indexes, update_index
 from test.unit.conftest import BaseFakeClient
 
 
@@ -17,17 +18,21 @@ class FakeIndexResource(IndexResourceProtocol):
         get_response: Index | None = None,
         create_response: Index | None = None,
         update_response: Index | None = None,
+        deploy_response: PipelineValidationResult | None = None,
         get_exception: Exception | None = None,
         create_exception: Exception | None = None,
         update_exception: Exception | None = None,
+        deploy_exception: Exception | None = None,
     ) -> None:
         self._list_response = list_response
         self._get_response = get_response
         self._create_response = create_response
         self._update_response = update_response
+        self._deploy_response = deploy_response
         self._get_exception = get_exception
         self._create_exception = create_exception
         self._update_exception = update_exception
+        self._deploy_exception = deploy_exception
 
     async def list(self, limit: int = 10, page_number: int = 1) -> IndexList:
         if self._list_response is not None:
@@ -56,6 +61,16 @@ class FakeIndexResource(IndexResourceProtocol):
         if self._update_response is not None:
             return self._update_response
 
+        raise NotImplementedError
+
+    async def deploy(self, index_name: str) -> PipelineValidationResult:
+        if self._deploy_exception:
+            raise self._deploy_exception
+        if self._deploy_response is not None:
+            return self._deploy_response
+        return PipelineValidationResult(valid=True)
+
+    async def delete(self, index_name: str) -> None:
         raise NotImplementedError
 
 
@@ -314,3 +329,82 @@ async def test_update_index_with_detailed_error_messages() -> None:
     assert "Failed to update index 'existing_index'" in result
     assert "Name already exists" in result
     assert "400" in result
+
+
+@pytest.mark.asyncio
+async def test_deploy_index_returns_success_message() -> None:
+    """Test successful index deployment."""
+    resource = FakeIndexResource(deploy_response=PipelineValidationResult(valid=True))
+    client = FakeClient(resource)
+
+    result = await deploy_index(client=client, workspace="test", index_name="test_index")
+
+    assert "Index 'test_index' deployed successfully." == result
+
+
+@pytest.mark.asyncio
+async def test_deploy_index_returns_validation_errors() -> None:
+    """Test deployment with validation errors."""
+    validation_errors = [
+        ValidationError(code="invalid_config", message="Index configuration is invalid"),
+        ValidationError(code="missing_dependency", message="Required dependency not found"),
+    ]
+    validation_result = PipelineValidationResult(valid=False, errors=validation_errors)
+    resource = FakeIndexResource(deploy_response=validation_result)
+    client = FakeClient(resource)
+
+    result = await deploy_index(client=client, workspace="test", index_name="test_index")
+
+    assert "The provided pipeline configuration is invalid" in result
+    assert "invalid_config" in result
+    assert "Index configuration is invalid" in result
+    assert "missing_dependency" in result
+    assert "Required dependency not found" in result
+
+
+@pytest.mark.parametrize(
+    "error_class,expected_message",
+    [
+        (ResourceNotFoundError, "There is no index named 'test_index' in workspace 'test'"),
+        (BadRequestError, "Failed to deploy index 'test_index'"),
+        (UnexpectedAPIError, "Failed to deploy index 'test_index'"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_deploy_index_returns_error_message(
+    error_class: type[Exception],
+    expected_message: str,
+) -> None:
+    """Test deployment error handling."""
+    resource = FakeIndexResource(deploy_exception=error_class("Error details"))
+    client = FakeClient(resource)
+
+    result = await deploy_index(client=client, workspace="test", index_name="test_index")
+
+    assert expected_message in result
+
+
+@pytest.mark.asyncio
+async def test_deploy_index_with_detailed_error_messages() -> None:
+    """Test deployment with detailed error messages."""
+    # Test BadRequestError with detailed message
+    resource_bad = FakeIndexResource(deploy_exception=BadRequestError(message="Invalid index configuration"))
+    client_bad = FakeClient(resource_bad)
+
+    result_bad = await deploy_index(client=client_bad, workspace="test", index_name="bad_index")
+
+    assert "Failed to deploy index 'bad_index'" in result_bad
+    assert "Invalid index configuration" in result_bad
+    assert "400" in result_bad
+
+    # Test UnexpectedAPIError with status code
+    resource_unexpected = FakeIndexResource(
+        deploy_exception=UnexpectedAPIError(status_code=503, message="Service unavailable")
+    )
+    client_unexpected = FakeClient(resource_unexpected)
+
+    result_unexpected = await deploy_index(client=client_unexpected, workspace="test", index_name="unavailable_index")
+
+    assert "Failed to deploy index 'unavailable_index'" in result_unexpected
+    assert "Service unavailable" in result_unexpected
+    assert "503" in result_unexpected

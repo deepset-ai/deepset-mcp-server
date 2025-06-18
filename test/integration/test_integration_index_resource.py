@@ -6,6 +6,7 @@ from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.api.exceptions import ResourceNotFoundError
 from deepset_mcp.api.indexes.models import Index
 from deepset_mcp.api.indexes.resource import IndexResource
+from deepset_mcp.api.pipeline.models import PipelineValidationResult
 
 pytestmark = pytest.mark.integration
 
@@ -340,3 +341,39 @@ async def test_delete_index(
     # Verify the index no longer exists
     with pytest.raises(ResourceNotFoundError):
         await index_resource.get(index_name=index_name)
+
+
+@pytest.mark.asyncio
+async def test_deploy_index_success(
+    index_resource: IndexResource,
+    valid_index_config: str,
+) -> None:
+    """Test successful index deployment."""
+    index_name = "test-deploy-index"
+
+    # Create an index to deploy
+    config = json.loads(valid_index_config)
+    await index_resource.create(name=index_name, yaml_config=config["config_yaml"])
+
+    # Deploy the index
+    result = await index_resource.deploy(index_name=index_name)
+
+    # Verify deployment was successful
+    assert isinstance(result, PipelineValidationResult)
+    assert result.valid is True
+
+
+@pytest.mark.asyncio
+async def test_deploy_nonexistent_index(
+    index_resource: IndexResource,
+) -> None:
+    """Test deploying a non-existent index."""
+    non_existent_name = "non-existent-deploy-index"
+
+    # Deploy a non-existent index
+    result = await index_resource.deploy(index_name=non_existent_name)
+
+    # Verify deployment failed with appropriate error
+    assert isinstance(result, PipelineValidationResult)
+    assert result.valid is False
+    assert len(result.errors) > 0

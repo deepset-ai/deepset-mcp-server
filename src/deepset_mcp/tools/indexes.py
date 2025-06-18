@@ -1,5 +1,6 @@
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.protocols import AsyncClientProtocol
+from deepset_mcp.tools.formatting_utils import validation_result_to_llm_readable_string
 from deepset_mcp.tools.formatting_utils_index import index_list_to_llm_readable_string, index_to_llm_readable_string
 
 
@@ -68,3 +69,31 @@ async def update_index(
         return f"Failed to update index '{index_name}': {e}"
 
     return f"Index '{index_name}' updated successfully."
+
+
+async def deploy_index(client: AsyncClientProtocol, workspace: str, index_name: str) -> str:
+    """Deploys an index to production.
+
+    This function attempts to deploy the specified index in the given workspace.
+    If the deployment fails due to validation errors, it returns a readable string
+    describing the validation errors.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param index_name: Name of the index to deploy.
+
+    :returns: A string indicating the deployment result.
+    """
+    try:
+        deployment_result = await client.indexes(workspace=workspace).deploy(index_name=index_name)
+    except ResourceNotFoundError:
+        return f"There is no index named '{index_name}' in workspace '{workspace}'."
+    except BadRequestError as e:
+        return f"Failed to deploy index '{index_name}': {e}"
+    except UnexpectedAPIError as e:
+        return f"Failed to deploy index '{index_name}': {e}"
+
+    if not deployment_result.valid:
+        return validation_result_to_llm_readable_string(deployment_result)
+
+    return f"Index '{index_name}' deployed successfully."
