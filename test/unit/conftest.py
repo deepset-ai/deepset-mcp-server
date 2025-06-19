@@ -2,7 +2,7 @@ import json
 from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from types import TracebackType
-from typing import Any, Self, TypeVar, overload
+from typing import Any, Literal, Self, TypeVar, overload
 
 from deepset_mcp.api.protocols import (
     AsyncClientProtocol,
@@ -65,6 +65,7 @@ class BaseFakeClient(AsyncClientProtocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        timeout: float | None | Literal["config"] = "config",
         **kwargs: Any,
     ) -> TransportResponse[T]: ...
 
@@ -77,6 +78,7 @@ class BaseFakeClient(AsyncClientProtocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        timeout: float | None | Literal["config"] = "config",
         **kwargs: Any,
     ) -> TransportResponse[Any]: ...
 
@@ -88,6 +90,7 @@ class BaseFakeClient(AsyncClientProtocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        timeout: float | None | Literal["config"] = "config",
         **kwargs: Any,
     ) -> TransportResponse[Any]:
         """

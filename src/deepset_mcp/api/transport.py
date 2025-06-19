@@ -1,12 +1,13 @@
 import json
+import time
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
-from typing import Any, Generic, Protocol, TypeVar, cast, overload
+from typing import Any, Generic, Literal, Protocol, TypeVar, cast, overload
 
 import httpx
 
-from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
+from deepset_mcp.api.exceptions import BadRequestError, RequestTimeoutError, ResourceNotFoundError, UnexpectedAPIError
 
 T = TypeVar("T")
 
@@ -111,16 +112,34 @@ class TransportProtocol(Protocol):
 
     @overload
     async def request(
-        self, method: str, url: str, *, response_type: type[T], **kwargs: Any
+        self,
+        method: str,
+        url: str,
+        *,
+        response_type: type[T],
+        timeout: float | None | Literal["config"] = "config",
+        **kwargs: Any,
     ) -> TransportResponse[T]: ...
 
     @overload
     async def request(
-        self, method: str, url: str, *, response_type: None = None, **kwargs: Any
+        self,
+        method: str,
+        url: str,
+        *,
+        response_type: None = None,
+        timeout: float | None | Literal["config"] = "config",
+        **kwargs: Any,
     ) -> TransportResponse[Any]: ...
 
     async def request(
-        self, method: str, url: str, *, response_type: type[T] | None = None, **kwargs: Any
+        self,
+        method: str,
+        url: str,
+        *,
+        response_type: type[T] | None = None,
+        timeout: float | None | Literal["config"] = "config",
+        **kwargs: Any,
     ) -> TransportResponse[Any]:
         """Send a regular HTTP request and return the response."""
         ...
@@ -189,16 +208,34 @@ class AsyncTransport:
 
     @overload
     async def request(
-        self, method: str, url: str, *, response_type: type[T], **kwargs: Any
+        self,
+        method: str,
+        url: str,
+        *,
+        response_type: type[T],
+        timeout: float | None | Literal["config"] = "config",
+        **kwargs: Any,
     ) -> TransportResponse[T]: ...
 
     @overload
     async def request(
-        self, method: str, url: str, *, response_type: None = None, **kwargs: Any
+        self,
+        method: str,
+        url: str,
+        *,
+        response_type: None = None,
+        timeout: float | None | Literal["config"] = "config",
+        **kwargs: Any,
     ) -> TransportResponse[Any]: ...
 
     async def request(
-        self, method: str, url: str, *, response_type: type[T] | None = None, **kwargs: Any
+        self,
+        method: str,
+        url: str,
+        *,
+        response_type: type[T] | None = None,
+        timeout: float | None | Literal["config"] = "config",
+        **kwargs: Any,
     ) -> TransportResponse[Any]:
         """
         Send a regular HTTP request and return the response.
@@ -211,6 +248,9 @@ class AsyncTransport:
             URL endpoint
         response_type : type[T], optional
             Expected response type for type checking
+        timeout : float | None | Literal["config"], optional
+            Request timeout in seconds. If "config", uses transport config timeout.
+            If None, disables timeout. If float, uses specific timeout.
         **kwargs : Any
             Additional arguments to pass to httpx
 
@@ -219,7 +259,26 @@ class AsyncTransport:
         TransportResponse[T]
             The response with parsed JSON if available
         """
-        response = await self._client.request(method, url, **kwargs)
+        if timeout != "config":
+            kwargs["timeout"] = timeout
+
+        start_time = time.time()
+        try:
+            response = await self._client.request(method, url, **kwargs)
+        except httpx.TimeoutException as e:
+            duration = time.time() - start_time
+            timeout_value = kwargs.get("timeout", "config default")
+
+            detail = None
+            if "search" in url and duration > 60:
+                detail = (
+                    "Search operations can take longer with large document collections or complex pipelines. "
+                    "Consider increasing the timeout for search requests."
+                )
+
+            raise RequestTimeoutError(
+                method=method, url=url, timeout=timeout_value, duration=duration, detail=detail
+            ) from e
 
         if response_type is not None:
             raw = response.json()
