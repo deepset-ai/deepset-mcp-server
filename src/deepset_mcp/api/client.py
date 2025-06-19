@@ -2,7 +2,7 @@ import os
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from types import TracebackType
-from typing import Any, Self, TypeVar, overload
+from typing import Any, Literal, Self, TypeVar, overload
 
 from deepset_mcp.api.custom_components.resource import CustomComponentsResource
 from deepset_mcp.api.haystack_service.resource import HaystackServiceResource
@@ -68,6 +68,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        timeout: float | None | Literal["config"] = "config",
         **kwargs: Any,
     ) -> TransportResponse[T]: ...
 
@@ -80,6 +81,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        timeout: float | None | Literal["config"] = "config",
         **kwargs: Any,
     ) -> TransportResponse[Any]: ...
 
@@ -91,6 +93,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         response_type: type[T] | None = None,
+        timeout: float | None | Literal["config"] = "config",
         **kwargs: Any,
     ) -> TransportResponse[Any]:
         """
@@ -108,6 +111,9 @@ class AsyncDeepsetClient(AsyncClientProtocol):
             Additional headers to include
         response_type : type[T], optional
             Expected response type for type checking
+        timeout : float | None | Literal["config"], optional
+            Request timeout in seconds. If "config", uses transport config timeout.
+            If None, disables timeout. If float, uses specific timeout.
         **kwargs : Any
             Additional arguments to pass to transport
 
@@ -138,6 +144,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
             json=data,
             headers=request_headers,
             response_type=response_type,
+            timeout=timeout,
             **kwargs,
         )
 

@@ -312,6 +312,7 @@ class PipelineResource:
             method="POST",
             data=data,
             response_type=dict[str, Any],
+            timeout=180.0,
         )
 
         raise_for_status(resp)

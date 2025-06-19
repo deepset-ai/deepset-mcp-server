@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager
 from types import TracebackType
-from typing import Any, Protocol, Self, TypeVar, overload
+from typing import Any, Literal, Protocol, Self, TypeVar, overload
 
 from deepset_mcp.api.custom_components.models import CustomComponentInstallationList
 from deepset_mcp.api.indexes.models import Index, IndexList
@@ -93,6 +93,7 @@ class AsyncClientProtocol(Protocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        timeout: float | None | Literal["config"] = "config",
         **kwargs: Any,
     ) -> TransportResponse[T]: ...
 
@@ -105,6 +106,7 @@ class AsyncClientProtocol(Protocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        timeout: float | None | Literal["config"] = "config",
         **kwargs: Any,
     ) -> TransportResponse[Any]: ...
 
@@ -116,6 +118,7 @@ class AsyncClientProtocol(Protocol):
         method: str = "GET",
         data: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        timeout: float | None | Literal["config"] = "config",
         **kwargs: Any,
     ) -> TransportResponse[Any]:
         """Make a request to the API."""
