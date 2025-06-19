@@ -32,6 +32,34 @@ class BadRequestError(DeepsetAPIError):
         super().__init__(status_code=400, message=message, detail=detail)
 
 
+class RequestTimeoutError(Exception):
+    """Exception raised when a request times out."""
+
+    def __init__(
+        self,
+        method: str,
+        url: str,
+        timeout: float | None | str,
+        duration: float | None = None,
+        detail: str | None = None,
+    ):
+        """Initialize the timeout exception with request context."""
+        self.method = method
+        self.url = url
+        self.timeout = timeout
+        self.duration = duration
+        self.detail = detail
+
+        timeout_display = f"{timeout}s" if isinstance(timeout, int | float) else str(timeout)
+
+        if duration is not None:
+            message = f"Request timed out after {duration:.2f}s (limit: {timeout_display}): {method} {url}"
+        else:
+            message = f"Request timed out (limit: {timeout_display}): {method} {url}"
+
+        super().__init__(message)
+
+
 class UnexpectedAPIError(DeepsetAPIError):
     """Catch-all exception for unexpected API errors."""
 

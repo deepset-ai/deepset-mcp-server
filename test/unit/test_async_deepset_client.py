@@ -1,7 +1,7 @@
 import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, TypeVar, overload
+from typing import Any, Literal, TypeVar, overload
 
 import pytest
 import pytest_asyncio
@@ -19,16 +19,34 @@ class DummyProtocol(TransportProtocol):
 
     @overload
     async def request(
-        self, method: str, url: str, *, response_type: type[T], **kwargs: Any
+        self,
+        method: str,
+        url: str,
+        *,
+        response_type: type[T],
+        timeout: float | None | Literal["config"] = "config",
+        **kwargs: Any,
     ) -> TransportResponse[T]: ...
 
     @overload
     async def request(
-        self, method: str, url: str, *, response_type: None = None, **kwargs: Any
+        self,
+        method: str,
+        url: str,
+        *,
+        response_type: None = None,
+        timeout: float | None | Literal["config"] = "config",
+        **kwargs: Any,
     ) -> TransportResponse[Any]: ...
 
     async def request(
-        self, method: str, url: str, *, response_type: type[T] | None = None, **kwargs: Any
+        self,
+        method: str,
+        url: str,
+        *,
+        response_type: type[T] | None = None,
+        timeout: float | None | Literal["config"] = "config",
+        **kwargs: Any,
     ) -> TransportResponse[Any]:
         # Record the request and return a dummy response
         record: dict[str, Any] = {"method": method, "url": url, **kwargs}
