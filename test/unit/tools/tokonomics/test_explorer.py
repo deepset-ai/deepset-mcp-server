@@ -50,9 +50,8 @@ class TestRichExplorer:
 
     def test_explore_nonexistent_object(self, explorer: RichExplorer) -> None:
         """Test exploring a non-existent object."""
-        result = explorer.explore("obj_999")
-
-        assert "Object obj_999 not found or expired" in result
+        with pytest.raises(ValueError, match="Object obj_999 not found or expired"):
+            explorer.explore("obj_999")
 
     def test_explore_simple_object(self, store: ObjectStore, explorer: RichExplorer) -> None:
         """Test exploring a simple object."""
@@ -83,9 +82,8 @@ class TestRichExplorer:
         test_data = {"key": "value"}
         obj_id = store.put(test_data)
 
-        result = explorer.explore(obj_id, "nonexistent.path")
-
-        assert "Navigation error" in result
+        with pytest.raises(ValueError, match="does not have a value at path"):
+            explorer.explore(obj_id, "nonexistent.path")
 
     def test_explore_disallowed_attribute(self, store: ObjectStore, explorer: RichExplorer) -> None:
         """Test exploring with disallowed attribute name."""
@@ -377,19 +375,16 @@ class TestRichExplorer:
 
     def test_get_object_at_path_nonexistent(self, explorer: RichExplorer) -> None:
         """Test object retrieval for non-existent object."""
-        result = explorer._get_object_at_path("obj_999", "")
-
-        assert "Object obj_999 not found or expired" in result
+        with pytest.raises(ValueError, match="Object obj_999 not found or expired"):
+            explorer._get_object_at_path("obj_999", "")
 
     def test_get_object_at_path_invalid_path(self, store: ObjectStore, explorer: RichExplorer) -> None:
         """Test object retrieval with invalid path."""
         test_data = {"key": "value"}
         obj_id = store.put(test_data)
 
-        result = explorer._get_object_at_path(obj_id, "nonexistent")
-
-        assert isinstance(result, str)
-        assert "Navigation error" in result
+        with pytest.raises(ValueError, match="does not have a value at path"):
+            explorer._get_object_at_path(obj_id, "nonexistent")
 
     def test_search_context_length(self, store: ObjectStore) -> None:
         """Test search context length configuration."""
