@@ -129,7 +129,7 @@ class TestTokonomicsIntegration:
             return f"Processed {len(data)} items"
 
         # Test non-existent object reference
-        with pytest.raises(ValueError, match="Object obj_999 not found or expired"):
+        with pytest.raises(ValueError, match="Object @obj_999 not found or expired"):
             process_data("@obj_999")
 
         # Test invalid reference format
@@ -232,12 +232,14 @@ class TestTokonomicsIntegration:
         """Test TTL expiration in integrated workflow."""
         # Create store with short TTL
         short_ttl_store = ObjectStore(ttl=0.1)  # 100ms TTL
+        # Create explorer that uses the same store
+        short_ttl_explorer = RichExplorer(short_ttl_store)
 
-        @explorable(object_store=short_ttl_store, explorer=explorer)
+        @explorable(object_store=short_ttl_store, explorer=short_ttl_explorer)
         def create_data() -> dict:
             return {"data": "will_expire"}
 
-        @referenceable(object_store=short_ttl_store, explorer=explorer)
+        @referenceable(object_store=short_ttl_store, explorer=short_ttl_explorer)
         def use_data(data: dict) -> str:
             return data["data"]
 

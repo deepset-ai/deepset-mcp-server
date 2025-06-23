@@ -207,7 +207,7 @@ def referenceable(
 
         obj = object_store.get(ref.obj_id)
         if obj is None:
-            raise ValueError(f"Object {ref.obj_id} not found or expired")
+            raise ValueError(f"Object @{ref.obj_id} not found or expired")
 
         if ref.path:
             try:

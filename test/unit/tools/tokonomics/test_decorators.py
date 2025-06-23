@@ -305,7 +305,7 @@ class TestReferenceableDecorator:
         def test_func(data: dict) -> str:
             return "success"
 
-        with pytest.raises(ValueError, match="Object obj_999 not found or expired"):
+        with pytest.raises(ValueError, match="Object @obj_999 not found or expired"):
             test_func("@obj_999")
 
     def test_referenceable_invalid_path(self, store: ObjectStore, explorer: RichExplorer) -> None:
