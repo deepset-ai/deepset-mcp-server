@@ -13,7 +13,7 @@ from functools import wraps
 from types import UnionType
 from typing import Any, TypeVar, Union, get_args, get_origin
 
-from glom import GlomError, glom  # type: ignore[import-untyped]
+from glom import GlomError, glom
 
 from .explorer import RichExplorer
 from .object_store import Explorable, ObjectRef, ObjectStore

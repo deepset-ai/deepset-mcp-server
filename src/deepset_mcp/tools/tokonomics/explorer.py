@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from glom import GlomError, Path, T, glom  # type: ignore[import-untyped]
+from glom import GlomError, Path, T, glom
 from rich.console import Console
 from rich.pretty import Pretty
 
