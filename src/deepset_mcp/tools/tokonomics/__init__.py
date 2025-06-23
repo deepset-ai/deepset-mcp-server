@@ -54,7 +54,7 @@ Exploration utilities:
     >>> search("obj_001", "Alice")
 """
 
-from .decorators import explorable, referenceable
+from .decorators import explorable, explorable_and_referenceable, referenceable
 from .explorer import RichExplorer
 from .object_store import Explorable, ObjectRef, ObjectStore
 
@@ -67,6 +67,7 @@ __all__ = [
     # Decorators
     "explorable",
     "referenceable",
+    "explorable_and_referenceable",
 ]
 
 __version__ = "0.1.0"
