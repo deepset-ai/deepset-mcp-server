@@ -6,24 +6,11 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 
 from deepset_mcp.api.client import AsyncDeepsetClient
-from deepset_mcp.mcp.initialize_embedding_model import get_initialized_model
-from deepset_mcp.mcp.tool_factory import WorkspaceMode, register_workspace_tools
+from deepset_mcp.tool_factory import WorkspaceMode, register_all_tools
 from deepset_mcp.tools.doc_search import (
     get_docs_config,
     search_docs as search_docs_tool,
 )
-from deepset_mcp.tools.haystack_service import (
-    get_component_definition as get_component_definition_tool,
-    get_custom_components as get_custom_components_tool,
-    list_component_families as list_component_families_tool,
-    search_component_definition as search_component_definition_tool,
-)
-from deepset_mcp.tools.secrets import (
-    get_secret as get_secret_tool,
-    list_secrets as list_secrets_tool,
-)
-
-INITIALIZED_MODEL = get_initialized_model()
 
 # Initialize MCP Server
 mcp = FastMCP("Deepset Cloud MCP")
@@ -35,90 +22,6 @@ async def deepset_copilot() -> str:
     prompt_path = Path(__file__).parent / "prompts/deepset_copilot_prompt.md"
 
     return prompt_path.read_text()
-
-
-@mcp.tool()
-async def list_component_families() -> str:
-    """
-    Returns a list of all component families available in deepset alongside their descriptions.
-
-    Use this as a starting point for when you are unsure what types of components are available.
-    """
-    async with AsyncDeepsetClient() as client:
-        response = await list_component_families_tool(client)
-
-    return response
-
-
-@mcp.tool()
-async def get_component_definition(component_type: str) -> str:
-    """Use this to get the full definition of a specific component.
-
-    The component type is the fully qualified import path of the component class.
-    For example: haystack.components.converters.xlsx.XLSXToDocument
-    The component definition contains a description, parameters, and example usage of the component.
-    """
-    async with AsyncDeepsetClient() as client:
-        response = await get_component_definition_tool(client, component_type)
-
-    return response
-
-
-@mcp.tool()
-async def search_component_definitions(query: str) -> str:
-    """Use this to search for components in deepset.
-
-    You can use full natural language queries to find components.
-    You can also use simple keywords.
-    Use this if you want to find the definition for a component,
-    but you are not sure what the exact name of the component is.
-    """
-    async with AsyncDeepsetClient() as client:
-        response = await search_component_definition_tool(client=client, query=query, model=INITIALIZED_MODEL)
-
-    return response
-
-
-@mcp.tool()
-async def get_custom_components() -> str:
-    """Retrieves a list of all installed custom components.
-
-    Use this when you need to know what custom components are available in the workspace.
-    Custom components are identified by having a package_version in their schema.
-    This returns detailed information about each custom component including version, type, and parameters.
-    """
-    async with AsyncDeepsetClient() as client:
-        response = await get_custom_components_tool(client)
-
-    return response
-
-
-@mcp.tool()
-async def list_secrets(limit: int = 10) -> str:
-    """Lists all secrets available in the deepset workspace.
-
-    Use this tool to retrieve a list of secrets with their names and IDs.
-    This is useful for getting an overview of all secrets before retrieving specific ones.
-
-    :param limit: Maximum number of secrets to return (default: 10).
-    """
-    async with AsyncDeepsetClient() as client:
-        response = await list_secrets_tool(client, limit)
-    return response
-
-
-@mcp.tool()
-async def get_secret(secret_id: str) -> str:
-    """Retrieves detailed information about a specific secret by its ID.
-
-    Use this tool to get information about a specific secret when you know its ID.
-    The secret value itself is not returned for security reasons, only metadata.
-
-    :param secret_id: The unique identifier of the secret to retrieve.
-    """
-    async with AsyncDeepsetClient() as client:
-        response = await get_secret_tool(client, secret_id)
-    return response
 
 
 # Check if docs search should be enabled
@@ -220,8 +123,8 @@ def main() -> None:
     if docs_api_key:
         os.environ["DEEPSET_DOCS_API_KEY"] = docs_api_key
 
-    # Register tools based on configuration
-    register_workspace_tools(mcp, workspace_mode, workspace)
+    # Register all tools based on configuration
+    register_all_tools(mcp, workspace_mode, workspace)
 
     # run with SSE transport (HTTP+Server-Sent Events)
     mcp.run(transport="stdio")

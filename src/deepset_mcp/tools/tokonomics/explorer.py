@@ -21,22 +21,22 @@ class RichExplorer:
     """Presents Python objects in various Rich formats with navigation support.
 
     :param store: Object store used for lookups.
-    :param max_items: Maximum number of items to show for lists and nested collections (default: 5).
+    :param max_items: Maximum number of items to show for lists and nested collections (default: 20).
                       Note: All keys are shown for top-level dicts.
-    :param max_string_length: Maximum string length before truncation (default: 50).
+    :param max_string_length: Maximum string length before truncation (default: 300).
     :param max_depth: Maximum depth for object representation (default: 3).
     :param max_search_matches: Maximum number of search matches to display (default: 10).
-    :param search_context_length: Number of characters to show around search matches (default: 30).
+    :param search_context_length: Number of characters to show around search matches (default: 150).
     """
 
     def __init__(
         self,
         store: ObjectStore,
         max_items: int = 20,
-        max_string_length: int = 800,
+        max_string_length: int = 300,
         max_depth: int = 3,
         max_search_matches: int = 10,
-        search_context_length: int = 250,
+        search_context_length: int = 150,
     ) -> None:
         """Initialize the RichExplorer with storage and configuration options."""
         self.store = store
