@@ -14,7 +14,7 @@ from glom import GlomError, Path, T, glom
 from rich.console import Console
 from rich.pretty import Pretty
 
-from .object_store import ObjectStore
+from .object_store import ObjectRef, ObjectStore
 
 
 class RichExplorer:
@@ -58,21 +58,10 @@ class RichExplorer:
         """Return a string preview of the requested object.
 
         :param obj_id: Identifier obtained from the store.
-        :param path: Navigation path using ``.`` or ``[...]`` notation.
+        :param path: Navigation path using ``.`` or ``[...]`` notation (e.g. ``@obj_001.path.to.attribute``).
         :return: String representation of the object.
         """
-        obj = self.store.get(obj_id)
-        if obj is None:
-            return f"Object {obj_id} not found or expired"
-
-        # Navigate to path if provided
-        if path:
-            try:
-                self._validate_path(path)
-                obj = glom(obj, self._parse_path(path))
-            except GlomError as exc:
-                return f"Navigation error at {path}: {exc}"
-            # Let ValueError from _validate_path bubble up
+        obj = self._get_object_at_path(obj_id, path)
 
         # Generate header and body
         header = self._make_header(obj_id, path, obj)
@@ -90,8 +79,6 @@ class RichExplorer:
         :return: Search results as formatted string.
         """
         obj = self._get_object_at_path(obj_id, path)
-        if isinstance(obj, str) and obj.startswith("Object") and "not found" in obj:
-            return obj
 
         # Generate header
         header = self._make_header(obj_id, path, obj)
@@ -138,15 +125,13 @@ class RichExplorer:
     def slice(self, obj_id: str, start: int = 0, end: int | None = None, path: str = "") -> str:
         """Extract a slice from a string or list object.
 
-        :param obj_id: Identifier obtained from the store.
+        :param obj_id: Identifier of the object.
         :param start: Start index for slicing.
         :param end: End index for slicing (None for end of sequence).
         :param path: Navigation path to object to slice (optional).
         :return: String representation of the slice.
         """
         obj = self._get_object_at_path(obj_id, path)
-        if isinstance(obj, str) and obj.startswith("Object") and "not found" in obj:
-            return obj
 
         # Generate header
         header = self._make_header(obj_id, path, obj)
@@ -193,17 +178,23 @@ class RichExplorer:
         :param path: Navigation path (optional).
         :return: Object at path or error string.
         """
-        obj = self.store.get(obj_id)
+        ref = ObjectRef.parse(obj_id)
+        # We accept @obj_001 as well as obj_001
+        if ref is None:
+            resolved_obj_id = obj_id
+        else:
+            resolved_obj_id = ref.obj_id
+
+        obj = self.store.get(resolved_obj_id)
         if obj is None:
-            return f"Object {obj_id} not found or expired"
+            raise ValueError(f"Object {obj_id} not found or expired.")
 
         if path:
+            self._validate_path(path)
             try:
-                self._validate_path(path)
                 obj = glom(obj, self._parse_path(path))
-            except GlomError as exc:
-                return f"Navigation error at {path}: {exc}"
-            # Let ValueError from _validate_path bubble up
+            except GlomError as e:
+                raise ValueError(f"Object '{obj_id}' does not have a value at path '{path}'.") from e
 
         return obj
 
