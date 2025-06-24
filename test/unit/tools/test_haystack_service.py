@@ -5,6 +5,7 @@ import pytest
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.tools.haystack_service import (
+    extract_component_texts,
     get_component_definition,
     get_custom_components,
     list_component_families,
@@ -80,6 +81,23 @@ class FakeClient(BaseFakeClient):
         if self._resource is None:
             raise ValueError("Haystack service resource not configured")
         return self._resource
+
+
+def test_extract_component_texts() -> None:
+    component_def = {
+        "title": "TestComponent",
+        "description": "A test component",
+        "properties": {
+            "type": {
+                "const": "test.component.TestComponent",
+            },
+        },
+    }
+
+    component_type, text = extract_component_texts(component_def)
+
+    assert component_type == "test.component.TestComponent"
+    assert text == "TestComponent A test component"
 
 
 @pytest.mark.asyncio
