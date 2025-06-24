@@ -5,7 +5,13 @@ import numpy as np
 import pytest
 
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.pipeline_template.models import PipelineTemplate, PipelineTemplateTag, PipelineType
+from deepset_mcp.api.pipeline_template.models import (
+    PipelineTemplate,
+    PipelineTemplateList,
+    PipelineTemplateSearchResults,
+    PipelineTemplateTag,
+    PipelineType,
+)
 from deepset_mcp.tools.model_protocol import ModelProtocol
 from deepset_mcp.tools.pipeline_template import (
     get_pipeline_template,
@@ -49,14 +55,16 @@ class FakePipelineTemplateResource:
 
     async def list_templates(
         self, limit: int = 100, field: str = "created_at", order: str = "DESC", filter: str | None = None
-    ) -> list[PipelineTemplate]:
+    ) -> PipelineTemplateList:
         # Store the parameters for verification
         self.last_list_call_params = {"limit": limit, "field": field, "order": order, "filter": filter}
 
         if self._list_exception:
             raise self._list_exception
         if self._list_response is not None:
-            return self._list_response
+            return PipelineTemplateList(
+                data=self._list_response, has_more=len(self._list_response) == limit, total=len(self._list_response)
+            )
         raise NotImplementedError
 
     async def get_template(self, template_name: str) -> PipelineTemplate:
@@ -77,7 +85,7 @@ class FakeClient(BaseFakeClient):
 
 
 @pytest.mark.asyncio
-async def test_list_pipeline_templates_returns_formatted_string() -> None:
+async def test_list_pipeline_templates_returns_template_list() -> None:
     template1 = PipelineTemplate(
         pipeline_name="template1",
         name="template1",
@@ -106,14 +114,12 @@ async def test_list_pipeline_templates_returns_formatted_string() -> None:
     client = FakeClient(resource)
     result = await list_pipeline_templates(client, workspace="ws1")
 
-    assert result.count("<pipeline_template name=") == 2
-    assert "template1" in result
-    assert "template2" in result
-    assert "Alice Smith" in result
-    assert "Bob Jones" in result
-
-    # We only add the yaml config when getting a single template
-    assert "config2: value2" not in result
+    assert isinstance(result, PipelineTemplateList)
+    assert len(result.data) == 2
+    assert result.data[0].template_name == "template1"
+    assert result.data[1].template_name == "template2"
+    assert result.data[0].author == "Alice Smith"
+    assert result.data[1].author == "Bob Jones"
 
 
 @pytest.mark.asyncio
@@ -122,6 +128,7 @@ async def test_list_pipeline_templates_handles_resource_not_found() -> None:
     client = FakeClient(resource)
     result = await list_pipeline_templates(client, workspace="invalid_ws")
 
+    assert isinstance(result, str)
     assert "no workspace named 'invalid_ws'" in result.lower()
 
 
@@ -136,7 +143,7 @@ async def test_list_pipeline_templates_handles_unexpected_error() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_pipeline_template_returns_formatted_string() -> None:
+async def test_get_pipeline_template_returns_template() -> None:
     template = PipelineTemplate(
         pipeline_name="test_template",
         name="test_template",
@@ -153,11 +160,12 @@ async def test_get_pipeline_template_returns_formatted_string() -> None:
     client = FakeClient(resource)
     result = await get_pipeline_template(client, workspace="ws1", template_name="test_template")
 
-    assert "test_template" in result
-    assert "Eve Brown" in result
-    assert "Test template" in result
-    assert "config: value" in result
-    assert "tag1" in result
+    assert isinstance(result, PipelineTemplate)
+    assert result.template_name == "test_template"
+    assert result.author == "Eve Brown"
+    assert result.description == "Test template"
+    assert result.yaml_config == "config: value"
+    assert result.tags[0].name == "tag1"
 
 
 @pytest.mark.asyncio
@@ -166,6 +174,7 @@ async def test_get_pipeline_template_handles_resource_not_found() -> None:
     client = FakeClient(resource)
     result = await get_pipeline_template(client, workspace="ws1", template_name="invalid_template")
 
+    assert isinstance(result, str)
     assert "no pipeline template named 'invalid_template'" in result.lower()
 
 
@@ -297,27 +306,23 @@ async def test_search_pipeline_templates_success() -> None:
 
     # Search for RAG templates
     result = await search_pipeline_templates(client, "retrieval augmented generation", model, "test_workspace")
-    assert "rag-pipeline" in result
-    assert "Similarity Score:" in result
-    assert "retrieval-augmented generation" in result
-
-    # We do not add the yaml config to search results
-    assert "components:" not in result
-
-    # RAG pipeline listed before chat
-    assert result.index("rag-pipeline") < result.index("chat-pipeline")
+    assert isinstance(result, PipelineTemplateSearchResults)
+    assert result.query == "retrieval augmented generation"
+    assert result.total_found == 2
+    assert len(result.results) == 2
+    # RAG pipeline should be first due to higher similarity
+    assert result.results[0].template.template_name == "rag-pipeline"
+    assert result.results[1].template.template_name == "chat-pipeline"
 
     # Search for chat templates
     result = await search_pipeline_templates(client, "conversational chat interface", model, "test_workspace")
-    assert "chat-pipeline" in result
-    assert "Similarity Score:" in result
-    assert "chat-based conversational" in result
-
-    # We do not add the yaml config to search results
-    assert "components:" not in result
-
-    # Chat pipeline listed before RAG
-    assert result.index("chat-pipeline") < result.index("rag-pipeline")
+    assert isinstance(result, PipelineTemplateSearchResults)
+    assert result.query == "conversational chat interface"
+    assert result.total_found == 2
+    assert len(result.results) == 2
+    # Chat pipeline should be first due to higher similarity
+    assert result.results[0].template.template_name == "chat-pipeline"
+    assert result.results[1].template.template_name == "rag-pipeline"
 
 
 @pytest.mark.asyncio
@@ -327,7 +332,10 @@ async def test_search_pipeline_templates_no_templates() -> None:
     model = FakeModel()
 
     result = await search_pipeline_templates(client, "test query", model, "test_workspace")
-    assert "No pipeline templates found" in result
+    assert isinstance(result, PipelineTemplateSearchResults)
+    assert result.query == "test query"
+    assert result.total_found == 0
+    assert len(result.results) == 0
 
 
 @pytest.mark.asyncio

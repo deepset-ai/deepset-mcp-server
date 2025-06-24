@@ -1,8 +1,13 @@
 import numpy as np
 
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
+from deepset_mcp.api.pipeline_template.models import (
+    PipelineTemplate,
+    PipelineTemplateList,
+    PipelineTemplateSearchResult,
+    PipelineTemplateSearchResults,
+)
 from deepset_mcp.api.protocols import AsyncClientProtocol
-from deepset_mcp.tools.formatting_utils import pipeline_template_to_llm_readable_string
 from deepset_mcp.tools.model_protocol import ModelProtocol
 
 
@@ -13,7 +18,7 @@ async def list_pipeline_templates(
     field: str = "created_at",
     order: str = "DESC",
     filter: str | None = None,
-) -> str:
+) -> PipelineTemplateList | str:
     """Retrieves a list of all available pipeline templates.
 
     :param client: The async client for API requests.
@@ -23,25 +28,31 @@ async def list_pipeline_templates(
     :param order: Sort order, either "ASC" or "DESC" (default: "DESC").
     :param filter: OData filter expression to filter templates by criteria.
 
-    :returns: Formatted string with template information.
+    :returns: List of pipeline templates or error message.
     """
     try:
-        response = await client.pipeline_templates(workspace=workspace).list_templates(
+        return await client.pipeline_templates(workspace=workspace).list_templates(
             limit=limit, field=field, order=order, filter=filter
         )
-        formatted_templates = [pipeline_template_to_llm_readable_string(t) for t in response]
-        return "\n\n".join(formatted_templates)
     except ResourceNotFoundError:
         return f"There is no workspace named '{workspace}'. Did you mean to configure it?"
     except UnexpectedAPIError as e:
         return f"Failed to list pipeline templates: {e}"
 
 
-async def get_pipeline_template(client: AsyncClientProtocol, workspace: str, template_name: str) -> str:
-    """Fetches detailed information for a specific pipeline template, identified by its `template_name`."""
+async def get_pipeline_template(
+    client: AsyncClientProtocol, workspace: str, template_name: str
+) -> PipelineTemplate | str:
+    """Fetches detailed information for a specific pipeline template, identified by its `template_name`.
+
+    :param client: The async client for API requests.
+    :param workspace: The workspace to fetch template from.
+    :param template_name: The name of the template to fetch.
+
+    :returns: Pipeline template details or error message.
+    """
     try:
-        response = await client.pipeline_templates(workspace=workspace).get_template(template_name)
-        return pipeline_template_to_llm_readable_string(response, include_yaml=True)
+        return await client.pipeline_templates(workspace=workspace).get_template(template_name)
     except ResourceNotFoundError:
         return f"There is no pipeline template named '{template_name}' in workspace '{workspace}'."
     except UnexpectedAPIError as e:
@@ -50,18 +61,16 @@ async def get_pipeline_template(client: AsyncClientProtocol, workspace: str, tem
 
 async def search_pipeline_templates(
     client: AsyncClientProtocol, query: str, model: ModelProtocol, workspace: str, top_k: int = 10
-) -> str:
+) -> PipelineTemplateSearchResults | str:
     """Searches for pipeline templates based on name or description using semantic similarity.
 
-    Args:
-        client: The API client to use
-        query: The search query
-        model: The model to use for computing embeddings
-        workspace: The workspace to search templates from
-        top_k: Maximum number of results to return (default: 5)
+    :param client: The API client to use.
+    :param query: The search query.
+    :param model: The model to use for computing embeddings.
+    :param workspace: The workspace to search templates from.
+    :param top_k: Maximum number of results to return (default: 10).
 
-    Returns:
-        A formatted string containing the matched pipeline template definitions
+    :returns: Search results with similarity scores or error message.
     """
     try:
         response = await client.pipeline_templates(workspace=workspace).list_templates(
@@ -70,12 +79,12 @@ async def search_pipeline_templates(
     except UnexpectedAPIError as e:
         return f"Failed to retrieve pipeline templates: {e}"
 
-    if not response:
-        return "No pipeline templates found"
+    if not response.data:
+        return PipelineTemplateSearchResults(results=[], query=query, total_found=0)
 
     # Extract text for embedding from all templates
     template_texts: list[tuple[str, str]] = [
-        (template.template_name, f"{template.template_name} {template.description}") for template in response
+        (template.template_name, f"{template.template_name} {template.description}") for template in response.data
     ]
     template_names: list[str] = [t[0] for t in template_texts]
 
@@ -96,12 +105,11 @@ async def search_pipeline_templates(
     template_similarities.sort(key=lambda x: x[1], reverse=True)
 
     top_templates = template_similarities[:top_k]
-    results = []
+    search_results = []
     for template_name, sim in top_templates:
         # Find the template object by name
-        template = next((t for t in response if t.template_name == template_name), None)
+        template = next((t for t in response.data if t.template_name == template_name), None)
         if template:
-            template_str = pipeline_template_to_llm_readable_string(template)
-            results.append(f"Similarity Score: {sim:.3f}\n{template_str}\n{'-' * 80}\n")
+            search_results.append(PipelineTemplateSearchResult(template=template, similarity_score=float(sim)))
 
-    return "\n".join(results)
+    return PipelineTemplateSearchResults(results=search_results, query=query, total_found=len(search_results))
