@@ -13,7 +13,7 @@ from deepset_mcp.api.pipeline.models import (
     PipelineLogList,
     PipelineValidationResult,
 )
-from deepset_mcp.api.pipeline_template.models import PipelineTemplate
+from deepset_mcp.api.pipeline_template.models import PipelineTemplate, PipelineTemplateList
 from deepset_mcp.api.secrets.models import Secret, SecretList
 from deepset_mcp.api.shared_models import DeepsetUser, NoContentResponse
 from deepset_mcp.api.transport import StreamingResponse, TransportResponse
@@ -237,7 +237,7 @@ class PipelineTemplateResourceProtocol(Protocol):
 
     async def list_templates(
         self, limit: int = 100, field: str = "created_at", order: str = "DESC", filter: str | None = None
-    ) -> list[PipelineTemplate]:
+    ) -> PipelineTemplateList:
         """List pipeline templates in the configured workspace."""
         ...
 
