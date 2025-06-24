@@ -144,12 +144,12 @@ class TestExplorable:
 
         # These should work (defined in __slots__)
         explorable.obj_id = "new_id"
-        explorable.value = "new_value"  # type: ignore[assignment]
+        explorable.value = "new_value"
         explorable._preview = "new_preview"
 
         # This should fail (not in __slots__)
         with pytest.raises(AttributeError):
-            explorable.new_attribute = "value"  # type: ignore[attr-defined]
+            explorable.new_attribute = "value"
 
     def test_generic_type_hint_preservation(self) -> None:
         """Test that generic type information is preserved."""
