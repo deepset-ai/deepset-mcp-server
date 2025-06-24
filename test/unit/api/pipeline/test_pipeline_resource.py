@@ -6,6 +6,7 @@ from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
+    PipelineList,
     PipelineLog,
     PipelineLogList,
     PipelineServiceLevel,
@@ -120,10 +121,11 @@ class TestPipelineResource:
         result = await resource.list()
 
         # Verify results
-        assert len(result) == 2
-        assert isinstance(result[0], DeepsetPipeline)
-        assert result[0].id == "1"
-        assert result[0].name == "Pipeline 1"
+        assert isinstance(result, PipelineList)
+        assert len(result.data) == 2
+        assert isinstance(result.data[0], DeepsetPipeline)
+        assert result.data[0].id == "1"
+        assert result.data[0].name == "Pipeline 1"
 
         # Verify request
         assert len(client.requests) == 1
@@ -156,9 +158,10 @@ class TestPipelineResource:
         result = await resource.list(page_number=2, limit=5)
 
         # Verify results
-        assert len(result) == 2
-        assert result[0].id == "3"
-        assert result[1].id == "4"
+        assert isinstance(result, PipelineList)
+        assert len(result.data) == 2
+        assert result.data[0].id == "3"
+        assert result.data[1].id == "4"
 
         # Verify request
         assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines"
@@ -175,7 +178,8 @@ class TestPipelineResource:
         result = await resource.list()
 
         # Verify empty results
-        assert len(result) == 0
+        assert isinstance(result, PipelineList)
+        assert len(result.data) == 0
 
     @pytest.mark.asyncio
     async def test_list_pipelines_error(self) -> None:
@@ -201,7 +205,8 @@ class TestPipelineResource:
         result = await resource.list(limit=0)
 
         # Verify empty results
-        assert len(result) == 0
+        assert isinstance(result, PipelineList)
+        assert len(result.data) == 0
 
         # Verify request
         assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines"

@@ -128,14 +128,38 @@ def get_workspace_from_env() -> str:
 # Tool registry with configurations
 TOOL_REGISTRY = {
     # Workspace tools
-    "list_pipelines": (list_pipelines_tool, ToolConfig(needs_client=True, needs_workspace=True)),
-    "create_pipeline": (create_pipeline_tool, ToolConfig(needs_client=True, needs_workspace=True)),
-    "update_pipeline": (update_pipeline_tool, ToolConfig(needs_client=True, needs_workspace=True)),
-    "get_pipeline": (get_pipeline_tool, ToolConfig(needs_client=True, needs_workspace=True)),
-    "deploy_pipeline": (deploy_pipeline_tool, ToolConfig(needs_client=True, needs_workspace=True)),
-    "validate_pipeline": (validate_pipeline_tool, ToolConfig(needs_client=True, needs_workspace=True)),
-    "get_pipeline_logs": (get_pipeline_logs_tool, ToolConfig(needs_client=True, needs_workspace=True)),
-    "search_pipeline": (search_pipeline_tool, ToolConfig(needs_client=True, needs_workspace=True)),
+    "list_pipelines": (
+        list_pipelines_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "create_pipeline": (
+        create_pipeline_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.BOTH),
+    ),
+    "update_pipeline": (
+        update_pipeline_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.BOTH),
+    ),
+    "get_pipeline": (
+        get_pipeline_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "deploy_pipeline": (
+        deploy_pipeline_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "validate_pipeline": (
+        validate_pipeline_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.BOTH),
+    ),
+    "get_pipeline_logs": (
+        get_pipeline_logs_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "search_pipeline": (
+        search_pipeline_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
     "list_indexes": (
         list_indexes_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
