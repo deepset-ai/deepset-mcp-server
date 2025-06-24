@@ -2,7 +2,7 @@ import pytest
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.api.exceptions import ResourceNotFoundError
-from deepset_mcp.api.pipeline_template.models import PipelineTemplate
+from deepset_mcp.api.pipeline_template.models import PipelineTemplate, PipelineTemplateList
 from deepset_mcp.api.pipeline_template.resource import PipelineTemplateResource
 
 pytestmark = pytest.mark.integration
@@ -26,14 +26,14 @@ async def test_get_template(
     First lists all templates, then gets the first one by name.
     """
     # Get all templates to find an existing one
-    templates = await template_resource.list_templates()
+    templates_list = await template_resource.list_templates()
 
     # Skip if no templates are available
-    if not templates:
+    if not templates_list.data:
         pytest.skip("No templates available in the test environment")
 
     # Get the first template's name
-    template_name = templates[0].template_name
+    template_name = templates_list.data[0].template_name
 
     # Now get that specific template
     template = await template_resource.get_template(template_name=template_name)
@@ -64,17 +64,18 @@ async def test_list_templates(
 ) -> None:
     """Test listing templates."""
     # Test listing templates with default limit
-    templates = await template_resource.list_templates()
+    templates_list = await template_resource.list_templates()
 
-    # Verify that the templates are returned as a list
-    assert isinstance(templates, list)
+    # Verify that the templates are returned as a PipelineTemplateList
+    assert isinstance(templates_list, PipelineTemplateList)
+    assert isinstance(templates_list.data, list)
 
     # Skip further checks if no templates are available
-    if not templates:
+    if not templates_list.data:
         pytest.skip("No templates available in the test environment")
 
     # Verify the first template has the expected structure
-    template = templates[0]
+    template = templates_list.data[0]
     assert isinstance(template, PipelineTemplate)
     assert template.template_name is not None
     assert template.author is not None
@@ -89,10 +90,11 @@ async def test_list_templates_with_limit(
     """Test listing templates with a specific limit."""
     # Test with a small limit
     limit = 1
-    templates = await template_resource.list_templates(limit=limit)
+    templates_list = await template_resource.list_templates(limit=limit)
 
     # Verify that the number of templates is not more than the limit
-    assert len(templates) <= limit
+    assert isinstance(templates_list, PipelineTemplateList)
+    assert len(templates_list.data) <= limit
 
 
 @pytest.mark.asyncio
@@ -101,24 +103,26 @@ async def test_list_templates_with_filter(
 ) -> None:
     """Test listing templates with a pipeline type filter."""
     # Test filtering by QUERY pipeline type
-    query_templates = await template_resource.list_templates(filter="pipeline_type eq 'QUERY'")
+    query_templates_list = await template_resource.list_templates(filter="pipeline_type eq 'QUERY'")
 
     # Verify that all returned templates are QUERY type
-    assert isinstance(query_templates, list)
+    assert isinstance(query_templates_list, PipelineTemplateList)
+    assert isinstance(query_templates_list.data, list)
 
     # If templates are available, verify they are all QUERY type
-    for template in query_templates:
+    for template in query_templates_list.data:
         assert isinstance(template, PipelineTemplate)
         assert template.pipeline_type == "query"
 
     # Test filtering by INDEXING pipeline type
-    indexing_templates = await template_resource.list_templates(filter="pipeline_type eq 'INDEXING'")
+    indexing_templates_list = await template_resource.list_templates(filter="pipeline_type eq 'INDEXING'")
 
     # Verify that all returned templates are INDEXING type
-    assert isinstance(indexing_templates, list)
+    assert isinstance(indexing_templates_list, PipelineTemplateList)
+    assert isinstance(indexing_templates_list.data, list)
 
     # If templates are available, verify they are all INDEXING type
-    for template in indexing_templates:
+    for template in indexing_templates_list.data:
         assert isinstance(template, PipelineTemplate)
         assert template.pipeline_type == "indexing"
 
@@ -129,12 +133,13 @@ async def test_list_templates_with_custom_sorting(
 ) -> None:
     """Test listing templates with custom sorting."""
     # Test sorting by name in ascending order
-    templates = await template_resource.list_templates(field="name", order="ASC", limit=5)
+    templates_list = await template_resource.list_templates(field="name", order="ASC", limit=5)
 
-    # Verify that the templates are returned as a list
-    assert isinstance(templates, list)
+    # Verify that the templates are returned as a PipelineTemplateList
+    assert isinstance(templates_list, PipelineTemplateList)
+    assert isinstance(templates_list.data, list)
 
     # If we have multiple templates, verify they are sorted correctly
-    if len(templates) > 1:
-        for i in range(len(templates) - 1):
-            assert templates[i].display_name <= templates[i + 1].display_name
+    if len(templates_list.data) > 1:
+        for i in range(len(templates_list.data) - 1):
+            assert templates_list.data[i].display_name <= templates_list.data[i + 1].display_name

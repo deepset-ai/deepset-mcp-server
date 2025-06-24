@@ -1,7 +1,7 @@
 from typing import Any
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
-from deepset_mcp.api.pipeline_template.models import PipelineTemplate
+from deepset_mcp.api.pipeline_template.models import PipelineTemplate, PipelineTemplateList
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.transport import raise_for_status
 
@@ -43,7 +43,7 @@ class PipelineTemplateResource:
 
     async def list_templates(
         self, limit: int = 100, field: str = "created_at", order: str = "DESC", filter: str | None = None
-    ) -> list[PipelineTemplate]:
+    ) -> PipelineTemplateList:
         """List pipeline templates in the configured workspace.
 
         Parameters
@@ -59,8 +59,8 @@ class PipelineTemplateResource:
 
         Returns
         -------
-        list[PipelineTemplate]
-            List of pipeline templates
+        PipelineTemplateList
+            List of pipeline templates with metadata
         """
         params = {"limit": limit, "page_number": 1, "field": field, "order": order}
 
@@ -80,4 +80,8 @@ class PipelineTemplateResource:
 
         response_data: dict[str, Any] = response.json
 
-        return [PipelineTemplate.model_validate(template) for template in response_data["data"]]
+        return PipelineTemplateList(
+            data=[PipelineTemplate.model_validate(template) for template in response_data["data"]],
+            has_more=response_data.get("has_more", False),
+            total=response_data.get("total", len(response_data["data"])),
+        )

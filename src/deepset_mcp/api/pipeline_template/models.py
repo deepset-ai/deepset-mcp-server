@@ -31,3 +31,26 @@ class PipelineTemplate(BaseModel):
     yaml_config: str | None = Field(None, alias="query_yaml")
     tags: list[PipelineTemplateTag]
     pipeline_type: PipelineType
+
+
+class PipelineTemplateList(BaseModel):
+    """Response model for listing pipeline templates."""
+
+    data: list[PipelineTemplate]
+    has_more: bool
+    total: int
+
+
+class PipelineTemplateSearchResult(BaseModel):
+    """Model representing a search result for pipeline templates."""
+
+    template: PipelineTemplate
+    similarity_score: float
+
+
+class PipelineTemplateSearchResults(BaseModel):
+    """Response model for pipeline template search results."""
+
+    results: list[PipelineTemplateSearchResult]
+    query: str
+    total_found: int

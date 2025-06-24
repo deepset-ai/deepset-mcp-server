@@ -3,7 +3,7 @@ from typing import Any
 import pytest
 
 from deepset_mcp.api.exceptions import ResourceNotFoundError
-from deepset_mcp.api.pipeline_template.models import PipelineTemplate
+from deepset_mcp.api.pipeline_template.models import PipelineTemplate, PipelineTemplateList
 from deepset_mcp.api.pipeline_template.resource import PipelineTemplateResource
 from deepset_mcp.api.protocols import PipelineTemplateResourceProtocol
 from test.unit.conftest import BaseFakeClient
@@ -120,10 +120,13 @@ class TestPipelineTemplateResource:
         result = await resource.list_templates()
 
         # Verify results
-        assert len(result) == 2
-        assert isinstance(result[0], PipelineTemplate)
-        assert result[0].template_name == "Template 1"
-        assert result[1].template_name == "Template 2"
+        assert isinstance(result, PipelineTemplateList)
+        assert len(result.data) == 2
+        assert result.has_more is False
+        assert result.total == 2
+        assert isinstance(result.data[0], PipelineTemplate)
+        assert result.data[0].template_name == "Template 1"
+        assert result.data[1].template_name == "Template 2"
 
         # Verify request
         assert len(client.requests) == 1
@@ -154,9 +157,12 @@ class TestPipelineTemplateResource:
         result = await resource.list_templates(limit=1)
 
         # Verify results
-        assert len(result) == 1
-        assert isinstance(result[0], PipelineTemplate)
-        assert result[0].template_name == "Template 1"
+        assert isinstance(result, PipelineTemplateList)
+        assert len(result.data) == 1
+        assert result.has_more is True
+        assert result.total == 2
+        assert isinstance(result.data[0], PipelineTemplate)
+        assert result.data[0].template_name == "Template 1"
 
         # Verify request
         assert client.requests[0]["endpoint"] == "/v1/workspaces/test-workspace/pipeline_templates"
@@ -180,7 +186,10 @@ class TestPipelineTemplateResource:
         result = await resource.list_templates()
 
         # Verify empty results
-        assert len(result) == 0
+        assert isinstance(result, PipelineTemplateList)
+        assert len(result.data) == 0
+        assert result.has_more is False
+        assert result.total == 0
 
     @pytest.mark.asyncio
     async def test_list_templates_with_filter(self) -> None:
@@ -208,10 +217,13 @@ class TestPipelineTemplateResource:
         result = await resource.list_templates(filter="pipeline_type eq 'QUERY'")
 
         # Verify results
-        assert len(result) == 1
-        assert isinstance(result[0], PipelineTemplate)
-        assert result[0].template_name == "Query Template"
-        assert result[0].pipeline_type == "query"
+        assert isinstance(result, PipelineTemplateList)
+        assert len(result.data) == 1
+        assert result.has_more is False
+        assert result.total == 1
+        assert isinstance(result.data[0], PipelineTemplate)
+        assert result.data[0].template_name == "Query Template"
+        assert result.data[0].pipeline_type == "query"
 
         # Verify request includes filter
         assert len(client.requests) == 1
@@ -244,10 +256,13 @@ class TestPipelineTemplateResource:
         result = await resource.list_templates(field="name", order="ASC")
 
         # Verify results
-        assert len(result) == 2
-        assert isinstance(result[0], PipelineTemplate)
-        assert result[0].template_name == "Template A"
-        assert result[1].template_name == "Template B"
+        assert isinstance(result, PipelineTemplateList)
+        assert len(result.data) == 2
+        assert result.has_more is False
+        assert result.total == 2
+        assert isinstance(result.data[0], PipelineTemplate)
+        assert result.data[0].template_name == "Template A"
+        assert result.data[1].template_name == "Template B"
 
         # Verify request includes custom sorting
         assert len(client.requests) == 1

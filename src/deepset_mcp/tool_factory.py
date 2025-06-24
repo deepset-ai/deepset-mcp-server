@@ -75,7 +75,7 @@ async def search_component_definitions_wrapper(client: Any, query: str, top_k: i
 
 
 # Special wrapper for search_pipeline_templates that needs the model
-async def search_pipeline_templates_wrapper(client: Any, workspace: str, query: str, top_k: int = 10) -> str:
+async def search_pipeline_templates_wrapper(client: Any, workspace: str, query: str, top_k: int = 10) -> Any:
     """Searches for pipeline templates based on name or description using semantic similarity.
 
     Args:
@@ -85,7 +85,7 @@ async def search_pipeline_templates_wrapper(client: Any, workspace: str, query: 
         top_k: Maximum number of results to return (default: 10)
 
     Returns:
-        A formatted string containing the matched pipeline template definitions
+        Search results with similarity scores or error message
     """
     model = get_initialized_model()
     return await search_pipeline_templates_tool(client, query, model, workspace, top_k)
@@ -156,11 +156,17 @@ TOOL_REGISTRY = {
         deploy_index_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
-    "list_pipeline_templates": (list_pipeline_templates_tool, ToolConfig(needs_client=True, needs_workspace=True)),
-    "get_pipeline_template": (get_pipeline_template_tool, ToolConfig(needs_client=True, needs_workspace=True)),
+    "list_pipeline_templates": (
+        list_pipeline_templates_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_pipeline_template": (
+        get_pipeline_template_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
     "search_pipeline_templates": (
         search_pipeline_templates_wrapper,
-        ToolConfig(needs_client=True, needs_workspace=True),
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
     "list_custom_component_installations": (
         list_custom_component_installations_tool,
