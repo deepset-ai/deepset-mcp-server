@@ -218,8 +218,8 @@ TOOL_REGISTRY = {
         get_custom_components_tool,
         ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE),
     ),
-    "list_secrets": (list_secrets_tool, ToolConfig(needs_client=True)),
-    "get_secret": (get_secret_tool, ToolConfig(needs_client=True)),
+    "list_secrets": (list_secrets_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
+    "get_secret": (get_secret_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
 }
 
 
