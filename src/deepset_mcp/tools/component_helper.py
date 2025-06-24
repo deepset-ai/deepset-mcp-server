@@ -1,40 +1,7 @@
 from typing import Any
 
 
-def extract_component_info(components: dict[str, Any], component_def: dict[str, Any]) -> str:
-    """Extracts and formats component information from its definition.
 
-    Args:
-        components: The components dictionary from the schema
-        component_def: The specific component definition
-
-    Returns:
-        A formatted string containing the component information
-    """
-    component_type_info = component_def["properties"]["type"]
-    init_params = component_def["properties"].get("init_parameters", {}).get("properties", {})
-    component_type = component_type_info["const"]
-
-    # Format the basic component information
-    parts = [
-        f"Component: {component_type}",
-        f"Name: {component_def.get('title', 'Unknown')}",
-        f"Family: {component_type_info.get('family', 'Unknown')}",
-        f"Family Description: {component_type_info.get('family_description', 'No description available.')}",
-        f"\nDescription:\n{component_def.get('description', 'No description available.')}\n",
-        "\nInitialization Parameters:",
-    ]
-
-    if not init_params:
-        parts.append("  No initialization parameters")
-    else:
-        for param_name, param_info in init_params.items():
-            param_type = param_info.get("_annotation", param_info.get("type", "Unknown"))
-            param_desc = param_info.get("description", "No description available.")
-            default = f" (default: {param_info['default']})" if "default" in param_info else ""
-            parts.append(f"  {param_name}: {param_type}{default}\n    {param_desc}")
-
-    return "\n".join(parts)
 
 
 def format_io_info(io_info: dict[str, Any]) -> str:
