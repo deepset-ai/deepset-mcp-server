@@ -53,6 +53,39 @@ from deepset_mcp.tools.secrets import (
 )
 from deepset_mcp.tools.tokonomics import RichExplorer, explorable, explorable_and_referenceable, referenceable
 
+EXPLORER = RichExplorer(store=STORE)
+
+
+def get_from_object_store(object_id: str, path: str = "") -> str:
+    """Use this tool to fetch an object from the object store.
+
+    You can fetch a specific object by using the object's id (e.g. `@obj_001`).
+    You can also fetch any nested path by using the path-parameter
+        (e.g. `{"object_id": "@obj_001", "path": "user_info.given_name"}`
+        -> returns the content at obj.user_info.given_name).
+
+    :param object_id: The id of the object to fetch in the format `@obj_001`.
+    :param path: The path of the object to fetch in the format of `access.to.attr` or `["access"]["to"]["attr"]`.
+    """
+    return EXPLORER.explore(obj_id=object_id, path=path)
+
+
+def get_slice_from_object_store(
+    object_id: str,
+    start: int = 0,
+    end: int | None = None,
+    path: str = "",
+) -> str:
+    """Extract a slice from a string or list object that is stored in the object store.
+
+    :param object_id: Identifier of the object.
+    :param start: Start index for slicing.
+    :param end: End index for slicing (None for end of sequence).
+    :param path: Navigation path to object to slice (optional).
+    :return: String representation of the slice.
+    """
+    return EXPLORER.slice(obj_id=object_id, start=start, end=end, path=path)
+
 
 # Special wrapper for search_component_definitions that needs the model
 async def search_component_definitions_wrapper(client: Any, query: str, top_k: int = 5) -> ComponentSearchResults | str:
@@ -220,6 +253,8 @@ TOOL_REGISTRY = {
     ),
     "list_secrets": (list_secrets_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "get_secret": (get_secret_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
+    "get_from_object_store": (get_from_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
+    "get_slice_from_object_store": (get_slice_from_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
 }
 
 
@@ -335,8 +370,8 @@ def register_all_tools(mcp: FastMCP, workspace_mode: WorkspaceMode, workspace: s
         workspace_mode: How workspace should be handled
         workspace: Workspace to use for implicit mode (if None, reads from env)
     """
-    for _tool_name, (base_func, config) in TOOL_REGISTRY.items():
+    for tool_name, (base_func, config) in TOOL_REGISTRY.items():
         # Create enhanced tool
         enhanced_tool = create_enhanced_tool(base_func, config, workspace_mode, workspace)  # type: ignore[arg-type]
 
-        mcp.add_tool(enhanced_tool)
+        mcp.add_tool(enhanced_tool, name=tool_name)
