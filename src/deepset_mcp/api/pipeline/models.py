@@ -188,3 +188,26 @@ class DeepsetStreamEvent(BaseModel):
     delta: StreamDelta | None = None
     result: DeepsetSearchResponse | None = None
     error: str | None = None
+
+
+class PipelineList(BaseModel):
+    """Response model for listing pipelines."""
+
+    data: list[DeepsetPipeline]
+    has_more: bool
+    total: int
+
+
+class PipelineValidationResultWithYaml(BaseModel):
+    """Model for pipeline validation result that includes the original YAML."""
+
+    validation_result: PipelineValidationResult
+    yaml_config: str
+
+
+class PipelineOperationWithErrors(BaseModel):
+    """Model for pipeline operations that complete with validation errors."""
+
+    message: str
+    validation_result: PipelineValidationResult
+    pipeline: DeepsetPipeline

@@ -2,7 +2,7 @@ import pytest
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.api.exceptions import ResourceNotFoundError
-from deepset_mcp.api.pipeline.models import DeepsetPipeline, DeepsetSearchResponse, DeepsetStreamEvent
+from deepset_mcp.api.pipeline.models import DeepsetPipeline, DeepsetSearchResponse, DeepsetStreamEvent, PipelineList
 from deepset_mcp.api.pipeline.resource import PipelineResource
 from test.integration.test_integration_pipeline_logs import wait_for_pipeline_deployment
 
@@ -92,28 +92,31 @@ async def test_list_pipelines(
         await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
 
     # Test listing without pagination
-    pipelines = await pipeline_resource.list(limit=10)
-    assert len(pipelines) == 3
+    pipelines_list = await pipeline_resource.list(limit=10)
+    assert isinstance(pipelines_list, PipelineList)
+    assert len(pipelines_list.data) == 3
 
     # Verify our created pipelines are in the list
-    retrieved_names = [p.name for p in pipelines]
+    retrieved_names = [p.name for p in pipelines_list.data]
     for name in pipeline_names:
         assert name in retrieved_names
 
     # Test pagination
-    if len(pipelines) > 1:
+    if len(pipelines_list.data) > 1:
         # Get the first page with 1 item
         first_page = await pipeline_resource.list(limit=1)
-        assert len(first_page) == 1
-        assert isinstance(first_page[0], DeepsetPipeline)
+        assert isinstance(first_page, PipelineList)
+        assert len(first_page.data) == 1
+        assert isinstance(first_page.data[0], DeepsetPipeline)
 
         # Get the second page
         second_page = await pipeline_resource.list(page_number=2, limit=1)
-        assert len(second_page) == 1
-        assert isinstance(second_page[0], DeepsetPipeline)
+        assert isinstance(second_page, PipelineList)
+        assert len(second_page.data) == 1
+        assert isinstance(second_page.data[0], DeepsetPipeline)
 
         # Verify they're different pipelines
-        assert first_page[0].id != second_page[0].id
+        assert first_page.data[0].id != second_page.data[0].id
 
 
 @pytest.mark.asyncio

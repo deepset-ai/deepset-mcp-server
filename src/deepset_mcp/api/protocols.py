@@ -10,6 +10,7 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     DeepsetSearchResponse,
     DeepsetStreamEvent,
+    PipelineList,
     PipelineLogList,
     PipelineValidationResult,
 )
@@ -257,7 +258,7 @@ class PipelineResourceProtocol(Protocol):
         self,
         page_number: int = 1,
         limit: int = 10,
-    ) -> list[DeepsetPipeline]:
+    ) -> PipelineList:
         """List pipelines in the configured workspace with optional pagination."""
         ...
 
