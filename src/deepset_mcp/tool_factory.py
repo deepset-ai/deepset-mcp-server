@@ -22,6 +22,7 @@ from deepset_mcp.tools.haystack_service import (
     list_component_families as list_component_families_tool,
     search_component_definition as search_component_definition_tool,
 )
+from deepset_mcp.tools.haystack_service_models import ComponentSearchResults
 from deepset_mcp.tools.indexes import (
     create_index as create_index_tool,
     deploy_index as deploy_index_tool,
@@ -54,7 +55,7 @@ from deepset_mcp.tools.tokonomics import RichExplorer, explorable, explorable_an
 
 
 # Special wrapper for search_component_definitions that needs the model
-async def search_component_definitions_wrapper(client: Any, query: str, top_k: int = 5) -> str:
+async def search_component_definitions_wrapper(client: Any, query: str, top_k: int = 5) -> ComponentSearchResults | str:
     """Use this to search for components in deepset.
 
     You can use full natural language queries to find components.
@@ -68,7 +69,7 @@ async def search_component_definitions_wrapper(client: Any, query: str, top_k: i
         top_k: Maximum number of results to return (default: 5)
 
     Returns:
-        A formatted string containing the matched component definitions
+        ComponentSearchResults model or error message string
     """
     model = get_initialized_model()
     return await search_component_definition_tool(client, query, model, top_k)
@@ -201,10 +202,22 @@ TOOL_REGISTRY = {
         ToolConfig(needs_client=True, needs_workspace=True),
     ),
     # Non-workspace tools
-    "list_component_families": (list_component_families_tool, ToolConfig(needs_client=True)),
-    "get_component_definition": (get_component_definition_tool, ToolConfig(needs_client=True)),
-    "search_component_definitions": (search_component_definitions_wrapper, ToolConfig(needs_client=True)),
-    "get_custom_components": (get_custom_components_tool, ToolConfig(needs_client=True)),
+    "list_component_families": (
+        list_component_families_tool,
+        ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_component_definition": (
+        get_component_definition_tool,
+        ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "search_component_definitions": (
+        search_component_definitions_wrapper,
+        ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_custom_components": (
+        get_custom_components_tool,
+        ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE),
+    ),
     "list_secrets": (list_secrets_tool, ToolConfig(needs_client=True)),
     "get_secret": (get_secret_tool, ToolConfig(needs_client=True)),
 }
