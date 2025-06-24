@@ -6,8 +6,15 @@ import pytest
 from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.tools.haystack_service import (
     get_component_definition,
+    get_custom_components,
     list_component_families,
     search_component_definition,
+)
+from deepset_mcp.tools.haystack_service_models import (
+    ComponentDefinition,
+    ComponentDefinitionList,
+    ComponentFamilyList,
+    ComponentSearchResults,
 )
 from deepset_mcp.tools.model_protocol import ModelProtocol
 from test.unit.conftest import BaseFakeClient
@@ -104,7 +111,8 @@ async def test_get_component_definition_success() -> None:
                                         "description": "The format to convert the Excel file to.",
                                         "default": "csv",
                                     },
-                                }
+                                },
+                                "required": ["table_format"],
                             },
                         },
                     }
@@ -151,27 +159,38 @@ async def test_get_component_definition_success() -> None:
     client = FakeClient(resource=resource)
     result = await get_component_definition(client, component_type)
 
-    # Check that all required information is present
-    assert component_type in result
-    assert "XLSXToDocument" in result
-    assert "converters" in result
-    assert "Convert data into a format" in result
-    assert "sheet_name" in result
-    assert "table_format" in result
-    assert "default: csv" in result
+    # Check that we get a ComponentDefinition model
+    assert isinstance(result, ComponentDefinition)
+    assert result.component_type == component_type
+    assert result.title == "XLSXToDocument"
+    assert result.description == "Converts XLSX files into Documents."
+    assert result.family == "converters"
+    assert result.family_description == "Convert data into a format your pipeline can query."
 
-    # Check input/output schema information
-    assert "Input Schema:" in result
-    assert "file_path" in result
-    assert "Path to the XLSX file" in result
-    assert "(required)" in result
-    assert "Output Schema:" in result
-    assert "List of documents" in result
-    assert "documents: typing.List[haystack.dataclasses.document.Document]" in result
-    assert "Definitions:" in result
-    assert "Document:" in result
-    assert "content: string (required)" in result
-    assert "meta: object" in result
+    # Check init parameters
+    assert len(result.init_parameters) == 2
+    sheet_name_param = next((p for p in result.init_parameters if p.name == "sheet_name"), None)
+    assert sheet_name_param is not None
+    assert sheet_name_param.annotation == "typing.Union[str, int, list, None]"
+    assert sheet_name_param.description == "The name of the sheet to read."
+    assert sheet_name_param.default is None
+    assert not sheet_name_param.required
+
+    table_format_param = next((p for p in result.init_parameters if p.name == "table_format"), None)
+    assert table_format_param is not None
+    assert table_format_param.required
+
+    # Check input/output schemas
+    assert result.input_schema is not None
+    assert "file_path" in result.input_schema.properties
+    assert result.input_schema.properties["file_path"].description == "Path to the XLSX file"
+    assert "file_path" in result.input_schema.required
+
+    assert result.output_schema is not None
+    assert "documents" in result.output_schema.properties
+    assert result.output_schema.properties["documents"].description == "List of documents"
+    assert "documents" in result.output_schema.required
+    assert "Document" in result.output_schema.definitions
 
 
 @pytest.mark.asyncio
@@ -180,6 +199,8 @@ async def test_get_component_definition_not_found() -> None:
     resource = FakeHaystackServiceResource(get_component_schemas_response=response)
     client = FakeClient(resource=resource)
     result = await get_component_definition(client, "nonexistent.component")
+
+    assert isinstance(result, str)
     assert "Component not found" in result
 
 
@@ -196,7 +217,9 @@ async def test_search_component_definition_success() -> None:
                             "type": {
                                 "const": "haystack.components.converters.XLSXConverter",
                                 "family": "converters",
+                                "family_description": "Convert data into a format your pipeline can query.",
                             },
+                            "init_parameters": {"properties": {}},
                         },
                     },
                     "PDFReader": {
@@ -206,7 +229,9 @@ async def test_search_component_definition_success() -> None:
                             "type": {
                                 "const": "haystack.components.readers.PDFReader",
                                 "family": "readers",
+                                "family_description": "Read and parse documents.",
                             },
+                            "init_parameters": {"properties": {}},
                         },
                     },
                 }
@@ -227,15 +252,24 @@ async def test_search_component_definition_success() -> None:
 
     # Search for converters
     result = await search_component_definition(client, "convert excel files", model)
-    assert "XLSXConverter" in result
-    assert "Similarity Score:" in result
-    assert "haystack.components.converters.XLSXConverter" in result
+    assert isinstance(result, ComponentSearchResults)
+    assert result.query == "convert excel files"
+    assert result.total_found == 2
+    assert len(result.results) == 2
+    # XLSXConverter should be first due to higher similarity
+    assert result.results[0].component.title == "XLSXConverter"
+    assert result.results[0].component.component_type == "haystack.components.converters.XLSXConverter"
+    assert isinstance(result.results[0].similarity_score, float)
 
     # Search for readers
-    result = await search_component_definition(client, "read pdf documents", model)
-    assert "PDFReader" in result
-    assert "Similarity Score:" in result
-    assert "haystack.components.readers.PDFReader" in result
+    result = await search_component_definition(client, "pdf reader documents", model)
+    assert isinstance(result, ComponentSearchResults)
+    assert result.query == "pdf reader documents"
+    assert result.total_found == 2
+    assert len(result.results) == 2
+    # PDFReader should be first due to higher similarity
+    assert result.results[0].component.title == "PDFReader"
+    assert result.results[0].component.component_type == "haystack.components.readers.PDFReader"
 
 
 @pytest.mark.asyncio
@@ -243,6 +277,8 @@ async def test_get_component_definition_api_error() -> None:
     resource = FakeHaystackServiceResource(exception=UnexpectedAPIError(status_code=500, message="API Error"))
     client = FakeClient(resource=resource)
     result = await get_component_definition(client, "some.component")
+
+    assert isinstance(result, str)
     assert "Failed to retrieve component definition" in result
     assert "API Error" in result
 
@@ -255,7 +291,10 @@ async def test_search_component_definition_no_components() -> None:
     model = FakeModel()
 
     result = await search_component_definition(client, "test query", model)
-    assert "No components found" in result
+    assert isinstance(result, ComponentSearchResults)
+    assert result.query == "test query"
+    assert result.total_found == 0
+    assert len(result.results) == 0
 
 
 @pytest.mark.asyncio
@@ -265,6 +304,7 @@ async def test_search_component_definition_api_error() -> None:
     model = FakeModel()
 
     result = await search_component_definition(client, "test query", model)
+    assert isinstance(result, str)
     assert "Failed to retrieve component schemas" in result
 
 
@@ -274,6 +314,8 @@ async def test_list_component_families_no_families() -> None:
     resource = FakeHaystackServiceResource(get_component_schemas_response=response)
     client = FakeClient(resource=resource)
     result = await list_component_families(client)
+
+    assert isinstance(result, str)
     assert "No component families found" in result
 
 
@@ -299,13 +341,16 @@ async def test_list_component_families_success() -> None:
     client = FakeClient(resource=resource)
     result = await list_component_families(client)
 
-    assert "Available Haystack component families" in result
-    assert "**converters**" in result
-    assert "Convert data format" in result
-    assert "**readers**" in result
-    assert "Read data" in result
-    # Only two unique families should be present
-    assert result.count("**") == 4  # Two sets of ** for each family
+    assert isinstance(result, ComponentFamilyList)
+    assert result.total_count == 2
+    assert len(result.families) == 2
+
+    # Check sorted order
+    families_by_name = {f.name: f for f in result.families}
+    assert "converters" in families_by_name
+    assert families_by_name["converters"].description == "Convert data format"
+    assert "readers" in families_by_name
+    assert families_by_name["readers"].description == "Read data"
 
 
 @pytest.mark.asyncio
@@ -313,5 +358,141 @@ async def test_list_component_families_api_error() -> None:
     resource = FakeHaystackServiceResource(exception=UnexpectedAPIError(status_code=500, message="API Error"))
     client = FakeClient(resource=resource)
     result = await list_component_families(client)
+
+    assert isinstance(result, str)
     assert "Failed to retrieve component families" in result
+    assert "API Error" in result
+
+
+@pytest.mark.asyncio
+async def test_get_custom_components_success() -> None:
+    response = {
+        "component_schema": {
+            "definitions": {
+                "Components": {
+                    "CustomComponent1": {
+                        "title": "CustomComponent1",
+                        "description": "A custom component for testing",
+                        "package_version": "1.0.0",
+                        "dynamic_params": True,
+                        "properties": {
+                            "type": {
+                                "const": "custom.components.CustomComponent1",
+                                "family": "custom",
+                                "family_description": "Custom components",
+                            },
+                            "init_parameters": {
+                                "properties": {
+                                    "param1": {
+                                        "_annotation": "str",
+                                        "description": "First parameter",
+                                    },
+                                    "param2": {
+                                        "_annotation": "int",
+                                        "description": "Second parameter",
+                                    },
+                                },
+                                "required": ["param1"],
+                            },
+                        },
+                    },
+                    "RegularComponent": {
+                        # No package_version, so not a custom component
+                        "title": "RegularComponent",
+                        "description": "A regular component",
+                        "properties": {
+                            "type": {
+                                "const": "haystack.components.RegularComponent",
+                                "family": "regular",
+                                "family_description": "Regular components",
+                            },
+                            "init_parameters": {"properties": {}},
+                        },
+                    },
+                }
+            }
+        }
+    }
+
+    io_response = {
+        "input": {"properties": {"file_path": {"type": "string"}}},
+        "output": {"properties": {"text": {"type": "string"}}},
+    }
+
+    resource = FakeHaystackServiceResource(
+        get_component_schemas_response=response, get_component_io_response=io_response
+    )
+    client = FakeClient(resource=resource)
+    result = await get_custom_components(client)
+
+    assert isinstance(result, ComponentDefinitionList)
+    assert result.total_count == 1
+    assert len(result.components) == 1
+
+    custom_comp = result.components[0]
+    assert custom_comp.title == "CustomComponent1"
+    assert custom_comp.component_type == "custom.components.CustomComponent1"
+    assert custom_comp.package_version == "1.0.0"
+    assert custom_comp.family == "custom"
+    assert custom_comp.family_description == "Custom components"
+    assert custom_comp.dynamic_params is True
+    assert custom_comp.is_custom is True
+    assert len(custom_comp.init_parameters) == 2
+
+    # Check parameters
+    param1 = next((p for p in custom_comp.init_parameters if p.name == "param1"), None)
+    assert param1 is not None
+    assert param1.annotation == "str"
+    assert param1.description == "First parameter"
+    assert param1.required is True
+
+    param2 = next((p for p in custom_comp.init_parameters if p.name == "param2"), None)
+    assert param2 is not None
+    assert param2.annotation == "int"
+    assert param2.description == "Second parameter"
+    assert param2.required is False
+
+    # Check I/O schemas are included
+    assert custom_comp.input_schema is not None
+    assert custom_comp.output_schema is not None
+
+
+@pytest.mark.asyncio
+async def test_get_custom_components_none_found() -> None:
+    response = {
+        "component_schema": {
+            "definitions": {
+                "Components": {
+                    "RegularComponent": {
+                        "title": "RegularComponent",
+                        "description": "A regular component",
+                        "properties": {
+                            "type": {
+                                "const": "haystack.components.RegularComponent",
+                                "family": "regular",
+                                "family_description": "Regular components",
+                            },
+                            "init_parameters": {"properties": {}},
+                        },
+                    }
+                }
+            }
+        }
+    }
+    resource = FakeHaystackServiceResource(get_component_schemas_response=response)
+    client = FakeClient(resource=resource)
+    result = await get_custom_components(client)
+
+    assert isinstance(result, str)
+    assert "No custom components found" in result
+
+
+@pytest.mark.asyncio
+async def test_get_custom_components_api_error() -> None:
+    resource = FakeHaystackServiceResource(exception=UnexpectedAPIError(status_code=500, message="API Error"))
+    client = FakeClient(resource=resource)
+    result = await get_custom_components(client)
+
+    assert isinstance(result, str)
+    assert "Error retrieving component schemas" in result
     assert "API Error" in result
