@@ -130,18 +130,35 @@ async def test_list_custom_component_installations() -> None:
 
     result = await list_custom_component_installations(client, "test-workspace")
 
-    assert "# Custom Component Installations (showing 2 of 2)" in result
-    assert "## Installation comp_123..." in result
-    assert "## Installation comp_456..." in result
-    assert "**Status**: installed" in result
-    assert "**Status**: failed" in result
-    assert "**Version**: 1.0.0" in result
-    assert "**Version**: 0.9.0" in result
-    assert "**Installed by**: John Doe (john.doe@example.com)" in result
-    assert "**Installed by**: Jane Smith (jane.smith@example.com)" in result
-    assert "[INFO] Installation complete" in result
-    assert "[ERROR] Installation failed" in result
-    assert "[DEBUG] Debug info" in result
+    assert isinstance(result, CustomComponentInstallationList)
+    assert len(result.data) == 2
+    assert result.total == 2
+    assert result.has_more is False
+
+    # Check first installation
+    first_install = result.data[0]
+    assert first_install.custom_component_id == "comp_123"
+    assert first_install.status == "installed"
+    assert first_install.version == "1.0.0"
+    assert first_install.created_by_user_id == "user_123"
+    assert len(first_install.logs) == 1
+    assert first_install.logs[0]["level"] == "INFO"
+    assert first_install.user_info is not None
+    assert first_install.user_info.given_name == "John"
+    assert first_install.user_info.family_name == "Doe"
+    assert first_install.user_info.email == "john.doe@example.com"
+
+    # Check second installation
+    second_install = result.data[1]
+    assert second_install.custom_component_id == "comp_456"
+    assert second_install.status == "failed"
+    assert second_install.version == "0.9.0"
+    assert second_install.created_by_user_id == "user_456"
+    assert len(second_install.logs) == 2
+    assert second_install.user_info is not None
+    assert second_install.user_info.given_name == "Jane"
+    assert second_install.user_info.family_name == "Smith"
+    assert second_install.user_info.email == "jane.smith@example.com"
 
 
 @pytest.mark.asyncio
@@ -162,7 +179,10 @@ async def test_list_custom_component_installations_empty() -> None:
 
     result = await list_custom_component_installations(client, "test-workspace")
 
-    assert result == "No custom component installations found."
+    assert isinstance(result, CustomComponentInstallationList)
+    assert len(result.data) == 0
+    assert result.total == 0
+    assert result.has_more is False
 
 
 @pytest.mark.asyncio
@@ -192,7 +212,10 @@ async def test_list_custom_component_installations_user_fetch_error() -> None:
 
     result = await list_custom_component_installations(client, "test-workspace")
 
-    assert "**Installed by**: Unknown" in result
+    assert isinstance(result, CustomComponentInstallationList)
+    assert len(result.data) == 1
+    assert result.data[0].created_by_user_id == "user_unknown"
+    assert result.data[0].user_info is None  # User fetch failed, so user_info should be None
 
 
 @pytest.mark.asyncio
@@ -220,7 +243,7 @@ async def test_get_latest_custom_component_installation_logs() -> None:
 
     result = await get_latest_custom_component_installation_logs(client, "test-workspace")
 
-    assert result == f"Latest custom component installation logs:\n\n{mock_logs}"
+    assert result == mock_logs
 
 
 @pytest.mark.asyncio
@@ -242,5 +265,5 @@ async def test_get_latest_custom_component_installation_logs_api_error() -> None
     )
     client = FakeClient(custom_components_resource=custom_components_resource)
 
-    with pytest.raises(UnexpectedAPIError):
-        await get_latest_custom_component_installation_logs(client, "test-workspace")
+    result = await get_latest_custom_component_installation_logs(client, "test-workspace")
+    assert result == "Failed to retrieve latest installation logs: API Error (Status Code: 500)"
