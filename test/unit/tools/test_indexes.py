@@ -19,6 +19,7 @@ class FakeIndexResource(IndexResourceProtocol):
         create_response: Index | None = None,
         update_response: Index | None = None,
         deploy_response: PipelineValidationResult | None = None,
+        list_exception: Exception | None = None,
         get_exception: Exception | None = None,
         create_exception: Exception | None = None,
         update_exception: Exception | None = None,
@@ -29,12 +30,15 @@ class FakeIndexResource(IndexResourceProtocol):
         self._create_response = create_response
         self._update_response = update_response
         self._deploy_response = deploy_response
+        self._list_exception = list_exception
         self._get_exception = get_exception
         self._create_exception = create_exception
         self._update_exception = update_exception
         self._deploy_exception = deploy_exception
 
     async def list(self, limit: int = 10, page_number: int = 1) -> IndexList:
+        if self._list_exception:
+            raise self._list_exception
         if self._list_response is not None:
             return self._list_response
         return IndexList(data=[], has_more=False, total=0)
@@ -118,17 +122,18 @@ def create_test_index(
 
 
 @pytest.mark.asyncio
-async def test_list_indexes_returns_formatted_string_when_no_indexes() -> None:
+async def test_list_indexes_without_indexes() -> None:
     resource = FakeIndexResource(list_response=IndexList(data=[], has_more=False, total=0))
     client = FakeClient(resource)
 
     result = await list_indexes(client=client, workspace="test")
 
-    assert result == "No indexes found."
+    assert isinstance(result, IndexList)
+    assert len(result.data) == 0
 
 
 @pytest.mark.asyncio
-async def test_list_indexes_returns_formatted_string_with_indexes() -> None:
+async def test_list_indexes_returns_indexes() -> None:
     index1 = create_test_index(name="index1", description="First index")
     index2 = create_test_index(name="index2", description="Second index")
 
@@ -137,25 +142,33 @@ async def test_list_indexes_returns_formatted_string_with_indexes() -> None:
 
     result = await list_indexes(client=client, workspace="test")
 
-    assert "index1" in result
-    assert "index2" in result
-    assert "First index" in result
-    assert "Second index" in result
-    assert "idx_123" in result
+    assert isinstance(result, IndexList)
+    assert len(result.data) == 2
+    assert result.data[0].name == index1.name
+    assert result.data[1].name == index2.name
 
 
 @pytest.mark.asyncio
-async def test_get_index_returns_formatted_string() -> None:
+async def test_list_indexes_returns_string_on_non_existant_workspace() -> None:
+    resource = FakeIndexResource(list_exception=ResourceNotFoundError(message="Resource not found."))
+    client = FakeClient(resource)
+
+    result = await list_indexes(client=client, workspace="test")
+
+    assert isinstance(result, str)
+    assert result == "Error listing indexes. Error: Resource not found. (404)"
+
+
+@pytest.mark.asyncio
+async def test_get_index_returns_index() -> None:
     index = create_test_index(name="my_index", description="My special index")
     resource = FakeIndexResource(get_response=index)
     client = FakeClient(resource)
 
     result = await get_index(client=client, workspace="test", index_name="my_index")
 
-    assert "my_index" in result
-    assert "config: value" in result
-    assert "idx_123" in result
-    assert "My special index" in result
+    assert isinstance(result, Index)
+    assert result.name == "my_index"
 
 
 @pytest.mark.asyncio
@@ -169,7 +182,7 @@ async def test_get_index_returns_error_message_when_index_not_found() -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_index_returns_success_message() -> None:
+async def test_create_index_returns_success_message_and_index() -> None:
     created_index = create_test_index(name="new_index")
     resource = FakeIndexResource(create_response=created_index)
     client = FakeClient(resource)
@@ -182,7 +195,11 @@ async def test_create_index_returns_success_message() -> None:
         description="New index description",
     )
 
-    assert "Index 'new_index' created successfully." == result
+    assert isinstance(result, dict)
+    assert isinstance(result.get("message"), str)
+    index = result.get("index")
+    assert isinstance(index, Index)
+    assert index.name == "new_index"
 
 
 @pytest.mark.parametrize(
@@ -225,7 +242,12 @@ async def test_update_index_returns_success_message() -> None:
         yaml_configuration="new_config",
     )
 
-    assert "Index 'test_index' updated successfully." == result
+    assert isinstance(result, dict)
+    assert isinstance(result.get("message"), str)
+
+    index = result.get("index")
+    assert isinstance(index, Index)
+    assert index.name == "new_test_index"
 
 
 @pytest.mark.asyncio
@@ -355,11 +377,8 @@ async def test_deploy_index_returns_validation_errors() -> None:
 
     result = await deploy_index(client=client, workspace="test", index_name="test_index")
 
-    assert "The provided pipeline configuration is invalid" in result
-    assert "invalid_config" in result
-    assert "Index configuration is invalid" in result
-    assert "missing_dependency" in result
-    assert "Required dependency not found" in result
+    assert isinstance(result, PipelineValidationResult)
+    assert result.errors == validation_errors
 
 
 @pytest.mark.parametrize(
