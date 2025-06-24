@@ -195,11 +195,11 @@ TOOL_REGISTRY = {
     ),
     "list_custom_component_installations": (
         list_custom_component_installations_tool,
-        ToolConfig(needs_client=True, needs_workspace=True),
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
     "get_latest_custom_component_installation_logs": (
         get_latest_custom_component_installation_logs_tool,
-        ToolConfig(needs_client=True, needs_workspace=True),
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
     # Non-workspace tools
     "list_component_families": (
