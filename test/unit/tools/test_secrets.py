@@ -66,8 +66,14 @@ async def test_list_secrets_success() -> None:
 
     result = await list_secrets(client, limit=10)
 
-    expected = "Found 2 secret(s):\nName: api-key, ID: secret-1\nName: database-password, ID: secret-2"
-    assert result == expected
+    assert isinstance(result, SecretList)
+    assert len(result.data) == 2
+    assert result.total == 2
+    assert result.has_more is False
+    assert result.data[0].name == "api-key"
+    assert result.data[0].secret_id == "secret-1"
+    assert result.data[1].name == "database-password"
+    assert result.data[1].secret_id == "secret-2"
 
 
 @pytest.mark.asyncio
@@ -82,11 +88,12 @@ async def test_list_secrets_with_pagination() -> None:
 
     result = await list_secrets(client, limit=1)
 
-    expected = (
-        "Found 1 secret(s):\nName: api-key, ID: secret-1\n\n"
-        "Showing 1 of 5 total secrets. Use a higher limit to see more."
-    )
-    assert result == expected
+    assert isinstance(result, SecretList)
+    assert len(result.data) == 1
+    assert result.total == 5
+    assert result.has_more is True
+    assert result.data[0].name == "api-key"
+    assert result.data[0].secret_id == "secret-1"
 
 
 @pytest.mark.asyncio
@@ -98,7 +105,10 @@ async def test_list_secrets_empty() -> None:
 
     result = await list_secrets(client)
 
-    assert result == "No secrets found in this workspace."
+    assert isinstance(result, SecretList)
+    assert len(result.data) == 0
+    assert result.total == 0
+    assert result.has_more is False
 
 
 @pytest.mark.asyncio
@@ -132,8 +142,9 @@ async def test_get_secret_success() -> None:
 
     result = await get_secret(client, "secret-1")
 
-    expected = "Secret Details:\nName: api-key\nID: secret-1"
-    assert result == expected
+    assert isinstance(result, Secret)
+    assert result.name == "api-key"
+    assert result.secret_id == "secret-1"
 
 
 @pytest.mark.asyncio
