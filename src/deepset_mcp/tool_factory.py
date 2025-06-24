@@ -5,7 +5,7 @@ import os
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
@@ -98,13 +98,22 @@ class WorkspaceMode(StrEnum):
     EXPLICIT = "explicit"  # workspace as required parameter in tool signature
 
 
+class MemoryType(StrEnum):
+    """Configuration for how memory is provided to tools."""
+
+    EXPLORABLE = "explorable"
+    REFERENCEABLE = "referenceable"
+    BOTH = "both"
+    NO_MEMORY = "no_memory"
+
+
 @dataclass
 class ToolConfig:
     """Configuration for tool registration."""
 
     needs_client: bool = False
     needs_workspace: bool = False
-    decorator_type: Literal["none", "explorable", "referenceable", "both"] = "none"
+    memory_type: MemoryType = MemoryType.NO_MEMORY
     custom_args: dict[str, Any] | None = None  # For special cases like search_component_definition
 
 
@@ -127,11 +136,26 @@ TOOL_REGISTRY = {
     "validate_pipeline": (validate_pipeline_tool, ToolConfig(needs_client=True, needs_workspace=True)),
     "get_pipeline_logs": (get_pipeline_logs_tool, ToolConfig(needs_client=True, needs_workspace=True)),
     "search_pipeline": (search_pipeline_tool, ToolConfig(needs_client=True, needs_workspace=True)),
-    "list_indexes": (list_indexes_tool, ToolConfig(needs_client=True, needs_workspace=True)),
-    "get_index": (get_index_tool, ToolConfig(needs_client=True, needs_workspace=True)),
-    "create_index": (create_index_tool, ToolConfig(needs_client=True, needs_workspace=True)),
-    "update_index": (update_index_tool, ToolConfig(needs_client=True, needs_workspace=True)),
-    "deploy_index": (deploy_index_tool, ToolConfig(needs_client=True, needs_workspace=True)),
+    "list_indexes": (
+        list_indexes_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_index": (
+        get_index_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "create_index": (
+        create_index_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.BOTH),
+    ),
+    "update_index": (
+        update_index_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.BOTH),
+    ),
+    "deploy_index": (
+        deploy_index_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
     "list_pipeline_templates": (list_pipeline_templates_tool, ToolConfig(needs_client=True, needs_workspace=True)),
     "get_pipeline_template": (get_pipeline_template_tool, ToolConfig(needs_client=True, needs_workspace=True)),
     "search_pipeline_templates": (
@@ -172,15 +196,15 @@ def create_enhanced_tool(
     """
     # Apply decorators first (if needed)
     decorated_func = base_func
-    if config.decorator_type != "none":
+    if config.memory_type != "none":
         store = STORE
         explorer = RichExplorer(store)
 
-        if config.decorator_type == "explorable":
+        if config.memory_type == "explorable":
             decorated_func = explorable(object_store=store, explorer=explorer)(decorated_func)
-        elif config.decorator_type == "referenceable":
+        elif config.memory_type == "referenceable":
             decorated_func = referenceable(object_store=store, explorer=explorer)(decorated_func)
-        elif config.decorator_type == "both":
+        elif config.memory_type == "both":
             decorated_func = explorable_and_referenceable(object_store=store, explorer=explorer)(decorated_func)
 
     # Handle client and workspace injection
