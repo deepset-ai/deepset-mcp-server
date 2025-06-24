@@ -17,10 +17,13 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetSearchResponse,
     DeepsetStreamEvent,
     ExceptionInfo,
+    PipelineList,
     PipelineLog,
     PipelineLogList,
+    PipelineOperationWithErrors,
     PipelineServiceLevel,
     PipelineValidationResult,
+    PipelineValidationResultWithYaml,
     ValidationError,
 )
 from deepset_mcp.api.shared_models import DeepsetUser, NoContentResponse
@@ -57,6 +60,7 @@ class FakePipelineResource:
         logs_exception: Exception | None = None,
         deploy_exception: Exception | None = None,
         search_exception: Exception | None = None,
+        list_exception: Exception | None = None,
     ) -> None:
         self._list_response = list_response
         self._get_response = get_response
@@ -74,11 +78,13 @@ class FakePipelineResource:
         self._deploy_exception = deploy_exception
         self._search_response = search_response
         self._search_exception = search_exception
+        self._list_exception = list_exception
 
-    async def list(self, page_number: int = 1, limit: int = 10) -> list[DeepsetPipeline]:
+    async def list(self, page_number: int = 1, limit: int = 10) -> PipelineList:
+        if self._list_exception:
+            raise self._list_exception
         if self._list_response is not None:
-            # Convert DeepsetPipeline instances to PipelineHandle
-            return self._list_response
+            return PipelineList(data=self._list_response, has_more=False, total=len(self._list_response))
         raise NotImplementedError
 
     async def get(self, pipeline_name: str, include_yaml: bool = True) -> DeepsetPipeline:
@@ -181,7 +187,7 @@ class FakeClient(BaseFakeClient):
 
 
 @pytest.mark.asyncio
-async def test_list_pipelines_returns_formatted_string() -> None:
+async def test_list_pipelines_returns_pipeline_list() -> None:
     user = DeepsetUser(user_id="u1", given_name="Alice", family_name="Smith")
     pipeline1 = DeepsetPipeline(
         pipeline_id="p1",
@@ -208,13 +214,14 @@ async def test_list_pipelines_returns_formatted_string() -> None:
     resource = FakePipelineResource(list_response=[pipeline1, pipeline2])
     client = FakeClient(resource)
     result = await list_pipelines(client, workspace="ws1")
-    assert result.count("<pipeline name=") == 2
-    assert "pipeline1" in result
-    assert "pipeline2" in result
+    assert isinstance(result, PipelineList)
+    assert len(result.data) == 2
+    assert result.data[0].name == "pipeline1"
+    assert result.data[1].name == "pipeline2"
 
 
 @pytest.mark.asyncio
-async def test_get_pipeline_returns_formatted_string() -> None:
+async def test_get_pipeline_returns_pipeline_object() -> None:
     user = DeepsetUser(user_id="u1", given_name="Bob", family_name="Jones")
     pipeline = DeepsetPipeline(
         pipeline_id="pX",
@@ -230,8 +237,9 @@ async def test_get_pipeline_returns_formatted_string() -> None:
     resource = FakePipelineResource(get_response=pipeline)
     client = FakeClient(resource)
     result = await get_pipeline(client, workspace="ws2", pipeline_name="mypipe")
-    assert "mypipe" in result
-    assert "foo: bar" in result
+    assert isinstance(result, DeepsetPipeline)
+    assert result.name == "mypipe"
+    assert result.yaml_config == "foo: bar"
 
 
 @pytest.mark.asyncio
@@ -246,11 +254,12 @@ async def test_validate_pipeline_invalid_yaml_returns_error() -> None:
     client = FakeClient(FakePipelineResource())
     invalid_yaml = "invalid: : yaml"
     result = await validate_pipeline(client, workspace="ws", yaml_configuration=invalid_yaml)
+    assert isinstance(result, str)
     assert result.startswith("Invalid YAML provided:")
 
 
 @pytest.mark.asyncio
-async def test_validate_pipeline_validates_via_client_and_formats() -> None:
+async def test_validate_pipeline_validates_via_client_and_returns_model() -> None:
     valid_result = PipelineValidationResult(valid=True, errors=[])
     invalid_result = PipelineValidationResult(
         valid=False,
@@ -260,14 +269,17 @@ async def test_validate_pipeline_validates_via_client_and_formats() -> None:
     resource_valid = FakePipelineResource(validate_response=valid_result)
     client_valid = FakeClient(resource_valid)
     res_valid = await validate_pipeline(client_valid, workspace="ws", yaml_configuration="a: b")
-    assert "configuration is valid" in res_valid
+    assert isinstance(res_valid, PipelineValidationResultWithYaml)
+    assert res_valid.validation_result.valid is True
+    assert res_valid.yaml_config == "a: b"
     # Test invalid
     resource_invalid = FakePipelineResource(validate_response=invalid_result)
     client_invalid = FakeClient(resource_invalid)
     res_invalid = await validate_pipeline(client_invalid, workspace="ws", yaml_configuration="a: b")
-    assert "configuration is invalid" in res_invalid
-    assert "Error 1" in res_invalid
-    assert "Error 2" in res_invalid
+    assert isinstance(res_invalid, PipelineValidationResultWithYaml)
+    assert res_invalid.validation_result.valid is False
+    assert len(res_invalid.validation_result.errors) == 2
+    assert res_invalid.validation_result.errors[0].code == "E1"
 
 
 @pytest.mark.asyncio
@@ -278,23 +290,39 @@ async def test_create_pipeline_handles_validation_failure() -> None:
     result = await create_pipeline(
         client, workspace="ws", pipeline_name="pname", yaml_configuration="cfg", skip_validation_errors=False
     )
-    assert "invalid" in result.lower()
-    assert "Error 1" in result
+    assert isinstance(result, str)
+    assert "Pipeline validation failed" in result
+    assert "E: Err" in result
 
 
 @pytest.mark.asyncio
 async def test_create_pipeline_handles_success_and_failure_response() -> None:
+    user = DeepsetUser(user_id="u1", given_name="Alice", family_name="Smith")
     valid_result = PipelineValidationResult(valid=True, errors=[])
+    created_pipeline = DeepsetPipeline(
+        pipeline_id="p1",
+        name="p1",
+        status="DRAFT",
+        service_level=PipelineServiceLevel.DEVELOPMENT,
+        created_at=datetime(2023, 1, 1, 12, 0),
+        last_edited_at=None,
+        created_by=user,
+        last_edited_by=None,
+        yaml_config="a: b",
+    )
 
     # success
     resource_succ = FakePipelineResource(
         validate_response=valid_result,
         create_response=NoContentResponse(message="created successfully"),
+        get_response=created_pipeline,
     )
     client_succ = FakeClient(resource_succ)
     res_succ = await create_pipeline(client_succ, workspace="ws", pipeline_name="p1", yaml_configuration="a: b")
 
-    assert "created successfully" in res_succ
+    assert isinstance(res_succ, DeepsetPipeline)
+    assert res_succ.name == "p1"
+
     # failure
     resource_fail = FakePipelineResource(
         validate_response=valid_result,
@@ -302,18 +330,32 @@ async def test_create_pipeline_handles_success_and_failure_response() -> None:
     )
     client_fail = FakeClient(resource_fail)
     res_fail = await create_pipeline(client_fail, workspace="ws", pipeline_name="p1", yaml_configuration="a: b")
+    assert isinstance(res_fail, str)
     assert "Failed to create pipeline 'p1': bad things (Status Code: 400)" == res_fail
 
 
 @pytest.mark.asyncio
 async def test_create_pipeline_skip_validation_errors_true() -> None:
     """Test that create_pipeline creates the pipeline despite validation errors."""
+    user = DeepsetUser(user_id="u1", given_name="Alice", family_name="Smith")
     invalid_result = PipelineValidationResult(
         valid=False, errors=[ValidationError(code="E1", message="Test error message")]
+    )
+    created_pipeline = DeepsetPipeline(
+        pipeline_id="p1",
+        name="test_pipeline",
+        status="DRAFT",
+        service_level=PipelineServiceLevel.DEVELOPMENT,
+        created_at=datetime(2023, 1, 1, 12, 0),
+        last_edited_at=None,
+        created_by=user,
+        last_edited_by=None,
+        yaml_config="config: test",
     )
     resource = FakePipelineResource(
         validate_response=invalid_result,
         create_response=NoContentResponse(message="created successfully"),
+        get_response=created_pipeline,
     )
     client = FakeClient(resource)
 
@@ -326,19 +368,24 @@ async def test_create_pipeline_skip_validation_errors_true() -> None:
         skip_validation_errors=True,
     )
 
-    assert "Pipeline 'test_pipeline' created successfully." in result
-    assert "Note: Pipeline was created despite validation issues:" in result
-    assert "configuration is invalid" in result
-    assert "Error 1" in result
-    assert "Test error message" in result
+    assert isinstance(result, PipelineOperationWithErrors)
+    assert result.message == "The operation completed with errors"
+    assert result.validation_result.valid is False
+    assert len(result.validation_result.errors) == 1
+    assert result.validation_result.errors[0].code == "E1"
+    assert result.pipeline.name == "test_pipeline"
+
+    # Reset call count for the second test
+    resource._get_call_count = 0
 
     # Test with default (should behave the same as True)
     result_default = await create_pipeline(
         client, workspace="ws", pipeline_name="test_pipeline", yaml_configuration="config: test"
     )
 
-    assert "Pipeline 'test_pipeline' created successfully." in result_default
-    assert "Note: Pipeline was created despite validation issues:" in result_default
+    assert isinstance(result_default, PipelineOperationWithErrors)
+    assert result_default.message == "The operation completed with errors"
+    assert result_default.pipeline.name == "test_pipeline"
 
 
 @pytest.mark.asyncio
@@ -348,6 +395,7 @@ async def test_update_pipeline_not_found_on_get() -> None:
     res = await update_pipeline(
         client, workspace="ws", pipeline_name="np", original_config_snippet="x", replacement_config_snippet="y"
     )
+    assert isinstance(res, str)
     assert "no pipeline named 'np'" in res.lower()
 
 
@@ -422,8 +470,9 @@ async def test_update_pipeline_validation_failure() -> None:
         replacement_config_snippet="foo: 2",
         skip_validation_errors=False,
     )
-    assert "invalid" in res.lower()
-    assert "Error 1" in res
+    assert isinstance(res, str)
+    assert "Pipeline validation failed" in res
+    assert "E: err" in res
 
 
 @pytest.mark.asyncio
@@ -454,6 +503,7 @@ async def test_update_pipeline_exceptions_on_update() -> None:
         original_config_snippet="foo: 1",
         replacement_config_snippet="foo: 2",
     )
+    assert isinstance(r1, str)
     assert "no pipeline named 'np'" in r1.lower()
     # BadRequestError
     res_bad = FakePipelineResource(
@@ -502,11 +552,22 @@ async def test_update_pipeline_success_response() -> None:
         last_edited_by=None,
         yaml_config=orig_yaml,
     )
+    updated = DeepsetPipeline(
+        pipeline_id="p",
+        name="np",
+        status="S",
+        service_level=PipelineServiceLevel.DEVELOPMENT,
+        created_at=datetime.now(),
+        last_edited_at=None,
+        created_by=user,
+        last_edited_by=None,
+        yaml_config="foo: 2",
+    )
     val_ok = PipelineValidationResult(valid=True, errors=[])
 
     # success
     res_succ = FakePipelineResource(
-        get_response=original,
+        get_responses=[original, updated],  # First get returns original, second returns updated
         validate_response=val_ok,
         update_response=NoContentResponse(message="successfully updated"),
     )
@@ -518,7 +579,8 @@ async def test_update_pipeline_success_response() -> None:
         original_config_snippet="foo: 1",
         replacement_config_snippet="foo: 2",
     )
-    assert "successfully updated" in r_success.lower()
+    assert isinstance(r_success, DeepsetPipeline)
+    assert r_success.yaml_config == "foo: 2"
 
 
 @pytest.mark.asyncio
@@ -537,12 +599,23 @@ async def test_update_pipeline_skip_validation_errors_true() -> None:
         last_edited_by=None,
         yaml_config=orig_yaml,
     )
+    updated = DeepsetPipeline(
+        pipeline_id="p",
+        name="np",
+        status="S",
+        service_level=PipelineServiceLevel.DEVELOPMENT,
+        created_at=datetime.now(),
+        last_edited_at=None,
+        created_by=user,
+        last_edited_by=None,
+        yaml_config="foo: 2",
+    )
     invalid_result = PipelineValidationResult(
         valid=False, errors=[ValidationError(code="E1", message="Test error message")]
     )
 
     resource = FakePipelineResource(
-        get_response=original,
+        get_responses=[original, updated],
         validate_response=invalid_result,
         update_response=NoContentResponse(message="successfully updated"),
     )
@@ -558,11 +631,13 @@ async def test_update_pipeline_skip_validation_errors_true() -> None:
         skip_validation_errors=True,
     )
 
-    assert "The pipeline 'np' was successfully updated." in result
-    assert "Note: Pipeline was updated despite validation issues:" in result
-    assert "configuration is invalid" in result
-    assert "Error 1" in result
-    assert "Test error message" in result
+    assert isinstance(result, PipelineOperationWithErrors)
+    assert result.message == "The operation completed with errors"
+    assert result.validation_result == invalid_result
+    assert result.pipeline.yaml_config == "foo: 2"
+
+    # Reset call count for second test
+    resource._get_call_count = 0
 
     # Test with default (should behave the same as True)
     result_default = await update_pipeline(
@@ -573,8 +648,10 @@ async def test_update_pipeline_skip_validation_errors_true() -> None:
         replacement_config_snippet="foo: 2",
     )
 
-    assert "The pipeline 'np' was successfully updated." in result_default
-    assert "Note: Pipeline was updated despite validation issues:" in result_default
+    assert isinstance(result_default, PipelineOperationWithErrors)
+    assert result_default.message == "The operation completed with errors"
+    assert result_default.validation_result == invalid_result
+    assert result_default.pipeline.yaml_config == "foo: 2"
 
 
 @pytest.mark.asyncio
@@ -604,13 +681,12 @@ async def test_get_pipeline_logs_success() -> None:
 
     result = await get_pipeline_logs(client, workspace="ws", pipeline_name="test-pipeline")
 
-    assert "Logs for Pipeline 'test-pipeline'" in result
-    assert "Pipeline started" in result
-    assert "Error occurred" in result
-    assert "**Level:** info" in result
-    assert "**Level:** error" in result
-    assert "**Exceptions:**" in result
-    assert "component: reader" in result
+    assert isinstance(result, PipelineLogList)
+    assert len(result.data) == 2
+    assert result.data[0].message == "Pipeline started"
+    assert result.data[1].message == "Error occurred"
+    assert result.data[0].level == "info"
+    assert result.data[1].level == "error"
 
 
 @pytest.mark.asyncio
@@ -622,7 +698,9 @@ async def test_get_pipeline_logs_empty() -> None:
 
     result = await get_pipeline_logs(client, workspace="ws", pipeline_name="test-pipeline")
 
-    assert "No logs found for pipeline 'test-pipeline'" in result
+    assert isinstance(result, PipelineLogList)
+    assert len(result.data) == 0
+    assert result.total == 0
 
 
 @pytest.mark.asyncio
@@ -634,7 +712,8 @@ async def test_get_pipeline_logs_with_level_filter() -> None:
 
     result = await get_pipeline_logs(client, workspace="ws", pipeline_name="test-pipeline", level=LogLevel.ERROR)
 
-    assert "No logs found for pipeline 'test-pipeline' (filtered by level: error)" in result
+    assert isinstance(result, PipelineLogList)
+    assert len(result.data) == 0
 
 
 @pytest.mark.asyncio
@@ -676,7 +755,9 @@ async def test_deploy_pipeline_success() -> None:
 
     result = await deploy_pipeline(client, workspace="ws", pipeline_name="test-pipeline")
 
-    assert "Pipeline 'test-pipeline' deployed successfully." == result
+    assert isinstance(result, PipelineValidationResult)
+    assert result.valid is True
+    assert len(result.errors) == 0
 
 
 @pytest.mark.asyncio
@@ -694,11 +775,11 @@ async def test_deploy_pipeline_with_validation_errors() -> None:
 
     result = await deploy_pipeline(client, workspace="ws", pipeline_name="test-pipeline")
 
-    assert "configuration is invalid" in result
-    assert "Error 1" in result
-    assert "Error 2" in result
-    assert "INVALID_COMPONENT" in result
-    assert "MISSING_FIELD" in result
+    assert isinstance(result, PipelineValidationResult)
+    assert result.valid is False
+    assert len(result.errors) == 2
+    assert result.errors[0].code == "INVALID_COMPONENT"
+    assert result.errors[1].code == "MISSING_FIELD"
 
 
 @pytest.mark.asyncio
@@ -782,7 +863,8 @@ async def test_deploy_pipeline_wait_for_deployment_success() -> None:
         poll_interval=0.1,  # Short interval for test
     )
 
-    assert "Pipeline 'test-pipeline' deployed successfully and is now DEPLOYED." == result
+    assert isinstance(result, PipelineValidationResult)
+    assert result.valid is True
 
 
 @pytest.mark.asyncio
@@ -908,7 +990,8 @@ async def test_deploy_pipeline_no_wait_backwards_compatibility() -> None:
     # Test with default parameters (should not wait)
     result = await deploy_pipeline(client, workspace="ws", pipeline_name="test-pipeline")
 
-    assert "Pipeline 'test-pipeline' deployed successfully." == result
+    assert isinstance(result, PipelineValidationResult)
+    assert result.valid is True
 
 
 @pytest.mark.asyncio
@@ -920,7 +1003,8 @@ async def test_deploy_pipeline_wait_false_explicit() -> None:
 
     result = await deploy_pipeline(client, workspace="ws", pipeline_name="test-pipeline", wait_for_deployment=False)
 
-    assert "Pipeline 'test-pipeline' deployed successfully." == result
+    assert isinstance(result, PipelineValidationResult)
+    assert result.valid is True
 
 
 # Search pipeline tests
@@ -962,9 +1046,10 @@ async def test_search_pipeline_success() -> None:
 
     result = await search_pipeline(client, workspace="ws", pipeline_name="test-pipeline", query="What is the answer?")
 
-    assert "Search Results from Pipeline 'test-pipeline'" in result
-    assert "**Query:** What is the answer?" in result
-    assert "The answer to your question is 42." in result
+    assert isinstance(result, DeepsetSearchResponse)
+    assert result.query == "What is the answer?"
+    assert len(result.answers) == 1
+    assert result.answers[0].answer == "The answer to your question is 42."
 
 
 @pytest.mark.asyncio
@@ -1060,7 +1145,10 @@ async def test_search_pipeline_no_results() -> None:
 
     result = await search_pipeline(client, workspace="ws", pipeline_name="test-pipeline", query="No results query")
 
-    assert "No results found for the search query using pipeline 'test-pipeline'" in result
+    assert isinstance(result, DeepsetSearchResponse)
+    assert result.query == "No results query"
+    assert len(result.answers) == 0
+    assert len(result.documents) == 0
 
 
 @pytest.mark.asyncio
@@ -1100,9 +1188,9 @@ async def test_search_pipeline_with_documents() -> None:
 
     result = await search_pipeline(client, workspace="ws", pipeline_name="test-pipeline", query="test document")
 
-    assert "Search Results from Pipeline 'test-pipeline'" in result
-    assert "**Query:** test document" in result
-    assert "### Documents" in result
-    assert "This is a test document with some content" in result
-    assert "title: Test Document" in result
-    assert "source: test.txt" in result
+    assert isinstance(result, DeepsetSearchResponse)
+    assert result.query == "test document"
+    assert len(result.answers) == 0
+    assert len(result.documents) == 1
+    assert result.documents[0].content == "This is a test document with some content that should be displayed."
+    assert result.documents[0].meta["title"] == "Test Document"
