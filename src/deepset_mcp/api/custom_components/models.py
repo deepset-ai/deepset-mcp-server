@@ -2,6 +2,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from deepset_mcp.api.shared_models import DeepsetUser
+
 
 class CustomComponentInstallation(BaseModel):
     """Model representing a custom component installation."""
@@ -12,6 +14,7 @@ class CustomComponentInstallation(BaseModel):
     created_by_user_id: str
     logs: list[dict[str, Any]]
     organization_id: str
+    user_info: DeepsetUser | None = None
 
 
 class CustomComponentInstallationList(BaseModel):
