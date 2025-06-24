@@ -5,9 +5,6 @@ import numpy as np
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.protocols import AsyncClientProtocol
-from deepset_mcp.tools.component_helper import (
-    extract_component_texts,
-)
 from deepset_mcp.tools.haystack_service_models import (
     ComponentDefinition,
     ComponentDefinitionList,
@@ -21,6 +18,21 @@ from deepset_mcp.tools.haystack_service_models import (
     ComponentSearchResults,
 )
 from deepset_mcp.tools.model_protocol import ModelProtocol
+
+
+def extract_component_texts(component_def: dict[str, Any]) -> tuple[str, str]:
+    """Extracts the component name and description for embedding.
+
+    Args:
+        component_def: The component definition
+
+    Returns:
+        A tuple containing the component name and description
+    """
+    component_type = component_def["properties"]["type"]["const"]
+    name = component_def.get("title", "")
+    description = component_def.get("description", "")
+    return component_type, f"{name} {description}"
 
 
 async def _build_component_definition(
