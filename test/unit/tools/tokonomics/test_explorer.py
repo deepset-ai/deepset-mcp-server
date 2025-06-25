@@ -23,9 +23,9 @@ class TestRichExplorer:
         explorer = RichExplorer(store)
 
         assert explorer.store is store
-        assert explorer.max_items == 20
+        assert explorer.max_items == 25
         assert explorer.max_string_length == 300
-        assert explorer.max_depth == 3
+        assert explorer.max_depth == 4
         assert explorer.max_search_matches == 10
         assert explorer.search_context_length == 150
         assert explorer.console.options.is_terminal is False
