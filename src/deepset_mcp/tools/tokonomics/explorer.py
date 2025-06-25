@@ -32,9 +32,9 @@ class RichExplorer:
     def __init__(
         self,
         store: ObjectStore,
-        max_items: int = 20,
+        max_items: int = 25,
         max_string_length: int = 300,
-        max_depth: int = 3,
+        max_depth: int = 4,
         max_search_matches: int = 10,
         search_context_length: int = 150,
     ) -> None:

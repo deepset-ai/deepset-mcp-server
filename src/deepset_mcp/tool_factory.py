@@ -80,7 +80,7 @@ def get_slice_from_object_store(
 
     :param object_id: Identifier of the object.
     :param start: Start index for slicing.
-    :param end: End index for slicing (None for end of sequence).
+    :param end: End index for slicing (optional - leave empty to get slice from start to end of sequence).
     :param path: Navigation path to object to slice (optional).
     :return: String representation of the slice.
     """

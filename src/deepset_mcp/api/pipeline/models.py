@@ -4,6 +4,7 @@ from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
+from rich.repr import Result
 
 from deepset_mcp.api.shared_models import DeepsetUser
 
@@ -41,6 +42,22 @@ class DeepsetPipeline(BaseModel):
             datetime: lambda dt: dt.isoformat()
         }
 
+    def __rich_repr__(self) -> Result:
+        """Used to display the model in an LLM friendly way."""
+        yield "name", self.name
+        yield "service_level", self.service_level.value
+        yield "status", self.status
+        yield "created_by", f"{self.created_by.given_name} {self.created_by.family_name} ({self.created_by.id})"
+        yield "created_at", self.created_at.strftime("%m/%d/%Y %I:%M:%S %p")
+        yield (
+            "last_updated_by",
+            f"{self.last_updated_by.given_name} {self.last_updated_by.family_name} ({self.last_updated_by.id})"
+            if self.last_updated_by
+            else None,
+        )
+        yield "last_updated_at", self.last_updated_at.strftime("%m/%d/%Y %I:%M:%S %p") if self.last_updated_at else None
+        yield "yaml_config", self.yaml_config if self.yaml_config is not None else "Get full pipeline to see config."
+
 
 class ValidationError(BaseModel):
     """Model representing a validation error from the pipeline validation API."""
@@ -54,6 +71,11 @@ class PipelineValidationResult(BaseModel):
 
     valid: bool
     errors: list[ValidationError] = []
+
+    def __rich_repr__(self) -> Result:
+        """Used to display the model in an LLM friendly way."""
+        yield "valid", self.valid
+        yield "errors", [f"{e.message} ({e.code})" for e in self.errors]
 
 
 class TraceFrame(BaseModel):
