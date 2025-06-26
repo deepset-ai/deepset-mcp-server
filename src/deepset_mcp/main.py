@@ -13,7 +13,14 @@ from deepset_mcp.tools.doc_search import (
 )
 
 # Initialize MCP Server
-mcp = FastMCP("Deepset Cloud MCP")
+mcp = FastMCP("Deepset Cloud MCP", settings={"log_level": "ERROR"})
+
+logging.getLogger("uvicorn").setLevel(logging.WARNING)
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+logging.getLogger("fastapi").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("mcp").setLevel(logging.WARNING)
 
 
 @mcp.prompt()
