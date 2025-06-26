@@ -53,7 +53,7 @@ def run_agent_single(
 
     try:
         results, _ = run_agent_benchmark(
-            agent_config=agent_cfg, test_case_name=test_case, benchmark_config=benchmark_cfg, streaming=False
+            agent_config=agent_cfg, test_case_name=test_case, benchmark_config=benchmark_cfg, streaming=True
         )
 
         result = results[0]
@@ -117,7 +117,7 @@ def run_agent_all(
             test_case_name=None,  # Run all
             benchmark_config=benchmark_cfg,
             concurrency=concurrency,
-            streaming=False,
+            streaming=True,
         )
 
         # Display summary statistics

@@ -12,6 +12,8 @@ dependencies = [
     "pyyaml",
     "numpy",
     "model2vec",
+    "glom",
+    "rich",
 ]
 
 [project.scripts]
@@ -31,7 +33,7 @@ benchmark = [
 agents = [
     "haystack-ai",
     "mcp-haystack",
-    "anthropic-haystack",
+    "anthropic-haystack>=2.7.0",
     "langfuse-haystack"
 ]
 
@@ -102,8 +104,13 @@ convention = "pep257"
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["haystack_integrations.*", "langfuse.*"]
+module = ["haystack_integrations.*", "langfuse.*", "glom"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["test.unit.tools.tokonomics.*"]
+disable_error_code = ["arg-type", "attr-defined", "operator", "misc", "type-arg", "no-any-return", "assignment"]
+# These tests intentionally test runtime decorator behavior that mypy cannot understand
 
 
 

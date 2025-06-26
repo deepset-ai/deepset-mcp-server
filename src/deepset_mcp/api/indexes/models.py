@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel
+from rich.repr import Result
 
 from deepset_mcp.api.shared_models import DeepsetUser
 
@@ -34,6 +35,24 @@ class Index(BaseModel):
     created_by: DeepsetUser
     last_edited_by: DeepsetUser | None = None
     status: IndexStatus
+
+    def __rich_repr__(self) -> Result:
+        """Used to display the model in an LLM friendly way."""
+        yield "name", self.name
+        yield "description", self.description, None
+        yield "desired_status", self.desired_status
+        yield "status", self.status
+        yield "status", self.status
+        yield "created_by", f"{self.created_by.given_name} {self.created_by.family_name} ({self.created_by.id})"
+        yield "created_at", self.created_at.strftime("%m/%d/%Y %I:%M:%S %p")
+        yield (
+            "last_edited_by",
+            f"{self.last_edited_by.given_name} {self.last_edited_by.family_name} ({self.last_edited_by.id})"
+            if self.last_edited_by
+            else None,
+        )
+        yield "last_edited_at", self.last_edited_at.strftime("%m/%d/%Y %I:%M:%S %p") if self.last_edited_at else None
+        yield "config_yaml", self.config_yaml if self.config_yaml is not None else "Get full index to see config."
 
 
 class IndexList(BaseModel):

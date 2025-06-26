@@ -9,6 +9,7 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     DeepsetSearchResponse,
     DeepsetStreamEvent,
+    PipelineList,
     PipelineLogList,
     PipelineValidationResult,
     ValidationError,
@@ -73,12 +74,12 @@ class PipelineResource:
         self,
         page_number: int = 1,
         limit: int = 10,
-    ) -> list[DeepsetPipeline]:
+    ) -> PipelineList:
         """Retrieve pipeline in the configured workspace with optional pagination.
 
         :param page_number: Page number for paging.
         :param limit: Max number of items to return.
-        :returns: List of DeepsetPipeline instances.
+        :returns: PipelineList with pipelines and metadata.
         """
         params: dict[str, Any] = {
             "page_number": page_number,
@@ -97,10 +98,13 @@ class PipelineResource:
 
         if response is not None:
             pipelines = [DeepsetPipeline.model_validate(item) for item in response.get("data", [])]
+            return PipelineList(
+                data=pipelines,
+                has_more=response.get("has_more", False),
+                total=response.get("total", len(pipelines)),
+            )
         else:
-            pipelines = []
-
-        return pipelines
+            return PipelineList(data=[], has_more=False, total=0)
 
     async def get(self, pipeline_name: str, include_yaml: bool = True) -> DeepsetPipeline:
         """Fetch a single pipeline by its name.
@@ -218,8 +222,6 @@ class PipelineResource:
             method="GET",
             params=params,
         )
-
-        logger.warning(resp.json)
 
         raise_for_status(resp)
 

@@ -1,8 +1,9 @@
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.protocols import AsyncClientProtocol
+from deepset_mcp.api.secrets.models import Secret, SecretList
 
 
-async def list_secrets(client: AsyncClientProtocol, limit: int = 10) -> str:
+async def list_secrets(client: AsyncClientProtocol, limit: int = 10) -> SecretList | str:
     """Lists all secrets available in the user's deepset organization.
 
     Use this tool to retrieve a list of secrets with their names and IDs.
@@ -11,27 +12,10 @@ async def list_secrets(client: AsyncClientProtocol, limit: int = 10) -> str:
     :param client: The deepset API client
     :param limit: Maximum number of secrets to return (default: 10)
 
-    :returns: A formatted string containing secret names and IDs
+    :returns: List of secrets or error message
     """
     try:
-        response = await client.secrets().list(limit=limit)
-
-        if not response.data:
-            return "No secrets found in this workspace."
-
-        secrets_info = []
-        for secret in response.data:
-            secrets_info.append(f"Name: {secret.name}, ID: {secret.secret_id}")
-
-        result = f"Found {len(response.data)} secret(s):\n" + "\n".join(secrets_info)
-
-        if response.has_more:
-            result += (
-                f"\n\nShowing {len(response.data)} of {response.total} total secrets. Use a higher limit to see more."
-            )
-
-        return result
-
+        return await client.secrets().list(limit=limit)
     except ResourceNotFoundError as e:
         return f"Error: {str(e)}"
     except UnexpectedAPIError as e:
@@ -40,7 +24,7 @@ async def list_secrets(client: AsyncClientProtocol, limit: int = 10) -> str:
         return f"Unexpected error: {str(e)}"
 
 
-async def get_secret(client: AsyncClientProtocol, secret_id: str) -> str:
+async def get_secret(client: AsyncClientProtocol, secret_id: str) -> Secret | str:
     """Retrieves detailed information about a specific secret by its ID.
 
     Use this tool to get information about a specific secret when you know its ID.
@@ -49,13 +33,10 @@ async def get_secret(client: AsyncClientProtocol, secret_id: str) -> str:
     :param client: The deepset API client
     :param secret_id: The unique identifier of the secret to retrieve
 
-    :returns: A formatted string containing secret information
+    :returns: Secret information or error message
     """
     try:
-        response = await client.secrets().get(secret_id)
-
-        return f"Secret Details:\nName: {response.name}\nID: {response.secret_id}"
-
+        return await client.secrets().get(secret_id)
     except ResourceNotFoundError as e:
         return f"Error: {str(e)}"
     except UnexpectedAPIError as e:

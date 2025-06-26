@@ -13,6 +13,7 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     DeepsetSearchResponse,
     DeepsetStreamEvent,
+    PipelineList,
     PipelineLogList,
     PipelineServiceLevel,
     PipelineValidationResult,
@@ -85,7 +86,7 @@ class FakeDocsPipelineResource(PipelineResourceProtocol):
     async def validate(self, yaml_config: str) -> PipelineValidationResult:
         raise NotImplementedError
 
-    async def list(self, page_number: int = 1, limit: int = 10) -> list[DeepsetPipeline]:
+    async def list(self, page_number: int = 1, limit: int = 10) -> PipelineList:
         raise NotImplementedError
 
     async def create(self, name: str, yaml_config: str) -> NoContentResponse:
