@@ -223,8 +223,6 @@ class PipelineResource:
             params=params,
         )
 
-        logger.warning(resp.json)
-
         raise_for_status(resp)
 
         if resp.json is not None:
