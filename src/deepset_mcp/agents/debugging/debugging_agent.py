@@ -17,6 +17,9 @@ def get_agent(benchmark_config: BenchmarkConfig) -> Agent:
             env={
                 "DEEPSET_WORKSPACE": benchmark_config.deepset_workspace,
                 "DEEPSET_API_KEY": benchmark_config.deepset_api_key,
+                "DEEPSET_DOCS_API_KEY": benchmark_config.get_env_var("DEEPSET_DOCS_API_KEY"),
+                "DEEPSET_DOCS_WORKSPACE": benchmark_config.get_env_var("DEEPSET_DOCS_WORKSPACE"),
+                "DEEPSET_DOCS_PIPELINE_NAME": benchmark_config.get_env_var("DEEPSET_DOCS_PIPELINE_NAME"),
             },
         )
     )
