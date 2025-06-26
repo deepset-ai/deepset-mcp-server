@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import sys
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -18,6 +17,7 @@ from deepset_mcp.benchmark.runner.config_loader import (
     load_test_case_by_name,
 )
 from deepset_mcp.benchmark.runner.models import AgentConfig, TestCaseConfig
+from deepset_mcp.benchmark.runner.streaming import StreamingCallbackManager
 from deepset_mcp.benchmark.runner.teardown_actions import teardown_test_case_async
 from deepset_mcp.benchmark.runner.tracing import enable_tracing
 
@@ -31,7 +31,7 @@ class AgentBenchmarkRunner:
         self,
         agent_config: AgentConfig,
         benchmark_config: BenchmarkConfig,
-        streaming: bool = False,
+        streaming: bool = True,
     ):
         """
         Initialize the benchmark runner.
@@ -66,7 +66,6 @@ class AgentBenchmarkRunner:
             f"{self.agent_config.display_name}-{self.commit_hash}_{self.run_timestamp.strftime('%Y%m%d_%H%M%S')}"
         )
 
-    # TODO: streaming is WIP; wait until https://github.com/deepset-ai/haystack-core-integrations/issues/1947 is fixed
     def _create_streaming_callback(self, test_case_name: str) -> Callable[[StreamingChunk], Any]:
         """
         Create a streaming callback function for a specific test case.
@@ -77,33 +76,10 @@ class AgentBenchmarkRunner:
         Returns:
             Callback function for streaming
         """
+        callback = StreamingCallbackManager()
 
-        async def streaming_callback(chunk: StreamingChunk) -> None:
-            """Handle streaming chunks from the agent."""
-            if hasattr(chunk, "content") and chunk.content:
-                # meta content_block type=tool_use
-                # meta type (content_block_start)
-                # meta delta type=input_json_delta
-                # meta delta message_delta
-                # meta delta stop_reason=tool_use
-                # Print with test case context, using a subtle prefix
-                content = chunk.content
-                # Handle newlines by adding the prefix to each new line
-                lines = content.split("\n")
-                for i, line in enumerate(lines):
-                    if i == 0:
-                        print(f"{line}", end="")
-                    elif line.strip():  # Only print non-empty lines with prefix
-                        print(f"\n[{test_case_name}] {line}", end="")
-                    else:
-                        print()  # Just print the newline for empty lines
-
-                # If the content ends with a newline, print it
-                if content.endswith("\n"):
-                    print()
-
-                # Ensure output is flushed immediately
-                sys.stdout.flush()
+        async def streaming_callback(chunk: StreamingChunk) -> Any:
+            return await callback(chunk)
 
         return streaming_callback
 
@@ -477,8 +453,10 @@ class AgentBenchmarkRunner:
             meta = message.meta
             if "usage" in meta:
                 usage = meta["usage"]
-                total_prompt_tokens += usage.get("prompt_tokens", 0)
-                total_completion_tokens += usage.get("completion_tokens", 0)
+                prompt_tokens = usage.get("prompt_tokens")
+                total_prompt_tokens += prompt_tokens if prompt_tokens is not None else 0
+                completion_tokens = usage.get("completion_tokens")
+                total_completion_tokens += completion_tokens if completion_tokens is not None else 0
 
             # Extract model (should be consistent across messages)
             if "model" in meta and model is None:

@@ -35,15 +35,15 @@ wheels = [
 
 [[package]]
 name = "anthropic-haystack"
-version = "2.6.1"
+version = "2.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anthropic" },
     { name = "haystack-ai" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ff/8a/2cbcedc149f884d0767261410e53487ba127bb85fc9f98854065e3035cd2/anthropic_haystack-2.6.1.tar.gz", hash = "sha256:00087ebe7c79ce369ad35bbfafef23db671df1f1585c845db30052c5a54e389c", size = 30739 }
+sdist = { url = "https://files.pythonhosted.org/packages/25/5f/191753f2809b7bb15c5ed8f83b82030f3608935a36d8a34f1f0d793c6a77/anthropic_haystack-2.7.0.tar.gz", hash = "sha256:470053998eecaab9dd6b9fbdc2cc92681e47d82e42779709106d51ecd8ec839c", size = 31229 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4c/ab/3a5cccfc331750d2d39faed163377df96f611330c5ff34997c5213ba235d/anthropic_haystack-2.6.1-py3-none-any.whl", hash = "sha256:af747f1d9bc8ea0571dc641035e4fdee7f23397012cdfc6fff1b681adc32798f", size = 19258 },
+    { url = "https://files.pythonhosted.org/packages/9a/a2/1628d1bd11f08379aaf06fa5c8b61dff8b28588b39b3c490edf06606a926/anthropic_haystack-2.7.0-py3-none-any.whl", hash = "sha256:1224f2df00315fe6e62605f2fc010cace2ac1edb851cc3d036a2252d8b5f942b", size = 19944 },
 ]
 
 [[package]]
@@ -477,7 +477,7 @@ types = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic-haystack", marker = "extra == 'agents'" },
+    { name = "anthropic-haystack", marker = "extra == 'agents'", specifier = ">=2.7.0" },
     { name = "fastapi" },
     { name = "glom" },
     { name = "haystack-ai", marker = "extra == 'agents'" },

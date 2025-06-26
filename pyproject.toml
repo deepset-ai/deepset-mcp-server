@@ -33,7 +33,7 @@ benchmark = [
 agents = [
     "haystack-ai",
     "mcp-haystack",
-    "anthropic-haystack",
+    "anthropic-haystack>=2.7.0",
     "langfuse-haystack"
 ]
 

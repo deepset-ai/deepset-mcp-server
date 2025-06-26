@@ -18,7 +18,8 @@ def get_agent(benchmark_config: BenchmarkConfig) -> Agent:
                 "DEEPSET_WORKSPACE": benchmark_config.deepset_workspace,
                 "DEEPSET_API_KEY": benchmark_config.deepset_api_key,
             },
-        )
+        ),
+        invocation_timeout=300.0,
     )
     prompt = (Path(__file__).parent / "system_prompt.md").read_text()
     generator = AnthropicChatGenerator(
