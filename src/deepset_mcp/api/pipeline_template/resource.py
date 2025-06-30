@@ -2,11 +2,12 @@ from typing import Any
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.pipeline_template.models import PipelineTemplate, PipelineTemplateList
+from deepset_mcp.api.pipeline_template.protocols import PipelineTemplateResourceProtocol
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.transport import raise_for_status
 
 
-class PipelineTemplateResource:
+class PipelineTemplateResource(PipelineTemplateResourceProtocol):
     """Resource for interacting with pipeline templates in a workspace."""
 
     def __init__(self, client: AsyncClientProtocol, workspace: str) -> None:

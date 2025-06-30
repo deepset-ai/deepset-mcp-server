@@ -14,6 +14,7 @@ from deepset_mcp.api.pipeline.models import (
     PipelineValidationResult,
     ValidationError,
 )
+from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
 from deepset_mcp.api.shared_models import NoContentResponse
 from deepset_mcp.api.transport import raise_for_status
 
@@ -23,7 +24,7 @@ if TYPE_CHECKING:
     from deepset_mcp.api.protocols import AsyncClientProtocol
 
 
-class PipelineResource:
+class PipelineResource(PipelineResourceProtocol):
     """Manages interactions with the deepset pipeline API."""
 
     def __init__(

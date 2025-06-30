@@ -4,8 +4,8 @@ import pytest
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.indexes.models import Index, IndexList, IndexStatus
+from deepset_mcp.api.indexes.protocols import IndexResourceProtocol
 from deepset_mcp.api.pipeline.models import PipelineValidationResult, ValidationError
-from deepset_mcp.api.protocols import IndexResourceProtocol
 from deepset_mcp.api.shared_models import DeepsetUser
 from deepset_mcp.tools.indexes import create_index, deploy_index, get_index, list_indexes, update_index
 from test.unit.conftest import BaseFakeClient
