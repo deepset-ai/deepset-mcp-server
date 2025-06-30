@@ -18,3 +18,10 @@ wheels/
 
 
 agent_runs/
+
+misc.xml
+modules.xml
+profile_settings.xml
+Project_Default.xml
+pyright-overrides.xml
+vcs.xml
