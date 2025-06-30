@@ -1,7 +1,8 @@
 from typing import Any
 
 from deepset_mcp.api.custom_components.models import CustomComponentInstallationList
-from deepset_mcp.api.protocols import AsyncClientProtocol, CustomComponentsProtocol
+from deepset_mcp.api.custom_components.protocols import CustomComponentsProtocol
+from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.transport import raise_for_status
 
 

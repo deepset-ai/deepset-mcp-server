@@ -1,8 +1,8 @@
 import pytest
 
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.protocols import SecretResourceProtocol
 from deepset_mcp.api.secrets.models import Secret, SecretList
+from deepset_mcp.api.secrets.protocols import SecretResourceProtocol
 from deepset_mcp.api.shared_models import NoContentResponse
 from deepset_mcp.tools.secrets import get_secret, list_secrets
 from test.unit.conftest import BaseFakeClient

@@ -12,8 +12,8 @@ from deepset_mcp.api.pipeline.models import (
     PipelineServiceLevel,
     PipelineValidationResult,
 )
+from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
 from deepset_mcp.api.pipeline.resource import PipelineResource
-from deepset_mcp.api.protocols import PipelineResourceProtocol
 from deepset_mcp.api.transport import TransportResponse
 from test.unit.conftest import BaseFakeClient
 

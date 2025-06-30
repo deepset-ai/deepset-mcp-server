@@ -1,8 +1,9 @@
 from typing import Any
 
 from deepset_mcp.api.exceptions import ResourceNotFoundError
-from deepset_mcp.api.protocols import AsyncClientProtocol, SecretResourceProtocol
+from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.secrets.models import Secret, SecretList
+from deepset_mcp.api.secrets.protocols import SecretResourceProtocol
 from deepset_mcp.api.shared_models import NoContentResponse
 from deepset_mcp.api.transport import raise_for_status
 
