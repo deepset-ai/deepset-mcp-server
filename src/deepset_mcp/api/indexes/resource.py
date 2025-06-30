@@ -1,11 +1,12 @@
 from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.indexes.models import Index, IndexList
+from deepset_mcp.api.indexes.protocols import IndexResourceProtocol
 from deepset_mcp.api.pipeline.models import PipelineValidationResult, ValidationError
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.transport import raise_for_status
 
 
-class IndexResource:
+class IndexResource(IndexResourceProtocol):
     """Resource for interacting with deepset indexes."""
 
     def __init__(self, client: AsyncClientProtocol, workspace: str) -> None:

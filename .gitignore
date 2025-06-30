@@ -15,3 +15,14 @@ wheels/
 .env.prod
 .env.dev
 .env.test
+
+
+agent_runs/
+
+misc.xml
+modules.xml
+profiles_settings.xml
+deepset-mcp-server.iml
+Project_Default.xml
+pyright-overrides.xml
+vcs.xml

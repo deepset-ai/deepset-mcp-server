@@ -4,8 +4,8 @@ import pytest
 
 from deepset_mcp.api.exceptions import ResourceNotFoundError
 from deepset_mcp.api.pipeline_template.models import PipelineTemplate, PipelineTemplateList
+from deepset_mcp.api.pipeline_template.protocols import PipelineTemplateResourceProtocol
 from deepset_mcp.api.pipeline_template.resource import PipelineTemplateResource
-from deepset_mcp.api.protocols import PipelineTemplateResourceProtocol
 from test.unit.conftest import BaseFakeClient
 
 
