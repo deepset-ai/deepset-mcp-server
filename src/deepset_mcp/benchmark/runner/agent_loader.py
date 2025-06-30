@@ -3,15 +3,25 @@ import json
 import os
 import subprocess
 from collections.abc import Callable
-from typing import cast
+from typing import Any, cast
 
 from haystack.components.agents.agent import Agent
 
 from deepset_mcp.benchmark.runner.config import BenchmarkConfig
+from deepset_mcp.benchmark.runner.interactive import (
+    ConfirmationCallback,
+    ConfirmationManager,
+)
 from deepset_mcp.benchmark.runner.models import AgentConfig
 
 
-def load_agent(config: AgentConfig, benchmark_config: BenchmarkConfig) -> tuple[Agent, str | None]:
+def load_agent(
+    config: AgentConfig,
+    benchmark_config: BenchmarkConfig,
+    interactive: bool = False,
+    confirmation_callback: ConfirmationCallback | None = None,
+    confirmation_manager: ConfirmationManager | None = None,
+) -> tuple[Agent, str | None]:
     """
     Load an agent based on the configuration.
 
@@ -23,6 +33,9 @@ def load_agent(config: AgentConfig, benchmark_config: BenchmarkConfig) -> tuple[
     Args:
         config: AgentConfig instance specifying how to load the agent
         benchmark_config: BenchmarkConfig instance specifying the benchmark configuration.
+        interactive: Whether to load the agent in interactive mode.
+        confirmation_callback: Callback for user confirmation.
+        confirmation_manager: Manager for auto-confirmations.
 
     Returns:
         LoadedAgent containing the agent instance and metadata
@@ -49,8 +62,18 @@ def load_agent(config: AgentConfig, benchmark_config: BenchmarkConfig) -> tuple[
     # Load the agent
     if config.agent_factory_function:
         agent_func = _import_factory_from_qualified_name(config.agent_factory_function)
-        agent = agent_func(benchmark_config)
+        if interactive:
+            agent = agent_func(
+                benchmark_config,
+                interactive=True,
+                confirmation_callback=confirmation_callback,
+                confirmation_manager=confirmation_manager,
+            )
+        else:
+            agent = agent_func(benchmark_config)
     elif config.agent_json:
+        if interactive:
+            raise ValueError("Interactive mode is not supported for JSON-based agents.")
         agent = _load_from_json(config.agent_json)
     else:
         # This should never happen due to validation, but just in case

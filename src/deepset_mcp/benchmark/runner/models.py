@@ -157,6 +157,8 @@ class AgentConfig(BaseModel):
 
     display_name: str = Field(..., description="Display name for the agent.")
 
+    interactive: bool = Field(False, description="Whether to run the agent in interactive mode.")
+
     required_env_vars: list[str] = Field(
         default_factory=list, description="Required environment variables to run the agent."
     )
