@@ -21,7 +21,8 @@ agent_runs/
 
 misc.xml
 modules.xml
-profile_settings.xml
+profiles_settings.xml
+deepset-mcp-server.iml
 Project_Default.xml
 pyright-overrides.xml
 vcs.xml
