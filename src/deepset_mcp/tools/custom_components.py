@@ -3,7 +3,7 @@ from deepset_mcp.api.protocols import AsyncClientProtocol
 
 
 async def list_custom_component_installations(
-    client: AsyncClientProtocol, workspace: str
+    *, client: AsyncClientProtocol, workspace: str
 ) -> CustomComponentInstallationList | str:
     """List custom component installations.
 
@@ -33,7 +33,7 @@ async def list_custom_component_installations(
     return installations
 
 
-async def get_latest_custom_component_installation_logs(client: AsyncClientProtocol, workspace: str) -> str:
+async def get_latest_custom_component_installation_logs(*, client: AsyncClientProtocol, workspace: str) -> str:
     """Get the logs from the latest custom component installation.
 
     :param client: The API client to use.
