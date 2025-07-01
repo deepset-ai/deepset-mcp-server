@@ -480,13 +480,13 @@ requires-dist = [
     { name = "anthropic-haystack", marker = "extra == 'agents'", specifier = ">=2.7.0" },
     { name = "fastapi" },
     { name = "glom" },
-    { name = "haystack-ai", marker = "extra == 'agents'" },
+    { name = "haystack-ai", marker = "extra == 'agents'", specifier = ">=2.15.1" },
     { name = "httpx" },
     { name = "jupyterlab", marker = "extra == 'analysis'" },
     { name = "langfuse-haystack", marker = "extra == 'agents'" },
     { name = "matplotlib", marker = "extra == 'analysis'" },
     { name = "mcp" },
-    { name = "mcp-haystack", marker = "extra == 'agents'" },
+    { name = "mcp-haystack", marker = "extra == 'agents'", specifier = ">=0.4.0" },
     { name = "model2vec" },
     { name = "numpy" },
     { name = "pandas", marker = "extra == 'analysis'" },
@@ -527,6 +527,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/fc/f8/98eea607f65de6527f8a2e8885fc8015d3e6f5775df186e443e0964a11c3/distro-1.9.0.tar.gz", hash = "sha256:2fa77c6fd8940f116ee1d6b94a2f90b13b5ea8d019b98bc8bafdcabcdd9bdbed", size = 60722 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/12/b3/231ffd4ab1fc9d679809f356cebee130ac7daa00d6d6f3206dd4fd137e9e/distro-1.9.0-py3-none-any.whl", hash = "sha256:7bffd925d65168f85027d8da9af6bddab658135b840670a223589bc0c8ef02b2", size = 20277 },
+]
+
+[[package]]
+name = "docstring-parser"
+version = "0.16"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/08/12/9c22a58c0b1e29271051222d8906257616da84135af9ed167c9e28f85cb3/docstring_parser-0.16.tar.gz", hash = "sha256:538beabd0af1e2db0146b6bd3caa526c35a34d61af9fd2887f3a8a27a739aa6e", size = 26565 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d5/7c/e9fcff7623954d86bdc17782036cbf715ecab1bec4847c008557affe1ca8/docstring_parser-0.16-py3-none-any.whl", hash = "sha256:bf0a1387354d3691d102edef7ec124f219ef639982d096e26e3b60aeffa90637", size = 36533 },
 ]
 
 [[package]]
@@ -679,9 +688,10 @@ wheels = [
 
 [[package]]
 name = "haystack-ai"
-version = "2.14.3"
+version = "2.15.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "docstring-parser" },
     { name = "haystack-experimental" },
     { name = "jinja2" },
     { name = "jsonschema" },
@@ -699,9 +709,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/85/18/51e1e7990642a2fc7a0ec6d8bd07b20f16dd749cc78ea5149eb255dcdc0b/haystack_ai-2.14.3.tar.gz", hash = "sha256:1a154d4b642cc65f657aa7de936a841b35b6ed9236cd9bd798ee55e26b196988", size = 342518 }
+sdist = { url = "https://files.pythonhosted.org/packages/c6/99/eb78cb7b3edcde6891abe730721f24f4bbc634a489f913d8541251f39a37/haystack_ai-2.15.1.tar.gz", hash = "sha256:0eebfd7f686bf5a841d65ec56e900279393f402ef4f27fa88babc2ded985466f", size = 355533 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/26/e5/90353d42e2a9336522180fc752b2fb67ae50bc6e63376919ed32ed67a180/haystack_ai-2.14.3-py3-none-any.whl", hash = "sha256:0fb6d3672624e06be8c7df7aa7d1c3a07fea6742248c98cf97944a5c1c922a9e", size = 515279 },
+    { url = "https://files.pythonhosted.org/packages/a8/23/14ea92c696f411d5aa921cee89a211a22401543d528b5b681bb389d847b6/haystack_ai-2.15.1-py3-none-any.whl", hash = "sha256:c7582d9eeec95242c66236f0156815ac7b991d8ac45266312d194ed8fe316d11", size = 530239 },
 ]
 
 [[package]]

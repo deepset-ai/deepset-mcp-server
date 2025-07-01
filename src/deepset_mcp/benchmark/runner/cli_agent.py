@@ -8,6 +8,7 @@ from deepset_mcp.benchmark.runner.agent_benchmark_runner import run_agent_benchm
 from deepset_mcp.benchmark.runner.cli_utils import override_deepset_env_vars, validate_and_setup_configs
 from deepset_mcp.benchmark.runner.config import BenchmarkConfig
 from deepset_mcp.benchmark.runner.models import AgentConfig
+from deepset_mcp.benchmark.runner.repl import run_repl_session
 
 
 def load_env_file(env_file: str | None) -> None:
@@ -338,6 +339,29 @@ def validate_agent_config(
 
     except Exception as e:
         typer.secho(f"✘ Invalid agent config: {e}", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+
+@agent_app.command("chat")
+def chat_with_agent(
+    agent_config: str = typer.Argument(..., help="Path to agent configuration file (YAML)."),
+    workspace: str | None = typer.Option(None, "--workspace", "-w", help="Override Deepset workspace."),
+    api_key: str | None = typer.Option(None, "--api-key", "-k", help="Override Deepset API key."),
+    env_file: str | None = typer.Option(None, "--env-file", "-e", help="Path to environment file."),
+) -> None:
+    """Start an interactive REPL session with an agent."""
+    load_env_file(env_file)
+    override_deepset_env_vars(workspace=workspace, api_key=api_key)
+    agent_cfg, benchmark_cfg = validate_and_setup_configs(
+        agent_config=agent_config,
+        test_case_base_dir=None,
+        output_dir=None,
+    )
+
+    try:
+        run_repl_session(agent_config=agent_cfg, benchmark_config=benchmark_cfg)
+    except Exception as e:
+        typer.secho(f"✘ Error during REPL session: {e}", fg=typer.colors.RED)
         raise typer.Exit(code=1)
 
 

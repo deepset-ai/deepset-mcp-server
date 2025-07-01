@@ -11,7 +11,11 @@ from deepset_mcp.benchmark.runner.config import BenchmarkConfig
 from deepset_mcp.benchmark.runner.models import AgentConfig
 
 
-def load_agent(config: AgentConfig, benchmark_config: BenchmarkConfig) -> tuple[Agent, str | None]:
+def load_agent(
+    config: AgentConfig,
+    benchmark_config: BenchmarkConfig,
+    interactive: bool = False,
+) -> tuple[Agent, str | None]:
     """
     Load an agent based on the configuration.
 
@@ -23,6 +27,7 @@ def load_agent(config: AgentConfig, benchmark_config: BenchmarkConfig) -> tuple[
     Args:
         config: AgentConfig instance specifying how to load the agent
         benchmark_config: BenchmarkConfig instance specifying the benchmark configuration.
+        interactive: Whether to load the agent in interactive mode.
 
     Returns:
         LoadedAgent containing the agent instance and metadata
@@ -49,8 +54,16 @@ def load_agent(config: AgentConfig, benchmark_config: BenchmarkConfig) -> tuple[
     # Load the agent
     if config.agent_factory_function:
         agent_func = _import_factory_from_qualified_name(config.agent_factory_function)
-        agent = agent_func(benchmark_config)
+        if interactive:
+            agent = agent_func(
+                benchmark_config,
+                interactive=True,
+            )
+        else:
+            agent = agent_func(benchmark_config)
     elif config.agent_json:
+        if interactive:
+            raise ValueError("Interactive mode is not supported for JSON-based agents.")
         agent = _load_from_json(config.agent_json)
     else:
         # This should never happen due to validation, but just in case
@@ -64,7 +77,7 @@ def load_agent(config: AgentConfig, benchmark_config: BenchmarkConfig) -> tuple[
     return agent, git_commit_hash
 
 
-def _import_factory_from_qualified_name(qualified_name: str) -> Callable[[BenchmarkConfig], Agent]:
+def _import_factory_from_qualified_name(qualified_name: str) -> Callable[..., Agent]:
     """Load agent from qualified function name."""
     try:
         module_path, function_name = qualified_name.rsplit(".", 1)
@@ -86,7 +99,7 @@ def _import_factory_from_qualified_name(qualified_name: str) -> Callable[[Benchm
     if not callable(get_agent_func):
         raise ValueError(f"'{qualified_name}' is not callable")
 
-    return cast(Callable[[BenchmarkConfig], Agent], get_agent_func)
+    return cast(Callable[..., Agent], get_agent_func)
 
 
 def _load_from_json(json_path: str) -> Agent:

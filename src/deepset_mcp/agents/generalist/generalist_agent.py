@@ -6,21 +6,28 @@ from haystack_integrations.components.generators.anthropic.chat.chat_generator i
 from haystack_integrations.tools.mcp import MCPToolset, StdioServerInfo
 
 from deepset_mcp.benchmark.runner.config import BenchmarkConfig
+from deepset_mcp.benchmark.runner.interactive import wrap_toolset_interactive
 
 
-def get_agent(benchmark_config: BenchmarkConfig) -> Agent:
+def get_agent(
+    benchmark_config: BenchmarkConfig,
+    interactive: bool = False,
+) -> Agent:
     """Get an instance of the Generalist agent."""
-    tools = MCPToolset(
-        server_info=StdioServerInfo(
-            command="uv",
-            args=["run", "deepset-mcp"],
-            env={
-                "DEEPSET_WORKSPACE": benchmark_config.deepset_workspace,
-                "DEEPSET_API_KEY": benchmark_config.deepset_api_key,
-            },
-        ),
-        invocation_timeout=300.0,
+    server_info = StdioServerInfo(
+        command="uv",
+        args=["run", "deepset-mcp"],
+        env={
+            "DEEPSET_WORKSPACE": benchmark_config.deepset_workspace,
+            "DEEPSET_API_KEY": benchmark_config.deepset_api_key,
+        },
     )
+
+    tools = MCPToolset(server_info=server_info, invocation_timeout=300.0)
+
+    if interactive:
+        tools = wrap_toolset_interactive(tools).toolset
+
     prompt = (Path(__file__).parent / "system_prompt.md").read_text()
     generator = AnthropicChatGenerator(
         model="claude-sonnet-4-20250514",
