@@ -26,7 +26,7 @@ def get_agent(
     tools = MCPToolset(server_info=server_info, invocation_timeout=300.0)
 
     if interactive:
-        tools = wrap_toolset_interactive(tools)
+        tools = wrap_toolset_interactive(tools).toolset
 
     prompt = (Path(__file__).parent / "system_prompt.md").read_text()
     generator = AnthropicChatGenerator(

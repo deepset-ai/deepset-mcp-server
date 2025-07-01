@@ -25,7 +25,7 @@ def get_agent(benchmark_config: BenchmarkConfig, interactive: bool = False) -> A
 
     tools = MCPToolset(server_info=server_info)
     if interactive:
-        tools = wrap_toolset_interactive(tools)
+        tools = wrap_toolset_interactive(tools).toolset
 
     prompt = (Path(__file__).parent / "system_prompt.md").read_text()
     generator = AnthropicChatGenerator(
@@ -34,4 +34,4 @@ def get_agent(benchmark_config: BenchmarkConfig, interactive: bool = False) -> A
         api_key=Secret.from_token(benchmark_config.get_env_var("ANTHROPIC_API_KEY")),
     )
 
-    return Agent(tools=tools.toolset, system_prompt=prompt, chat_generator=generator)
+    return Agent(tools=tools, system_prompt=prompt, chat_generator=generator)
