@@ -43,7 +43,7 @@ async def run_repl_session_async(agent_config: AgentConfig, benchmark_config: Be
                 return await manager(chunk)
 
             # Run the agent
-            typer.secho("\n🤖 Agent", fg=typer.colors.BLUE, nl=False)
+            typer.secho("\n🤖 Agent\n\n", fg=typer.colors.BLUE, nl=False)
             agent_output = await agent.run_async(messages=history, streaming_callback=streaming_callback)
 
             # The streaming callback handles printing the final text output.

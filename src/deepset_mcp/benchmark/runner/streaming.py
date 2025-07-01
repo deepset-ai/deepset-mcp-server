@@ -9,6 +9,8 @@ from typing import Any
 
 from haystack.dataclasses.streaming_chunk import StreamingChunk
 from rich.console import Console
+from rich.live import Live
+from rich.markdown import Markdown
 
 
 class StreamingCallbackManager:
@@ -22,6 +24,9 @@ class StreamingCallbackManager:
         """Initialize the streaming callback."""
         self.console = Console()
         self.active_tools: dict[int, dict[str, Any]] = {}
+        self.accumulated_text = ""
+        self.live_display: Live | None = None
+        self.text_started = False
 
     async def __call__(self, chunk: StreamingChunk) -> None:
         """Process each streaming chunk asynchronously."""
@@ -34,7 +39,8 @@ class StreamingCallbackManager:
         # 1. Handle text streaming (like "I'll help you troubleshoot...")
         if self._is_text_delta(meta):
             text = meta["delta"]["text"]
-            self.console.print(text, end="")
+            self.accumulated_text += text
+            await self._render_markdown_optimistic()
 
         # 2. Handle tool call start (like list_pipelines, get_pipeline)
         elif self._is_tool_start(meta):
@@ -52,9 +58,35 @@ class StreamingCallbackManager:
         elif self._is_message_delta(meta):
             await self._handle_message_delta(meta)
 
-        # 6. Handle finish events
-        elif self._is_finish_event(meta):
+        if self._is_finish_event(meta):
             await self._handle_finish_event(meta)
+
+    async def _render_markdown_optimistic(self) -> None:
+        """Render accumulated text as markdown optimistically."""
+        if not self.accumulated_text.strip():
+            return
+
+        try:
+            # Attempt to render as markdown
+            markdown = Markdown(self.accumulated_text)
+
+            # Start live display if not already started
+            if not self.live_display:
+                self.live_display = Live(markdown, console=self.console, refresh_per_second=10)
+                self.live_display.start()
+                self.text_started = True
+            else:
+                # Update the live display
+                self.live_display.update(markdown)
+
+        except Exception:
+            # Fallback to plain text if markdown parsing fails
+            if not self.live_display:
+                self.live_display = Live(self.accumulated_text, console=self.console, refresh_per_second=10)
+                self.live_display.start()
+                self.text_started = True
+            else:
+                self.live_display.update(self.accumulated_text)
 
     def _is_text_delta(self, meta: dict[str, Any]) -> bool:
         """Check if this is a text streaming chunk."""
@@ -78,7 +110,7 @@ class StreamingCallbackManager:
 
     def _is_finish_event(self, meta: dict[str, Any]) -> bool:
         """Check if this is a finish event."""
-        return "finish_reason" in meta
+        return "stop_reason" in meta.get("delta", {})
 
     async def _handle_tool_start(self, meta: dict[str, Any]) -> None:
         """Handle the start of a tool call."""
@@ -86,6 +118,11 @@ class StreamingCallbackManager:
         tool_name = content_block["name"]
         tool_id = content_block["id"]
         index = meta["index"]
+
+        # Stop live display if active
+        if self.live_display:
+            self.live_display.stop()
+            self.live_display = None
 
         # Store tool state
         self.active_tools[index] = {
@@ -96,7 +133,7 @@ class StreamingCallbackManager:
             "args_displayed": False,
         }
 
-        # Display tool call header
+        # Display tool call header (text accumulation continues after tools)
         self.console.print()  # New line
         self.console.print("┌─ 🔧 Tool Call", style="bold cyan")
         self.console.print(f"│ Name: {tool_name}", style="cyan")
@@ -307,9 +344,17 @@ class StreamingCallbackManager:
 
     async def _handle_finish_event(self, meta: dict[str, Any]) -> None:
         """Handle finish events."""
-        finish_reason = meta.get("finish_reason")
-
+        finish_reason = meta.get("delta", {}).get("stop_reason")
         if finish_reason == "tool_call_results":
             # Clean up after tool calls
             self.active_tools.clear()
             self.console.print()  # Extra line after tools
+        elif finish_reason == "end_turn":
+            # Stop live display and reset for next interaction
+            if self.live_display:
+                self.live_display.stop()
+                self.live_display = None
+                # Ensure cursor is on a new line for the next prompt
+                self.console.print()
+            self.accumulated_text = ""
+            self.text_started = False
