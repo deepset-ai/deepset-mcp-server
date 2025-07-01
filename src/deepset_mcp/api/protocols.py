@@ -111,3 +111,7 @@ class AsyncClientProtocol(Protocol):
     def secrets(self) -> "SecretResourceProtocol":
         """Access secrets."""
         ...
+
+    def workspaces(self) -> "WorkspaceResourceProtocol":
+        """Access workspaces."""
+        ...
