@@ -16,7 +16,7 @@ from deepset_mcp.api.pipeline.models import (
 from deepset_mcp.api.protocols import AsyncClientProtocol
 
 
-async def list_pipelines(client: AsyncClientProtocol, workspace: str) -> PipelineList | str:
+async def list_pipelines(*, client: AsyncClientProtocol, workspace: str) -> PipelineList | str:
     """Retrieves a list of all pipeline available within the currently configured deepset workspace.
 
     :param client: The async client for API communication.
@@ -31,7 +31,7 @@ async def list_pipelines(client: AsyncClientProtocol, workspace: str) -> Pipelin
         return f"Failed to list pipelines: {e}"
 
 
-async def get_pipeline(client: AsyncClientProtocol, workspace: str, pipeline_name: str) -> DeepsetPipeline | str:
+async def get_pipeline(*, client: AsyncClientProtocol, workspace: str, pipeline_name: str) -> DeepsetPipeline | str:
     """Fetches detailed configuration information for a specific pipeline, identified by its unique `pipeline_name`.
 
     :param client: The async client for API communication.
@@ -40,7 +40,7 @@ async def get_pipeline(client: AsyncClientProtocol, workspace: str, pipeline_nam
     :returns: Pipeline details or error message.
     """
     try:
-        return await client.pipelines(workspace=workspace).get(pipeline_name)
+        return await client.pipelines(workspace=workspace).get(pipeline_name=pipeline_name)
     except ResourceNotFoundError:
         return f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}'."
     except (BadRequestError, UnexpectedAPIError) as e:
@@ -48,7 +48,7 @@ async def get_pipeline(client: AsyncClientProtocol, workspace: str, pipeline_nam
 
 
 async def validate_pipeline(
-    client: AsyncClientProtocol, workspace: str, yaml_configuration: str
+    *, client: AsyncClientProtocol, workspace: str, yaml_configuration: str
 ) -> PipelineValidationResultWithYaml | str:
     """Validates the provided pipeline YAML configuration against the deepset API.
 
@@ -75,6 +75,7 @@ async def validate_pipeline(
 
 
 async def create_pipeline(
+    *,
     client: AsyncClientProtocol,
     workspace: str,
     pipeline_name: str,
@@ -121,6 +122,7 @@ async def create_pipeline(
 
 
 async def update_pipeline(
+    *,
     client: AsyncClientProtocol,
     workspace: str,
     pipeline_name: str,
@@ -201,11 +203,7 @@ async def update_pipeline(
 
 
 async def get_pipeline_logs(
-    client: AsyncClientProtocol,
-    workspace: str,
-    pipeline_name: str,
-    limit: int = 30,
-    level: LogLevel | None = None,
+    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str, limit: int = 30, level: LogLevel | None = None
 ) -> PipelineLogList | str:
     """Fetches logs for a specific pipeline.
 
@@ -233,6 +231,7 @@ async def get_pipeline_logs(
 
 
 async def deploy_pipeline(
+    *,
     client: AsyncClientProtocol,
     workspace: str,
     pipeline_name: str,
@@ -297,7 +296,7 @@ async def deploy_pipeline(
 
 
 async def search_pipeline(
-    client: AsyncClientProtocol, workspace: str, pipeline_name: str, query: str
+    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str, query: str
 ) -> DeepsetSearchResponse | str:
     """Searches using a pipeline.
 

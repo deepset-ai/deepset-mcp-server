@@ -128,7 +128,7 @@ async def test_list_custom_component_installations() -> None:
         user_resource=user_resource,
     )
 
-    result = await list_custom_component_installations(client, "test-workspace")
+    result = await list_custom_component_installations(client=client, workspace="test-workspace")
 
     assert isinstance(result, CustomComponentInstallationList)
     assert len(result.data) == 2
@@ -177,7 +177,7 @@ async def test_list_custom_component_installations_empty() -> None:
         user_resource=user_resource,
     )
 
-    result = await list_custom_component_installations(client, "test-workspace")
+    result = await list_custom_component_installations(client=client, workspace="test-workspace")
 
     assert isinstance(result, CustomComponentInstallationList)
     assert len(result.data) == 0
@@ -210,7 +210,7 @@ async def test_list_custom_component_installations_user_fetch_error() -> None:
         user_resource=user_resource,
     )
 
-    result = await list_custom_component_installations(client, "test-workspace")
+    result = await list_custom_component_installations(client=client, workspace="test-workspace")
 
     assert isinstance(result, CustomComponentInstallationList)
     assert len(result.data) == 1
@@ -228,7 +228,7 @@ async def test_list_custom_component_installations_api_error() -> None:
         user_resource=user_resource,
     )
 
-    result = await list_custom_component_installations(client, "test-workspace")
+    result = await list_custom_component_installations(client=client, workspace="test-workspace")
 
     assert result == "Failed to retrieve custom component installations: API Error"
 
@@ -241,7 +241,7 @@ async def test_get_latest_custom_component_installation_logs() -> None:
     custom_components_resource = FakeCustomComponentsResource(latest_logs_response=mock_logs)
     client = FakeClient(custom_components_resource=custom_components_resource)
 
-    result = await get_latest_custom_component_installation_logs(client, "test-workspace")
+    result = await get_latest_custom_component_installation_logs(client=client, workspace="test-workspace")
 
     assert result == mock_logs
 
@@ -252,7 +252,7 @@ async def test_get_latest_custom_component_installation_logs_empty() -> None:
     custom_components_resource = FakeCustomComponentsResource(latest_logs_response=None)
     client = FakeClient(custom_components_resource=custom_components_resource)
 
-    result = await get_latest_custom_component_installation_logs(client, "test-workspace")
+    result = await get_latest_custom_component_installation_logs(client=client, workspace="test-workspace")
 
     assert result == "No installation logs found."
 
@@ -265,5 +265,5 @@ async def test_get_latest_custom_component_installation_logs_api_error() -> None
     )
     client = FakeClient(custom_components_resource=custom_components_resource)
 
-    result = await get_latest_custom_component_installation_logs(client, "test-workspace")
+    result = await get_latest_custom_component_installation_logs(client=client, workspace="test-workspace")
     assert result == "Failed to retrieve latest installation logs: API Error (Status Code: 500)"
