@@ -65,7 +65,12 @@ class RichExplorer:
 
         # Generate header and body
         header = self._make_header(obj_id, path, obj)
-        body = self._get_pretty_repr(obj)
+
+        # We want the full length str if the (nested) object is a string
+        if isinstance(obj, str):
+            body = obj
+        else:
+            body = self._get_pretty_repr(obj)
 
         return f"{header}\n\n{body}"
 
