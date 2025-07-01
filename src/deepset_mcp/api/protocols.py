@@ -10,6 +10,7 @@ from deepset_mcp.api.pipeline_template.protocols import PipelineTemplateResource
 from deepset_mcp.api.secrets.protocols import SecretResourceProtocol
 from deepset_mcp.api.transport import StreamingResponse, TransportResponse
 from deepset_mcp.api.user.protocols import UserResourceProtocol
+from deepset_mcp.api.workspace.protocols import WorkspaceResourceProtocol
 
 T = TypeVar("T")
 
