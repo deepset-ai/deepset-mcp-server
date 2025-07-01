@@ -20,7 +20,7 @@ from deepset_mcp.tools.haystack_service_models import (
 from deepset_mcp.tools.model_protocol import ModelProtocol
 
 
-def extract_component_texts(component_def: dict[str, Any]) -> tuple[str, str]:
+def extract_component_texts(*, component_def: dict[str, Any]) -> tuple[str, str]:
     """Extracts the component name and description for embedding.
 
     Args:
@@ -36,10 +36,7 @@ def extract_component_texts(component_def: dict[str, Any]) -> tuple[str, str]:
 
 
 async def _build_component_definition(
-    component_def: dict[str, Any],
-    component_type: str,
-    haystack_service: Any,
-    schema: dict[str, Any] | None = None,
+    *, component_def: dict[str, Any], component_type: str, haystack_service: Any, schema: dict[str, Any] | None = None
 ) -> ComponentDefinition | str:
     """Build a ComponentDefinition from component schema data."""
     try:
@@ -154,7 +151,7 @@ async def _build_component_definition(
         return f"Failed to build component definition: {str(e)}"
 
 
-async def get_component_definition(client: AsyncClientProtocol, component_type: str) -> ComponentDefinition | str:
+async def get_component_definition(*, client: AsyncClientProtocol, component_type: str) -> ComponentDefinition | str:
     """Returns the definition of a specific Haystack component.
 
     Args:
@@ -184,11 +181,13 @@ async def get_component_definition(client: AsyncClientProtocol, component_type: 
     if not component_def:
         return f"Component not found: {component_type}"
 
-    return await _build_component_definition(component_def, component_type, haystack_service)
+    return await _build_component_definition(
+        component_def=component_def, component_type=component_type, haystack_service=haystack_service
+    )
 
 
 async def search_component_definition(
-    client: AsyncClientProtocol, query: str, model: ModelProtocol, top_k: int = 5
+    *, client: AsyncClientProtocol, query: str, model: ModelProtocol, top_k: int = 5
 ) -> ComponentSearchResults | str:
     """Searches for components based on name or description using semantic similarity.
 
@@ -211,7 +210,9 @@ async def search_component_definition(
     components = response["component_schema"]["definitions"]["Components"]
 
     # Extract text for embedding from all components
-    component_texts: list[tuple[str, str]] = [extract_component_texts(comp) for comp in components.values()]
+    component_texts: list[tuple[str, str]] = [
+        extract_component_texts(component_def=comp) for comp in components.values()
+    ]
     component_types: list[str] = [c[0] for c in component_texts]
 
     if not component_texts:
@@ -244,14 +245,16 @@ async def search_component_definition(
                 break
 
         if component_def:
-            definition = await _build_component_definition(component_def, component_type, haystack_service)
+            definition = await _build_component_definition(
+                component_def=component_def, component_type=component_type, haystack_service=haystack_service
+            )
             if isinstance(definition, ComponentDefinition):
                 search_results.append(ComponentSearchResult(component=definition, similarity_score=float(sim)))
 
     return ComponentSearchResults(results=search_results, query=query, total_found=len(search_results))
 
 
-async def list_component_families(client: AsyncClientProtocol) -> ComponentFamilyList | str:
+async def list_component_families(*, client: AsyncClientProtocol) -> ComponentFamilyList | str:
     """Lists all Haystack component families that are available on deepset.
 
     Args:
@@ -287,7 +290,7 @@ async def list_component_families(client: AsyncClientProtocol) -> ComponentFamil
     return ComponentFamilyList(families=family_objects, total_count=len(family_objects))
 
 
-async def get_custom_components(client: AsyncClientProtocol) -> ComponentDefinitionList | str:
+async def get_custom_components(*, client: AsyncClientProtocol) -> ComponentDefinitionList | str:
     """Get a list of all installed custom components.
 
     :param client: The API client to use.
@@ -332,7 +335,12 @@ async def get_custom_components(client: AsyncClientProtocol) -> ComponentDefinit
                     break
 
             if component_def:
-                definition = await _build_component_definition(component_def, component_type, haystack_service, schema)
+                definition = await _build_component_definition(
+                    component_def=component_def,
+                    component_type=component_type,
+                    haystack_service=haystack_service,
+                    schema=schema,
+                )
                 if isinstance(definition, ComponentDefinition):
                     return definition
             return None

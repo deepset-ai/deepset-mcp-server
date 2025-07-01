@@ -64,7 +64,7 @@ async def test_list_secrets_success() -> None:
     fake_resource = FakeSecretResource(list_response=secret_list)
     client = FakeClientWithSecrets(fake_resource)
 
-    result = await list_secrets(client, limit=10)
+    result = await list_secrets(client=client, limit=10)
 
     assert isinstance(result, SecretList)
     assert len(result.data) == 2
@@ -86,7 +86,7 @@ async def test_list_secrets_with_pagination() -> None:
     fake_resource = FakeSecretResource(list_response=secret_list)
     client = FakeClientWithSecrets(fake_resource)
 
-    result = await list_secrets(client, limit=1)
+    result = await list_secrets(client=client, limit=1)
 
     assert isinstance(result, SecretList)
     assert len(result.data) == 1
@@ -103,7 +103,7 @@ async def test_list_secrets_empty() -> None:
     fake_resource = FakeSecretResource(list_response=secret_list)
     client = FakeClientWithSecrets(fake_resource)
 
-    result = await list_secrets(client)
+    result = await list_secrets(client=client)
 
     assert isinstance(result, SecretList)
     assert len(result.data) == 0
@@ -117,7 +117,7 @@ async def test_list_secrets_unexpected_api_error() -> None:
     fake_resource = FakeSecretResource(list_exception=UnexpectedAPIError(500, "Internal server error"))
     client = FakeClientWithSecrets(fake_resource)
 
-    result = await list_secrets(client)
+    result = await list_secrets(client=client)
 
     assert result == "API Error: Internal server error (Status Code: 500)"
 
@@ -128,7 +128,7 @@ async def test_list_secrets_generic_exception() -> None:
     fake_resource = FakeSecretResource(list_exception=ValueError("Generic error"))
     client = FakeClientWithSecrets(fake_resource)
 
-    result = await list_secrets(client)
+    result = await list_secrets(client=client)
 
     assert result == "Unexpected error: Generic error"
 
@@ -140,7 +140,7 @@ async def test_get_secret_success() -> None:
     fake_resource = FakeSecretResource(get_response=secret)
     client = FakeClientWithSecrets(fake_resource)
 
-    result = await get_secret(client, "secret-1")
+    result = await get_secret(client=client, secret_id="secret-1")
 
     assert isinstance(result, Secret)
     assert result.name == "api-key"
@@ -153,7 +153,7 @@ async def test_get_secret_not_found() -> None:
     fake_resource = FakeSecretResource(get_exception=ResourceNotFoundError("Secret 'nonexistent' not found."))
     client = FakeClientWithSecrets(fake_resource)
 
-    result = await get_secret(client, "nonexistent")
+    result = await get_secret(client=client, secret_id="nonexistent")
 
     assert result == "Error: Secret 'nonexistent' not found. (Status Code: 404)"
 
@@ -164,7 +164,7 @@ async def test_get_secret_unexpected_api_error() -> None:
     fake_resource = FakeSecretResource(get_exception=UnexpectedAPIError(500, "Server error"))
     client = FakeClientWithSecrets(fake_resource)
 
-    result = await get_secret(client, "secret-1")
+    result = await get_secret(client=client, secret_id="secret-1")
 
     assert result == "API Error: Server error (Status Code: 500)"
 
@@ -175,6 +175,6 @@ async def test_get_secret_generic_exception() -> None:
     fake_resource = FakeSecretResource(get_exception=ValueError("Something went wrong"))
     client = FakeClientWithSecrets(fake_resource)
 
-    result = await get_secret(client, "secret-1")
+    result = await get_secret(client=client, secret_id="secret-1")
 
     assert result == "Unexpected error: Something went wrong"

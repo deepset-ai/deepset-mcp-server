@@ -4,7 +4,7 @@ from deepset_mcp.api.pipeline import PipelineValidationResult
 from deepset_mcp.api.protocols import AsyncClientProtocol
 
 
-async def list_indexes(client: AsyncClientProtocol, workspace: str) -> IndexList | str:
+async def list_indexes(*, client: AsyncClientProtocol, workspace: str) -> IndexList | str:
     """Use this to list available indexes on the deepset platform in your workspace.
 
     :param client: Deepset API client to use for requesting indexes.
@@ -18,7 +18,7 @@ async def list_indexes(client: AsyncClientProtocol, workspace: str) -> IndexList
     return result
 
 
-async def get_index(client: AsyncClientProtocol, workspace: str, index_name: str) -> Index | str:
+async def get_index(*, client: AsyncClientProtocol, workspace: str, index_name: str) -> Index | str:
     """Fetches detailed configuration information for a specific index, identified by its unique `index_name`.
 
     :param client: Deepset API client to use for requesting the index.
@@ -34,6 +34,7 @@ async def get_index(client: AsyncClientProtocol, workspace: str, index_name: str
 
 
 async def create_index(
+    *,
     client: AsyncClientProtocol,
     workspace: str,
     index_name: str,
@@ -63,6 +64,7 @@ async def create_index(
 
 
 async def update_index(
+    *,
     client: AsyncClientProtocol,
     workspace: str,
     index_name: str,
@@ -97,7 +99,9 @@ async def update_index(
     return {"message": f"Index '{index_name}' updated successfully.", "index": result}
 
 
-async def deploy_index(client: AsyncClientProtocol, workspace: str, index_name: str) -> str | PipelineValidationResult:
+async def deploy_index(
+    *, client: AsyncClientProtocol, workspace: str, index_name: str
+) -> str | PipelineValidationResult:
     """Deploys an index to production.
 
     This function attempts to deploy the specified index in the given workspace.

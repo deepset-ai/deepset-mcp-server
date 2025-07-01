@@ -213,7 +213,7 @@ async def test_list_pipelines_returns_pipeline_list() -> None:
     )
     resource = FakePipelineResource(list_response=[pipeline1, pipeline2])
     client = FakeClient(resource)
-    result = await list_pipelines(client, workspace="ws1")
+    result = await list_pipelines(client=client, workspace="ws1")
     assert isinstance(result, PipelineList)
     assert len(result.data) == 2
     assert result.data[0].name == "pipeline1"
@@ -236,7 +236,7 @@ async def test_get_pipeline_returns_pipeline_object() -> None:
     )
     resource = FakePipelineResource(get_response=pipeline)
     client = FakeClient(resource)
-    result = await get_pipeline(client, workspace="ws2", pipeline_name="mypipe")
+    result = await get_pipeline(client=client, workspace="ws2", pipeline_name="mypipe")
     assert isinstance(result, DeepsetPipeline)
     assert result.name == "mypipe"
     assert result.yaml_config == "foo: bar"
@@ -245,7 +245,7 @@ async def test_get_pipeline_returns_pipeline_object() -> None:
 @pytest.mark.asyncio
 async def test_validate_pipeline_empty_yaml_returns_message() -> None:
     client = FakeClient(FakePipelineResource())
-    result = await validate_pipeline(client, workspace="ws", yaml_configuration="   ")
+    result = await validate_pipeline(client=client, workspace="ws", yaml_configuration="   ")
     assert result == "You need to provide a YAML configuration to validate."
 
 
@@ -253,7 +253,7 @@ async def test_validate_pipeline_empty_yaml_returns_message() -> None:
 async def test_validate_pipeline_invalid_yaml_returns_error() -> None:
     client = FakeClient(FakePipelineResource())
     invalid_yaml = "invalid: : yaml"
-    result = await validate_pipeline(client, workspace="ws", yaml_configuration=invalid_yaml)
+    result = await validate_pipeline(client=client, workspace="ws", yaml_configuration=invalid_yaml)
     assert isinstance(result, str)
     assert result.startswith("Invalid YAML provided:")
 
@@ -268,14 +268,14 @@ async def test_validate_pipeline_validates_via_client_and_returns_model() -> Non
     # Test valid
     resource_valid = FakePipelineResource(validate_response=valid_result)
     client_valid = FakeClient(resource_valid)
-    res_valid = await validate_pipeline(client_valid, workspace="ws", yaml_configuration="a: b")
+    res_valid = await validate_pipeline(client=client_valid, workspace="ws", yaml_configuration="a: b")
     assert isinstance(res_valid, PipelineValidationResultWithYaml)
     assert res_valid.validation_result.valid is True
     assert res_valid.yaml_config == "a: b"
     # Test invalid
     resource_invalid = FakePipelineResource(validate_response=invalid_result)
     client_invalid = FakeClient(resource_invalid)
-    res_invalid = await validate_pipeline(client_invalid, workspace="ws", yaml_configuration="a: b")
+    res_invalid = await validate_pipeline(client=client_invalid, workspace="ws", yaml_configuration="a: b")
     assert isinstance(res_invalid, PipelineValidationResultWithYaml)
     assert res_invalid.validation_result.valid is False
     assert len(res_invalid.validation_result.errors) == 2
@@ -288,7 +288,7 @@ async def test_create_pipeline_handles_validation_failure() -> None:
     resource = FakePipelineResource(validate_response=invalid_result)
     client = FakeClient(resource)
     result = await create_pipeline(
-        client, workspace="ws", pipeline_name="pname", yaml_configuration="cfg", skip_validation_errors=False
+        client=client, workspace="ws", pipeline_name="pname", yaml_configuration="cfg", skip_validation_errors=False
     )
     assert isinstance(result, str)
     assert "Pipeline validation failed" in result
@@ -318,7 +318,7 @@ async def test_create_pipeline_handles_success_and_failure_response() -> None:
         get_response=created_pipeline,
     )
     client_succ = FakeClient(resource_succ)
-    res_succ = await create_pipeline(client_succ, workspace="ws", pipeline_name="p1", yaml_configuration="a: b")
+    res_succ = await create_pipeline(client=client_succ, workspace="ws", pipeline_name="p1", yaml_configuration="a: b")
 
     assert isinstance(res_succ, DeepsetPipeline)
     assert res_succ.name == "p1"
@@ -329,7 +329,7 @@ async def test_create_pipeline_handles_success_and_failure_response() -> None:
         create_exception=BadRequestError(message="bad things"),
     )
     client_fail = FakeClient(resource_fail)
-    res_fail = await create_pipeline(client_fail, workspace="ws", pipeline_name="p1", yaml_configuration="a: b")
+    res_fail = await create_pipeline(client=client_fail, workspace="ws", pipeline_name="p1", yaml_configuration="a: b")
     assert isinstance(res_fail, str)
     assert "Failed to create pipeline 'p1': bad things (Status Code: 400)" == res_fail
 
@@ -361,7 +361,7 @@ async def test_create_pipeline_skip_validation_errors_true() -> None:
 
     # Test with explicit True
     result = await create_pipeline(
-        client,
+        client=client,
         workspace="ws",
         pipeline_name="test_pipeline",
         yaml_configuration="config: test",
@@ -380,7 +380,7 @@ async def test_create_pipeline_skip_validation_errors_true() -> None:
 
     # Test with default (should behave the same as True)
     result_default = await create_pipeline(
-        client, workspace="ws", pipeline_name="test_pipeline", yaml_configuration="config: test"
+        client=client, workspace="ws", pipeline_name="test_pipeline", yaml_configuration="config: test"
     )
 
     assert isinstance(result_default, PipelineOperationWithErrors)
@@ -393,7 +393,7 @@ async def test_update_pipeline_not_found_on_get() -> None:
     resource = FakePipelineResource(get_exception=ResourceNotFoundError())
     client = FakeClient(resource)
     res = await update_pipeline(
-        client, workspace="ws", pipeline_name="np", original_config_snippet="x", replacement_config_snippet="y"
+        client=client, workspace="ws", pipeline_name="np", original_config_snippet="x", replacement_config_snippet="y"
     )
     assert isinstance(res, str)
     assert "no pipeline named 'np'" in res.lower()
@@ -416,7 +416,11 @@ async def test_update_pipeline_no_occurrences() -> None:
     resource = FakePipelineResource(get_response=original)
     client = FakeClient(resource)
     res = await update_pipeline(
-        client, workspace="ws", pipeline_name="np", original_config_snippet="baz", replacement_config_snippet="qux"
+        client=client,
+        workspace="ws",
+        pipeline_name="np",
+        original_config_snippet="baz",
+        replacement_config_snippet="qux",
     )
     assert "No occurrences" in res
 
@@ -439,7 +443,11 @@ async def test_update_pipeline_multiple_occurrences() -> None:
     resource = FakePipelineResource(get_response=original)
     client = FakeClient(resource)
     res = await update_pipeline(
-        client, workspace="ws", pipeline_name="np", original_config_snippet="dup: x", replacement_config_snippet="z"
+        client=client,
+        workspace="ws",
+        pipeline_name="np",
+        original_config_snippet="dup: x",
+        replacement_config_snippet="z",
     )
     assert "Multiple occurrences (2)" in res
 
@@ -463,7 +471,7 @@ async def test_update_pipeline_validation_failure() -> None:
     resource = FakePipelineResource(get_response=original, validate_response=invalid_val)
     client = FakeClient(resource)
     res = await update_pipeline(
-        client,
+        client=client,
         workspace="ws",
         pipeline_name="np",
         original_config_snippet="foo: 1",
@@ -497,7 +505,7 @@ async def test_update_pipeline_exceptions_on_update() -> None:
     )
     client_not_found = FakeClient(res_not_found)
     r1 = await update_pipeline(
-        client_not_found,
+        client=client_not_found,
         workspace="ws",
         pipeline_name="np",
         original_config_snippet="foo: 1",
@@ -511,7 +519,7 @@ async def test_update_pipeline_exceptions_on_update() -> None:
     )
     client_bad = FakeClient(res_bad)
     r2 = await update_pipeline(
-        client_bad,
+        client=client_bad,
         workspace="ws",
         pipeline_name="np",
         original_config_snippet="foo: 1",
@@ -527,7 +535,7 @@ async def test_update_pipeline_exceptions_on_update() -> None:
     )
     client_unexp = FakeClient(res_unexp)
     r3 = await update_pipeline(
-        client_unexp,
+        client=client_unexp,
         workspace="ws",
         pipeline_name="np",
         original_config_snippet="foo: 1",
@@ -573,7 +581,7 @@ async def test_update_pipeline_success_response() -> None:
     )
     client_succ = FakeClient(res_succ)
     r_success = await update_pipeline(
-        client_succ,
+        client=client_succ,
         workspace="ws",
         pipeline_name="np",
         original_config_snippet="foo: 1",
@@ -623,7 +631,7 @@ async def test_update_pipeline_skip_validation_errors_true() -> None:
 
     # Test with explicit True
     result = await update_pipeline(
-        client,
+        client=client,
         workspace="ws",
         pipeline_name="np",
         original_config_snippet="foo: 1",
@@ -641,7 +649,7 @@ async def test_update_pipeline_skip_validation_errors_true() -> None:
 
     # Test with default (should behave the same as True)
     result_default = await update_pipeline(
-        client,
+        client=client,
         workspace="ws",
         pipeline_name="np",
         original_config_snippet="foo: 1",
@@ -679,7 +687,7 @@ async def test_get_pipeline_logs_success() -> None:
     resource = FakePipelineResource(logs_response=logs)
     client = FakeClient(resource)
 
-    result = await get_pipeline_logs(client, workspace="ws", pipeline_name="test-pipeline")
+    result = await get_pipeline_logs(client=client, workspace="ws", pipeline_name="test-pipeline")
 
     assert isinstance(result, PipelineLogList)
     assert len(result.data) == 2
@@ -696,7 +704,7 @@ async def test_get_pipeline_logs_empty() -> None:
     resource = FakePipelineResource(logs_response=logs)
     client = FakeClient(resource)
 
-    result = await get_pipeline_logs(client, workspace="ws", pipeline_name="test-pipeline")
+    result = await get_pipeline_logs(client=client, workspace="ws", pipeline_name="test-pipeline")
 
     assert isinstance(result, PipelineLogList)
     assert len(result.data) == 0
@@ -710,7 +718,7 @@ async def test_get_pipeline_logs_with_level_filter() -> None:
     resource = FakePipelineResource(logs_response=logs)
     client = FakeClient(resource)
 
-    result = await get_pipeline_logs(client, workspace="ws", pipeline_name="test-pipeline", level=LogLevel.ERROR)
+    result = await get_pipeline_logs(client=client, workspace="ws", pipeline_name="test-pipeline", level=LogLevel.ERROR)
 
     assert isinstance(result, PipelineLogList)
     assert len(result.data) == 0
@@ -721,7 +729,7 @@ async def test_get_pipeline_logs_resource_not_found() -> None:
     resource = FakePipelineResource(logs_exception=ResourceNotFoundError())
     client = FakeClient(resource)
 
-    result = await get_pipeline_logs(client, workspace="ws", pipeline_name="missing-pipeline")
+    result = await get_pipeline_logs(client=client, workspace="ws", pipeline_name="missing-pipeline")
 
     assert "There is no pipeline named 'missing-pipeline' in workspace 'ws'" in result
 
@@ -731,7 +739,7 @@ async def test_get_pipeline_logs_bad_request() -> None:
     resource = FakePipelineResource(logs_exception=BadRequestError("Invalid level filter"))
     client = FakeClient(resource)
 
-    result = await get_pipeline_logs(client, workspace="ws", pipeline_name="test-pipeline")
+    result = await get_pipeline_logs(client=client, workspace="ws", pipeline_name="test-pipeline")
 
     assert "Failed to fetch logs for pipeline 'test-pipeline': Invalid level filter" in result
 
@@ -741,7 +749,7 @@ async def test_get_pipeline_logs_unexpected_error() -> None:
     resource = FakePipelineResource(logs_exception=UnexpectedAPIError(status_code=500, message="Internal server error"))
     client = FakeClient(resource)
 
-    result = await get_pipeline_logs(client, workspace="ws", pipeline_name="test-pipeline")
+    result = await get_pipeline_logs(client=client, workspace="ws", pipeline_name="test-pipeline")
 
     assert "Failed to fetch logs for pipeline 'test-pipeline': Internal server error" in result
 
@@ -753,7 +761,7 @@ async def test_deploy_pipeline_success() -> None:
     resource = FakePipelineResource(deploy_response=success_result)
     client = FakeClient(resource)
 
-    result = await deploy_pipeline(client, workspace="ws", pipeline_name="test-pipeline")
+    result = await deploy_pipeline(client=client, workspace="ws", pipeline_name="test-pipeline")
 
     assert isinstance(result, PipelineValidationResult)
     assert result.valid is True
@@ -773,7 +781,7 @@ async def test_deploy_pipeline_with_validation_errors() -> None:
     resource = FakePipelineResource(deploy_response=error_result)
     client = FakeClient(resource)
 
-    result = await deploy_pipeline(client, workspace="ws", pipeline_name="test-pipeline")
+    result = await deploy_pipeline(client=client, workspace="ws", pipeline_name="test-pipeline")
 
     assert isinstance(result, PipelineValidationResult)
     assert result.valid is False
@@ -788,7 +796,7 @@ async def test_deploy_pipeline_not_found() -> None:
     resource = FakePipelineResource(deploy_exception=ResourceNotFoundError())
     client = FakeClient(resource)
 
-    result = await deploy_pipeline(client, workspace="ws", pipeline_name="missing-pipeline")
+    result = await deploy_pipeline(client=client, workspace="ws", pipeline_name="missing-pipeline")
 
     assert "There is no pipeline named 'missing-pipeline' in workspace 'ws'." == result
 
@@ -799,7 +807,7 @@ async def test_deploy_pipeline_bad_request() -> None:
     resource = FakePipelineResource(deploy_exception=BadRequestError("Pipeline is not ready for deployment"))
     client = FakeClient(resource)
 
-    result = await deploy_pipeline(client, workspace="ws", pipeline_name="test-pipeline")
+    result = await deploy_pipeline(client=client, workspace="ws", pipeline_name="test-pipeline")
 
     assert "Failed to deploy pipeline 'test-pipeline': Pipeline is not ready for deployment" in result
 
@@ -812,7 +820,7 @@ async def test_deploy_pipeline_unexpected_error() -> None:
     )
     client = FakeClient(resource)
 
-    result = await deploy_pipeline(client, workspace="ws", pipeline_name="test-pipeline")
+    result = await deploy_pipeline(client=client, workspace="ws", pipeline_name="test-pipeline")
 
     assert "Failed to deploy pipeline 'test-pipeline': Internal server error" in result
 
@@ -855,7 +863,7 @@ async def test_deploy_pipeline_wait_for_deployment_success() -> None:
     client = FakeClient(resource)
 
     result = await deploy_pipeline(
-        client,
+        client=client,
         workspace="ws",
         pipeline_name="test-pipeline",
         wait_for_deployment=True,
@@ -905,7 +913,7 @@ async def test_deploy_pipeline_wait_for_deployment_failed() -> None:
     client = FakeClient(resource)
 
     result = await deploy_pipeline(
-        client,
+        client=client,
         workspace="ws",
         pipeline_name="test-pipeline",
         wait_for_deployment=True,
@@ -942,7 +950,7 @@ async def test_deploy_pipeline_wait_for_deployment_timeout() -> None:
     client = FakeClient(resource)
 
     result = await deploy_pipeline(
-        client,
+        client=client,
         workspace="ws",
         pipeline_name="test-pipeline",
         wait_for_deployment=True,
@@ -968,7 +976,7 @@ async def test_deploy_pipeline_wait_for_deployment_get_error() -> None:
     client = FakeClient(resource)
 
     result = await deploy_pipeline(
-        client,
+        client=client,
         workspace="ws",
         pipeline_name="test-pipeline",
         wait_for_deployment=True,
@@ -988,7 +996,7 @@ async def test_deploy_pipeline_no_wait_backwards_compatibility() -> None:
     client = FakeClient(resource)
 
     # Test with default parameters (should not wait)
-    result = await deploy_pipeline(client, workspace="ws", pipeline_name="test-pipeline")
+    result = await deploy_pipeline(client=client, workspace="ws", pipeline_name="test-pipeline")
 
     assert isinstance(result, PipelineValidationResult)
     assert result.valid is True
@@ -1001,7 +1009,9 @@ async def test_deploy_pipeline_wait_false_explicit() -> None:
     resource = FakePipelineResource(deploy_response=success_result)
     client = FakeClient(resource)
 
-    result = await deploy_pipeline(client, workspace="ws", pipeline_name="test-pipeline", wait_for_deployment=False)
+    result = await deploy_pipeline(
+        client=client, workspace="ws", pipeline_name="test-pipeline", wait_for_deployment=False
+    )
 
     assert isinstance(result, PipelineValidationResult)
     assert result.valid is True
@@ -1044,7 +1054,9 @@ async def test_search_pipeline_success() -> None:
     )
     client = FakeClient(resource)
 
-    result = await search_pipeline(client, workspace="ws", pipeline_name="test-pipeline", query="What is the answer?")
+    result = await search_pipeline(
+        client=client, workspace="ws", pipeline_name="test-pipeline", query="What is the answer?"
+    )
 
     assert isinstance(result, DeepsetSearchResponse)
     assert result.query == "What is the answer?"
@@ -1071,7 +1083,7 @@ async def test_search_pipeline_not_deployed() -> None:
     resource = FakePipelineResource(get_response=pipeline)
     client = FakeClient(resource)
 
-    result = await search_pipeline(client, workspace="ws", pipeline_name="test-pipeline", query="test query")
+    result = await search_pipeline(client=client, workspace="ws", pipeline_name="test-pipeline", query="test query")
 
     assert "Pipeline 'test-pipeline' is not deployed (current status: DRAFT)" in result
     assert "Please deploy the pipeline first" in result
@@ -1083,7 +1095,7 @@ async def test_search_pipeline_not_found() -> None:
     resource = FakePipelineResource(get_exception=ResourceNotFoundError())
     client = FakeClient(resource)
 
-    result = await search_pipeline(client, workspace="ws", pipeline_name="missing-pipeline", query="test query")
+    result = await search_pipeline(client=client, workspace="ws", pipeline_name="missing-pipeline", query="test query")
 
     assert "There is no pipeline named 'missing-pipeline' in workspace 'ws'" in result
 
@@ -1110,7 +1122,7 @@ async def test_search_pipeline_search_error() -> None:
     )
     client = FakeClient(resource)
 
-    result = await search_pipeline(client, workspace="ws", pipeline_name="test-pipeline", query="test query")
+    result = await search_pipeline(client=client, workspace="ws", pipeline_name="test-pipeline", query="test query")
 
     assert "Failed to search using pipeline 'test-pipeline': Search failed" in result
 
@@ -1143,7 +1155,9 @@ async def test_search_pipeline_no_results() -> None:
     )
     client = FakeClient(resource)
 
-    result = await search_pipeline(client, workspace="ws", pipeline_name="test-pipeline", query="No results query")
+    result = await search_pipeline(
+        client=client, workspace="ws", pipeline_name="test-pipeline", query="No results query"
+    )
 
     assert isinstance(result, DeepsetSearchResponse)
     assert result.query == "No results query"
@@ -1186,7 +1200,7 @@ async def test_search_pipeline_with_documents() -> None:
     )
     client = FakeClient(resource)
 
-    result = await search_pipeline(client, workspace="ws", pipeline_name="test-pipeline", query="test document")
+    result = await search_pipeline(client=client, workspace="ws", pipeline_name="test-pipeline", query="test document")
 
     assert isinstance(result, DeepsetSearchResponse)
     assert result.query == "test document"

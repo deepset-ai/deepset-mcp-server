@@ -5,7 +5,7 @@ from deepset_mcp.api.pipeline.models import DeepsetSearchResponse
 from deepset_mcp.api.protocols import AsyncClientProtocol
 
 
-def doc_search_results_to_llm_readable_string(results: DeepsetSearchResponse) -> str:
+def doc_search_results_to_llm_readable_string(*, results: DeepsetSearchResponse) -> str:
     """Formats results of the doc search pipeline so that they can be read by an LLM.
 
     :param results: DeepsetSearchResponse object
@@ -32,12 +32,7 @@ def doc_search_results_to_llm_readable_string(results: DeepsetSearchResponse) ->
     return "\n----\n".join(files)
 
 
-async def search_docs(
-    client: AsyncClientProtocol,
-    workspace: str,
-    pipeline_name: str,
-    query: str,
-) -> str:
+async def search_docs(*, client: AsyncClientProtocol, workspace: str, pipeline_name: str, query: str) -> str:
     """Search deepset documentation using a dedicated docs pipeline.
 
     Uses the specified pipeline to perform a search with the given query against the deepset
@@ -61,7 +56,7 @@ async def search_docs(
         # Execute the search
         search_response = await client.pipelines(workspace=workspace).search(pipeline_name=pipeline_name, query=query)
 
-        return doc_search_results_to_llm_readable_string(search_response)
+        return doc_search_results_to_llm_readable_string(results=search_response)
 
     except ResourceNotFoundError:
         return f"There is no documentation pipeline named '{pipeline_name}' in workspace '{workspace}'."

@@ -1,5 +1,6 @@
 """Factory for creating workspace-aware MCP tools."""
 
+import functools
 import inspect
 import os
 from collections.abc import Awaitable, Callable
@@ -22,7 +23,6 @@ from deepset_mcp.tools.haystack_service import (
     list_component_families as list_component_families_tool,
     search_component_definition as search_component_definition_tool,
 )
-from deepset_mcp.tools.haystack_service_models import ComponentSearchResults
 from deepset_mcp.tools.indexes import (
     create_index as create_index_tool,
     deploy_index as deploy_index_tool,
@@ -87,44 +87,6 @@ def get_slice_from_object_store(
     return EXPLORER.slice(obj_id=object_id, start=start, end=end, path=path)
 
 
-# Special wrapper for search_component_definitions that needs the model
-async def search_component_definitions_wrapper(client: Any, query: str, top_k: int = 5) -> ComponentSearchResults | str:
-    """Use this to search for components in deepset.
-
-    You can use full natural language queries to find components.
-    You can also use simple keywords.
-    Use this if you want to find the definition for a component,
-    but you are not sure what the exact name of the component is.
-
-    Args:
-        client: The API client to use
-        query: The search query
-        top_k: Maximum number of results to return (default: 5)
-
-    Returns:
-        ComponentSearchResults model or error message string
-    """
-    model = get_initialized_model()
-    return await search_component_definition_tool(client, query, model, top_k)
-
-
-# Special wrapper for search_pipeline_templates that needs the model
-async def search_pipeline_templates_wrapper(client: Any, workspace: str, query: str, top_k: int = 10) -> Any:
-    """Searches for pipeline templates based on name or description using semantic similarity.
-
-    Args:
-        client: The API client to use
-        workspace: The workspace to search templates from
-        query: The search query
-        top_k: Maximum number of results to return (default: 10)
-
-    Returns:
-        Search results with similarity scores or error message
-    """
-    model = get_initialized_model()
-    return await search_pipeline_templates_tool(client, query, model, workspace, top_k)
-
-
 class WorkspaceMode(StrEnum):
     """Configuration for how workspace is provided to tools."""
 
@@ -159,8 +121,7 @@ def get_workspace_from_env() -> str:
     return workspace
 
 
-# Tool registry with configurations
-TOOL_REGISTRY = {
+TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     # Workspace tools
     "list_pipelines": (
         list_pipelines_tool,
@@ -180,7 +141,12 @@ TOOL_REGISTRY = {
     ),
     "deploy_pipeline": (
         deploy_pipeline_tool,
-        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+        ToolConfig(
+            needs_client=True,
+            needs_workspace=True,
+            memory_type=MemoryType.EXPLORABLE,
+            custom_args={"wait_for_deployment": True, "timeout_seconds": 600, "poll_interval": 5},
+        ),
     ),
     "validate_pipeline": (
         validate_pipeline_tool,
@@ -223,8 +189,13 @@ TOOL_REGISTRY = {
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
     "search_pipeline_templates": (
-        search_pipeline_templates_wrapper,
-        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+        search_pipeline_templates_tool,
+        ToolConfig(
+            needs_client=True,
+            needs_workspace=True,
+            memory_type=MemoryType.EXPLORABLE,
+            custom_args={"model": get_initialized_model()},
+        ),
     ),
     "list_custom_component_installations": (
         list_custom_component_installations_tool,
@@ -244,8 +215,10 @@ TOOL_REGISTRY = {
         ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE),
     ),
     "search_component_definitions": (
-        search_component_definitions_wrapper,
-        ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE),
+        search_component_definition_tool,
+        ToolConfig(
+            needs_client=True, memory_type=MemoryType.EXPLORABLE, custom_args={"model": get_initialized_model()}
+        ),
     ),
     "get_custom_components": (
         get_custom_components_tool,
@@ -263,101 +236,146 @@ def create_enhanced_tool(
 ) -> Callable[..., Awaitable[Any]]:
     """Universal tool creator that handles client injection, workspace, and decorators.
 
+    This function takes a base tool function and enhances it based on a configuration.
+    It can inject a `client`, manage a `workspace` parameter (either explicitly required
+    or implicitly provided from the environment), and apply memory-related decorators.
+
+    It also supports partial application of custom arguments specified in the ToolConfig.
+    These arguments are bound to the function, and both the function signature and the
+    docstring are updated to hide these implementation details from the end user of the tool.
+
+    All parameters in the final tool signature are converted to be keyword-only to enforce
+    explicit naming of arguments in tool calls.
+
     Args:
-        base_func: The base tool function
-        config: Tool configuration specifying dependencies
-        workspace_mode: How workspace should be handled
-        workspace: Workspace to use for implicit mode
+        base_func: The base tool function.
+        config: Tool configuration specifying dependencies and custom arguments.
+        workspace_mode: How the workspace should be handled (implicit or explicit).
+        workspace: The workspace to use for implicit mode.
 
     Returns:
-        Enhanced tool function with appropriate signature
+        An enhanced, awaitable tool function with an updated signature and docstring.
     """
-    # Apply decorators first (if needed)
-    decorated_func = base_func
-    if config.memory_type != "none":
+    original_func = base_func
+
+    # If custom arguments are provided, create a wrapper that applies them.
+    # This wrapper preserves the original function's metadata so that decorators work correctly.
+    func_to_decorate: Any
+    if config.custom_args:
+
+        @functools.wraps(original_func)
+        async def func_with_custom_args(*args: Any, **kwargs: Any) -> Any:
+            # Create a partial function with the custom arguments bound.
+            partial_func = functools.partial(original_func, **(config.custom_args or {}))
+            # Await the result of the partial function call.
+            return await partial_func(**kwargs)
+
+        func_to_decorate = func_with_custom_args
+    else:
+        func_to_decorate = original_func
+
+    # Apply memory-related decorators to the (potentially wrapped) function
+    decorated_func = func_to_decorate
+    if config.memory_type != MemoryType.NO_MEMORY:
         store = STORE
         explorer = RichExplorer(store)
 
-        if config.memory_type == "explorable":
+        if config.memory_type == MemoryType.EXPLORABLE:
             decorated_func = explorable(object_store=store, explorer=explorer)(decorated_func)
-        elif config.memory_type == "referenceable":
+        elif config.memory_type == MemoryType.REFERENCEABLE:
             decorated_func = referenceable(object_store=store, explorer=explorer)(decorated_func)
-        elif config.memory_type == "both":
+        elif config.memory_type == MemoryType.BOTH:
             decorated_func = explorable_and_referenceable(object_store=store, explorer=explorer)(decorated_func)
 
-    # Handle client and workspace injection
+    # Determine the parameters to remove from the original function's signature
+    params_to_remove: set[str] = set()
+    if config.custom_args:
+        params_to_remove.update(config.custom_args.keys())
+    if config.needs_client:
+        params_to_remove.add("client")
+    if config.needs_workspace and workspace_mode == WorkspaceMode.IMPLICIT:
+        params_to_remove.add("workspace")
+
+    # Create the new signature from the original function
+    original_sig = inspect.signature(original_func)
+    final_params = [p for name, p in original_sig.parameters.items() if name not in params_to_remove]
+
+    # Convert all positional-or-keyword parameters to be keyword-only
+    keyword_only_params = [
+        p.replace(kind=inspect.Parameter.KEYWORD_ONLY) if p.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD else p
+        for p in final_params
+    ]
+    new_sig = original_sig.replace(parameters=keyword_only_params)
+
+    # Create the final wrapper function that handles client/workspace injection
     if config.needs_client:
         if config.needs_workspace:
-            # Workspace + client tools
             if workspace_mode == WorkspaceMode.IMPLICIT:
-                # Remove client and workspace from signature
-                sig = inspect.signature(decorated_func)
-                params = list(sig.parameters.values())[2:]  # Skip client and workspace
-                new_sig = sig.replace(parameters=params)
 
-                async def workspace_implicit_wrapper(*args: Any, **kwargs: Any) -> Any:
+                async def workspace_implicit_wrapper(**kwargs: Any) -> Any:
                     ws = workspace or get_workspace_from_env()
                     async with AsyncDeepsetClient() as client:
-                        # Add custom args if specified
-                        if config.custom_args:
-                            kwargs.update(config.custom_args)
-                        return await decorated_func(client, ws, *args, **kwargs)
+                        return await decorated_func(client=client, workspace=ws, **kwargs)
 
                 wrapper = workspace_implicit_wrapper
-                wrapper.__signature__ = new_sig  # type: ignore
-            else:
-                # EXPLICIT mode - remove only client from signature
-                sig = inspect.signature(decorated_func)
-                params = list(sig.parameters.values())[1:]  # Skip client parameter
-                new_sig = sig.replace(parameters=params)
+            else:  # EXPLICIT mode
 
-                async def workspace_explicit_wrapper(*args: Any, **kwargs: Any) -> Any:
+                async def workspace_explicit_wrapper(**kwargs: Any) -> Any:
                     async with AsyncDeepsetClient() as client:
-                        # Add custom args if specified
-                        if config.custom_args:
-                            kwargs.update(config.custom_args)
-                        return await decorated_func(client, *args, **kwargs)
+                        # The first argument is the workspace, which must be passed by keyword.
+                        return await decorated_func(client=client, **kwargs)
 
                 wrapper = workspace_explicit_wrapper
-                wrapper.__signature__ = new_sig  # type: ignore
-        else:
-            # Client-only tools (no workspace)
-            sig = inspect.signature(decorated_func)
-            params = list(sig.parameters.values())[1:]  # Skip client parameter
-            new_sig = sig.replace(parameters=params)
+        else:  # Client-only tools
 
-            async def client_only_wrapper(*args: Any, **kwargs: Any) -> Any:
+            async def client_only_wrapper(**kwargs: Any) -> Any:
                 async with AsyncDeepsetClient() as client:
-                    # Add custom args if specified
-                    if config.custom_args:
-                        kwargs.update(config.custom_args)
-                    return await decorated_func(client, *args, **kwargs)
+                    return await decorated_func(client=client, **kwargs)
 
             wrapper = client_only_wrapper
-            wrapper.__signature__ = new_sig  # type: ignore
-    else:
-        # No injection needed
-        wrapper = decorated_func
+    else:  # No injection needed
+        if inspect.iscoroutinefunction(decorated_func):
 
-    # Set metadata
-    wrapper.__name__ = base_func.__name__
+            async def no_injection_wrapper(**kwargs: Any) -> Any:
+                return await decorated_func(**kwargs)
 
-    # Process docstring to remove injected parameters
-    if config.needs_client and base_func.__doc__:
+            wrapper = no_injection_wrapper
+        else:
+
+            @functools.wraps(decorated_func)
+            async def async_wrapper(**kwargs: Any) -> Any:
+                return decorated_func(**kwargs)
+
+            wrapper = async_wrapper
+
+    # Set metadata on the final wrapper
+    wrapper.__signature__ = new_sig  # type: ignore
+    wrapper.__name__ = original_func.__name__
+
+    # Process the docstring to remove injected and partially applied parameters
+    if original_func.__doc__:
         import re
 
-        doc = base_func.__doc__
-
-        # Remove :param client: line
-        doc = re.sub(r"^\s*:param\s+client:.*?(?=^\s*:|^\s*$|\Z)", "", doc, flags=re.MULTILINE | re.DOTALL)
-
-        # Remove :param workspace: line if implicit mode
+        doc = original_func.__doc__
+        params_to_remove_from_doc = set()
+        if config.needs_client:
+            params_to_remove_from_doc.add("client")
         if config.needs_workspace and workspace_mode == WorkspaceMode.IMPLICIT:
-            doc = re.sub(r"^\s*:param\s+workspace:.*?(?=^\s*:|^\s*$|\Z)", "", doc, flags=re.MULTILINE | re.DOTALL)
+            params_to_remove_from_doc.add("workspace")
+        if config.custom_args:
+            params_to_remove_from_doc.update(config.custom_args.keys())
 
-        wrapper.__doc__ = doc
+        for param_name in params_to_remove_from_doc:
+            doc = re.sub(
+                rf"^\s*:param\s+{re.escape(param_name)}.*?(?=^\s*:|^\s*$|\Z)",
+                "",
+                doc,
+                flags=re.MULTILINE | re.DOTALL,
+            )
+
+        wrapper.__doc__ = "\n".join([line.rstrip() for line in doc.strip().split("\n")])
     else:
-        wrapper.__doc__ = base_func.__doc__
+        wrapper.__doc__ = original_func.__doc__
 
     return wrapper
 
@@ -372,6 +390,6 @@ def register_all_tools(mcp: FastMCP, workspace_mode: WorkspaceMode, workspace: s
     """
     for tool_name, (base_func, config) in TOOL_REGISTRY.items():
         # Create enhanced tool
-        enhanced_tool = create_enhanced_tool(base_func, config, workspace_mode, workspace)  # type: ignore[arg-type]
+        enhanced_tool = create_enhanced_tool(base_func, config, workspace_mode, workspace)
 
         mcp.add_tool(enhanced_tool, name=tool_name)
