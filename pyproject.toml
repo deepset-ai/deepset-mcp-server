@@ -31,8 +31,8 @@ benchmark = [
     "typer",
 ]
 agents = [
-    "haystack-ai",
-    "mcp-haystack",
+    "haystack-ai>=2.15.1",
+    "mcp-haystack>=0.4.0",
     "anthropic-haystack>=2.7.0",
     "langfuse-haystack"
 ]
