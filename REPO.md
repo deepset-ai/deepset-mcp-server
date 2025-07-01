@@ -10,7 +10,7 @@ Haystack is an Open Source Python framework for AI application building.
 All source code is in `src/deepset_mcp`.
 Code for the API SDK is in `src/deepset_mcp/api`.
 Code for tools is in `src/deepset_mcp/tools`.
-The tools are added to an MCP server which is defined in main.py
+The tools are added to an MCP server which is defined in `src/deepset_mcp/main.py` and configured in `src/deepset_mcp/tool_factory.py`.
 
 Tests are in the `test` directory.
 All unit tests go into `test/unit`, integration tests go into `test/integration`.
@@ -36,11 +36,11 @@ async with AsyncDeepsetClient() as client:
 
 ### Tool Structure
 
-Tools are meant to be used by large language models. Therefore, the output of a tool should always be a string.
-Known exceptions should usually be caught and converted to strings as well.
+Tools are meant to be used by large language models.
+Known exceptions should usually be caught and converted to strings.
 Typically, we have one tool file per resource.
 A tool can make multiple calls to different resources or different methods on the same resource to produce the desired output.
-Most tools are imported into `src/deepset_mcp/main.py` where they are added to the MCP server.
+Most tools are imported into `src/deepset_mcp/tool_factory.py` where they are added to the MCP server.
 
 
 ## Instructions for common tasks
@@ -53,8 +53,8 @@ You would need to make the following changes:
 1. add a package for the resource at `src/deepset_mcp/api/pipeline_feedback`
 2. the resource goes into `src/deepset_mcp/api/pipeline_feedback/resource.py`
 3. (optional) if you need to define models for API response they would go into `src/deepset_mcp/api/pipeline_feedback/models.py`
-4. add a Protocol for the resource in `src/deepset_mcp/api/protocols.py`
-5. add the resource to the AsyncClientProtocol in the same file (depending on the resource you need client and workspace or just client)
+4. add a Protocol for the resource in `src/deepset_mcp/api/pipeline_feedback/protocols.py`
+5. add the resource to the AsyncClientProtocol in the `src/deepset_mcp/api/protocols.py` (depending on the resource you need client and workspace or just client)
 6. add a method for the resource to the `AsyncDeepsetClient` in `src/deepset_mcp/api/client.py`
 
 #### Testing the resource
@@ -85,9 +85,8 @@ You would need to perform the following steps:
 3. the tool should call the methods on the resource through the client
 4. refer to `src/deepset_mcp/tools/pipeline.py` as a good example for tool implementations
 5. extract model or response serialization into reusable helper functions
-6. once you added a tool, import it in `src/deepset_mcp/main.py`
-7. add a corresponding mcp tool using the `@mcp.tool`-decorator
-8. the docstring of the tool will serve as the prompt for the large language model calling the tool, make sure it has good instructions on when to use the tool, how to best use it, and what kind of answer to expect.
+6. once you added a tool, import it in `src/deepset_mcp/tool_factory.py` and add it to the tool registry with the appropriate config
+7the docstring of the tool will serve as the prompt for the large language model calling the tool, make sure it has good instructions on when to use the tool, how to best use it, and what kind of answer to expect.
 
 #### Testing the tool
 
