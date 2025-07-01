@@ -44,9 +44,7 @@ async def get_user_confirmation(
 
 
 async def run_repl_session_async(agent_config: AgentConfig, benchmark_config: BenchmarkConfig) -> None:
-    """
-    Starts an interactive REPL session with the specified agent.
-    """
+    """Starts an interactive REPL session with the specified agent."""
     console = Console()
     manager = ConfirmationManager()
 
@@ -78,8 +76,11 @@ async def run_repl_session_async(agent_config: AgentConfig, benchmark_config: Be
             # Setup streaming
             streaming_callback_manager = StreamingCallbackManager()
 
-            async def streaming_callback(chunk: StreamingChunk) -> Any:
-                return await streaming_callback_manager(chunk)
+            async def streaming_callback(
+                chunk: StreamingChunk,
+                manager: StreamingCallbackManager = streaming_callback_manager,
+            ) -> Any:
+                return await manager(chunk)
 
             # Run the agent
             typer.secho("\n🤖 Agent", fg=typer.colors.BLUE, nl=False)

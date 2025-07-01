@@ -3,7 +3,7 @@ import json
 import os
 import subprocess
 from collections.abc import Callable
-from typing import Any, cast
+from typing import cast
 
 from haystack.components.agents.agent import Agent
 
@@ -87,7 +87,7 @@ def load_agent(
     return agent, git_commit_hash
 
 
-def _import_factory_from_qualified_name(qualified_name: str) -> Callable[[BenchmarkConfig], Agent]:
+def _import_factory_from_qualified_name(qualified_name: str) -> Callable[..., Agent]:
     """Load agent from qualified function name."""
     try:
         module_path, function_name = qualified_name.rsplit(".", 1)
@@ -109,7 +109,7 @@ def _import_factory_from_qualified_name(qualified_name: str) -> Callable[[Benchm
     if not callable(get_agent_func):
         raise ValueError(f"'{qualified_name}' is not callable")
 
-    return cast(Callable[[BenchmarkConfig], Agent], get_agent_func)
+    return cast(Callable[..., Agent], get_agent_func)
 
 
 def _load_from_json(json_path: str) -> Agent:

@@ -342,7 +342,6 @@ def validate_agent_config(
         raise typer.Exit(code=1)
 
 
-
 @agent_app.command("chat")
 def chat_with_agent(
     agent_config: str = typer.Argument(..., help="Path to agent configuration file (YAML)."),
@@ -369,4 +368,3 @@ def chat_with_agent(
 def create_agents_app() -> typer.Typer:
     """Create the agents CLI app."""
     return agent_app
-
