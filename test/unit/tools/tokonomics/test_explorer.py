@@ -412,3 +412,36 @@ class TestRichExplorer:
         assert "Match 2:" in result
         assert "Match 3:" not in result  # Should be limited
         assert "and 2 more matches" in result
+
+    def test_explore_string_returns_full_string(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test that exploring a string object returns the full string without pretty formatting."""
+        test_string = "This is a test string with special characters: \n\t quotes 'single' and double"
+        obj_id = store.put(test_string)
+
+        result = explorer.explore(obj_id)
+
+        # Should contain the header
+        assert f"@{obj_id} → str" in result
+        # Should contain the full original string without quotes or escaping
+        assert test_string in result
+        # The body should be exactly the string (after the header)
+        lines = result.split("\n\n", 1)
+        body = lines[1] if len(lines) > 1 else ""
+        assert body == test_string
+
+    def test_explore_nested_string_returns_full_string(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test that exploring a nested string object returns the full string without pretty formatting."""
+        test_string = "Nested string with newlines\nand tabs\tand quotes 'test'"
+        test_data = {"content": test_string}
+        obj_id = store.put(test_data)
+
+        result = explorer.explore(obj_id, "content")
+
+        # Should contain the header for the nested path
+        assert f"@{obj_id}.content → str" in result
+        # Should contain the full original string
+        assert test_string in result
+        # Should not be wrapped in quotes like Rich Pretty would do
+        lines = result.split("\n\n", 1)
+        body = lines[1] if len(lines) > 1 else ""
+        assert body == test_string
