@@ -266,3 +266,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
     def secrets(self) -> SecretResource:
         """Resource to interact with secrets."""
         return SecretResource(client=self)
+
+    def workspaces(self) -> WorkspaceResource:
+        """Resource to interact with workspaces."""
+        return WorkspaceResource(client=self)
