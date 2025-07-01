@@ -112,7 +112,7 @@ async def test_list_pipeline_templates_returns_template_list() -> None:
     )
     resource = FakePipelineTemplateResource(list_response=[template1, template2])
     client = FakeClient(resource)
-    result = await list_pipeline_templates(client, workspace="ws1")
+    result = await list_pipeline_templates(client=client, workspace="ws1")
 
     assert isinstance(result, PipelineTemplateList)
     assert len(result.data) == 2
@@ -126,7 +126,7 @@ async def test_list_pipeline_templates_returns_template_list() -> None:
 async def test_list_pipeline_templates_handles_resource_not_found() -> None:
     resource = FakePipelineTemplateResource(list_exception=ResourceNotFoundError())
     client = FakeClient(resource)
-    result = await list_pipeline_templates(client, workspace="invalid_ws")
+    result = await list_pipeline_templates(client=client, workspace="invalid_ws")
 
     assert isinstance(result, str)
     assert "no workspace named 'invalid_ws'" in result.lower()
@@ -136,7 +136,7 @@ async def test_list_pipeline_templates_handles_resource_not_found() -> None:
 async def test_list_pipeline_templates_handles_unexpected_error() -> None:
     resource = FakePipelineTemplateResource(list_exception=UnexpectedAPIError(status_code=500, message="Server error"))
     client = FakeClient(resource)
-    result = await list_pipeline_templates(client, workspace="ws1")
+    result = await list_pipeline_templates(client=client, workspace="ws1")
 
     assert "Failed to list pipeline templates" in result
     assert "Server error" in result
@@ -158,7 +158,7 @@ async def test_get_pipeline_template_returns_template() -> None:
     )
     resource = FakePipelineTemplateResource(get_response=template)
     client = FakeClient(resource)
-    result = await get_pipeline_template(client, workspace="ws1", template_name="test_template")
+    result = await get_pipeline_template(client=client, workspace="ws1", template_name="test_template")
 
     assert isinstance(result, PipelineTemplate)
     assert result.template_name == "test_template"
@@ -172,7 +172,7 @@ async def test_get_pipeline_template_returns_template() -> None:
 async def test_get_pipeline_template_handles_resource_not_found() -> None:
     resource = FakePipelineTemplateResource(get_exception=ResourceNotFoundError())
     client = FakeClient(resource)
-    result = await get_pipeline_template(client, workspace="ws1", template_name="invalid_template")
+    result = await get_pipeline_template(client=client, workspace="ws1", template_name="invalid_template")
 
     assert isinstance(result, str)
     assert "no pipeline template named 'invalid_template'" in result.lower()
@@ -182,7 +182,7 @@ async def test_get_pipeline_template_handles_resource_not_found() -> None:
 async def test_get_pipeline_template_handles_unexpected_error() -> None:
     resource = FakePipelineTemplateResource(get_exception=UnexpectedAPIError(status_code=500, message="Server error"))
     client = FakeClient(resource)
-    result = await get_pipeline_template(client, workspace="ws1", template_name="test_template")
+    result = await get_pipeline_template(client=client, workspace="ws1", template_name="test_template")
 
     assert "Failed to fetch pipeline template 'test_template'" in result
     assert "Server error" in result
@@ -208,7 +208,7 @@ async def test_list_pipeline_templates_with_filter() -> None:
     client = FakeClient(resource)
 
     filter_value = "pipeline_type eq 'QUERY'"
-    await list_pipeline_templates(client, workspace="ws1", filter=filter_value)
+    await list_pipeline_templates(client=client, workspace="ws1", filter=filter_value)
 
     # Verify the filter was passed to the resource
     assert resource.last_list_call_params["filter"] == filter_value
@@ -232,7 +232,7 @@ async def test_list_pipeline_templates_with_custom_sorting() -> None:
     resource = FakePipelineTemplateResource(list_response=[template])
     client = FakeClient(resource)
 
-    await list_pipeline_templates(client, workspace="ws1", limit=50, field="name", order="ASC")
+    await list_pipeline_templates(client=client, workspace="ws1", limit=50, field="name", order="ASC")
 
     # Verify parameters were passed correctly
     assert resource.last_list_call_params["limit"] == 50
@@ -261,7 +261,9 @@ async def test_list_pipeline_templates_with_filter_and_sorting() -> None:
 
     filter_value = "tags/any(tag: tag/name eq 'category:basic qa') and pipeline_type eq 'QUERY'"
 
-    await list_pipeline_templates(client, workspace="ws1", limit=25, field="name", order="ASC", filter=filter_value)
+    await list_pipeline_templates(
+        client=client, workspace="ws1", limit=25, field="name", order="ASC", filter=filter_value
+    )
 
     # Verify all parameters were passed correctly
     assert resource.last_list_call_params["limit"] == 25
@@ -305,7 +307,9 @@ async def test_search_pipeline_templates_success() -> None:
     model = FakeModel()
 
     # Search for RAG templates
-    result = await search_pipeline_templates(client, "retrieval augmented generation", model, "test_workspace")
+    result = await search_pipeline_templates(
+        client=client, query="retrieval augmented generation", model=model, workspace="test_workspace"
+    )
     assert isinstance(result, PipelineTemplateSearchResults)
     assert result.query == "retrieval augmented generation"
     assert result.total_found == 2
@@ -315,7 +319,9 @@ async def test_search_pipeline_templates_success() -> None:
     assert result.results[1].template.template_name == "chat-pipeline"
 
     # Search for chat templates
-    result = await search_pipeline_templates(client, "conversational chat interface", model, "test_workspace")
+    result = await search_pipeline_templates(
+        client=client, query="conversational chat interface", model=model, workspace="test_workspace"
+    )
     assert isinstance(result, PipelineTemplateSearchResults)
     assert result.query == "conversational chat interface"
     assert result.total_found == 2
@@ -331,7 +337,7 @@ async def test_search_pipeline_templates_no_templates() -> None:
     client = FakeClient(resource)
     model = FakeModel()
 
-    result = await search_pipeline_templates(client, "test query", model, "test_workspace")
+    result = await search_pipeline_templates(client=client, query="test query", model=model, workspace="test_workspace")
     assert isinstance(result, PipelineTemplateSearchResults)
     assert result.query == "test query"
     assert result.total_found == 0
@@ -344,5 +350,5 @@ async def test_search_pipeline_templates_api_error() -> None:
     client = FakeClient(resource)
     model = FakeModel()
 
-    result = await search_pipeline_templates(client, "test query", model, "test_workspace")
+    result = await search_pipeline_templates(client=client, query="test query", model=model, workspace="test_workspace")
     assert "Failed to retrieve pipeline templates" in result

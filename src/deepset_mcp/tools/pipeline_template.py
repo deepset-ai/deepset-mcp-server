@@ -12,6 +12,7 @@ from deepset_mcp.tools.model_protocol import ModelProtocol
 
 
 async def list_pipeline_templates(
+    *,
     client: AsyncClientProtocol,
     workspace: str,
     limit: int = 100,
@@ -41,7 +42,7 @@ async def list_pipeline_templates(
 
 
 async def get_pipeline_template(
-    client: AsyncClientProtocol, workspace: str, template_name: str
+    *, client: AsyncClientProtocol, workspace: str, template_name: str
 ) -> PipelineTemplate | str:
     """Fetches detailed information for a specific pipeline template, identified by its `template_name`.
 
@@ -52,7 +53,7 @@ async def get_pipeline_template(
     :returns: Pipeline template details or error message.
     """
     try:
-        return await client.pipeline_templates(workspace=workspace).get_template(template_name)
+        return await client.pipeline_templates(workspace=workspace).get_template(template_name=template_name)
     except ResourceNotFoundError:
         return f"There is no pipeline template named '{template_name}' in workspace '{workspace}'."
     except UnexpectedAPIError as e:
@@ -60,7 +61,7 @@ async def get_pipeline_template(
 
 
 async def search_pipeline_templates(
-    client: AsyncClientProtocol, query: str, model: ModelProtocol, workspace: str, top_k: int = 10
+    *, client: AsyncClientProtocol, query: str, model: ModelProtocol, workspace: str, top_k: int = 10
 ) -> PipelineTemplateSearchResults | str:
     """Searches for pipeline templates based on name or description using semantic similarity.
 

@@ -94,7 +94,7 @@ def test_extract_component_texts() -> None:
         },
     }
 
-    component_type, text = extract_component_texts(component_def)
+    component_type, text = extract_component_texts(component_def=component_def)
 
     assert component_type == "test.component.TestComponent"
     assert text == "TestComponent A test component"
@@ -175,7 +175,7 @@ async def test_get_component_definition_success() -> None:
         get_component_schemas_response=schema_response, get_component_io_response=io_response
     )
     client = FakeClient(resource=resource)
-    result = await get_component_definition(client, component_type)
+    result = await get_component_definition(client=client, component_type=component_type)
 
     # Check that we get a ComponentDefinition model
     assert isinstance(result, ComponentDefinition)
@@ -216,7 +216,7 @@ async def test_get_component_definition_not_found() -> None:
     response: dict[str, Any] = {"component_schema": {"definitions": {"Components": {}}}}
     resource = FakeHaystackServiceResource(get_component_schemas_response=response)
     client = FakeClient(resource=resource)
-    result = await get_component_definition(client, "nonexistent.component")
+    result = await get_component_definition(client=client, component_type="nonexistent.component")
 
     assert isinstance(result, str)
     assert "Component not found" in result
@@ -269,7 +269,7 @@ async def test_search_component_definition_success() -> None:
     model = FakeModel()
 
     # Search for converters
-    result = await search_component_definition(client, "convert excel files", model)
+    result = await search_component_definition(client=client, query="convert excel files", model=model)
     assert isinstance(result, ComponentSearchResults)
     assert result.query == "convert excel files"
     assert result.total_found == 2
@@ -280,7 +280,7 @@ async def test_search_component_definition_success() -> None:
     assert isinstance(result.results[0].similarity_score, float)
 
     # Search for readers
-    result = await search_component_definition(client, "pdf reader documents", model)
+    result = await search_component_definition(client=client, query="pdf reader documents", model=model)
     assert isinstance(result, ComponentSearchResults)
     assert result.query == "pdf reader documents"
     assert result.total_found == 2
@@ -294,7 +294,7 @@ async def test_search_component_definition_success() -> None:
 async def test_get_component_definition_api_error() -> None:
     resource = FakeHaystackServiceResource(exception=UnexpectedAPIError(status_code=500, message="API Error"))
     client = FakeClient(resource=resource)
-    result = await get_component_definition(client, "some.component")
+    result = await get_component_definition(client=client, component_type="some.component")
 
     assert isinstance(result, str)
     assert "Failed to retrieve component definition" in result
@@ -308,7 +308,7 @@ async def test_search_component_definition_no_components() -> None:
     client = FakeClient(resource=resource)
     model = FakeModel()
 
-    result = await search_component_definition(client, "test query", model)
+    result = await search_component_definition(client=client, query="test query", model=model)
     assert isinstance(result, ComponentSearchResults)
     assert result.query == "test query"
     assert result.total_found == 0
@@ -321,7 +321,7 @@ async def test_search_component_definition_api_error() -> None:
     client = FakeClient(resource=resource)
     model = FakeModel()
 
-    result = await search_component_definition(client, "test query", model)
+    result = await search_component_definition(client=client, query="test query", model=model)
     assert isinstance(result, str)
     assert "Failed to retrieve component schemas" in result
 
@@ -331,7 +331,7 @@ async def test_list_component_families_no_families() -> None:
     response: dict[str, Any] = {"component_schema": {"definitions": {"Components": {}}}}
     resource = FakeHaystackServiceResource(get_component_schemas_response=response)
     client = FakeClient(resource=resource)
-    result = await list_component_families(client)
+    result = await list_component_families(client=client)
 
     assert isinstance(result, str)
     assert "No component families found" in result
@@ -357,7 +357,7 @@ async def test_list_component_families_success() -> None:
     }
     resource = FakeHaystackServiceResource(get_component_schemas_response=response)
     client = FakeClient(resource=resource)
-    result = await list_component_families(client)
+    result = await list_component_families(client=client)
 
     assert isinstance(result, ComponentFamilyList)
     assert result.total_count == 2
@@ -375,7 +375,7 @@ async def test_list_component_families_success() -> None:
 async def test_list_component_families_api_error() -> None:
     resource = FakeHaystackServiceResource(exception=UnexpectedAPIError(status_code=500, message="API Error"))
     client = FakeClient(resource=resource)
-    result = await list_component_families(client)
+    result = await list_component_families(client=client)
 
     assert isinstance(result, str)
     assert "Failed to retrieve component families" in result
@@ -441,7 +441,7 @@ async def test_get_custom_components_success() -> None:
         get_component_schemas_response=response, get_component_io_response=io_response
     )
     client = FakeClient(resource=resource)
-    result = await get_custom_components(client)
+    result = await get_custom_components(client=client)
 
     assert isinstance(result, ComponentDefinitionList)
     assert result.total_count == 1
@@ -499,7 +499,7 @@ async def test_get_custom_components_none_found() -> None:
     }
     resource = FakeHaystackServiceResource(get_component_schemas_response=response)
     client = FakeClient(resource=resource)
-    result = await get_custom_components(client)
+    result = await get_custom_components(client=client)
 
     assert isinstance(result, str)
     assert "No custom components found" in result
@@ -509,7 +509,7 @@ async def test_get_custom_components_none_found() -> None:
 async def test_get_custom_components_api_error() -> None:
     resource = FakeHaystackServiceResource(exception=UnexpectedAPIError(status_code=500, message="API Error"))
     client = FakeClient(resource=resource)
-    result = await get_custom_components(client)
+    result = await get_custom_components(client=client)
 
     assert isinstance(result, str)
     assert "Error retrieving component schemas" in result

@@ -3,7 +3,7 @@ from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.secrets.models import Secret, SecretList
 
 
-async def list_secrets(client: AsyncClientProtocol, limit: int = 10) -> SecretList | str:
+async def list_secrets(*, client: AsyncClientProtocol, limit: int = 10) -> SecretList | str:
     """Lists all secrets available in the user's deepset organization.
 
     Use this tool to retrieve a list of secrets with their names and IDs.
@@ -24,7 +24,7 @@ async def list_secrets(client: AsyncClientProtocol, limit: int = 10) -> SecretLi
         return f"Unexpected error: {str(e)}"
 
 
-async def get_secret(client: AsyncClientProtocol, secret_id: str) -> Secret | str:
+async def get_secret(*, client: AsyncClientProtocol, secret_id: str) -> Secret | str:
     """Retrieves detailed information about a specific secret by its ID.
 
     Use this tool to get information about a specific secret when you know its ID.
@@ -36,7 +36,7 @@ async def get_secret(client: AsyncClientProtocol, secret_id: str) -> Secret | st
     :returns: Secret information or error message
     """
     try:
-        return await client.secrets().get(secret_id)
+        return await client.secrets().get(secret_id=secret_id)
     except ResourceNotFoundError as e:
         return f"Error: {str(e)}"
     except UnexpectedAPIError as e:
