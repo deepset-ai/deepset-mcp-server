@@ -1,62 +1,22 @@
 import asyncio
-import json
 from typing import Any
 
 import typer
 from haystack.dataclasses.chat_message import ChatMessage
 from haystack.dataclasses.streaming_chunk import StreamingChunk
-from rich.console import Console
-from rich.syntax import Syntax
 
 from deepset_mcp.benchmark.runner.agent_loader import load_agent
 from deepset_mcp.benchmark.runner.config import BenchmarkConfig
-from deepset_mcp.benchmark.runner.interactive import ConfirmationManager
 from deepset_mcp.benchmark.runner.models import AgentConfig
 from deepset_mcp.benchmark.runner.streaming import StreamingCallbackManager
 
 
-async def get_user_confirmation(
-    tool_name: str, tool_args: dict[str, Any], console: Console
-) -> tuple[bool, bool, str | None]:
-    """Prompt the user to confirm a tool call."""
-    console.print(f"\n[bold yellow]Tool call proposed:[/] [cyan]{tool_name}[/]")
-    if tool_args:
-        console.print("[bold yellow]Arguments:[/]")
-        # Pretty print the arguments as a JSON object
-        json_str = json.dumps(tool_args, indent=2)
-        console.print(Syntax(json_str, "json", theme="monokai", line_numbers=True))
-
-    while True:
-        response = typer.prompt(
-            "Confirm? (y)es, (n)o, (a)uto-confirm for this tool",
-            default="y",
-            show_default=False,
-        ).lower()
-
-        if response in ["y", "yes"]:
-            return True, False, None
-        if response in ["a", "auto"]:
-            return True, True, None
-        if response in ["n", "no"]:
-            feedback = typer.prompt("Provide feedback to the agent (optional)", default="", show_default=False)
-            return False, False, feedback
-        console.print("[bold red]Invalid input. Please try again.[/]")
-
-
 async def run_repl_session_async(agent_config: AgentConfig, benchmark_config: BenchmarkConfig) -> None:
     """Starts an interactive REPL session with the specified agent."""
-    console = Console()
-    manager = ConfirmationManager()
-
-    async def confirmation_callback(tool_name: str, tool_args: dict[str, Any]) -> tuple[bool, bool, str | None]:
-        return await get_user_confirmation(tool_name, tool_args, console)
-
     agent, _ = load_agent(
         config=agent_config,
         benchmark_config=benchmark_config,
         interactive=agent_config.interactive,
-        confirmation_callback=confirmation_callback,
-        confirmation_manager=manager,
     )
     history: list[ChatMessage] = []
 

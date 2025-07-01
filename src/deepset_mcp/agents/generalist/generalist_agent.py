@@ -6,18 +6,12 @@ from haystack_integrations.components.generators.anthropic.chat.chat_generator i
 from haystack_integrations.tools.mcp import MCPToolset, StdioServerInfo
 
 from deepset_mcp.benchmark.runner.config import BenchmarkConfig
-from deepset_mcp.benchmark.runner.interactive import (
-    ConfirmationCallback,
-    ConfirmationManager,
-    InteractiveMCPToolset,
-)
+from deepset_mcp.benchmark.runner.interactive import wrap_toolset_interactive
 
 
 def get_agent(
     benchmark_config: BenchmarkConfig,
     interactive: bool = False,
-    confirmation_callback: ConfirmationCallback | None = None,
-    confirmation_manager: ConfirmationManager | None = None,
 ) -> Agent:
     """Get an instance of the Generalist agent."""
     server_info = StdioServerInfo(
@@ -29,17 +23,10 @@ def get_agent(
         },
     )
 
+    tools = MCPToolset(server_info=server_info, invocation_timeout=300.0)
+
     if interactive:
-        if not confirmation_callback or not confirmation_manager:
-            raise ValueError("Confirmation callback and manager are required for interactive mode.")
-        tools = InteractiveMCPToolset(
-            server_info=server_info,
-            confirmation_callback=confirmation_callback,
-            manager=confirmation_manager,
-            invocation_timeout=300.0,
-        )
-    else:
-        tools = MCPToolset(server_info=server_info, invocation_timeout=300.0)
+        tools = wrap_toolset_interactive(tools)
 
     prompt = (Path(__file__).parent / "system_prompt.md").read_text()
     generator = AnthropicChatGenerator(

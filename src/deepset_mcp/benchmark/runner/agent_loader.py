@@ -8,10 +8,6 @@ from typing import cast
 from haystack.components.agents.agent import Agent
 
 from deepset_mcp.benchmark.runner.config import BenchmarkConfig
-from deepset_mcp.benchmark.runner.interactive import (
-    ConfirmationCallback,
-    ConfirmationManager,
-)
 from deepset_mcp.benchmark.runner.models import AgentConfig
 
 
@@ -19,8 +15,6 @@ def load_agent(
     config: AgentConfig,
     benchmark_config: BenchmarkConfig,
     interactive: bool = False,
-    confirmation_callback: ConfirmationCallback | None = None,
-    confirmation_manager: ConfirmationManager | None = None,
 ) -> tuple[Agent, str | None]:
     """
     Load an agent based on the configuration.
@@ -34,8 +28,6 @@ def load_agent(
         config: AgentConfig instance specifying how to load the agent
         benchmark_config: BenchmarkConfig instance specifying the benchmark configuration.
         interactive: Whether to load the agent in interactive mode.
-        confirmation_callback: Callback for user confirmation.
-        confirmation_manager: Manager for auto-confirmations.
 
     Returns:
         LoadedAgent containing the agent instance and metadata
@@ -66,8 +58,6 @@ def load_agent(
             agent = agent_func(
                 benchmark_config,
                 interactive=True,
-                confirmation_callback=confirmation_callback,
-                confirmation_manager=confirmation_manager,
             )
         else:
             agent = agent_func(benchmark_config)
