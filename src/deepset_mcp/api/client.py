@@ -18,6 +18,7 @@ from deepset_mcp.api.transport import (
     TransportResponse,
 )
 from deepset_mcp.api.user.resource import UserResource
+from deepset_mcp.api.workspace.resource import WorkspaceResource
 
 T = TypeVar("T")
 
@@ -265,3 +266,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
     def secrets(self) -> SecretResource:
         """Resource to interact with secrets."""
         return SecretResource(client=self)
+
+    def workspaces(self) -> WorkspaceResource:
+        """Resource to interact with workspaces."""
+        return WorkspaceResource(client=self)
