@@ -5,12 +5,7 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
-from deepset_mcp.api.client import AsyncDeepsetClient
-from deepset_mcp.tool_factory import WorkspaceMode, register_all_tools
-from deepset_mcp.tools.doc_search import (
-    get_docs_config,
-    search_docs as search_docs_tool,
-)
+from deepset_mcp.tool_factory import WorkspaceMode, register_tools
 
 # Initialize MCP Server
 mcp = FastMCP("Deepset Cloud MCP", settings={"log_level": "ERROR"})
@@ -29,41 +24,6 @@ async def deepset_copilot() -> str:
     prompt_path = Path(__file__).parent / "prompts/deepset_copilot_prompt.md"
 
     return prompt_path.read_text()
-
-
-# Check if docs search should be enabled
-docs_config = get_docs_config()
-if docs_config:
-    docs_workspace, docs_pipeline_name, docs_api_key = docs_config
-
-    async def search_docs(query: str) -> str:
-        """Search the deepset platform documentation.
-
-        This tool allows you to search through deepset's official documentation to find
-        information about features, API usage, best practices, and troubleshooting guides.
-        Use this when you need to look up specific deepset functionality or help users
-        understand how to use deepset features.
-
-        :param query: The search query to execute against the documentation.
-        :returns: The formatted search results from the documentation.
-        """
-        async with AsyncDeepsetClient(api_key=docs_api_key) as client:
-            response = await search_docs_tool(
-                client=client,
-                workspace=docs_workspace,
-                pipeline_name=docs_pipeline_name,
-                query=query,
-            )
-        return response
-
-    # Add the tool to the server
-    mcp.add_tool(search_docs)
-
-else:
-    logging.warning(
-        "Documentation search tool not enabled. To enable, set the following environment variables: "
-        "DEEPSET_DOCS_WORKSPACE, DEEPSET_DOCS_PIPELINE_NAME, DEEPSET_DOCS_API_KEY"
-    )
 
 
 def main() -> None:
@@ -97,7 +57,26 @@ def main() -> None:
         default="implicit",
         help="Whether workspace is implicit (from env) or explicit (as parameter). Default: implicit",
     )
+    parser.add_argument(
+        "--tools",
+        nargs="*",
+        help="Space-separated list of tools to register (default: all)",
+    )
+    parser.add_argument(
+        "--list-tools",
+        action="store_true",
+        help="List all available tools and exit",
+    )
     args = parser.parse_args()
+
+    # Handle --list-tools flag early
+    if args.list_tools:
+        from deepset_mcp.tool_factory import TOOL_REGISTRY
+
+        print("Available tools:")
+        for tool_name in sorted(TOOL_REGISTRY.keys()):
+            print(f"  {tool_name}")
+        return
 
     # prefer flags, fallback to env
     workspace = args.workspace or os.getenv("DEEPSET_WORKSPACE")
@@ -130,8 +109,13 @@ def main() -> None:
     if docs_api_key:
         os.environ["DEEPSET_DOCS_API_KEY"] = docs_api_key
 
-    # Register all tools based on configuration
-    register_all_tools(mcp, workspace_mode, workspace)
+    # Parse tool names if provided
+    tool_names = None
+    if args.tools:
+        tool_names = set(args.tools)
+
+    # Register tools based on configuration
+    register_tools(mcp, workspace_mode, workspace, tool_names)
 
     # run with SSE transport (HTTP+Server-Sent Events)
     mcp.run(transport="stdio")
