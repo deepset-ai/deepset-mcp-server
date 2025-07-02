@@ -28,7 +28,7 @@ The client automatically handles authentication, request management, and connect
 
 ## Core Resources
 
-The SDK provides access to seven main resources, each designed for specific aspects of the deepset platform:
+The SDK provides access to eight main resources, each designed for specific aspects of the deepset platform:
 
 ### Pipelines
 
@@ -320,6 +320,35 @@ async with AsyncDeepsetClient() as client:
     print(f"Email: {user.email}")
 ```
 
+### Workspaces
+
+Manage workspaces to organize your projects and resources:
+
+```python
+from deepset_mcp.api.client import AsyncDeepsetClient
+
+async with AsyncDeepsetClient() as client:
+    workspaces = client.workspaces()
+    
+    # List all workspaces
+    workspace_list = await workspaces.list()
+    
+    for workspace in workspace_list.data:
+        print(f"Workspace: {workspace.name}")
+        print(f"ID: {workspace.workspace_id}")
+        print(f"Default timeout: {workspace.default_idle_timeout_in_seconds}s")
+    
+    # Get a specific workspace
+    workspace = await workspaces.get("my-workspace")
+    print(f"Languages: {workspace.languages}")
+    
+    # Create a new workspace
+    await workspaces.create(name="new-workspace")
+    
+    # Delete a workspace
+    await workspaces.delete("old-workspace")
+```
+
 ## Advanced Configuration
 
 ### Custom Transport
@@ -474,6 +503,7 @@ Main client class for API access.
 - `haystack_service()`: Returns HaystackServiceResource
 - `secrets()`: Returns SecretResource
 - `users()`: Returns UserResource
+- `workspaces()`: Returns WorkspaceResource for workspace management
 
 ### Resource Classes
 
