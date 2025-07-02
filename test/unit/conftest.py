@@ -13,6 +13,7 @@ from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.secrets.protocols import SecretResourceProtocol
 from deepset_mcp.api.transport import StreamingResponse, StreamReaderProtocol, TransportResponse
 from deepset_mcp.api.user.protocols import UserResourceProtocol
+from deepset_mcp.api.workspace.protocols import WorkspaceResourceProtocol
 
 T = TypeVar("T")
 
@@ -268,4 +269,8 @@ class BaseFakeClient(AsyncClientProtocol):
 
     def secrets(self) -> SecretResourceProtocol:
         """Overwrite this method when testing SecretResource."""
+        raise NotImplementedError
+
+    def workspaces(self) -> WorkspaceResourceProtocol:
+        """Overwrite this method when testing WorkspaceResource."""
         raise NotImplementedError

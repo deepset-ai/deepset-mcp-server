@@ -86,7 +86,7 @@ You would need to perform the following steps:
 4. refer to `src/deepset_mcp/tools/pipeline.py` as a good example for tool implementations
 5. extract model or response serialization into reusable helper functions
 6. once you added a tool, import it in `src/deepset_mcp/tool_factory.py` and add it to the tool registry with the appropriate config
-7the docstring of the tool will serve as the prompt for the large language model calling the tool, make sure it has good instructions on when to use the tool, how to best use it, and what kind of answer to expect.
+7. the docstring of the tool will serve as the prompt for the large language model calling the tool, make sure it has good instructions on when to use the tool, how to best use it, and what kind of answer to expect.
 
 #### Testing the tool
 
