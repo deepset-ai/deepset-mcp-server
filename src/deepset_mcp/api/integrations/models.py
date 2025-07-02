@@ -1,12 +1,12 @@
 """Models for the integrations API."""
 
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel
 
 
-class IntegrationProvider(str, Enum):
+class IntegrationProvider(StrEnum):
     """Supported integration providers."""
 
     AWS_BEDROCK = "aws-bedrock"
