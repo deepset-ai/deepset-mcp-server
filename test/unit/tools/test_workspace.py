@@ -5,11 +5,12 @@ import pytest
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.shared_models import NoContentResponse
 from deepset_mcp.api.workspace.models import Workspace, WorkspaceList
+from deepset_mcp.api.workspace.protocols import WorkspaceResourceProtocol
 from deepset_mcp.tools.workspace import create_workspace, get_workspace, list_workspaces
 from test.unit.conftest import BaseFakeClient
 
 
-class FakeWorkspaceResource:
+class FakeWorkspaceResource(WorkspaceResourceProtocol):
     """Fake workspace resource for testing."""
 
     def __init__(
@@ -17,16 +18,20 @@ class FakeWorkspaceResource:
         list_response: list[Workspace] | None = None,
         get_response: Workspace | None = None,
         create_response: NoContentResponse | None = None,
+        delete_response: NoContentResponse | None = None,
         list_exception: Exception | None = None,
         get_exception: Exception | None = None,
         create_exception: Exception | None = None,
+        delete_exception: Exception | None = None,
     ) -> None:
         self._list_response = list_response
         self._get_response = get_response
         self._create_response = create_response
+        self._delete_response = delete_response
         self._list_exception = list_exception
         self._get_exception = get_exception
         self._create_exception = create_exception
+        self._delete_exception = delete_exception
 
     async def list(self) -> WorkspaceList:
         """List all workspaces."""
@@ -52,6 +57,14 @@ class FakeWorkspaceResource:
             return self._create_response
         raise NotImplementedError
 
+    async def delete(self, workspace_name: str) -> NoContentResponse:
+        """Delete a workspace."""
+        if self._delete_exception:
+            raise self._delete_exception
+        if self._delete_response is not None:
+            return self._delete_response
+        raise NotImplementedError
+
 
 class FakeClient(BaseFakeClient):
     """Fake client for testing workspace tools."""
@@ -60,7 +73,7 @@ class FakeClient(BaseFakeClient):
         self._resource = resource
         super().__init__()
 
-    def workspaces(self) -> FakeWorkspaceResource:
+    def workspaces(self) -> WorkspaceResourceProtocol:
         return self._resource
 
 
@@ -166,9 +179,7 @@ async def test_get_workspace_handles_bad_request_error() -> None:
 @pytest.mark.asyncio
 async def test_get_workspace_handles_unexpected_api_error() -> None:
     """Test that get_workspace handles UnexpectedAPIError."""
-    resource = FakeWorkspaceResource(
-        get_exception=UnexpectedAPIError(status_code=503, message="Service unavailable")
-    )
+    resource = FakeWorkspaceResource(get_exception=UnexpectedAPIError(status_code=503, message="Service unavailable"))
     client = FakeClient(resource)
 
     result = await get_workspace(client=client, workspace_name="test-workspace")
@@ -205,9 +216,7 @@ async def test_create_workspace_handles_bad_request_error() -> None:
 @pytest.mark.asyncio
 async def test_create_workspace_handles_unexpected_api_error() -> None:
     """Test that create_workspace handles UnexpectedAPIError."""
-    resource = FakeWorkspaceResource(
-        create_exception=UnexpectedAPIError(status_code=500, message="Database error")
-    )
+    resource = FakeWorkspaceResource(create_exception=UnexpectedAPIError(status_code=500, message="Database error"))
     client = FakeClient(resource)
 
     result = await create_workspace(client=client, name="test-workspace")

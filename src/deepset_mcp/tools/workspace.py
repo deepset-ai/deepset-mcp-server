@@ -10,7 +10,7 @@ async def list_workspaces(*, client: AsyncClientProtocol) -> WorkspaceList | str
     """Retrieves a list of all workspaces available to the user.
 
     This tool provides an overview of all workspaces that the user has access to.
-    Each workspace contains information about its name, ID, supported languages, 
+    Each workspace contains information about its name, ID, supported languages,
     and default idle timeout settings.
 
     :param client: The async client for API communication.
@@ -44,9 +44,9 @@ async def get_workspace(*, client: AsyncClientProtocol, workspace_name: str) -> 
 async def create_workspace(*, client: AsyncClientProtocol, name: str) -> NoContentResponse | str:
     """Creates a new workspace with the specified name.
 
-    This tool creates a new workspace that can be used to organize pipelines, 
-    indexes, and other resources. The workspace name must be unique across 
-    the platform. Once created, you can start deploying pipelines and other 
+    This tool creates a new workspace that can be used to organize pipelines,
+    indexes, and other resources. The workspace name must be unique across
+    the platform. Once created, you can start deploying pipelines and other
     resources within this workspace.
 
     :param client: The async client for API communication.
