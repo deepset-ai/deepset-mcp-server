@@ -5,6 +5,7 @@ from typing import Any, Literal, Protocol, Self, TypeVar, overload
 from deepset_mcp.api.custom_components.protocols import CustomComponentsProtocol
 from deepset_mcp.api.haystack_service.protocols import HaystackServiceProtocol
 from deepset_mcp.api.indexes.protocols import IndexResourceProtocol
+from deepset_mcp.api.integrations.protocols import IntegrationResourceProtocol
 from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
 from deepset_mcp.api.pipeline_template.protocols import PipelineTemplateResourceProtocol
 from deepset_mcp.api.secrets.protocols import SecretResourceProtocol
@@ -114,4 +115,8 @@ class AsyncClientProtocol(Protocol):
 
     def workspaces(self) -> "WorkspaceResourceProtocol":
         """Access workspaces."""
+        ...
+
+    def integrations(self) -> "IntegrationResourceProtocol":
+        """Access integrations."""
         ...

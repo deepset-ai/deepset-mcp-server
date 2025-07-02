@@ -28,7 +28,7 @@ The client automatically handles authentication, request management, and connect
 
 ## Core Resources
 
-The SDK provides access to eight main resources, each designed for specific aspects of the deepset platform:
+The SDK provides access to nine main resources, each designed for specific aspects of the deepset platform:
 
 ### Pipelines
 
@@ -272,6 +272,29 @@ async with AsyncDeepsetClient() as client:
         print(f"Version: {installation.version}")
 ```
 
+### Integrations
+
+Manage external service integrations:
+
+```python
+from deepset_mcp.api.client import AsyncDeepsetClient
+from deepset_mcp.api.integrations.models import IntegrationProvider
+
+async with AsyncDeepsetClient() as client:
+    integrations = client.integrations()
+    
+    # List all integrations
+    integration_list = await integrations.list()
+    
+    for integration in integration_list.integrations:
+        print(f"Provider: {integration.provider}")
+        print(f"Domain: {integration.provider_domain}")
+        
+    # Get a specific integration by provider
+    openai_integration = await integrations.get(IntegrationProvider.OPENAI)
+    print(f"OpenAI Integration: {openai_integration.provider_domain}")
+```
+
 ### Secrets
 
 Manage secrets for secure configuration and sensitive data:
@@ -500,6 +523,7 @@ Main client class for API access.
 - `indexes(workspace: str)`: Returns IndexResource for the specified workspace
 - `pipeline_templates(workspace: str)`: Returns PipelineTemplateResource for the specified workspace
 - `custom_components(workspace: str)`: Returns CustomComponentsResource for the specified workspace
+- `integrations()`: Returns IntegrationResource
 - `haystack_service()`: Returns HaystackServiceResource
 - `secrets()`: Returns SecretResource
 - `users()`: Returns UserResource
