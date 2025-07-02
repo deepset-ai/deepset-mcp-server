@@ -2,6 +2,7 @@
 
 import functools
 import inspect
+import logging
 import os
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -16,6 +17,10 @@ from deepset_mcp.store import STORE
 from deepset_mcp.tools.custom_components import (
     get_latest_custom_component_installation_logs as get_latest_custom_component_installation_logs_tool,
     list_custom_component_installations as list_custom_component_installations_tool,
+)
+from deepset_mcp.tools.doc_search import (
+    get_docs_config,
+    search_docs as search_docs_tool,
 )
 from deepset_mcp.tools.haystack_service import (
     get_component_definition as get_component_definition_tool,
@@ -90,6 +95,32 @@ def get_slice_from_object_store(
     :return: String representation of the slice.
     """
     return EXPLORER.slice(obj_id=object_id, start=start, end=end, path=path)
+
+
+async def search_docs(query: str) -> str:
+    """Search the deepset platform documentation.
+
+    This tool allows you to search through deepset's official documentation to find
+    information about features, API usage, best practices, and troubleshooting guides.
+    Use this when you need to look up specific deepset functionality or help users
+    understand how to use deepset features.
+
+    :param query: The search query to execute against the documentation.
+    :returns: The formatted search results from the documentation.
+    """
+    docs_config = get_docs_config()
+    if not docs_config:
+        raise RuntimeError("Documentation search configuration not available")
+
+    docs_workspace, docs_pipeline_name, docs_api_key = docs_config
+    async with AsyncDeepsetClient(api_key=docs_api_key) as client:
+        response = await search_docs_tool(
+            client=client,
+            workspace=docs_workspace,
+            pipeline_name=docs_pipeline_name,
+            query=query,
+        )
+    return response
 
 
 class WorkspaceMode(StrEnum):
@@ -236,6 +267,7 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "create_workspace": (create_workspace_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "get_from_object_store": (get_from_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
     "get_slice_from_object_store": (get_slice_from_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
+    "search_docs": (search_docs, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
 }
 
 
@@ -388,15 +420,53 @@ def create_enhanced_tool(
     return wrapper
 
 
-def register_all_tools(mcp: FastMCP, workspace_mode: WorkspaceMode, workspace: str | None = None) -> None:
-    """Register all tools with unified configuration.
+def register_tools(
+    mcp: FastMCP, workspace_mode: WorkspaceMode, workspace: str | None = None, tool_names: set[str] | None = None
+) -> None:
+    """Register tools with unified configuration.
 
     Args:
         mcp: FastMCP server instance
         workspace_mode: How workspace should be handled
         workspace: Workspace to use for implicit mode (if None, reads from env)
+        tool_names: Set of tool names to register (if None, registers all tools)
     """
-    for tool_name, (base_func, config) in TOOL_REGISTRY.items():
+    # Check if docs search is available
+    docs_available = get_docs_config() is not None
+
+    # Validate tool names if provided
+    if tool_names is not None:
+        all_tools = set(TOOL_REGISTRY.keys())
+        invalid_tools = tool_names - all_tools
+        if invalid_tools:
+            sorted_invalid = sorted(invalid_tools)
+            sorted_all = sorted(all_tools)
+            raise ValueError(f"Unknown tools: {', '.join(sorted_invalid)}\nAvailable tools: {', '.join(sorted_all)}")
+
+        # Warn if search_docs was requested but config is missing
+        if "search_docs" in tool_names and not docs_available:
+            logging.warning(
+                "Documentation search tool requested but not available. To enable, set the following environment "
+                "variables: DEEPSET_DOCS_WORKSPACE, DEEPSET_DOCS_PIPELINE_NAME, DEEPSET_DOCS_API_KEY"
+            )
+
+        tools_to_register = tool_names.copy()
+    else:
+        tools_to_register = set(TOOL_REGISTRY.keys())
+
+        # Warn if search_docs would be skipped in "all tools" mode
+        if not docs_available:
+            logging.warning(
+                "Documentation search tool not enabled. To enable, set the following environment "
+                "variables: DEEPSET_DOCS_WORKSPACE, DEEPSET_DOCS_PIPELINE_NAME, DEEPSET_DOCS_API_KEY"
+            )
+
+    # Remove search_docs if config is not available
+    if not docs_available:
+        tools_to_register.discard("search_docs")
+
+    for tool_name in tools_to_register:
+        base_func, config = TOOL_REGISTRY[tool_name]
         # Create enhanced tool
         enhanced_tool = create_enhanced_tool(base_func, config, workspace_mode, workspace)
 
