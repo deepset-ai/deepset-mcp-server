@@ -275,3 +275,7 @@ class BaseFakeClient(AsyncClientProtocol):
     def workspaces(self) -> WorkspaceResourceProtocol:
         """Overwrite this method when testing WorkspaceResource."""
         raise NotImplementedError
+
+    def integrations(self) -> IntegrationResourceProtocol:
+        """Overwrite this method when testing IntegrationResource."""
+        raise NotImplementedError
