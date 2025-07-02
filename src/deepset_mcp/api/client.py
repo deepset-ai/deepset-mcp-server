@@ -7,6 +7,7 @@ from typing import Any, Literal, Self, TypeVar, overload
 from deepset_mcp.api.custom_components.resource import CustomComponentsResource
 from deepset_mcp.api.haystack_service.resource import HaystackServiceResource
 from deepset_mcp.api.indexes.resource import IndexResource
+from deepset_mcp.api.integrations.resource import IntegrationResource
 from deepset_mcp.api.pipeline.resource import PipelineResource
 from deepset_mcp.api.pipeline_template.resource import PipelineTemplateResource
 from deepset_mcp.api.protocols import AsyncClientProtocol
