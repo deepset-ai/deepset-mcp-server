@@ -1,7 +1,7 @@
 """Models for the integrations API."""
 
 from enum import Enum
-from typing import List
+from typing import Iterator
 from uuid import UUID
 
 from pydantic import BaseModel
