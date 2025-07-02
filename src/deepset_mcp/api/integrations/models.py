@@ -40,12 +40,18 @@ class Integration(BaseModel):
 class IntegrationList(BaseModel):
     """Model representing a list of integrations."""
 
-    integrations: List[Integration]
+    integrations: list[Integration]
 
-    def __iter__(self):
-        """Make the list iterable."""
+    def __iter__(self) -> Iterator[Integration]:
+        """Make the list iterable.
+        
+        :returns: Iterator over integrations.
+        """
         return iter(self.integrations)
 
-    def __len__(self):
-        """Return the length of the list."""
+    def __len__(self) -> int:
+        """Return the length of the list.
+        
+        :returns: Number of integrations.
+        """
         return len(self.integrations)
