@@ -57,6 +57,10 @@ from deepset_mcp.tools.workspace import (
     get_workspace as get_workspace_tool,
     list_workspaces as list_workspaces_tool,
 )
+from deepset_mcp.tools.integrations import (
+    list_integrations as list_integrations_tool,
+    get_integration as get_integration_tool,
+)
 
 EXPLORER = RichExplorer(store=STORE)
 
