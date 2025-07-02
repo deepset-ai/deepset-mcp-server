@@ -271,3 +271,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
     def workspaces(self) -> WorkspaceResource:
         """Resource to interact with workspaces."""
         return WorkspaceResource(client=self)
+
+    def integrations(self) -> IntegrationResource:
+        """Resource to interact with integrations."""
+        return IntegrationResource(client=self)
