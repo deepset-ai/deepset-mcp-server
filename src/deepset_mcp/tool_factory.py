@@ -52,6 +52,11 @@ from deepset_mcp.tools.secrets import (
     list_secrets as list_secrets_tool,
 )
 from deepset_mcp.tools.tokonomics import RichExplorer, explorable, explorable_and_referenceable, referenceable
+from deepset_mcp.tools.workspace import (
+    create_workspace as create_workspace_tool,
+    get_workspace as get_workspace_tool,
+    list_workspaces as list_workspaces_tool,
+)
 
 EXPLORER = RichExplorer(store=STORE)
 
@@ -226,6 +231,9 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     ),
     "list_secrets": (list_secrets_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "get_secret": (get_secret_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
+    "list_workspaces": (list_workspaces_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
+    "get_workspace": (get_workspace_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
+    "create_workspace": (create_workspace_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "get_from_object_store": (get_from_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
     "get_slice_from_object_store": (get_slice_from_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
 }
