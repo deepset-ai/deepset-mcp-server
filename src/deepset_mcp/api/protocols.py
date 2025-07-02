@@ -116,3 +116,7 @@ class AsyncClientProtocol(Protocol):
     def workspaces(self) -> "WorkspaceResourceProtocol":
         """Access workspaces."""
         ...
+
+    def integrations(self) -> "IntegrationResourceProtocol":
+        """Access integrations."""
+        ...
