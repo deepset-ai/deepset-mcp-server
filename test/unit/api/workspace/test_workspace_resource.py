@@ -4,7 +4,7 @@ from uuid import UUID
 
 import pytest
 
-from deepset_mcp.api.exceptions import UnexpectedAPIError
+from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.shared_models import NoContentResponse
 from deepset_mcp.api.transport import TransportResponse
 from deepset_mcp.api.workspace.models import Workspace, WorkspaceList
@@ -73,6 +73,7 @@ class TestWorkspaceResourceList:
     @pytest.mark.asyncio
     async def test_list_empty_response(self) -> None:
         """Test handling of empty workspace list."""
+
         # Arrange
         class FakeWorkspaceClient(BaseFakeClient):
             def __init__(self) -> None:
@@ -96,6 +97,7 @@ class TestWorkspaceResourceList:
     @pytest.mark.asyncio
     async def test_list_null_response(self) -> None:
         """Test handling of null JSON response."""
+
         # Arrange
         class FakeWorkspaceClient(BaseFakeClient):
             def __init__(self) -> None:
@@ -119,6 +121,7 @@ class TestWorkspaceResourceList:
     @pytest.mark.asyncio
     async def test_list_error_response(self) -> None:
         """Test handling of error response."""
+
         # Arrange
         class FakeWorkspaceClient(BaseFakeClient):
             def __init__(self) -> None:
@@ -179,6 +182,7 @@ class TestWorkspaceResourceGet:
     @pytest.mark.asyncio
     async def test_get_not_found(self) -> None:
         """Test handling of workspace not found."""
+
         # Arrange
         class FakeWorkspaceClient(BaseFakeClient):
             def __init__(self) -> None:
@@ -193,7 +197,7 @@ class TestWorkspaceResourceGet:
         resource = client.workspaces()
 
         # Act & Assert
-        with pytest.raises(UnexpectedAPIError):
+        with pytest.raises(ResourceNotFoundError):
             await resource.get("nonexistent")
 
 
@@ -203,6 +207,7 @@ class TestWorkspaceResourceCreate:
     @pytest.mark.asyncio
     async def test_create_success(self) -> None:
         """Test successful workspace creation."""
+
         # Arrange
         class FakeWorkspaceClient(BaseFakeClient):
             def __init__(self) -> None:
@@ -231,12 +236,11 @@ class TestWorkspaceResourceCreate:
     @pytest.mark.asyncio
     async def test_create_error(self) -> None:
         """Test handling of creation error."""
+
         # Arrange
         class FakeWorkspaceClient(BaseFakeClient):
             def __init__(self) -> None:
-                super().__init__(
-                    responses={"v1/workspaces": TransportResponse(text="Bad Request", status_code=400)}
-                )
+                super().__init__(responses={"v1/workspaces": TransportResponse(text="Bad Request", status_code=400)})
 
             def workspaces(self) -> WorkspaceResource:
                 return WorkspaceResource(client=self)
@@ -245,7 +249,7 @@ class TestWorkspaceResourceCreate:
         resource = client.workspaces()
 
         # Act & Assert
-        with pytest.raises(UnexpectedAPIError):
+        with pytest.raises(BadRequestError):
             await resource.create("invalid-workspace")
 
 
@@ -255,10 +259,13 @@ class TestWorkspaceResourceDelete:
     @pytest.mark.asyncio
     async def test_delete_success(self) -> None:
         """Test successful workspace deletion."""
+
         # Arrange
         class FakeWorkspaceClient(BaseFakeClient):
             def __init__(self) -> None:
-                super().__init__(responses={"v1/workspaces/test-workspace": TransportResponse(text="", status_code=204)})
+                super().__init__(
+                    responses={"v1/workspaces/test-workspace": TransportResponse(text="", status_code=204)}
+                )
 
             def workspaces(self) -> WorkspaceResource:
                 return WorkspaceResource(client=self)
@@ -282,6 +289,7 @@ class TestWorkspaceResourceDelete:
     @pytest.mark.asyncio
     async def test_delete_not_found(self) -> None:
         """Test handling of workspace not found during deletion."""
+
         # Arrange
         class FakeWorkspaceClient(BaseFakeClient):
             def __init__(self) -> None:
@@ -296,5 +304,5 @@ class TestWorkspaceResourceDelete:
         resource = client.workspaces()
 
         # Act & Assert
-        with pytest.raises(UnexpectedAPIError):
+        with pytest.raises(ResourceNotFoundError):
             await resource.delete("nonexistent")
