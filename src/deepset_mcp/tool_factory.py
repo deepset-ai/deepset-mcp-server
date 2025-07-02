@@ -52,6 +52,11 @@ from deepset_mcp.tools.secrets import (
     list_secrets as list_secrets_tool,
 )
 from deepset_mcp.tools.tokonomics import RichExplorer, explorable, explorable_and_referenceable, referenceable
+from deepset_mcp.tools.workspace import (
+    create_workspace as create_workspace_tool,
+    get_workspace as get_workspace_tool,
+    list_workspaces as list_workspaces_tool,
+)
 
 EXPLORER = RichExplorer(store=STORE)
 
