@@ -1,9 +1,10 @@
 """Unit tests for IntegrationResource."""
 
-import pytest
 from uuid import UUID
 
-from deepset_mcp.api.exceptions import DeepsetAPIError
+import pytest
+
+from deepset_mcp.api.exceptions import DeepsetAPIError, ResourceNotFoundError
 from deepset_mcp.api.integrations.models import Integration, IntegrationList, IntegrationProvider
 from deepset_mcp.api.integrations.resource import IntegrationResource
 from deepset_mcp.api.transport import TransportResponse
@@ -39,9 +40,7 @@ class TestIntegrationResource:
                 "provider_domain": "api.openai.com",
             },
         ]
-        client = FakeClientForIntegrationResource(
-            responses={"v1/model_registry_tokens": mock_response}
-        )
+        client = FakeClientForIntegrationResource(responses={"v1/model_registry_tokens": mock_response})
 
         # Act
         result = await client.integrations().list()
@@ -49,12 +48,12 @@ class TestIntegrationResource:
         # Assert
         assert isinstance(result, IntegrationList)
         assert len(result) == 2
-        
+
         assert result.integrations[0].invalid is False
         assert result.integrations[0].model_registry_token_id == UUID("3fa85f64-5717-4562-b3fc-2c963f66afa6")
         assert result.integrations[0].provider == IntegrationProvider.AWS_BEDROCK
         assert result.integrations[0].provider_domain == "us-east-1"
-        
+
         assert result.integrations[1].invalid is True
         assert result.integrations[1].model_registry_token_id == UUID("4fa85f64-5717-4562-b3fc-2c963f66afa7")
         assert result.integrations[1].provider == IntegrationProvider.OPENAI
@@ -63,9 +62,7 @@ class TestIntegrationResource:
     async def test_list_integrations_empty_response(self) -> None:
         """Test listing integrations with empty response."""
         # Arrange
-        client = FakeClientForIntegrationResource(
-            responses={"v1/model_registry_tokens": []}
-        )
+        client = FakeClientForIntegrationResource(responses={"v1/model_registry_tokens": []})
 
         # Act
         result = await client.integrations().list()
@@ -94,7 +91,7 @@ class TestIntegrationResource:
         """Test listing integrations with API error."""
         # Arrange
         client = FakeClientForIntegrationResource(
-            responses={"v1/model_registry_tokens": DeepsetAPIError("API Error", status_code=500)}
+            responses={"v1/model_registry_tokens": DeepsetAPIError(message="API Error", status_code=500)}
         )
 
         # Act & Assert
@@ -110,9 +107,7 @@ class TestIntegrationResource:
             "provider": "aws-bedrock",
             "provider_domain": "us-east-1",
         }
-        client = FakeClientForIntegrationResource(
-            responses={"v1/model_registry_tokens/aws-bedrock": mock_response}
-        )
+        client = FakeClientForIntegrationResource(responses={"v1/model_registry_tokens/aws-bedrock": mock_response})
 
         # Act
         result = await client.integrations().get(IntegrationProvider.AWS_BEDROCK)
@@ -133,9 +128,7 @@ class TestIntegrationResource:
             "provider": "openai",
             "provider_domain": "api.openai.com",
         }
-        client = FakeClientForIntegrationResource(
-            responses={"v1/model_registry_tokens/openai": mock_response}
-        )
+        client = FakeClientForIntegrationResource(responses={"v1/model_registry_tokens/openai": mock_response})
 
         # Act
         result = await client.integrations().get(IntegrationProvider.OPENAI)
@@ -151,7 +144,7 @@ class TestIntegrationResource:
         """Test getting integration with API error."""
         # Arrange
         client = FakeClientForIntegrationResource(
-            responses={"v1/model_registry_tokens/aws-bedrock": DeepsetAPIError("Not Found", status_code=404)}
+            responses={"v1/model_registry_tokens/aws-bedrock": ResourceNotFoundError("Not Found")}
         )
 
         # Act & Assert
@@ -179,7 +172,7 @@ class TestIntegrationResource:
             IntegrationProvider.MONGODB,
             IntegrationProvider.TOGETHER_AI,
         ]
-        
+
         responses = {}
         for provider in providers_to_test:
             responses[f"v1/model_registry_tokens/{provider.value}"] = {
@@ -188,7 +181,7 @@ class TestIntegrationResource:
                 "provider": provider.value,
                 "provider_domain": "example.com",
             }
-        
+
         client = FakeClientForIntegrationResource(responses=responses)
 
         # Act & Assert
@@ -197,36 +190,3 @@ class TestIntegrationResource:
             assert isinstance(result, Integration)
             assert result.provider == provider
             assert result.provider_domain == "example.com"
-
-    async def test_integration_list_iteration(self) -> None:
-        """Test that IntegrationList can be iterated over."""
-        # Arrange
-        mock_response = [
-            {
-                "invalid": False,
-                "model_registry_token_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-                "provider": "aws-bedrock",
-                "provider_domain": "us-east-1",
-            },
-            {
-                "invalid": True,
-                "model_registry_token_id": "4fa85f64-5717-4562-b3fc-2c963f66afa7",
-                "provider": "openai",
-                "provider_domain": "api.openai.com",
-            },
-        ]
-        client = FakeClientForIntegrationResource(
-            responses={"v1/model_registry_tokens": mock_response}
-        )
-
-        # Act
-        result = await client.integrations().list()
-
-        # Assert - test iteration
-        integrations = list(result)
-        assert len(integrations) == 2
-        assert all(isinstance(integration, Integration) for integration in integrations)
-        
-        # Assert - test direct access
-        assert result.integrations[0].provider == IntegrationProvider.AWS_BEDROCK
-        assert result.integrations[1].provider == IntegrationProvider.OPENAI

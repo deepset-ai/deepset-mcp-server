@@ -1,7 +1,6 @@
 """Models for the integrations API."""
 
 from enum import Enum
-from typing import Iterator
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -42,16 +41,9 @@ class IntegrationList(BaseModel):
 
     integrations: list[Integration]
 
-    def __iter__(self) -> Iterator[Integration]:
-        """Make the list iterable.
-        
-        :returns: Iterator over integrations.
-        """
-        return iter(self.integrations)
-
     def __len__(self) -> int:
         """Return the length of the list.
-        
+
         :returns: Number of integrations.
         """
         return len(self.integrations)
