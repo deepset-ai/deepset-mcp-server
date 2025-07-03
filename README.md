@@ -1,8 +1,30 @@
 # MCP Server for the deepset AI platform
 
 The deepset MCP server exposes tools that MCP clients like Claude or Cursor can use to interact with the deepset AI platform.
-Use these tools to develop pipelines, or to get information about components and how they are defined.
 
+Agents can use these tools to:
+
+- develop and iterate on Pipelines or Indexes
+- debug Pipelines and Indexes
+- search the deepset AI platform documentation
+
+## Contents
+
+- [1. Installation](#installation)
+  - [1.1. Claude Desktop](#claude-desktop-app)
+  - [1.2. Other MCP Clients](#other-mcp-clients)
+  - [1.3. Advanced Configuration](#advanced-configuration)
+- [2. Prompts](#prompts)
+- [3. Use Cases](#use-cases)
+  - [3.1. Creating Pipelines](#creating-pipelines)
+  - [3.2. Debugging Pipelines](#debugging-pipelines)
+- [4. CLI](#cli)
+
+
+
+
+
+![GIF showing CLI interaction with the MCP server](assets/deepset-mcp-3.gif)
 
 
 ## Installation
@@ -12,7 +34,7 @@ Use these tools to develop pipelines, or to get information about components and
 **Prerequisites:**
 - [Claude Desktop App](https://claude.ai/download) needs to be installed
 - You need to be on the Claude Pro, Team, Max, or Enterprise plan
-- You need an installation of [Docker](https://docs.docker.com/desktop/) (scroll down to the `uv` section if you want to use `uv` instead of Docker)
+- You need an installation of [Docker](https://docs.docker.com/desktop/) ([Go here](#using-uv-instead-of-docker) if you want to use `uv` instead of Docker)
 - You need an [API key](https://docs.cloud.deepset.ai/docs/generate-api-key) for the deepset platform
 
 **Steps:**
@@ -51,7 +73,7 @@ Use these tools to develop pipelines, or to get information about components and
 
 
 
-**(Optional) Running the server with uv instead of Docker**
+#### Using uv instead of Docker
 
 Running the server with uv gives you faster startup time and consumes slightly less resources on your system.
 
@@ -85,54 +107,147 @@ Running the server with uv gives you faster startup time and consumes slightly l
 
 ### Other MCP Clients
 
-The repo was not tested with other MCP clients but tools like Cursor or the Haystack MCP package should work out of the box.
+`deepset-mcp` can be used with other MCP clients.
+
+Here is where you need to configure `deepset-mcp` for:
+
+- [Cursor](https://docs.cursor.com/context/mcp#using-mcp-json)
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code/mcp#configure-mcp-servers)
+- [Gemini CLI](https://cloud.google.com/gemini/docs/codeassist/use-agentic-chat-pair-programmer#configure-mcp-servers)
+
+Generally speaking, depending on your installation, you need to configure an MCP client with one of the following commands:
+
+`uv --directory path/to/deepset-mcp run deepset-mcp --workspace your_workspace --api-key your_api_key`
+
+If you installed the deepset-mcp package globally and added it to your `PATH`, you can just run:
+
+`deepset-mcp --workspace your_workspace --api-key your_api_key`
+
+The server runs locally using `stdio` to communicate with the client.
+
+### Advanced Configuration
+
+#### Tool Selection
+
+You can customize which tools the MCP server should expose.
+Use the `´--tools`-option in your config to explicitly specify which tools should be exposed.
+
+You can list available tools with: `deepset-mcp --list-tools`.
+
+To only expose the `list_pipelines` and `get_pipeline` tools you would use the following command:
+
+`deepset-mcp --tools list_pipelines get_pipeline`
+
+For smooth operations, you should always expose the `get_from_object_store` and `get_slice_from_object_store` tools.
 
 
-## Usage
+#### Allowing access to multiple workspaces
 
-_Assuming you are using the MCP server through Claude Desktop and you are part of the deepset organization._
+The basic configuration uses a hardcoded workspace which you pass in via the `DEEPSET_WORKSPACE` environment variable.
+If you want to allow an agent to access resources from multiple workspaces, you can use `--workspace-mode explicit`
+in your config.
 
-**Setup:**
-1. Go to "Projects" in Claude Desktop
-2. Select the "Your Team"-tab
-3. Select the "deepset-copilot" project
+For example:
 
-![Screenshot of the Projects menu in the Claude Desktop App.](assets/claude_desktop_projects.png)
+```json
+{
+  "mcpServers": {
+    "deepset": {
+      "command": "/opt/homebrew/bin/uv",
+      "args": [
+        "--directory",
+        "/path/to/your/clone/of/deepset-mcp-server",
+        "run",
+        "deepset-mcp",
+        "--workspace-mode",
+        "explicit"
+      ],
+      "env": {
+       "DEEPSET_API_KEY":"<DEEPSET_API_KEY>"
+     }
 
-The _deepset-copilot_ project contains system instructions that are optimized for the deepset MCP server.
+    }
+  }
+}
+```
 
-You can also access the system prompt [here](src/deepset_mcp/prompts/deepset_copilot_prompt.md).
-
-The MCP server also exposes the system prompt as the `deepset_copilot`-prompt.
-In Claude Desktop you can click on the plus-sign below the chat bar and select "Add from deepset" to add the prompt.
-However, this will only load the prompt as text context into your message. It won't set the prompt as system instructions.
-Using it via system instructions in Claude Desktop yields better results.
-
-Using these instructions with Claude will help you to create or update pipelines.
-You can also ask questions about pipelines in the workspace or get information about components
-(e.g. What init params do they accept? What inputs and outputs do they have?).
-
-You can activate and deactivate specific tools in the "Search and tools"-menu that is available below the chat bar.
-
-Claude will ask for your permission before a tool call is executed. You can opt to "allow once", "allow always" or "deny".
-
-
-
-**Limitations**
-
-Unfortunately, you need to set the workspace and organization (through the API key) in the `claude_desktop_config.json`.
-There is no way to pass the API key dynamically to Claude in a secure way.
-The workspace could be passed into the tool call, it's an easy enhancement, but I'd like to get feedback first.
+An agent using the MCP server now has access to all workspaces that the API-key has access to. When interacting with most
+resources, you will need to tell the agent what workspace it should use to perform an action. Instead of prompting it
+with "list my pipelines", you would now have to prompt it with "list my pipelines in the staging workspace".
 
 
+## Prompts
+
+All tools exposed through the MCP server have minimal prompts. Any Agent interacting with these tools benefits from an additional system prompt.
+
+View the **recommended prompt** [here](src/deepset_mcp/prompts/deepset_debugging_agent.md).
+
+This prompt is also exposed as the `deepset_recommended_prompt` on the MCP server.
+In Claude Desktop, click `add from deepset` to add the prompt to your context.
+A better way to add system prompts in Claude Desktop is through "Projects".
+
+You can customize the system prompt to your specific needs.
 
 
-## Further improvements ideas
+## Use Cases
 
-- expose standard prompts via MCP e.g., for debugging, fixing pipelines, reading logs etc
-- fix the docker run command to clear cache
-- the ability to dump the conversation of improving the copilot
-- test with different clients other than Claude Desktop app
+The primary way to use the deepset MCP server is through an LLM that interacts with the deepset MCP tools in an agentic way.
+
+### Creating Pipelines
+
+Tell the LLM about the type of pipeline you want to build. Creating new pipelines will work best if you use terminology
+that is similar to what is used on the deepset AI platform or in Haystack.
+
+Your prompts should be precise and specific.
+
+Examples:
+
+- "Build a RAG pipeline with hybrid retrieval that uses claude-sonnet-4 from Anthropic as the LLM."
+- "Build an Agent that can iteratively search the web (deep research). Use SerperDev for web search and GPT-4o as the LLM."
+
+You can also instruct the LLM to deploy pipelines, and it can issue search requests against pipelines to test them.
+
+**Best Practices**
+
+- be specific in your requests
+- point the LLM to examples, if there is already a similar pipeline in your workspace, then ask it to look at it first, 
+if you have a template in mind, ask it to look at the template
+- instruct the LLM to iterate with you locally before creating the pipeline, have it validate the drafts and then let it 
+create it once the pipeline is up to your standards
 
 
+### Debugging Pipelines
 
+The `deepset-mcp` tools allow LLMs to debug pipelines on the deepset AI platform.
+Primary tools used for debugging are:
+- get_logs
+- validate_pipeline
+- search_pipeline
+- search_pipeline_templates
+- search_component_definition
+
+You can ask the LLM to check the logs of a specific pipeline in case it is already deployed but has errors.
+The LLM will find errors in the logs and devise strategies to fix them.
+If your pipeline is not deployed yet, the LLM can autonomously validate it and fix validation errors.
+
+## CLI
+You can use the MCP server as a Haystack Agent through a command-line interface.
+
+Install with `uv pip install deepset-mcp[cli]`.
+
+Start the interactive CLI with:
+
+`deepset agent chat`
+
+You can set environment variables before starting the Agent via:
+
+```shell
+export DEEPSET_API_KEY=your_key
+export DEEPSET_WORKSPACE=your_workspace
+```
+
+You can also provide an `.env` file using the `--env-file` option:
+
+`deepset agent chat --env-file your/env/.file`
+
+The agent will load environment variables from the file on startup.

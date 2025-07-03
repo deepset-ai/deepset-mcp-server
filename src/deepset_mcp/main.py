@@ -26,6 +26,14 @@ async def deepset_copilot() -> str:
     return prompt_path.read_text()
 
 
+@mcp.prompt()
+async def deepset_recommended_prompt() -> str:
+    """Recommended system prompt for the deepset copilot."""
+    prompt_path = Path(__file__).parent / "prompts/deepset_debugging_agent.md"
+
+    return prompt_path.read_text()
+
+
 def main() -> None:
     """Entrypoint for the deepset MCP server."""
     parser = argparse.ArgumentParser(description="Run the Deepset MCP server.")
