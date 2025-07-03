@@ -23,7 +23,7 @@ def get_agent(benchmark_config: BenchmarkConfig, interactive: bool = False) -> A
         },
     )
 
-    tools = MCPToolset(server_info=server_info)
+    tools = MCPToolset(server_info=server_info, invocation_timeout=300.0)
     if interactive:
         tools = wrap_toolset_interactive(tools).toolset
 

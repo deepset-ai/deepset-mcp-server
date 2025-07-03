@@ -344,7 +344,10 @@ def validate_agent_config(
 
 @agent_app.command("chat")
 def chat_with_agent(
-    agent_config: str = typer.Argument(..., help="Path to agent configuration file (YAML)."),
+    agent_config: str = typer.Argument(
+        default=str(Path(__file__).parent.parent / "agent_configs/debugging_agent.yml"),
+        help="Path to agent configuration file (YAML).",
+    ),
     workspace: str | None = typer.Option(None, "--workspace", "-w", help="Override Deepset workspace."),
     api_key: str | None = typer.Option(None, "--api-key", "-k", help="Override Deepset API key."),
     env_file: str | None = typer.Option(None, "--env-file", "-e", help="Path to environment file."),
