@@ -1,0 +1,70 @@
+name: Publish deepset-mcp distribution to PyPI and TestPyPI
+on:
+  push:
+    tags:
+      - 'v*.*.*'        # matches v1.0.0, v0.10.0, etc.
+      - 'v*.*.*-rc*'    # matches v1.0.2-rc1, v0.10.0-rc2, etc.
+jobs:
+  build:
+    name: Build distribution
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.x"
+    - name: Install uv
+      run: >-
+        curl -LsSf https://astral.sh/uv/install.sh | sh &&
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+    - name: Build a binary wheel and a source tarball
+      run: uv build
+    - name: Store the distribution packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+  publish-to-pypi:
+    name: >-
+      Publish deepset-mcp distribution to PyPI
+    if: startsWith(github.ref, 'refs/tags/')  # only publish to PyPI on tag pushes
+    needs:
+    - build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/deepset-mcp
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+    steps:
+    - name: Download all the dists
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+    - name: Publish distribution to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+  publish-to-testpypi:
+    name: Publish  deepset-mcp distribution to TestPyPI
+    if: startsWith(github.ref, 'refs/tags/')  # only publish to TestPyPI on tag pushes
+    needs:
+    - build
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/deepset-mcp
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+    steps:
+    - name: Download all the dists
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+    - name: Publish distribution to TestPyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
