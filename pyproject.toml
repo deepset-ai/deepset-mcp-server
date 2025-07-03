@@ -10,7 +10,10 @@ name = "deepset-mcp"
 dynamic = ["version"]
 description = "Collection of MCP tools and Agents to work with the deepset AI platform. Create, debug or learn about pipelines on the platform. Useable from the CLI, Cursor, Claude Code, or other MCP clients."
 readme = "README.md"
-authors = [{ name = "deepset.ai", email = "mathis.lucka@deepset.ai" }]
+authors = [
+    { name = "Mathis Lucka", email = "mathis.lucka@deepset.ai" },
+    { name = "Tanay Soni", email = "tanay.soni@deepset.ai" }
+]
 keywords = [
   "MCP",
   "Agents",
