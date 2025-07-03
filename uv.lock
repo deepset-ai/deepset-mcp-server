@@ -429,7 +429,6 @@ wheels = [
 
 [[package]]
 name = "deepset-mcp"
-version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
@@ -444,19 +443,17 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-agents = [
-    { name = "anthropic-haystack" },
-    { name = "haystack-ai" },
-    { name = "langfuse-haystack" },
-    { name = "mcp-haystack" },
-]
 analysis = [
     { name = "jupyterlab" },
     { name = "matplotlib" },
     { name = "pandas" },
     { name = "seaborn" },
 ]
-benchmark = [
+cli = [
+    { name = "anthropic-haystack" },
+    { name = "haystack-ai" },
+    { name = "langfuse-haystack" },
+    { name = "mcp-haystack" },
     { name = "typer" },
 ]
 
@@ -477,16 +474,16 @@ types = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic-haystack", marker = "extra == 'agents'", specifier = ">=2.7.0" },
+    { name = "anthropic-haystack", marker = "extra == 'cli'", specifier = ">=2.7.0" },
     { name = "fastapi" },
     { name = "glom" },
-    { name = "haystack-ai", marker = "extra == 'agents'", specifier = ">=2.15.1" },
+    { name = "haystack-ai", marker = "extra == 'cli'", specifier = ">=2.15.1" },
     { name = "httpx" },
     { name = "jupyterlab", marker = "extra == 'analysis'" },
-    { name = "langfuse-haystack", marker = "extra == 'agents'" },
+    { name = "langfuse-haystack", marker = "extra == 'cli'" },
     { name = "matplotlib", marker = "extra == 'analysis'" },
     { name = "mcp" },
-    { name = "mcp-haystack", marker = "extra == 'agents'", specifier = ">=0.4.0" },
+    { name = "mcp-haystack", marker = "extra == 'cli'", specifier = ">=0.4.0" },
     { name = "model2vec" },
     { name = "numpy" },
     { name = "pandas", marker = "extra == 'analysis'" },
@@ -494,9 +491,9 @@ requires-dist = [
     { name = "pyyaml" },
     { name = "rich" },
     { name = "seaborn", marker = "extra == 'analysis'" },
-    { name = "typer", marker = "extra == 'benchmark'" },
+    { name = "typer", marker = "extra == 'cli'" },
 ]
-provides-extras = ["analysis", "benchmark", "agents"]
+provides-extras = ["analysis", "cli"]
 
 [package.metadata.requires-dev]
 dev = [
