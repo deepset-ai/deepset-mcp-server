@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "uv-dynamic-versioning"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
@@ -7,7 +7,7 @@ packages = ["src/deepset_mcp"]
 
 [project]
 name = "deepset-mcp"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Collection of MCP tools and Agents to work with the deepset AI platform. Create, debug or learn about pipelines on the platform. Useable from the CLI, Cursor, Claude Code, or other MCP clients."
 readme = "README.md"
 authors = [{ name = "deepset.ai", email = "mathis.lucka@deepset.ai" }]
@@ -32,9 +32,6 @@ classifiers = [
 ]
 requires-python = ">=3.11"
 
-[project.urls]
-Homepage = "https://deepset.ai"
-
 dependencies = [
     "fastapi",
     "mcp",
@@ -46,6 +43,9 @@ dependencies = [
     "glom",
     "rich",
 ]
+
+[project.urls]
+Homepage = "https://deepset.ai"
 
 [project.scripts]
 deepset-mcp = "deepset_mcp.main:main"
@@ -82,6 +82,14 @@ types = [
     "types-PyYAML",
     "pandas-stubs",
 ]
+
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "pep440"
+bump = true
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
