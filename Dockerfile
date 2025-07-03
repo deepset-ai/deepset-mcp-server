@@ -3,7 +3,7 @@ FROM python:3.11-slim AS builder
 
 # 1. Install curl & build tools for uv & any C extensions
 RUN apt-get update \
- && apt-get install -y --no-install-recommends curl build-essential \
+ && apt-get install -y --no-install-recommends curl build-essential git \
  && rm -rf /var/lib/apt/lists/*
 
 # 2. Install uv standalone and symlink it
@@ -11,6 +11,9 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
  && ln -sf /root/.local/bin/uv /usr/local/bin/uv
 
 WORKDIR /src
+
+# We need git for uv-dynamic-versioning
+COPY .git/ .git/
 
 # 3. Copy in only what uv needs to build the locked venv
 COPY pyproject.toml uv.lock README.md entrypoint.sh ./
