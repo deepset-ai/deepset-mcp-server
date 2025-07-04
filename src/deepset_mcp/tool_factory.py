@@ -470,4 +470,4 @@ def register_tools(
         # Create enhanced tool
         enhanced_tool = create_enhanced_tool(base_func, config, workspace_mode, workspace)
 
-        mcp.add_tool(enhanced_tool, name=tool_name)
+        mcp.add_tool(enhanced_tool, name=tool_name, structured_output=False)
