@@ -78,18 +78,14 @@ Agents can use these tools to:
 Running the server with uv gives you faster startup time and consumes slightly less resources on your system.
 
 1. [Install uv](https://docs.astral.sh/uv/guides/install-python/) if you don't have it yet
-2. Clone the [deepset-mcp-server repository](https://github.com/deepset-ai/deepset-mcp-server)
-3. Put the following into your `claude_desktop_config.json`
+2. Put the following into your `claude_desktop_config.json`
 
 ```python
 {
   "mcpServers": {
     "deepset": {
-      "command": "/opt/homebrew/bin/uv", # path to your uv installation
+      "command": "uvx",
       "args": [
-        "--directory",
-        "/path/to/your/clone/of/deepset-mcp-server", # path to your clone of the deepset-mcp-server repo 
-        "run",
         "deepset-mcp"
       ],
       "env": {
@@ -102,7 +98,10 @@ Running the server with uv gives you faster startup time and consumes slightly l
 }
 ```
 
-4. Quit and start the Claude Desktop App
+This will load the [deepset-mcp package from PyPi](https://pypi.org/project/deepset-mcp/) and install it into a temporary virtual environment.
+
+3. Quit and start the Claude Desktop App
+
 
 
 ### Other MCP Clients
@@ -117,7 +116,7 @@ Here is where you need to configure `deepset-mcp` for:
 
 Generally speaking, depending on your installation, you need to configure an MCP client with one of the following commands:
 
-`uv --directory path/to/deepset-mcp run deepset-mcp --workspace your_workspace --api-key your_api_key`
+`uvx deepset-mcp --workspace your_workspace --api-key your_api_key`
 
 If you installed the deepset-mcp package globally and added it to your `PATH`, you can just run:
 
@@ -153,11 +152,8 @@ For example:
 {
   "mcpServers": {
     "deepset": {
-      "command": "/opt/homebrew/bin/uv",
+      "command": "uvx",
       "args": [
-        "--directory",
-        "/path/to/your/clone/of/deepset-mcp-server",
-        "run",
         "deepset-mcp",
         "--workspace-mode",
         "explicit"
@@ -233,7 +229,7 @@ If your pipeline is not deployed yet, the LLM can autonomously validate it and f
 ## CLI
 You can use the MCP server as a Haystack Agent through a command-line interface.
 
-Install with `uv pip install deepset-mcp[cli]`.
+Install with `uvx tool install "deepset-mcp[cli]"`.
 
 Start the interactive CLI with:
 
