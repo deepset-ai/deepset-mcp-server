@@ -113,7 +113,10 @@ def main() -> None:
         "--workspace-mode",
         choices=["from_environment", "from_tool_call"],
         default="from_environment",
-        help="Whether workspace should be read from the environment or provided during a tool call. Default: from_environment",
+        help=(
+            "Whether workspace should be read from the environment or provided during a tool call. Default: "
+            "from_environment"
+        ),
     )
     parser.add_argument(
         "--tools",
