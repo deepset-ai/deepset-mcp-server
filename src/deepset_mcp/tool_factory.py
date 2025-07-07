@@ -130,8 +130,8 @@ async def search_docs(query: str) -> str:
 class WorkspaceMode(StrEnum):
     """Configuration for how workspace is provided to tools."""
 
-    IMPLICIT = "implicit"  # workspace from env, no parameter in tool signature
-    EXPLICIT = "explicit"  # workspace as required parameter in tool signature
+    STATIC = "static"  # workspace from env, no parameter in tool signature
+    DYNAMIC = "dynamic"  # workspace as required parameter in tool signature
 
 
 class MemoryType(StrEnum):
@@ -309,8 +309,8 @@ def create_enhanced_tool(
     Args:
         base_func: The base tool function.
         config: Tool configuration specifying dependencies and custom arguments.
-        workspace_mode: How the workspace should be handled (implicit or explicit).
-        workspace: The workspace to use for implicit mode.
+        workspace_mode: How the workspace should be handled.
+        workspace: The workspace to use when using a static workspace.
 
     Returns:
         An enhanced, awaitable tool function with an updated signature and docstring.
@@ -352,7 +352,7 @@ def create_enhanced_tool(
         params_to_remove.update(config.custom_args.keys())
     if config.needs_client:
         params_to_remove.add("client")
-    if config.needs_workspace and workspace_mode == WorkspaceMode.IMPLICIT:
+    if config.needs_workspace and workspace_mode == WorkspaceMode.STATIC:
         params_to_remove.add("workspace")
 
     # Create the new signature from the original function
@@ -369,15 +369,15 @@ def create_enhanced_tool(
     # Create the final wrapper function that handles client/workspace injection
     if config.needs_client:
         if config.needs_workspace:
-            if workspace_mode == WorkspaceMode.IMPLICIT:
+            if workspace_mode == WorkspaceMode.STATIC:
 
-                async def workspace_implicit_wrapper(**kwargs: Any) -> Any:
+                async def workspace_environment_wrapper(**kwargs: Any) -> Any:
                     ws = workspace or get_workspace_from_env()
                     async with AsyncDeepsetClient() as client:
                         return await decorated_func(client=client, workspace=ws, **kwargs)
 
-                wrapper = workspace_implicit_wrapper
-            else:  # EXPLICIT mode
+                wrapper = workspace_environment_wrapper
+            else:  # DYNAMIC mode
 
                 async def workspace_explicit_wrapper(**kwargs: Any) -> Any:
                     async with AsyncDeepsetClient() as client:
@@ -419,7 +419,7 @@ def create_enhanced_tool(
         params_to_remove_from_doc = set()
         if config.needs_client:
             params_to_remove_from_doc.add("client")
-        if config.needs_workspace and workspace_mode == WorkspaceMode.IMPLICIT:
+        if config.needs_workspace and workspace_mode == WorkspaceMode.STATIC:
             params_to_remove_from_doc.add("workspace")
         if config.custom_args:
             params_to_remove_from_doc.update(config.custom_args.keys())
@@ -447,7 +447,7 @@ def register_tools(
     Args:
         mcp: FastMCP server instance
         workspace_mode: How workspace should be handled
-        workspace: Workspace to use for implicit mode (if None, reads from env)
+        workspace: Workspace to use for environment mode (if None, reads from env)
         tool_names: Set of tool names to register (if None, registers all tools)
     """
     # Check if docs search is available

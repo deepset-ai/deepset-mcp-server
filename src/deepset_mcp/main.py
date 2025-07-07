@@ -111,9 +111,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--workspace-mode",
-        choices=["implicit", "explicit"],
-        default="implicit",
-        help="Whether workspace is implicit (from env) or explicit (as parameter). Default: implicit",
+        choices=[WorkspaceMode.STATIC, WorkspaceMode.DYNAMIC],
+        default=WorkspaceMode.STATIC,
+        help=(
+            "Whether workspace should be set statically or dynamically provided during a tool call. "
+            f"Default: '{WorkspaceMode.STATIC}'"
+        ),
     )
     parser.add_argument(
         "--tools",
@@ -153,10 +156,9 @@ def main() -> None:
     # Create server configuration
     workspace_mode = WorkspaceMode(args.workspace_mode)
 
-    # Only require workspace for implicit mode
-    if workspace_mode == WorkspaceMode.IMPLICIT:
+    if workspace_mode == WorkspaceMode.STATIC:
         if not workspace:
-            parser.error("Missing workspace: set --workspace or DEEPSET_WORKSPACE (required for implicit mode)")
+            parser.error("Missing workspace: set --workspace or DEEPSET_WORKSPACE")
 
     if not api_key:
         parser.error("Missing API key: set --api-key or DEEPSET_API_KEY")
