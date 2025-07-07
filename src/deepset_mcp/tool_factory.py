@@ -169,11 +169,21 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     ),
     "create_pipeline": (
         create_pipeline_tool,
-        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.BOTH),
+        ToolConfig(
+            needs_client=True,
+            needs_workspace=True,
+            memory_type=MemoryType.BOTH,
+            custom_args={"skip_validation_errors": True},
+        ),
     ),
     "update_pipeline": (
         update_pipeline_tool,
-        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.BOTH),
+        ToolConfig(
+            needs_client=True,
+            needs_workspace=True,
+            memory_type=MemoryType.BOTH,
+            custom_args={"skip_validation_errors": True},
+        ),
     ),
     "get_pipeline": (
         get_pipeline_tool,
@@ -222,7 +232,12 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     ),
     "list_pipeline_templates": (
         list_pipeline_templates_tool,
-        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+        ToolConfig(
+            needs_client=True,
+            needs_workspace=True,
+            memory_type=MemoryType.EXPLORABLE,
+            custom_args={"filter": None, "field": "created_at", "order": "DESC", "limit": 100},
+        ),
     ),
     "get_pipeline_template": (
         get_pipeline_template_tool,
