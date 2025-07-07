@@ -309,8 +309,8 @@ def create_enhanced_tool(
     Args:
         base_func: The base tool function.
         config: Tool configuration specifying dependencies and custom arguments.
-        workspace_mode: How the workspace should be handled (implicit or explicit).
-        workspace: The workspace to use for implicit mode.
+        workspace_mode: How the workspace should be handled (from_environment, from_tool_call).
+        workspace: The workspace to use when reading from the environment.
 
     Returns:
         An enhanced, awaitable tool function with an updated signature and docstring.
@@ -371,12 +371,12 @@ def create_enhanced_tool(
         if config.needs_workspace:
             if workspace_mode == WorkspaceMode.FROM_ENVIRONMENT:
 
-                async def workspace_implicit_wrapper(**kwargs: Any) -> Any:
+                async def workspace_environment_wrapper(**kwargs: Any) -> Any:
                     ws = workspace or get_workspace_from_env()
                     async with AsyncDeepsetClient() as client:
                         return await decorated_func(client=client, workspace=ws, **kwargs)
 
-                wrapper = workspace_implicit_wrapper
+                wrapper = workspace_environment_wrapper
             else:  # EXPLICIT mode
 
                 async def workspace_explicit_wrapper(**kwargs: Any) -> Any:
@@ -447,7 +447,7 @@ def register_tools(
     Args:
         mcp: FastMCP server instance
         workspace_mode: How workspace should be handled
-        workspace: Workspace to use for implicit mode (if None, reads from env)
+        workspace: Workspace to use for environment mode (if None, reads from env)
         tool_names: Set of tool names to register (if None, registers all tools)
     """
     # Check if docs search is available

@@ -153,7 +153,6 @@ def main() -> None:
     # Create server configuration
     workspace_mode = WorkspaceMode(args.workspace_mode)
 
-    # Only require workspace for implicit mode
     if workspace_mode == WorkspaceMode.FROM_ENVIRONMENT:
         if not workspace:
             parser.error("Missing workspace: set --workspace or DEEPSET_WORKSPACE")
