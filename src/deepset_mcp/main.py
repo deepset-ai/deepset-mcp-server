@@ -111,9 +111,9 @@ def main() -> None:
     )
     parser.add_argument(
         "--workspace-mode",
-        choices=["implicit", "explicit"],
-        default="implicit",
-        help="Whether workspace is implicit (from env) or explicit (as parameter). Default: implicit",
+        choices=["from_environment", "from_tool_call"],
+        default="from_environment",
+        help="Whether workspace should be read from the environment or provided during a tool call. Default: from_environment",
     )
     parser.add_argument(
         "--tools",
@@ -154,9 +154,9 @@ def main() -> None:
     workspace_mode = WorkspaceMode(args.workspace_mode)
 
     # Only require workspace for implicit mode
-    if workspace_mode == WorkspaceMode.IMPLICIT:
+    if workspace_mode == WorkspaceMode.FROM_ENVIRONMENT:
         if not workspace:
-            parser.error("Missing workspace: set --workspace or DEEPSET_WORKSPACE (required for implicit mode)")
+            parser.error("Missing workspace: set --workspace or DEEPSET_WORKSPACE")
 
     if not api_key:
         parser.error("Missing API key: set --api-key or DEEPSET_API_KEY")
