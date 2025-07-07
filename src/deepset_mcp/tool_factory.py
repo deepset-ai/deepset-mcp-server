@@ -19,7 +19,6 @@ from deepset_mcp.tools.custom_components import (
     list_custom_component_installations as list_custom_component_installations_tool,
 )
 from deepset_mcp.tools.doc_search import (
-    get_docs_config,
     search_docs as search_docs_tool,
 )
 from deepset_mcp.tools.haystack_service import (
@@ -62,6 +61,16 @@ from deepset_mcp.tools.workspace import (
     get_workspace as get_workspace_tool,
     list_workspaces as list_workspaces_tool,
 )
+
+
+def are_docs_available() -> bool:
+    """Checks if documentation search is available."""
+    return bool(
+        os.environ.get("DEEPSET_DOCS_WORKSPACE", False)
+        and os.environ.get("DEEPSET_DOCS_PIPELINE_NAME", False)
+        and os.environ.get("DEEPSET_DOCS_API_KEY", False)
+    )
+
 
 EXPLORER = RichExplorer(store=STORE)
 
@@ -108,16 +117,11 @@ async def search_docs(query: str) -> str:
     :param query: The search query to execute against the documentation.
     :returns: The formatted search results from the documentation.
     """
-    docs_config = get_docs_config()
-    if not docs_config:
-        raise RuntimeError("Documentation search configuration not available")
-
-    docs_workspace, docs_pipeline_name, docs_api_key = docs_config
-    async with AsyncDeepsetClient(api_key=docs_api_key) as client:
+    async with AsyncDeepsetClient(api_key=os.environ["DEEPSET_DOCS_API_KEY"]) as client:
         response = await search_docs_tool(
             client=client,
-            workspace=docs_workspace,
-            pipeline_name=docs_pipeline_name,
+            workspace=os.environ["DEEPSET_DOCS_WORKSPACE"],
+            pipeline_name=os.environ["DEEPSET_DOCS_PIPELINE_NAME"],
             query=query,
         )
     return response
@@ -432,7 +436,7 @@ def register_tools(
         tool_names: Set of tool names to register (if None, registers all tools)
     """
     # Check if docs search is available
-    docs_available = get_docs_config() is not None
+    docs_available = are_docs_available()
 
     # Validate tool names if provided
     if tool_names is not None:
@@ -446,8 +450,8 @@ def register_tools(
         # Warn if search_docs was requested but config is missing
         if "search_docs" in tool_names and not docs_available:
             logging.warning(
-                "Documentation search tool requested but not available. To enable, set the following environment "
-                "variables: DEEPSET_DOCS_WORKSPACE, DEEPSET_DOCS_PIPELINE_NAME, DEEPSET_DOCS_API_KEY"
+                "Documentation search tool requested but not available. To enable, set the DEEPSET_DOCS_SHARE_URL "
+                "environment variable."
             )
 
         tools_to_register = tool_names.copy()
@@ -457,8 +461,7 @@ def register_tools(
         # Warn if search_docs would be skipped in "all tools" mode
         if not docs_available:
             logging.warning(
-                "Documentation search tool not enabled. To enable, set the following environment "
-                "variables: DEEPSET_DOCS_WORKSPACE, DEEPSET_DOCS_PIPELINE_NAME, DEEPSET_DOCS_API_KEY"
+                "Documentation search tool not enabled. To enable, set the DEEPSET_DOCS_SHARE_URL environment variable."
             )
 
     # Remove search_docs if config is not available

@@ -1,5 +1,3 @@
-import os
-
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.pipeline.models import DeepsetSearchResponse
 from deepset_mcp.api.protocols import AsyncClientProtocol
@@ -46,14 +44,6 @@ async def search_docs(*, client: AsyncClientProtocol, workspace: str, pipeline_n
     :returns: A string containing the formatted search results or error message.
     """
     try:
-        # First, check if the pipeline exists and get its status
-        pipeline = await client.pipelines(workspace=workspace).get(pipeline_name=pipeline_name)
-
-        # Check if pipeline is deployed
-        if pipeline.status != "DEPLOYED":
-            return f"Documentation pipeline '{pipeline_name}' is not deployed (current status: {pipeline.status})."
-
-        # Execute the search
         search_response = await client.pipelines(workspace=workspace).search(pipeline_name=pipeline_name, query=query)
 
         return doc_search_results_to_llm_readable_string(results=search_response)
@@ -66,18 +56,3 @@ async def search_docs(*, client: AsyncClientProtocol, workspace: str, pipeline_n
         return f"Failed to search documentation using pipeline '{pipeline_name}': {e}"
     except Exception as e:
         return f"An unexpected error occurred while searching documentation with pipeline '{pipeline_name}': {str(e)}"
-
-
-def get_docs_config() -> tuple[str, str, str] | None:
-    """Get docs search configuration from environment variables.
-
-    :returns: Tuple of (workspace, pipeline_name, api_key) if all are available, None otherwise.
-    """
-    workspace = os.environ.get("DEEPSET_DOCS_WORKSPACE")
-    pipeline_name = os.environ.get("DEEPSET_DOCS_PIPELINE_NAME")
-    api_key = os.environ.get("DEEPSET_DOCS_API_KEY")
-
-    if workspace and pipeline_name and api_key:
-        return workspace, pipeline_name, api_key
-
-    return None
