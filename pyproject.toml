@@ -45,6 +45,7 @@ dependencies = [
     "model2vec",
     "glom",
     "rich",
+    "pyjwt[crypto]",
 ]
 
 [project.urls]

@@ -1,10 +1,15 @@
 import argparse
+import asyncio
 import logging
 import os
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
+import jwt
 from mcp.server.fastmcp import FastMCP
 
+from deepset_mcp.api.client import AsyncDeepsetClient
+from deepset_mcp.config import DEEPSET_DOCS_DEFAULT_SHARE_URL
 from deepset_mcp.tool_factory import WorkspaceMode, register_tools
 
 # Initialize MCP Server
@@ -34,6 +39,58 @@ async def deepset_recommended_prompt() -> str:
     return prompt_path.read_text()
 
 
+async def fetch_shared_prototype_details(share_url: str) -> tuple[str, str, str]:
+    """Gets the pipeline name, workspace name and an API token for a shared prototype url.
+
+    :param share_url: The URL of a shared prototype on the deepset platform.
+
+    :returns: A tuple containing the pipeline name, workspace name and an API token.
+    """
+    parsed_url = urlparse(share_url)
+    query_params = parse_qs(parsed_url.query)
+    share_token = query_params.get("share_token", [None])[0]
+    if not share_token:
+        raise ValueError("Invalid share URL: missing share_token parameter.")
+
+    jwt_token = share_token.replace("prototype_", "")
+
+    decoded_token = jwt.decode(jwt_token, options={"verify_signature": False})
+    workspace_name = decoded_token.get("workspace_name")
+    if not workspace_name:
+        raise ValueError("Invalid JWT in share_token: missing 'workspace_name'.")
+
+    share_id = decoded_token.get("share_id")
+    if not share_id:
+        raise ValueError("Invalid JWT in share_token: missing 'share_id'.")
+
+    # For shared prototypes, we need to:
+    # 1. Fetch prototype details (pipeline name) using the information encoded in the JWT
+    # 2. Create a shared prototype user
+    async with AsyncDeepsetClient(api_key=share_token) as client:
+        response = await client.request(f"/v1/workspaces/{workspace_name}/shared_prototypes/{share_id}")
+        if not response.success:
+            raise ValueError(f"Failed to fetch shared prototype details: {response.status_code} {response.json}")
+
+        data = response.json or {}
+        pipeline_names: list[str] = data.get("pipeline_names", [])
+        if not pipeline_names:
+            raise ValueError("No pipeline names found in shared prototype response.")
+
+        user_info = await client.request("/v1/workspaces/dc-docs-content/shared_prototype_users", method="POST")
+
+        if not user_info.success:
+            raise ValueError("Failed to fetch user information from shared prototype response.")
+
+        user_data = user_info.json or {}
+
+        try:
+            api_key = user_data["user_token"]
+        except KeyError:
+            raise ValueError("No user token in shared prototype response.") from None
+
+    return workspace_name, pipeline_names[0], api_key
+
+
 def main() -> None:
     """Entrypoint for the deepset MCP server."""
     parser = argparse.ArgumentParser(description="Run the Deepset MCP server.")
@@ -48,16 +105,9 @@ def main() -> None:
         help="Deepset API key (env DEEPSET_API_KEY)",
     )
     parser.add_argument(
-        "--docs-workspace",
-        help="Deepset docs search workspace (env DEEPSET_DOCS_WORKSPACE)",
-    )
-    parser.add_argument(
-        "--docs-pipeline-name",
-        help="Deepset docs pipeline name (env DEEPSET_DOCS_PIPELINE_NAME)",
-    )
-    parser.add_argument(
-        "--docs-api-key",
-        help="Deepset docs pipeline API key (env DEEPSET_DOCS_API_KEY)",
+        "--docs-share-url",
+        default=DEEPSET_DOCS_DEFAULT_SHARE_URL,
+        help="Deepset docs search share URL (env DEEPSET_DOCS_SHARE_URL)",
     )
     parser.add_argument(
         "--workspace-mode",
@@ -89,9 +139,16 @@ def main() -> None:
     # prefer flags, fallback to env
     workspace = args.workspace or os.getenv("DEEPSET_WORKSPACE")
     api_key = args.api_key or os.getenv("DEEPSET_API_KEY")
-    docs_workspace = args.docs_workspace or os.getenv("DEEPSET_DOCS_WORKSPACE")
-    docs_pipeline_name = args.docs_pipeline_name or os.getenv("DEEPSET_DOCS_PIPELINE_NAME")
-    docs_api_key = args.docs_api_key or os.getenv("DEEPSET_DOCS_API_KEY")
+    docs_share_url = args.docs_share_url or os.getenv("DEEPSET_DOCS_SHARE_URL")
+
+    if docs_share_url:
+        try:
+            workspace_name, pipeline_name, api_key_docs = asyncio.run(fetch_shared_prototype_details(docs_share_url))
+            os.environ["DEEPSET_DOCS_WORKSPACE"] = workspace_name
+            os.environ["DEEPSET_DOCS_PIPELINE_NAME"] = pipeline_name
+            os.environ["DEEPSET_DOCS_API_KEY"] = api_key_docs
+        except (ValueError, jwt.DecodeError) as e:
+            parser.error(f"Error processing --docs-share-url: {e}")
 
     # Create server configuration
     workspace_mode = WorkspaceMode(args.workspace_mode)
@@ -108,14 +165,6 @@ def main() -> None:
     if workspace:
         os.environ["DEEPSET_WORKSPACE"] = workspace
     os.environ["DEEPSET_API_KEY"] = api_key
-
-    # Set docs environment variables if provided
-    if docs_workspace:
-        os.environ["DEEPSET_DOCS_WORKSPACE"] = docs_workspace
-    if docs_pipeline_name:
-        os.environ["DEEPSET_DOCS_PIPELINE_NAME"] = docs_pipeline_name
-    if docs_api_key:
-        os.environ["DEEPSET_DOCS_API_KEY"] = docs_api_key
 
     # Parse tool names if provided
     tool_names = None
