@@ -111,11 +111,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--workspace-mode",
-        choices=["from_environment", "from_tool_call"],
-        default="from_environment",
+        choices=[WorkspaceMode.STATIC, WorkspaceMode.DYNAMIC],
+        default=WorkspaceMode.STATIC,
         help=(
-            "Whether workspace should be read from the environment or provided during a tool call. Default: "
-            "from_environment"
+            "Whether workspace should be set statically or dynamically provided during a tool call. "
+            f"Default: '{WorkspaceMode.STATIC}'"
         ),
     )
     parser.add_argument(
@@ -156,7 +156,7 @@ def main() -> None:
     # Create server configuration
     workspace_mode = WorkspaceMode(args.workspace_mode)
 
-    if workspace_mode == WorkspaceMode.FROM_ENVIRONMENT:
+    if workspace_mode == WorkspaceMode.STATIC:
         if not workspace:
             parser.error("Missing workspace: set --workspace or DEEPSET_WORKSPACE")
 
