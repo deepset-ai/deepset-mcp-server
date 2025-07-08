@@ -6,34 +6,38 @@ from deepset_mcp.api.pipeline_template.models import (
     PipelineTemplateList,
     PipelineTemplateSearchResult,
     PipelineTemplateSearchResults,
+    PipelineType,
 )
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.tools.model_protocol import ModelProtocol
 
 
-async def list_pipeline_templates(
+async def list_templates(
     *,
     client: AsyncClientProtocol,
     workspace: str,
     limit: int = 100,
     field: str = "created_at",
     order: str = "DESC",
-    filter: str | None = None,
+    pipeline_type: PipelineType | str | None = None,
 ) -> PipelineTemplateList | str:
-    """Retrieves a list of all available pipeline templates.
+    """Retrieves a list of all available pipeline and indexing templates.
 
     :param client: The async client for API requests.
     :param workspace: The workspace to list templates from.
     :param limit: Maximum number of templates to return (default: 100).
     :param field: Field to sort by (default: "created_at").
     :param order: Sort order, either "ASC" or "DESC" (default: "DESC").
-    :param filter: OData filter expression to filter templates by criteria.
+    :param pipeline_type: The type of pipeline to return.
 
     :returns: List of pipeline templates or error message.
     """
     try:
         return await client.pipeline_templates(workspace=workspace).list_templates(
-            limit=limit, field=field, order=order, filter=filter
+            limit=limit,
+            field=field,
+            order=order,
+            filter=f"pipeline_type eq '{pipeline_type}'" if pipeline_type else None,
         )
     except ResourceNotFoundError:
         return f"There is no workspace named '{workspace}'. Did you mean to configure it?"
@@ -41,16 +45,14 @@ async def list_pipeline_templates(
         return f"Failed to list pipeline templates: {e}"
 
 
-async def get_pipeline_template(
-    *, client: AsyncClientProtocol, workspace: str, template_name: str
-) -> PipelineTemplate | str:
-    """Fetches detailed information for a specific pipeline template, identified by its `template_name`.
+async def get_template(*, client: AsyncClientProtocol, workspace: str, template_name: str) -> PipelineTemplate | str:
+    """Fetches detailed information for a specific pipeline or indexing template, identified by its `template_name`.
 
     :param client: The async client for API requests.
     :param workspace: The workspace to fetch template from.
     :param template_name: The name of the template to fetch.
 
-    :returns: Pipeline template details or error message.
+    :returns: Pipeline or indexing template details or error message.
     """
     try:
         return await client.pipeline_templates(workspace=workspace).get_template(template_name=template_name)
@@ -60,22 +62,29 @@ async def get_pipeline_template(
         return f"Failed to fetch pipeline template '{template_name}': {e}"
 
 
-async def search_pipeline_templates(
-    *, client: AsyncClientProtocol, query: str, model: ModelProtocol, workspace: str, top_k: int = 10
+async def search_templates(
+    *,
+    client: AsyncClientProtocol,
+    query: str,
+    model: ModelProtocol,
+    workspace: str,
+    top_k: int = 10,
+    pipeline_type: PipelineType | str = PipelineType.QUERY,
 ) -> PipelineTemplateSearchResults | str:
-    """Searches for pipeline templates based on name or description using semantic similarity.
+    """Searches for pipeline or indexing templates based on name or description using semantic similarity.
 
     :param client: The API client to use.
     :param query: The search query.
     :param model: The model to use for computing embeddings.
     :param workspace: The workspace to search templates from.
     :param top_k: Maximum number of results to return (default: 10).
+    :param pipeline_type: The type of pipeline to return ('indexing' or 'query'; default: 'query').
 
     :returns: Search results with similarity scores or error message.
     """
     try:
         response = await client.pipeline_templates(workspace=workspace).list_templates(
-            filter="pipeline_type eq 'QUERY'"
+            filter=f"pipeline_type eq '{pipeline_type}'"
         )
     except UnexpectedAPIError as e:
         return f"Failed to retrieve pipeline templates: {e}"
