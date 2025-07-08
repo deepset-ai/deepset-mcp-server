@@ -450,11 +450,7 @@ async def test_search_indexing_templates_success() -> None:
             pipeline_template_id=uuid4(),
             potential_applications=["ETL processes", "Data cleaning"],
             yaml_config=(
-                "components:\n"
-                "  - name: cleaner\n"
-                "    type: DocumentCleaner\n"
-                "  - name: splitter\n"
-                "    type: Splitter"
+                "components:\n  - name: cleaner\n    type: DocumentCleaner\n  - name: splitter\n    type: Splitter"
             ),
             tags=[],
             pipeline_type=PipelineType.INDEXING,
