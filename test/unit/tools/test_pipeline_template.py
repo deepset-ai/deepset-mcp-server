@@ -14,9 +14,9 @@ from deepset_mcp.api.pipeline_template.models import (
 )
 from deepset_mcp.tools.model_protocol import ModelProtocol
 from deepset_mcp.tools.pipeline_template import (
-    get_pipeline_template,
-    list_pipeline_templates,
-    search_pipeline_templates,
+    get_template,
+    list_templates,
+    search_templates,
 )
 from test.unit.conftest import BaseFakeClient
 
@@ -94,7 +94,7 @@ async def test_list_pipeline_templates_returns_template_list() -> None:
         description="First template",
         best_for=["use case 1", "use case 2"],
         potential_applications=["app 1", "app 2"],
-        query_yaml="config1: value1",
+        yaml_config="config1: value1",
         tags=[PipelineTemplateTag(name="tag1", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
         pipeline_type=PipelineType.QUERY,
     )
@@ -106,13 +106,13 @@ async def test_list_pipeline_templates_returns_template_list() -> None:
         description="Second template",
         best_for=["use case 3"],
         potential_applications=["app 3"],
-        query_yaml="config2: value2",
+        yaml_config="config2: value2",
         tags=[PipelineTemplateTag(name="tag2", tag_id=UUID("20000000-0000-0000-0000-000000000002"))],
         pipeline_type=PipelineType.INDEXING,
     )
     resource = FakePipelineTemplateResource(list_response=[template1, template2])
     client = FakeClient(resource)
-    result = await list_pipeline_templates(client=client, workspace="ws1")
+    result = await list_templates(client=client, workspace="ws1")
 
     assert isinstance(result, PipelineTemplateList)
     assert len(result.data) == 2
@@ -126,7 +126,7 @@ async def test_list_pipeline_templates_returns_template_list() -> None:
 async def test_list_pipeline_templates_handles_resource_not_found() -> None:
     resource = FakePipelineTemplateResource(list_exception=ResourceNotFoundError())
     client = FakeClient(resource)
-    result = await list_pipeline_templates(client=client, workspace="invalid_ws")
+    result = await list_templates(client=client, workspace="invalid_ws")
 
     assert isinstance(result, str)
     assert "no workspace named 'invalid_ws'" in result.lower()
@@ -136,7 +136,7 @@ async def test_list_pipeline_templates_handles_resource_not_found() -> None:
 async def test_list_pipeline_templates_handles_unexpected_error() -> None:
     resource = FakePipelineTemplateResource(list_exception=UnexpectedAPIError(status_code=500, message="Server error"))
     client = FakeClient(resource)
-    result = await list_pipeline_templates(client=client, workspace="ws1")
+    result = await list_templates(client=client, workspace="ws1")
 
     assert "Failed to list pipeline templates" in result
     assert "Server error" in result
@@ -152,13 +152,13 @@ async def test_get_pipeline_template_returns_template() -> None:
         description="Test template",
         best_for=["use case 1"],
         potential_applications=["app 1"],
-        query_yaml="config: value",
+        yaml_config="config: value",
         tags=[PipelineTemplateTag(name="tag1", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
         pipeline_type=PipelineType.QUERY,
     )
     resource = FakePipelineTemplateResource(get_response=template)
     client = FakeClient(resource)
-    result = await get_pipeline_template(client=client, workspace="ws1", template_name="test_template")
+    result = await get_template(client=client, workspace="ws1", template_name="test_template")
 
     assert isinstance(result, PipelineTemplate)
     assert result.template_name == "test_template"
@@ -172,7 +172,7 @@ async def test_get_pipeline_template_returns_template() -> None:
 async def test_get_pipeline_template_handles_resource_not_found() -> None:
     resource = FakePipelineTemplateResource(get_exception=ResourceNotFoundError())
     client = FakeClient(resource)
-    result = await get_pipeline_template(client=client, workspace="ws1", template_name="invalid_template")
+    result = await get_template(client=client, workspace="ws1", template_name="invalid_template")
 
     assert isinstance(result, str)
     assert "no pipeline template named 'invalid_template'" in result.lower()
@@ -182,15 +182,15 @@ async def test_get_pipeline_template_handles_resource_not_found() -> None:
 async def test_get_pipeline_template_handles_unexpected_error() -> None:
     resource = FakePipelineTemplateResource(get_exception=UnexpectedAPIError(status_code=500, message="Server error"))
     client = FakeClient(resource)
-    result = await get_pipeline_template(client=client, workspace="ws1", template_name="test_template")
+    result = await get_template(client=client, workspace="ws1", template_name="test_template")
 
     assert "Failed to fetch pipeline template 'test_template'" in result
     assert "Server error" in result
 
 
 @pytest.mark.asyncio
-async def test_list_pipeline_templates_with_filter() -> None:
-    """Test that filter parameter is passed correctly to the resource."""
+async def test_list_pipeline_templates_with_pipeline_type() -> None:
+    """Test that pipeline_type parameter is passed correctly to the resource."""
     template = PipelineTemplate(
         pipeline_name="query_template",
         name="query_template",
@@ -199,7 +199,7 @@ async def test_list_pipeline_templates_with_filter() -> None:
         description="A query template",
         best_for=["use case 1"],
         potential_applications=["app 1"],
-        query_yaml="config: value",
+        yaml_config="config: value",
         tags=[PipelineTemplateTag(name="tag1", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
         pipeline_type=PipelineType.QUERY,
     )
@@ -207,11 +207,10 @@ async def test_list_pipeline_templates_with_filter() -> None:
     resource = FakePipelineTemplateResource(list_response=[template])
     client = FakeClient(resource)
 
-    filter_value = "pipeline_type eq 'QUERY'"
-    await list_pipeline_templates(client=client, workspace="ws1", filter=filter_value)
+    await list_templates(client=client, workspace="ws1", pipeline_type=PipelineType.QUERY)
 
     # Verify the filter was passed to the resource
-    assert resource.last_list_call_params["filter"] == filter_value
+    assert resource.last_list_call_params["filter"] == "pipeline_type eq 'query'"
 
 
 @pytest.mark.asyncio
@@ -225,14 +224,14 @@ async def test_list_pipeline_templates_with_custom_sorting() -> None:
         description="A test template",
         best_for=["use case 1"],
         potential_applications=["app 1"],
-        query_yaml="config: value",
+        yaml_config="config: value",
         tags=[PipelineTemplateTag(name="tag1", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
         pipeline_type=PipelineType.QUERY,
     )
     resource = FakePipelineTemplateResource(list_response=[template])
     client = FakeClient(resource)
 
-    await list_pipeline_templates(client=client, workspace="ws1", limit=50, field="name", order="ASC")
+    await list_templates(client=client, workspace="ws1", limit=50, field="name", order="ASC")
 
     # Verify parameters were passed correctly
     assert resource.last_list_call_params["limit"] == 50
@@ -242,8 +241,8 @@ async def test_list_pipeline_templates_with_custom_sorting() -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_pipeline_templates_with_filter_and_sorting() -> None:
-    """Test that both filter and sorting parameters work together."""
+async def test_list_pipeline_templates_with_pipeline_type_and_sorting() -> None:
+    """Test that both pipeline_type and sorting parameters work together."""
     template = PipelineTemplate(
         pipeline_name="query_template",
         name="query_template",
@@ -252,24 +251,22 @@ async def test_list_pipeline_templates_with_filter_and_sorting() -> None:
         description="A query template",
         best_for=["use case 1"],
         potential_applications=["app 1"],
-        query_yaml="config: value",
+        yaml_config="config: value",
         tags=[PipelineTemplateTag(name="tag1", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
         pipeline_type=PipelineType.QUERY,
     )
     resource = FakePipelineTemplateResource(list_response=[template])
     client = FakeClient(resource)
 
-    filter_value = "tags/any(tag: tag/name eq 'category:basic qa') and pipeline_type eq 'QUERY'"
-
-    await list_pipeline_templates(
-        client=client, workspace="ws1", limit=25, field="name", order="ASC", filter=filter_value
+    await list_templates(
+        client=client, workspace="ws1", limit=25, field="name", order="ASC", pipeline_type=PipelineType.QUERY
     )
 
     # Verify all parameters were passed correctly
     assert resource.last_list_call_params["limit"] == 25
     assert resource.last_list_call_params["field"] == "name"
     assert resource.last_list_call_params["order"] == "ASC"
-    assert resource.last_list_call_params["filter"] == filter_value
+    assert resource.last_list_call_params["filter"] == "pipeline_type eq 'query'"
 
 
 @pytest.mark.asyncio
@@ -284,7 +281,7 @@ async def test_search_pipeline_templates_success() -> None:
             name="RAG Pipeline",
             pipeline_template_id=uuid4(),
             potential_applications=["FAQ systems", "Document search"],
-            query_yaml="components:\n  retriever: ...\n  generator: ...",
+            yaml_config="components:\n  retriever: ...\n  generator: ...",
             tags=[],
             pipeline_type=PipelineType.QUERY,
         ),
@@ -296,7 +293,7 @@ async def test_search_pipeline_templates_success() -> None:
             name="Chat Pipeline",
             pipeline_template_id=uuid4(),
             potential_applications=["Chatbots", "Virtual assistants"],
-            query_yaml="components:\n  chat_generator: ...\n  memory: ...",
+            yaml_config="components:\n  chat_generator: ...\n  memory: ...",
             tags=[],
             pipeline_type=PipelineType.QUERY,
         ),
@@ -307,7 +304,7 @@ async def test_search_pipeline_templates_success() -> None:
     model = FakeModel()
 
     # Search for RAG templates
-    result = await search_pipeline_templates(
+    result = await search_templates(
         client=client, query="retrieval augmented generation", model=model, workspace="test_workspace"
     )
     assert isinstance(result, PipelineTemplateSearchResults)
@@ -319,7 +316,7 @@ async def test_search_pipeline_templates_success() -> None:
     assert result.results[1].template.template_name == "chat-pipeline"
 
     # Search for chat templates
-    result = await search_pipeline_templates(
+    result = await search_templates(
         client=client, query="conversational chat interface", model=model, workspace="test_workspace"
     )
     assert isinstance(result, PipelineTemplateSearchResults)
@@ -337,7 +334,7 @@ async def test_search_pipeline_templates_no_templates() -> None:
     client = FakeClient(resource)
     model = FakeModel()
 
-    result = await search_pipeline_templates(client=client, query="test query", model=model, workspace="test_workspace")
+    result = await search_templates(client=client, query="test query", model=model, workspace="test_workspace")
     assert isinstance(result, PipelineTemplateSearchResults)
     assert result.query == "test query"
     assert result.total_found == 0
@@ -350,5 +347,201 @@ async def test_search_pipeline_templates_api_error() -> None:
     client = FakeClient(resource)
     model = FakeModel()
 
-    result = await search_pipeline_templates(client=client, query="test query", model=model, workspace="test_workspace")
+    result = await search_templates(client=client, query="test query", model=model, workspace="test_workspace")
     assert "Failed to retrieve pipeline templates" in result
+
+
+@pytest.mark.asyncio
+async def test_list_indexing_templates() -> None:
+    """Test listing indexing templates specifically."""
+    template1 = PipelineTemplate(
+        pipeline_name="indexing_template1",
+        name="indexing_template1",
+        pipeline_template_id=UUID("00000000-0000-0000-0000-000000000001"),
+        author="Alice Smith",
+        description="First indexing template",
+        best_for=["document indexing", "search"],
+        potential_applications=["document store", "search engine"],
+        yaml_config="components:\n  - name: indexer\n    type: DocumentWriter",
+        tags=[PipelineTemplateTag(name="indexing", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
+        pipeline_type=PipelineType.INDEXING,
+    )
+    template2 = PipelineTemplate(
+        pipeline_name="indexing_template2",
+        name="indexing_template2",
+        pipeline_template_id=UUID("00000000-0000-0000-0000-000000000002"),
+        author="Bob Jones",
+        description="Second indexing template",
+        best_for=["data ingestion", "preprocessing"],
+        potential_applications=["ETL", "data pipeline"],
+        yaml_config="components:\n  - name: preprocessor\n    type: DocumentSplitter",
+        tags=[PipelineTemplateTag(name="preprocessing", tag_id=UUID("20000000-0000-0000-0000-000000000002"))],
+        pipeline_type=PipelineType.INDEXING,
+    )
+    resource = FakePipelineTemplateResource(list_response=[template1, template2])
+    client = FakeClient(resource)
+    result = await list_templates(client=client, workspace="ws1", pipeline_type=PipelineType.INDEXING)
+
+    assert isinstance(result, PipelineTemplateList)
+    assert len(result.data) == 2
+    assert result.data[0].template_name == "indexing_template1"
+    assert result.data[1].template_name == "indexing_template2"
+    assert result.data[0].pipeline_type == PipelineType.INDEXING
+    assert result.data[1].pipeline_type == PipelineType.INDEXING
+
+
+@pytest.mark.asyncio
+async def test_get_indexing_template_returns_template() -> None:
+    """Test getting an indexing template by name."""
+    template = PipelineTemplate(
+        pipeline_name="test_indexing_template",
+        name="test_indexing_template",
+        pipeline_template_id=UUID("00000000-0000-0000-0000-000000000001"),
+        author="Eve Brown",
+        description="Test indexing template",
+        best_for=["document processing"],
+        potential_applications=["content management"],
+        yaml_config="components:\n  - name: writer\n    type: DocumentWriter",
+        tags=[PipelineTemplateTag(name="indexing", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
+        pipeline_type=PipelineType.INDEXING,
+    )
+    resource = FakePipelineTemplateResource(get_response=template)
+    client = FakeClient(resource)
+    result = await get_template(client=client, workspace="ws1", template_name="test_indexing_template")
+
+    assert isinstance(result, PipelineTemplate)
+    assert result.template_name == "test_indexing_template"
+    assert result.author == "Eve Brown"
+    assert result.description == "Test indexing template"
+    assert result.yaml_config == "components:\n  - name: writer\n    type: DocumentWriter"
+    assert result.pipeline_type == PipelineType.INDEXING
+    assert result.tags[0].name == "indexing"
+
+
+@pytest.mark.asyncio
+async def test_search_indexing_templates_success() -> None:
+    """Test searching for indexing templates."""
+    # Create sample indexing templates
+    templates = [
+        PipelineTemplate(
+            author="Deepset",
+            best_for=["Document Indexing"],
+            description="A document indexing template for storing and organizing content",
+            pipeline_name="doc-indexing-pipeline",
+            name="Document Indexing Pipeline",
+            pipeline_template_id=uuid4(),
+            potential_applications=["Document stores", "Content management"],
+            yaml_config=(
+                "components:\n"
+                "  - name: indexer\n"
+                "    type: DocumentWriter\n"
+                "  - name: embedder\n"
+                "    type: SentenceTransformer"
+            ),
+            tags=[],
+            pipeline_type=PipelineType.INDEXING,
+        ),
+        PipelineTemplate(
+            author="Deepset",
+            best_for=["Data Preprocessing"],
+            description="A preprocessing indexing template for cleaning and preparing data",
+            pipeline_name="preprocessing-pipeline",
+            name="Preprocessing Pipeline",
+            pipeline_template_id=uuid4(),
+            potential_applications=["ETL processes", "Data cleaning"],
+            yaml_config=(
+                "components:\n  - name: cleaner\n    type: DocumentCleaner\n  - name: splitter\n    type: Splitter"
+            ),
+            tags=[],
+            pipeline_type=PipelineType.INDEXING,
+        ),
+    ]
+
+    resource = FakePipelineTemplateResource(list_response=templates)
+    client = FakeClient(resource)
+    model = FakeModel()
+
+    # Search for indexing templates
+    result = await search_templates(
+        client=client,
+        query="document indexing storage",
+        model=model,
+        workspace="test_workspace",
+        pipeline_type=PipelineType.INDEXING,
+    )
+    assert isinstance(result, PipelineTemplateSearchResults)
+    assert result.query == "document indexing storage"
+    assert result.total_found == 2
+    assert len(result.results) == 2
+    # Document indexing pipeline should be first due to higher similarity
+    assert result.results[0].template.template_name == "doc-indexing-pipeline"
+    assert result.results[1].template.template_name == "preprocessing-pipeline"
+
+    # Verify all returned templates are indexing type
+    for search_result in result.results:
+        assert search_result.template.pipeline_type == PipelineType.INDEXING
+
+
+@pytest.mark.asyncio
+async def test_list_templates_mixed_pipeline_types() -> None:
+    """Test listing templates with mixed query and indexing types."""
+    query_template = PipelineTemplate(
+        pipeline_name="query_template",
+        name="query_template",
+        pipeline_template_id=UUID("00000000-0000-0000-0000-000000000001"),
+        author="Query Author",
+        description="A query template",
+        best_for=["Q&A"],
+        potential_applications=["chatbots"],
+        yaml_config="components:\n  - name: retriever\n    type: BM25Retriever",
+        tags=[PipelineTemplateTag(name="query", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
+        pipeline_type=PipelineType.QUERY,
+    )
+    indexing_template = PipelineTemplate(
+        pipeline_name="indexing_template",
+        name="indexing_template",
+        pipeline_template_id=UUID("00000000-0000-0000-0000-000000000002"),
+        author="Indexing Author",
+        description="An indexing template",
+        best_for=["document storage"],
+        potential_applications=["search engines"],
+        yaml_config="components:\n  - name: writer\n    type: DocumentWriter",
+        tags=[PipelineTemplateTag(name="indexing", tag_id=UUID("20000000-0000-0000-0000-000000000002"))],
+        pipeline_type=PipelineType.INDEXING,
+    )
+
+    # Test listing all templates (no filter)
+    resource = FakePipelineTemplateResource(list_response=[query_template, indexing_template])
+    client = FakeClient(resource)
+    result = await list_templates(client=client, workspace="ws1")
+
+    assert isinstance(result, PipelineTemplateList)
+    assert len(result.data) == 2
+    assert result.data[0].pipeline_type == PipelineType.QUERY
+    assert result.data[1].pipeline_type == PipelineType.INDEXING
+
+
+@pytest.mark.asyncio
+async def test_list_templates_with_indexing_pipeline_type_string() -> None:
+    """Test that pipeline_type parameter works with string values."""
+    template = PipelineTemplate(
+        pipeline_name="indexing_template",
+        name="indexing_template",
+        pipeline_template_id=UUID("00000000-0000-0000-0000-000000000001"),
+        author="Test Author",
+        description="An indexing template",
+        best_for=["document indexing"],
+        potential_applications=["search"],
+        yaml_config="components:\n  - name: writer\n    type: DocumentWriter",
+        tags=[PipelineTemplateTag(name="indexing", tag_id=UUID("10000000-0000-0000-0000-000000000001"))],
+        pipeline_type=PipelineType.INDEXING,
+    )
+
+    resource = FakePipelineTemplateResource(list_response=[template])
+    client = FakeClient(resource)
+
+    # Test with string pipeline_type
+    await list_templates(client=client, workspace="ws1", pipeline_type="indexing")
+
+    # Verify the filter was passed to the resource correctly
+    assert resource.last_list_call_params["filter"] == "pipeline_type eq 'indexing'"

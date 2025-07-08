@@ -47,9 +47,9 @@ from deepset_mcp.tools.pipeline import (
     validate_pipeline as validate_pipeline_tool,
 )
 from deepset_mcp.tools.pipeline_template import (
-    get_pipeline_template as get_pipeline_template_tool,
-    list_pipeline_templates as list_pipeline_templates_tool,
-    search_pipeline_templates as search_pipeline_templates_tool,
+    get_template as get_pipeline_template_tool,
+    list_templates as list_pipeline_templates_tool,
+    search_templates as search_pipeline_templates_tool,
 )
 from deepset_mcp.tools.secrets import (
     get_secret as get_secret_tool,
@@ -230,20 +230,20 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
         deploy_index_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
-    "list_pipeline_templates": (
+    "list_templates": (
         list_pipeline_templates_tool,
         ToolConfig(
             needs_client=True,
             needs_workspace=True,
             memory_type=MemoryType.EXPLORABLE,
-            custom_args={"filter": None, "field": "created_at", "order": "DESC", "limit": 100},
+            custom_args={"field": "created_at", "order": "DESC", "limit": 100},
         ),
     ),
-    "get_pipeline_template": (
+    "get_template": (
         get_pipeline_template_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
-    "search_pipeline_templates": (
+    "search_templates": (
         search_pipeline_templates_tool,
         ToolConfig(
             needs_client=True,

@@ -143,3 +143,86 @@ async def test_list_templates_with_custom_sorting(
     if len(templates_list.data) > 1:
         for i in range(len(templates_list.data) - 1):
             assert templates_list.data[i].display_name <= templates_list.data[i + 1].display_name
+
+
+@pytest.mark.asyncio
+async def test_get_indexing_template(
+    template_resource: PipelineTemplateResource,
+) -> None:
+    """Test getting a single indexing template by name.
+
+    First lists all indexing templates, then gets the first one by name.
+    """
+    # Get all indexing templates
+    indexing_templates_list = await template_resource.list_templates(filter="pipeline_type eq 'INDEXING'")
+
+    # Skip if no indexing templates are available
+    if not indexing_templates_list.data:
+        pytest.skip("No indexing templates available in the test environment")
+
+    # Get the first indexing template's name
+    template_name = indexing_templates_list.data[0].template_name
+
+    # Now get that specific template
+    template = await template_resource.get_template(template_name=template_name)
+
+    # Verify the template was retrieved correctly
+    assert template.template_name == template_name
+    assert template.pipeline_type == "indexing"
+    assert template.pipeline_template_id is not None
+    assert template.yaml_config is not None  # Should have indexing_yaml content
+    assert isinstance(template.best_for, list)
+    assert isinstance(template.potential_applications, list)
+    assert isinstance(template.tags, list)
+
+
+@pytest.mark.asyncio
+async def test_list_indexing_templates_with_filter(
+    template_resource: PipelineTemplateResource,
+) -> None:
+    """Test listing templates with an indexing pipeline type filter."""
+    # Test filtering by INDEXING pipeline type
+    indexing_templates_list = await template_resource.list_templates(filter="pipeline_type eq 'INDEXING'")
+
+    # Verify that all returned templates are INDEXING type
+    assert isinstance(indexing_templates_list, PipelineTemplateList)
+    assert isinstance(indexing_templates_list.data, list)
+
+    # If templates are available, verify they are all INDEXING type
+    for template in indexing_templates_list.data:
+        assert isinstance(template, PipelineTemplate)
+        assert template.pipeline_type == "indexing"
+        assert template.yaml_config is not None  # Should have indexing_yaml content
+
+
+@pytest.mark.asyncio
+async def test_mixed_pipeline_types_integration(
+    template_resource: PipelineTemplateResource,
+) -> None:
+    """Test that query and indexing templates can be retrieved together."""
+    # Get all templates
+    all_templates = await template_resource.list_templates()
+
+    # Skip if no templates are available
+    if not all_templates.data:
+        pytest.skip("No templates available in the test environment")
+
+    # Separate templates by type
+    query_templates = [t for t in all_templates.data if t.pipeline_type == "query"]
+    indexing_templates = [t for t in all_templates.data if t.pipeline_type == "indexing"]
+
+    # Verify that both types can exist and have proper yaml_config
+    for template in query_templates:
+        assert template.pipeline_type == "query"
+        if template.yaml_config is not None:
+            # Query templates should have query_yaml content
+            assert isinstance(template.yaml_config, str)
+
+    for template in indexing_templates:
+        assert template.pipeline_type == "indexing"
+        if template.yaml_config is not None:
+            # Indexing templates should have indexing_yaml content
+            assert isinstance(template.yaml_config, str)
+
+    # Verify that the total matches the sum of individual types
+    assert len(query_templates) + len(indexing_templates) == len(all_templates.data)

@@ -17,13 +17,12 @@ def create_sample_template(
     pipeline_type: str = "query",
 ) -> dict[str, Any]:
     """Create a sample pipeline template response dictionary for testing."""
-    return {
+    template_data = {
         "name": name,
         "pipeline_template_id": template_id,
         "author": author,
         "description": description,
         "pipeline_name": name,
-        "query_yaml": "version: '1.0'\ncomponents: []\npipeline:\n  name: test",
         "available_to_all_organization_types": True,
         "best_for": ["quick-start", "testing"],
         "expected_output": ["answers", "documents"],
@@ -32,6 +31,14 @@ def create_sample_template(
         "tags": [{"name": "test", "tag_id": "d4a85f64-5717-4562-b3fc-2c963f66afa6"}],
         "pipeline_type": pipeline_type,
     }
+
+    # Add appropriate YAML config based on pipeline type
+    if pipeline_type == "indexing":
+        template_data["indexing_yaml"] = "version: '1.0'\ncomponents:\n  - name: indexer\n    type: DocumentWriter"
+    else:
+        template_data["query_yaml"] = "version: '1.0'\ncomponents: []\npipeline:\n  name: test"
+
+    return template_data
 
 
 class DummyClient(BaseFakeClient):
@@ -268,3 +275,119 @@ class TestPipelineTemplateResource:
         assert len(client.requests) == 1
         assert client.requests[0]["params"]["field"] == "name"
         assert client.requests[0]["params"]["order"] == "ASC"
+
+    @pytest.mark.asyncio
+    async def test_get_indexing_template_success(self) -> None:
+        """Test getting an indexing template by name successfully."""
+        # Create sample indexing template data
+        template_name = "test-indexing-template"
+        sample_template = create_sample_template(name=template_name, pipeline_type="indexing")
+
+        # Create client with predefined response
+        client = DummyClient(responses={f"test-workspace/pipeline_templates/{template_name}": sample_template})
+
+        # Create resource and call get method
+        resource = PipelineTemplateResource(client=client, workspace="test-workspace")
+        result = await resource.get_template(template_name=template_name)
+
+        # Verify results
+        assert isinstance(result, PipelineTemplate)
+        assert result.template_name == template_name
+        assert result.yaml_config == sample_template["indexing_yaml"]
+        assert result.pipeline_type == "indexing"
+        assert result.description == "A test template"
+        assert len(result.tags) == 1
+
+        # Verify request
+        assert len(client.requests) == 1
+        assert client.requests[0]["endpoint"] == f"/v1/workspaces/test-workspace/pipeline_templates/{template_name}"
+        assert client.requests[0]["method"] == "GET"
+
+    @pytest.mark.asyncio
+    async def test_list_indexing_templates_with_filter(self) -> None:
+        """Test listing indexing templates with a filter."""
+        # Create sample data with indexing templates
+        sample_templates = [
+            create_sample_template(
+                name="Indexing Template", template_id="1fa85f64-5717-4562-b3fc-2c963f66afa6", pipeline_type="indexing"
+            ),
+        ]
+
+        # Create client with predefined response
+        client = DummyClient(
+            responses={
+                "test-workspace/pipeline_templates": {
+                    "data": sample_templates,
+                    "has_more": False,
+                    "total": 1,
+                }
+            }
+        )
+
+        # Create resource and call list method with indexing filter
+        resource = PipelineTemplateResource(client=client, workspace="test-workspace")
+        result = await resource.list_templates(filter="pipeline_type eq 'INDEXING'")
+
+        # Verify results
+        assert isinstance(result, PipelineTemplateList)
+        assert len(result.data) == 1
+        assert result.has_more is False
+        assert result.total == 1
+        assert isinstance(result.data[0], PipelineTemplate)
+        assert result.data[0].template_name == "Indexing Template"
+        assert result.data[0].pipeline_type == "indexing"
+        assert result.data[0].yaml_config == sample_templates[0]["indexing_yaml"]
+
+        # Verify request includes filter
+        assert len(client.requests) == 1
+        assert client.requests[0]["endpoint"] == "/v1/workspaces/test-workspace/pipeline_templates"
+        assert "filter" in client.requests[0]["params"]
+        assert client.requests[0]["params"]["filter"] == "pipeline_type eq 'INDEXING'"
+
+    @pytest.mark.asyncio
+    async def test_mixed_pipeline_types(self) -> None:
+        """Test that query and indexing templates work correctly together."""
+        # Create sample data with mixed pipeline types
+        sample_templates = [
+            create_sample_template(
+                name="Query Template", template_id="1fa85f64-5717-4562-b3fc-2c963f66afa6", pipeline_type="query"
+            ),
+            create_sample_template(
+                name="Indexing Template", template_id="2fa85f64-5717-4562-b3fc-2c963f66afa6", pipeline_type="indexing"
+            ),
+        ]
+
+        # Create client with predefined response
+        client = DummyClient(
+            responses={
+                "test-workspace/pipeline_templates": {
+                    "data": sample_templates,
+                    "has_more": False,
+                    "total": 2,
+                }
+            }
+        )
+
+        # Create resource and call list method
+        resource = PipelineTemplateResource(client=client, workspace="test-workspace")
+        result = await resource.list_templates()
+
+        # Verify results
+        assert isinstance(result, PipelineTemplateList)
+        assert len(result.data) == 2
+        assert result.has_more is False
+        assert result.total == 2
+
+        # Verify query template
+        query_template = result.data[0]
+        assert isinstance(query_template, PipelineTemplate)
+        assert query_template.template_name == "Query Template"
+        assert query_template.pipeline_type == "query"
+        assert query_template.yaml_config == sample_templates[0]["query_yaml"]
+
+        # Verify indexing template
+        indexing_template = result.data[1]
+        assert isinstance(indexing_template, PipelineTemplate)
+        assert indexing_template.template_name == "Indexing Template"
+        assert indexing_template.pipeline_type == "indexing"
+        assert indexing_template.yaml_config == sample_templates[1]["indexing_yaml"]
