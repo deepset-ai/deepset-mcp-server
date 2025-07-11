@@ -1,0 +1,10 @@
+agent_factory_function: "deepset_mcp.benchmark.agents.debugging.agent.get_agent"
+display_name: "debugging-agent"
+interactive: true
+required_env_vars:
+  - DEEPSET_API_KEY
+  - DEEPSET_WORKSPACE
+  - ANTHROPIC_API_KEY
+  - DEEPSET_DOCS_WORKSPACE
+  - DEEPSET_DOCS_API_KEY
+  - DEEPSET_DOCS_PIPELINE_NAME

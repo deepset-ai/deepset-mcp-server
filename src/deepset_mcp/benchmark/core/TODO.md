@@ -1,0 +1,7 @@
+- move env configuration into cli commands
+- remove env decorator
+- extend resource manager to offer sync delete, create index/pipeline
+- remove factory and move factory functions to respective files
+- review exceptions and likely remove
+- merge test case and result repository (?)
+- 

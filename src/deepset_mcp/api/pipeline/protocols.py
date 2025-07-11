@@ -81,3 +81,7 @@ class PipelineResourceProtocol(Protocol):
     ) -> AsyncIterator[DeepsetStreamEvent]:
         """Search using a pipeline with response streaming."""
         ...
+
+    async def delete(self, pipeline_name: str) -> NoContentResponse:
+        """Delete a pipeline."""
+        ...

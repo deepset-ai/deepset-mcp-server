@@ -104,6 +104,9 @@ class FakeDocsPipelineResource(PipelineResourceProtocol):
     ) -> AsyncIterator[DeepsetStreamEvent]:
         raise NotImplementedError
 
+    async def delete(self, pipeline_name: str) -> NoContentResponse:
+        raise NotImplementedError
+
 
 @pytest.mark.asyncio
 async def test_search_docs_success() -> None:
