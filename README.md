@@ -698,3 +698,23 @@ The `get_latest_custom_component_installation_logs`-tool returns the logs from t
 
 The `search_docs`-tool allows you to search through deepset's official documentation to find information about features, API usage, best practices, and troubleshooting guides.
 Returns formatted search results from the documentation.
+
+
+## Known Limitations
+
+This MCP server is in Beta. Please report any issues you may face through a GitHub Issue.
+Feature requests and feedback are also appreciated.
+
+**Updating Deployed Pipelines**
+
+When a pipeline is deployed and updated through the `update_pipeline` tool, the update takes 30 to 300 seconds to apply.
+The tool is currently returning before the pipeline update is applied. This may lead to situations where the Agent might have
+already fixed an issue with a pipeline but when it tests it through search, the fix is not applied yet.
+This might lead to the Agent repeatedly trying different update strategies, although no further action might be required.
+You can check the state of the update in the pipeline logs. If "Application Startup Complete" appears in the logs,
+the pipeline update should be applied.
+
+**Deploying Indexes**
+
+When an index is deployed, we are currently not waiting for the deployment to complete before returning a success message.
+If the Agent deploys an index and tries a search immediately after, the search request may fail because the deployment is still in progress.
