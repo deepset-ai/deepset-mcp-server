@@ -106,11 +106,13 @@ def main() -> None:
     )
     parser.add_argument(
         "--docs-share-url",
+        "-d",
         default=DEEPSET_DOCS_DEFAULT_SHARE_URL,
         help="Deepset docs search share URL (env DEEPSET_DOCS_SHARE_URL)",
     )
     parser.add_argument(
         "--workspace-mode",
+        "-m",
         choices=[WorkspaceMode.STATIC, WorkspaceMode.DYNAMIC],
         default=WorkspaceMode.STATIC,
         help=(
@@ -120,11 +122,13 @@ def main() -> None:
     )
     parser.add_argument(
         "--tools",
+        "-t",
         nargs="*",
         help="Space-separated list of tools to register (default: all)",
     )
     parser.add_argument(
         "--list-tools",
+        "-l",
         action="store_true",
         help="List all available tools and exit",
     )
