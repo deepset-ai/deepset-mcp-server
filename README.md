@@ -34,6 +34,7 @@ Using the server, you benefit from faster creation of pipelines or indexes and s
     - [4.2.6 Object Store](#object-store)
     - [4.2.7 Components](#components)
     - [4.2.8 Documentation](#documentation)
+- [5. Known Limitations](#known-limitations)
 
 
 ## Installation
