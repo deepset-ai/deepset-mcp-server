@@ -1,12 +1,12 @@
 # MCP Server for the deepset AI platform
 
-The deepset MCP server exposes tools that MCP clients like Claude or Cursor can use to interact with the deepset AI platform.
+This is the _official_ MCP server for the [deepset AI platform](https://www.deepset.ai/products-and-services/deepset-ai-platform).
+It allows Agents in tools like Cursor or Claude Code to build and debug pipelines on the platform.
 
-Agents can use these tools to:
+The MCP server exposes up to 30 hand-crafted tools that are optimized for Agents interacting with the deepset platform.
+Using the server, you benefit from faster creation of pipelines or indexes and speedy issue resolution through agentic debugging.
 
-- develop and iterate on Pipelines or Indexes
-- debug Pipelines and Indexes
-- search the deepset AI platform documentation
+
 
 ## Contents
 
