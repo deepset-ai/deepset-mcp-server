@@ -74,6 +74,7 @@ jobs:
     name: Check License Headers
     runs-on: ubuntu-latest
     steps:
-    - name: Check License Header
-      uses: korandoru/hawkeye@v6
+      - uses: actions/checkout@v4
+      - name: Check presence of license header
+        run: docker run --rm -v "$(pwd):/github/workspace" ghcr.io/korandoru/hawkeye check
 
