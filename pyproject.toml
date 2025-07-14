@@ -53,23 +53,6 @@ Homepage = "https://deepset.ai"
 
 [project.scripts]
 deepset-mcp = "deepset_mcp.main:main"
-deepset = "deepset_mcp.benchmark.runner.cli:app"
-
-[project.optional-dependencies]
-analysis = [
-    "jupyterlab",
-    "pandas",
-    "matplotlib",
-    "seaborn"
-]
-
-cli = [
-    "haystack-ai>=2.15.1",
-    "mcp-haystack>=0.4.0",
-    "anthropic-haystack>=2.7.0",
-    "langfuse-haystack",
-    "typer",
-]
 
 [dependency-groups]
 dev = [
@@ -130,7 +113,6 @@ isort = { combine-as-imports = true, known-first-party = ["deepset_mcp"] }
 
 [tool.ruff.lint.per-file-ignores]
 "test/*" = ["D"]
-"src/deepset_mcp/benchmark/runner/cli*.py" = ["B904"] # Allow to raise Typer errors without attaching full stack trace.
 
 [tool.ruff.lint.pydocstyle]
 convention = "pep257"
@@ -139,7 +121,7 @@ convention = "pep257"
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["haystack_integrations.*", "langfuse.*", "glom"]
+module = ["glom"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

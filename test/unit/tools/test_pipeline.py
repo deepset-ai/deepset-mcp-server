@@ -176,6 +176,10 @@ class FakePipelineResource:
         """Search using a pipeline with response streaming."""
         raise NotImplementedError
 
+    async def delete(self, pipeline_name: str) -> NoContentResponse:
+        """Delete a pipeline."""
+        raise NotImplementedError
+
 
 class FakeClient(BaseFakeClient):
     def __init__(self, resource: FakePipelineResource) -> None:
