@@ -113,7 +113,6 @@ isort = { combine-as-imports = true, known-first-party = ["deepset_mcp"] }
 
 [tool.ruff.lint.per-file-ignores]
 "test/*" = ["D"]
-"src/deepset_mcp/benchmark/cli/**/*.py" = ["B904"] # Allow to raise Typer errors without attaching full stack trace.
 
 [tool.ruff.lint.pydocstyle]
 convention = "pep257"
