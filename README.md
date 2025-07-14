@@ -1,7 +1,7 @@
 # MCP Server for the deepset AI platform
 
 This is the _official_ MCP server for the [deepset AI platform](https://www.deepset.ai/products-and-services/deepset-ai-platform).
-It allows Agents in tools like Cursor or Claude Code to build and debug pipelines on the platform.
+It allows Agents in tools like Cursor or Claude Code to build and debug pipelines on the deepset platform.
 
 The MCP server exposes up to 30 hand-crafted tools that are optimized for Agents interacting with the deepset platform.
 Using the server, you benefit from faster creation of pipelines or indexes and speedy issue resolution through agentic debugging.
@@ -39,7 +39,7 @@ Using the server, you benefit from faster creation of pipelines or indexes and s
 
 ## Installation
 
-The recommended way to use the `deepset-mcp`-package is via [uv](https://docs.astral.sh/uv/).
+Before configuring MCP clients to work with `deepset-mcp`, you need to install [uv](https://docs.astral.sh/uv/), a modern Python package manager.
 
 If `uv` is not installed on your system, you can install it via:
 
@@ -68,11 +68,11 @@ Once you have `uv` installed, you can follow one of the guides below to configur
 **Configuration**
 
 Latest instructions on how to set up an MCP server for Cursor are covered in their [documentation](https://docs.cursor.com/context/mcp#using-mcp-json).
-You can either configure the MCP server for a single project or globally across all projects.
+You can either configure the MCP server for a single Cursor project or globally across all projects.
 
-To configure the `deepset-mcp` server for your project:
+To configure the `deepset-mcp` server for a single project:
 
-1. create a file with the name `mcp.json` in your `.cursor` directory
+1. create a file with the name `mcp.json` in your `.cursor` directory at the root of the project
 2. Add the following configuration
 
 ```json
@@ -91,7 +91,7 @@ To configure the `deepset-mcp` server for your project:
 ```
 
 This creates a virtual environment for the `deepset-mcp` package and runs the command to start the server.
-The `deepset-mcp` server should appear in the "Tools & Integrations"-section of your "Cursor Settings".
+The `deepset-mcp` server should appear in the "Tools & Integrations" section of your "Cursor Settings".
 The tools on the server are now available to the Cursor Agent.
 
 It is recommended to create a file named `.cursorrules` at the root of your project (if not already there)
@@ -192,9 +192,12 @@ If running with Docker, you need to use the following configuration with your MC
 
 ### Multiple Workspaces
 
-The basic configuration uses a `static` workspace which you pass in via the `DEEPSET_WORKSPACE` environment variable
+In the default configuration, the Agent can only interact with resources in a fixed deepset workspace.
+You configure this deepset workspace either through the `DEEPSET_WORKSPACE` environment variable
 or the `--workspace` option.
-You can configure this behaviour by using the `--workspace-mode`-option (default: `static`).
+
+The `--workspace-mode`-option (default: `static`) determines if the Agent can interact with a fixed, pre-configured workspace,
+or if it should have access to resources in multiple workspaces.
 If you want to allow an Agent to access resources from multiple workspaces, use `--workspace-mode dynamic`
 in your configuration.
 
@@ -267,7 +270,7 @@ You can view documentation for all tools in the [tools section](#tools). For man
 In this case, it is recommended to deactivate tools that are not needed. Using fewer tools has the following benefits:
 
 - some MCP clients limit the maximum number of tools
-- the LLM will be more focused on the task at hand and not call tools that it does not need
+- the Agent will be more focused on the task at hand and not call tools that it does not need
 - some savings for input tokens (minimal)
 
 If you are working in `static` workspace mode, you can deactivate the following tools:
@@ -299,6 +302,10 @@ all index tools except `get_index` because the Agent does not need to interact w
 
 If you are only working on indexes but not pipelines, you might deactivate all [pipeline tools](#pipelines).
 
+
+**Tools You Should Keep**
+
+
 You should **not** deactivate any tools related to the [object store](#object-store). These tools are special tools that help
 with lowering input token count for Agents and speeding up execution by allowing to call tools with outputs from other tools.
 
@@ -317,9 +324,9 @@ This prompt is also exposed as the `deepset_recommended_prompt` on the MCP serve
 
 In Cursor, add the prompt to `.cursorrules`.
 
-In Claude Desktop, create a "Project" and add set the prompt as system instructions.
+In Claude Desktop, create a "Project" and add the prompt as system instructions.
 
-You may find that customizing the prompt for your specific needs yields best results
+You may find that customizing the prompt for your specific needs yields best results.
 
 
 ## Use Cases
@@ -328,7 +335,7 @@ The primary way to use the deepset MCP server is through an LLM that interacts w
 
 ### Creating Pipelines
 
-Tell the LLM about the type of pipeline you want to build. Creating new pipelines will work best if you use terminology
+Tell the Agent about the type of pipeline you want to build. Creating new pipelines will work best if you use terminology
 that is similar to what is used on the deepset AI platform or in Haystack.
 
 Your prompts should be precise and specific.
@@ -338,20 +345,20 @@ Examples:
 - "Build a RAG pipeline with hybrid retrieval that uses claude-sonnet-4 from Anthropic as the LLM."
 - "Build an Agent that can iteratively search the web (deep research). Use SerperDev for web search and GPT-4o as the LLM."
 
-You can also instruct the LLM to deploy pipelines, and it can issue search requests against pipelines to test them.
+You can also instruct the Agent to deploy pipelines, and it can issue search requests against pipelines to test them.
 
 **Best Practices**
 
 - be specific in your requests
-- point the LLM to examples, if there is already a similar pipeline in your workspace, then ask it to look at it first, 
+- point the Agent to examples, if there is already a similar pipeline in your workspace, then ask it to look at it first, 
 if you have a template in mind, ask it to look at the template
-- instruct the LLM to iterate with you locally before creating the pipeline, have it validate the drafts and then let it 
+- instruct the Agent to iterate with you locally before creating the pipeline, have it validate the drafts and then let it 
 create it once the pipeline is up to your standards
 
 
 ### Debugging Pipelines
 
-The `deepset-mcp` tools allow LLMs to debug pipelines on the deepset AI platform.
+The `deepset-mcp` tools allow Agents to debug pipelines on the deepset AI platform.
 Primary tools used for debugging are:
 - get_logs
 - validate_pipeline
@@ -359,9 +366,9 @@ Primary tools used for debugging are:
 - search_pipeline_templates
 - search_component_definition
 
-You can ask the LLM to check the logs of a specific pipeline in case it is already deployed but has errors.
-The LLM will find errors in the logs and devise strategies to fix them.
-If your pipeline is not deployed yet, the LLM can autonomously validate it and fix validation errors.
+You can ask the Agent to check the logs of a specific pipeline in case it is already deployed but has errors.
+The Agent will find errors in the logs and devise strategies to fix them.
+If your pipeline is not deployed yet, the Agent can autonomously validate it and fix validation errors.
 
 ## Reference
 
