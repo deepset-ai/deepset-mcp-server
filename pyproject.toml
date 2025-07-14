@@ -53,23 +53,6 @@ Homepage = "https://deepset.ai"
 
 [project.scripts]
 deepset-mcp = "deepset_mcp.main:main"
-deepset = "deepset_mcp.benchmark.cli.cli:app"
-
-[project.optional-dependencies]
-analysis = [
-    "jupyterlab",
-    "pandas",
-    "matplotlib",
-    "seaborn"
-]
-
-cli = [
-    "haystack-ai>=2.15.1",
-    "mcp-haystack>=0.4.0",
-    "anthropic-haystack>=2.7.0",
-    "langfuse-haystack",
-    "typer",
-]
 
 [dependency-groups]
 dev = [
@@ -139,7 +122,7 @@ convention = "pep257"
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["haystack_integrations.*", "langfuse.*", "glom"]
+module = ["glom"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
