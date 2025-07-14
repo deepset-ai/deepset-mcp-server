@@ -9,6 +9,7 @@ packages = ["src/deepset_mcp"]
 name = "deepset-mcp"
 dynamic = ["version"]
 description = "Collection of MCP tools and Agents to work with the deepset AI platform. Create, debug or learn about pipelines on the platform. Useable from the CLI, Cursor, Claude Code, or other MCP clients."
+license = "Apache-2.0"
 readme = "README.md"
 authors = [
     { name = "Mathis Lucka", email = "mathis.lucka@deepset.ai" },
@@ -25,6 +26,8 @@ keywords = [
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
+    "License :: Freely Distributable",
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",

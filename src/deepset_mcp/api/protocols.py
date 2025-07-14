@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025-present deepset GmbH <info@deepset.ai>
+#
+# SPDX-License-Identifier: Apache-2.0
+
 from contextlib import AbstractAsyncContextManager
 from types import TracebackType
 from typing import Any, Literal, Protocol, Self, TypeVar, overload

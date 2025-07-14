@@ -69,3 +69,11 @@ jobs:
 
       - name: Run types
         run: uv run mypy src/ test/
+
+  license_headers:
+    name: Check License Headers
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check License Header
+      uses: korandoru/hawkeye@v5
+

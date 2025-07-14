@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025-present deepset GmbH <info@deepset.ai>
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """This module contains static configuration for the deepset MCP server."""
 
 # We need this mapping to which environment variables integrations are mapped to
