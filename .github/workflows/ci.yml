@@ -75,5 +75,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Check License Header
-      uses: korandoru/hawkeye@v5
+      uses: korandoru/hawkeye@v6
 
