@@ -69,3 +69,12 @@ jobs:
 
       - name: Run types
         run: uv run mypy src/ test/
+
+  license_headers:
+    name: Check License Headers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check presence of license header
+        run: docker run --rm -v "$(pwd):/github/workspace" ghcr.io/korandoru/hawkeye check
+

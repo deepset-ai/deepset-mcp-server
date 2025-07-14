@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025-present deepset GmbH <info@deepset.ai>
+#
+# SPDX-License-Identifier: Apache-2.0
+
 from deepset_mcp.api.custom_components.models import CustomComponentInstallationList
 from deepset_mcp.api.protocols import AsyncClientProtocol
 
