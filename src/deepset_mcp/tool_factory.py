@@ -16,6 +16,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from deepset_mcp.api.client import AsyncDeepsetClient
+from deepset_mcp.config import DEFAULT_CLIENT_HEADER
 from deepset_mcp.initialize_embedding_model import get_initialized_model
 from deepset_mcp.store import STORE
 from deepset_mcp.tools.custom_components import (
@@ -121,7 +122,9 @@ async def search_docs(query: str) -> str:
     :param query: The search query to execute against the documentation.
     :returns: The formatted search results from the documentation.
     """
-    async with AsyncDeepsetClient(api_key=os.environ["DEEPSET_DOCS_API_KEY"]) as client:
+    async with AsyncDeepsetClient(
+        api_key=os.environ["DEEPSET_DOCS_API_KEY"], transport_config=DEFAULT_CLIENT_HEADER
+    ) as client:
         response = await search_docs_tool(
             client=client,
             workspace=os.environ["DEEPSET_DOCS_WORKSPACE"],
@@ -377,14 +380,14 @@ def create_enhanced_tool(
 
                 async def workspace_environment_wrapper(**kwargs: Any) -> Any:
                     ws = workspace or get_workspace_from_env()
-                    async with AsyncDeepsetClient() as client:
+                    async with AsyncDeepsetClient(transport_config=DEFAULT_CLIENT_HEADER) as client:
                         return await decorated_func(client=client, workspace=ws, **kwargs)
 
                 wrapper = workspace_environment_wrapper
             else:  # DYNAMIC mode
 
                 async def workspace_explicit_wrapper(**kwargs: Any) -> Any:
-                    async with AsyncDeepsetClient() as client:
+                    async with AsyncDeepsetClient(transport_config=DEFAULT_CLIENT_HEADER) as client:
                         # The first argument is the workspace, which must be passed by keyword.
                         return await decorated_func(client=client, **kwargs)
 
@@ -392,7 +395,7 @@ def create_enhanced_tool(
         else:  # Client-only tools
 
             async def client_only_wrapper(**kwargs: Any) -> Any:
-                async with AsyncDeepsetClient() as client:
+                async with AsyncDeepsetClient(transport_config=DEFAULT_CLIENT_HEADER) as client:
                     return await decorated_func(client=client, **kwargs)
 
             wrapper = client_only_wrapper
