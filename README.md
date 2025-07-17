@@ -331,21 +331,13 @@ You may find that customizing the prompt for your specific needs yields best res
 
 The `deepset-mcp` package can be configured to run as a remote MCP server, allowing you to provide deepset platform access to multiple users through a centralized service. This is particularly useful for organizations that want to deploy the MCP server as a shared service or integrate it into existing infrastructure.
 
-**Prerequisites**
-
-- Python 3.9 or higher
-- `uv` package manager installed
-- Knowledge of FastAPI or similar web framework
-- OAuth authentication system (recommended)
-- SSL/TLS certificate for production deployment
-
 **Key Requirements**
 
 When running as a remote MCP server, you must configure the following:
 
 1. **Transport Protocol**: Use `streamable-http` instead of the default `stdio` transport
 2. **Authentication**: Implement OAuth or similar authentication flow to securely handle user credentials
-3. **Authorization Headers**: Ensure client requests include proper `Authorization` headers with Bearer tokens
+3. **Authorization Headers**: Ensure client requests include proper `Authorization` headers with Bearer token for deepset access
 4. **Dynamic Workspace Mode**: Use `workspace_mode='dynamic'` to support multiple users with different workspaces
 5. **API Key Management**: Enable `get_api_key_from_auth_header` to extract deepset API keys from request headers
 
