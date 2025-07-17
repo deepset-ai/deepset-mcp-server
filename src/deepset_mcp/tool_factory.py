@@ -6,9 +6,9 @@
 
 import functools
 import inspect
+import logging
 import os
 import re
-import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
