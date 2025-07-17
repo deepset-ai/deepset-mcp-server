@@ -493,25 +493,24 @@ def apply_client(
 
 
 def build_tool(
-    base_func: Callable[..., Any], config: ToolConfig, workspace_mode: WorkspaceMode, workspace: str | None = None
+    base_func: Callable[..., Any],
+    config: ToolConfig,
+    workspace_mode: WorkspaceMode,
+    workspace: str | None = None,
+    use_request_context: bool = True,
 ) -> Callable[..., Awaitable[Any]]:
     """
     Universal tool creator that handles client injection, workspace, and decorators.
 
-    This function takes a base tool function and enhances it based on a configuration
-    by composing individual enhancement functions. Each enhancement function handles
-    its own signature and docstring modifications.
-
-    All parameters in the final tool signature are converted to be keyword-only to enforce
-    explicit naming of arguments in tool calls.
+    This function takes a base tool function and enhances it based on the tool's configuration.
 
     :param base_func: The base tool function.
     :param config: Tool configuration specifying dependencies and custom arguments.
     :param workspace_mode: How the workspace should be handled.
     :param workspace: The workspace to use when using a static workspace.
+    :param use_request_context: Whether to collect the API key from the request context.
     :returns: An enhanced, awaitable tool function with an updated signature and docstring.
     """
-    # Apply enhancements in sequence - each function handles its own signature/docstring
     enhanced_func = base_func
 
     # Apply custom arguments first
@@ -524,7 +523,7 @@ def build_tool(
     enhanced_func = apply_workspace(enhanced_func, config, workspace_mode, workspace)
 
     # Apply client injection (adds ctx parameter if needed)
-    enhanced_func = apply_client(enhanced_func, config, use_request_context=True)
+    enhanced_func = apply_client(enhanced_func, config, use_request_context=use_request_context)
 
     # Create final async wrapper if needed
     if not inspect.iscoroutinefunction(enhanced_func):
@@ -543,7 +542,11 @@ def build_tool(
 
 
 def register_tools(
-    mcp: FastMCP, workspace_mode: WorkspaceMode, workspace: str | None = None, tool_names: set[str] | None = None
+    mcp: FastMCP,
+    workspace_mode: WorkspaceMode,
+    workspace: str | None = None,
+    tool_names: set[str] | None = None,
+    use_request_context: bool = True,
 ) -> None:
     """Register tools with unified configuration.
 
@@ -552,6 +555,7 @@ def register_tools(
         workspace_mode: How workspace should be handled
         workspace: Workspace to use for environment mode (if None, reads from env)
         tool_names: Set of tool names to register (if None, registers all tools)
+        use_request_context: Whether to use request context to retrieve an API key for tool execution.
     """
     # Check if docs search is available
     docs_available = are_docs_available()
@@ -589,6 +593,6 @@ def register_tools(
     for tool_name in tools_to_register:
         base_func, config = TOOL_REGISTRY[tool_name]
         # Create enhanced tool
-        enhanced_tool = build_tool(base_func, config, workspace_mode, workspace)
+        enhanced_tool = build_tool(base_func, config, workspace_mode, workspace, use_request_context)
 
         mcp.add_tool(enhanced_tool, name=tool_name, structured_output=False)
