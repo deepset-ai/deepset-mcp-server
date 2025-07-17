@@ -390,8 +390,8 @@ class TestApplyClient:
             assert "api_key" not in call_args[1] or call_args[1]["api_key"] is None
 
 
-class TestCreateEnhancedTool:
-    """Test the create_enhanced_tool function."""
+class TestBuildTool:
+    """Test the build_tool function."""
 
     @pytest.mark.asyncio
     async def test_basic_function_enhancement(self) -> None:
