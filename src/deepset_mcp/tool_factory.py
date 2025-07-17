@@ -6,9 +6,9 @@
 
 import functools
 import inspect
-import logging
 import os
 import re
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -492,7 +492,7 @@ def apply_client(
         return client_wrapper_without_context
 
 
-def create_enhanced_tool(
+def build_tool(
     base_func: Callable[..., Any], config: ToolConfig, workspace_mode: WorkspaceMode, workspace: str | None = None
 ) -> Callable[..., Awaitable[Any]]:
     """
@@ -589,6 +589,6 @@ def register_tools(
     for tool_name in tools_to_register:
         base_func, config = TOOL_REGISTRY[tool_name]
         # Create enhanced tool
-        enhanced_tool = create_enhanced_tool(base_func, config, workspace_mode, workspace)
+        enhanced_tool = build_tool(base_func, config, workspace_mode, workspace)
 
         mcp.add_tool(enhanced_tool, name=tool_name, structured_output=False)

@@ -15,7 +15,7 @@ from deepset_mcp.tool_factory import (
     apply_custom_args,
     apply_memory,
     apply_workspace,
-    create_enhanced_tool,
+    build_tool,
 )
 from test.unit.conftest import BaseFakeClient
 
@@ -401,7 +401,7 @@ class TestCreateEnhancedTool:
             return str(a)
 
         config = ToolConfig()
-        result = create_enhanced_tool(sample_func, config, WorkspaceMode.STATIC)
+        result = build_tool(sample_func, config, WorkspaceMode.STATIC)
 
         # Should return async function
         assert inspect.iscoroutinefunction(result)
@@ -418,7 +418,7 @@ class TestCreateEnhancedTool:
             return str(a)
 
         config = ToolConfig()
-        result = create_enhanced_tool(sample_func, config, WorkspaceMode.STATIC)
+        result = build_tool(sample_func, config, WorkspaceMode.STATIC)
 
         # Should return async function
         assert inspect.iscoroutinefunction(result)
@@ -449,7 +449,7 @@ class TestCreateEnhancedTool:
             custom_args={"custom_arg": "injected"},
         )
 
-        result = create_enhanced_tool(sample_func, config, WorkspaceMode.STATIC, "test-workspace")
+        result = build_tool(sample_func, config, WorkspaceMode.STATIC, "test-workspace")
 
         # Check final signature
         sig = inspect.signature(result)
@@ -478,7 +478,7 @@ class TestCreateEnhancedTool:
             needs_workspace=True,
         )
 
-        result = create_enhanced_tool(sample_func, config, WorkspaceMode.STATIC, "test-workspace")
+        result = build_tool(sample_func, config, WorkspaceMode.STATIC, "test-workspace")
 
         # Mock the context and use FakeClient
         mock_ctx = MagicMock()
@@ -509,7 +509,7 @@ class TestCreateEnhancedTool:
             needs_workspace=False,
         )
 
-        result = create_enhanced_tool(sample_func, config, WorkspaceMode.STATIC)
+        result = build_tool(sample_func, config, WorkspaceMode.STATIC)
 
         # Should work without ctx
         output = await result(a=42, b="test")
@@ -531,7 +531,7 @@ class TestCreateEnhancedTool:
             mock_explorable.return_value = mock_decorator
             mock_decorator.return_value = sample_func
 
-            create_enhanced_tool(sample_func, config, WorkspaceMode.STATIC)
+            build_tool(sample_func, config, WorkspaceMode.STATIC)
 
             # Should have applied the decorator
             mock_explorable.assert_called_once()
@@ -545,7 +545,7 @@ class TestCreateEnhancedTool:
             return str(a)
 
         config = ToolConfig(needs_client=True)
-        result = create_enhanced_tool(sample_func, config, WorkspaceMode.STATIC)
+        result = build_tool(sample_func, config, WorkspaceMode.STATIC)
 
         # Test missing context
         with pytest.raises(ValueError, match="Context is required"):
@@ -572,7 +572,7 @@ class TestCreateEnhancedTool:
             return f"{workspace}:{a}"
 
         config = ToolConfig(needs_workspace=True)
-        result = create_enhanced_tool(sample_func, config, WorkspaceMode.STATIC, None)
+        result = build_tool(sample_func, config, WorkspaceMode.STATIC, None)
 
         # Test workspace loading from env fails
         with patch("deepset_mcp.tool_factory.get_workspace_from_env", side_effect=ValueError("No workspace")):
