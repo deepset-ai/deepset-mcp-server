@@ -182,10 +182,10 @@ def main() -> None:
         tool_names = set(args.tools)
 
     # Register tools based on configuration
-    register_tools(mcp, workspace_mode, workspace, tool_names)
+    register_tools(mcp, workspace_mode, workspace, tool_names, use_request_context=False)
 
     # run with SSE transport (HTTP+Server-Sent Events)
-    mcp.run(transport="stdio")
+    mcp.run(transport="streamable-http")
 
 
 if __name__ == "__main__":
