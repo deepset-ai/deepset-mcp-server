@@ -14,7 +14,8 @@ from mcp.server.fastmcp import FastMCP
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.config import DEEPSET_DOCS_DEFAULT_SHARE_URL
-from deepset_mcp.tool_factory import WorkspaceMode, register_tools
+from deepset_mcp.tool_factory import register_tools
+from deepset_mcp.tool_models import WorkspaceMode
 
 # Initialize MCP Server
 mcp = FastMCP("Deepset Cloud MCP", settings={"log_level": "ERROR"})
@@ -140,7 +141,7 @@ def main() -> None:
 
     # Handle --list-tools flag early
     if args.list_tools:
-        from deepset_mcp.tool_factory import TOOL_REGISTRY
+        from deepset_mcp.tool_registry import TOOL_REGISTRY
 
         print("Available tools:")
         for tool_name in sorted(TOOL_REGISTRY.keys()):

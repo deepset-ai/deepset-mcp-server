@@ -12,15 +12,13 @@ import pytest
 
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.tool_factory import (
-    MemoryType,
-    ToolConfig,
-    WorkspaceMode,
     apply_client,
     apply_custom_args,
     apply_memory,
     apply_workspace,
     build_tool,
 )
+from deepset_mcp.tool_models import MemoryType, ToolConfig, WorkspaceMode
 from test.unit.conftest import BaseFakeClient
 
 
