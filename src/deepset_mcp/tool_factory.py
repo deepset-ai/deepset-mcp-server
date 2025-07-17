@@ -6,7 +6,6 @@
 
 import functools
 import inspect
-import logging
 import os
 import re
 from collections.abc import Awaitable, Callable
@@ -15,9 +14,9 @@ from typing import Any
 from mcp.server.fastmcp import Context, FastMCP
 
 from deepset_mcp.api.client import AsyncDeepsetClient
-from deepset_mcp.config import DEFAULT_CLIENT_HEADER
+from deepset_mcp.config import DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME
 from deepset_mcp.store import STORE
-from deepset_mcp.tool_models import MemoryType, ToolConfig, WorkspaceMode
+from deepset_mcp.tool_models import DeepsetDocsConfig, MemoryType, ToolConfig, WorkspaceMode
 from deepset_mcp.tool_registry import TOOL_REGISTRY
 from deepset_mcp.tools.tokonomics import RichExplorer, explorable, explorable_and_referenceable, referenceable
 
@@ -283,23 +282,48 @@ def build_tool(
 
 
 def register_tools(
-    mcp: FastMCP,
+    mcp_server_instance: FastMCP,
     workspace_mode: WorkspaceMode,
+    api_key: str | None = None,
     workspace: str | None = None,
     tool_names: set[str] | None = None,
-    use_request_context: bool = True,
+    get_api_key_from_authorization_header: bool = True,
+    docs_config: DeepsetDocsConfig | None = None,
 ) -> None:
     """Register tools with unified configuration.
 
     Args:
-        mcp: FastMCP server instance
+        mcp_server_instance: FastMCP server instance
         workspace_mode: How workspace should be handled
-        workspace: Workspace to use for environment mode (if None, reads from env)
+        api_key: An api key for the deepset AI platform; only needs to be provided when not read from request context.
+        workspace: Workspace to use; only needs to be provided if using a static workspace.
         tool_names: Set of tool names to register (if None, registers all tools)
-        use_request_context: Whether to use request context to retrieve an API key for tool execution.
+        get_api_key_from_authorization_header: Whether to use request context to retrieve an API key for tool execution.
+        docs_config: Configuration for the deepset documentation search tool.
     """
-    # Check if docs search is available
-    docs_available = are_docs_available()
+    if api_key is None and not get_api_key_from_authorization_header:
+        raise ValueError(
+            "'api_key' cannot be 'None' when 'use_request_context' is False. "
+            "Either pass 'api_key' or 'use_request_context'."
+        )
+
+    if workspace_mode == WorkspaceMode.STATIC and workspace is None:
+        raise ValueError(
+            "'workspace_mode' set to 'static' but no workspace provided. "
+            "You need to set a deepset workspace name as 'workspace'."
+        )
+
+    if docs_config is None and tool_names is None:
+        raise ValueError(
+            f"'docs_config' cannot be None when requesting to register all tools. "
+            f"Either pass 'docs_config' or disable the '{DOCS_SEARCH_TOOL_NAME}' tool."
+        )
+
+    if docs_config is None and tool_names is not None and DOCS_SEARCH_TOOL_NAME in tool_names:
+        raise ValueError(
+            f"Requested to register '{DOCS_SEARCH_TOOL_NAME}' tool but 'docs_config' is 'None'. "
+            f"Provide a valid 'docs_config' to register this tool."
+        )
 
     # Validate tool names if provided
     if tool_names is not None:
@@ -310,30 +334,21 @@ def register_tools(
             sorted_all = sorted(all_tools)
             raise ValueError(f"Unknown tools: {', '.join(sorted_invalid)}\nAvailable tools: {', '.join(sorted_all)}")
 
-        # Warn if search_docs was requested but config is missing
-        if "search_docs" in tool_names and not docs_available:
-            logging.warning(
-                "Documentation search tool requested but not available. To enable, set the DEEPSET_DOCS_SHARE_URL "
-                "environment variable."
-            )
-
         tools_to_register = tool_names.copy()
     else:
         tools_to_register = set(TOOL_REGISTRY.keys())
 
-        # Warn if search_docs would be skipped in "all tools" mode
-        if not docs_available:
-            logging.warning(
-                "Documentation search tool not enabled. To enable, set the DEEPSET_DOCS_SHARE_URL environment variable."
-            )
-
-    # Remove search_docs if config is not available
-    if not docs_available:
-        tools_to_register.discard("search_docs")
-
     for tool_name in tools_to_register:
         base_func, config = TOOL_REGISTRY[tool_name]
-        # Create enhanced tool
-        enhanced_tool = build_tool(base_func, config, workspace_mode, workspace, use_request_context)
 
-        mcp.add_tool(enhanced_tool, name=tool_name, structured_output=False)
+        if tool_name == DOCS_SEARCH_TOOL_NAME:
+            # search_docs is a special tool.
+            # base_func is a factory function.
+            # We configure with the docs_config to get the actual tool function.
+            enhanced_tool = base_func(config=docs_config)
+        else:
+            enhanced_tool = build_tool(
+                base_func, config, workspace_mode, workspace, get_api_key_from_authorization_header
+            )
+
+        mcp_server_instance.add_tool(enhanced_tool, name=tool_name, structured_output=False)

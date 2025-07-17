@@ -4,7 +4,14 @@
 
 """This module contains static configuration for the deepset MCP server."""
 
-from deepset_mcp import __version__
+import importlib.metadata
+
+try:
+    __version__ = importlib.metadata.version("deepset-mcp")
+except importlib.metadata.PackageNotFoundError:
+    __version__ = "0.0.0"  # Fallback for development mode
+
+PACKAGE_VERSION = __version__
 
 # We need this mapping to which environment variables integrations are mapped to
 # The mapping is maintained in the pipeline operator:
@@ -29,5 +36,6 @@ TOKEN_DOMAIN_MAPPING = {
 }
 
 DEEPSET_DOCS_DEFAULT_SHARE_URL = "https://cloud.deepset.ai/shared_prototypes?share_token=prototype_eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODM0MjE0OTguNTk5LCJhdWQiOiJleHRlcm5hbCB1c2VyIiwiaXNzIjoiZEMiLCJ3b3Jrc3BhY2VfaWQiOiI4YzI0ZjExMi1iMjljLTQ5MWMtOTkzOS1hZTkxMDRhNTQyMWMiLCJ3b3Jrc3BhY2VfbmFtZSI6ImRjLWRvY3MtY29udGVudCIsIm9yZ2FuaXphdGlvbl9pZCI6ImNhOWYxNGQ0LWMyYzktNDYwZC04ZDI2LWY4Y2IwYWNhMDI0ZiIsInNoYXJlX2lkIjoiY2Y3MTA3ODAtOThmNi00MzlmLThiNzYtMmMwNDkyODNiMDZhIiwibG9naW5fcmVxdWlyZWQiOmZhbHNlfQ.5j6DCNRQ1_KB8lhIJqHyw2hBIleEW1_Y_UBuH6MTYY0"
+DOCS_SEARCH_TOOL_NAME = "search_docs"
 
-DEFAULT_CLIENT_HEADER = {"headers": {"User-Agent": f"deepset-mcp/{__version__}"}}
+DEFAULT_CLIENT_HEADER = {"headers": {"user-agent": f"deepset-mcp/{__version__}"}}

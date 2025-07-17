@@ -49,13 +49,14 @@ dependencies = [
     "glom",
     "rich",
     "pyjwt[crypto]",
+    "typer",
 ]
 
 [project.urls]
 Homepage = "https://deepset.ai"
 
 [project.scripts]
-deepset-mcp = "deepset_mcp.main:main"
+deepset-mcp = "deepset_mcp.main:app"
 
 [dependency-groups]
 dev = [

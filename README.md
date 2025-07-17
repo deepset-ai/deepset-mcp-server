@@ -20,6 +20,7 @@ Using the server, you benefit from faster creation of pipelines or indexes and s
   - [2.2 Manage Tools](#manage-tools)
   - [2.3 Reduce Tool Count](#reduce-tool-count)
   - [2.4 Prompts](#prompts)
+  - [2.5 Providing a Remote MCP Server](#providing-a-remote-mcp-server)
 - [3. Use Cases](#use-cases)
   - [3.1. Creating Pipelines](#creating-pipelines)
   - [3.2. Debugging Pipelines](#debugging-pipelines)
@@ -216,7 +217,6 @@ For example:
       "env": {
        "DEEPSET_API_KEY":"<DEEPSET_API_KEY>"
      }
-
     }
   }
 }
@@ -320,13 +320,61 @@ All tools exposed through the MCP server have minimal prompts. Any Agent interac
 
 View the **recommended prompt** [here](src/deepset_mcp/prompts/deepset_debugging_agent.md).
 
-This prompt is also exposed as the `deepset_recommended_prompt` on the MCP server.
-
 In Cursor, add the prompt to `.cursorrules`.
 
 In Claude Desktop, create a "Project" and add the prompt as system instructions.
 
 You may find that customizing the prompt for your specific needs yields best results.
+
+
+### Providing a Remote MCP Server
+
+The `deepset-mcp` package can be configured to run as a remote MCP server, allowing you to provide deepset platform access to multiple users through a centralized service. This is particularly useful for organizations that want to deploy the MCP server as a shared service or integrate it into existing infrastructure.
+
+**Prerequisites**
+
+- Python 3.9 or higher
+- `uv` package manager installed
+- Knowledge of FastAPI or similar web framework
+- OAuth authentication system (recommended)
+- SSL/TLS certificate for production deployment
+
+**Key Requirements**
+
+When running as a remote MCP server, you must configure the following:
+
+1. **Transport Protocol**: Use `streamable-http` instead of the default `stdio` transport
+2. **Authentication**: Implement OAuth or similar authentication flow to securely handle user credentials
+3. **Authorization Headers**: Ensure client requests include proper `Authorization` headers with Bearer tokens
+4. **Dynamic Workspace Mode**: Use `workspace_mode='dynamic'` to support multiple users with different workspaces
+5. **API Key Management**: Enable `get_api_key_from_auth_header` to extract deepset API keys from request headers
+
+**Implementation Example**
+
+Here's a complete example of how to set up a remote MCP server:
+
+```python
+from mcp.server.fastmcp import FastMCP
+from deepset_mcp import configure_mcp_server, WorkspaceMode, ALL_DEEPSET_TOOLS, DEEPSET_DOCS_DEFAULT_SHARE_URL
+
+# Create FastMCP instance
+mcp = FastMCP("Deepset Remote MCP Server")
+
+# Add authentication middleware
+
+# Configure the deepset MCP server
+configure_mcp_server(
+    mcp_server_instance=mcp,
+    workspace_mode=WorkspaceMode.DYNAMIC,
+    tools_to_register=ALL_DEEPSET_TOOLS,
+    deepset_docs_shareable_prototype_url=DEEPSET_DOCS_DEFAULT_SHARE_URL,
+    get_api_key_from_authorization_header=True
+)
+
+# Run the server
+if __name__ == "__main__":
+    mcp.run(transport="streamable-http")
+```
 
 
 ## Use Cases
@@ -374,7 +422,7 @@ If your pipeline is not deployed yet, the Agent can autonomously validate it and
 
 ### deepset-mcp
 
-The `deepset-mcp`-command starts the `deepset-mcp` server.
+The `deepset-mcp` command starts the Deepset MCP server to interact with the deepset AI platform.
 
 You can run it in your terminal via `uvx deepset-mcp`.
 
@@ -384,14 +432,16 @@ If you want to run a specific version, you can run:
 
 The following options are available:
 
-| Option           | Shorthand | Description                                                                                                                                                                                                |
-|------------------|-----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| --api-key        | -k        | The deepset API key to use. Can also be set it via the "DEEPSET_API_KEY" environment variable.                                                                                                             |
-| --workspace      | -w        | The deepset workspace to use. Can also be set via the "DEEPSET_WORKSPACE" environment variable.                                                                                                            |
-| --workspace-mode | -m        | If you want to allow an Agent to access multiple workspaces (Options: static, dynamic; default: static)                                                                                                    |
-| --list-tools     | -l        | List all available tools (does not start the server).                                                                                                                                                      |
-| --tools          | -t        | Pass a space separated list of tool names that you want the server to register.                                                                                                                            |
-| --docs-share-url | -d        | Pass a [shared prototype](https://docs.cloud.deepset.ai/docs/share-a-pipeline-prototype) URL to customize which pipeline the Agent uses for documentation search (default: official deepset documentation) |
+| Option                      | Description                                                                                                                                                                                                |
+|-----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| --api-key                   | The deepset API key to use. Can also be set it via the "DEEPSET_API_KEY" environment variable.                                                                                                             |
+| --workspace                 | The deepset workspace to use. Can also be set via the "DEEPSET_WORKSPACE" environment variable.                                                                                                            |
+| --workspace-mode            | If you want to allow an Agent to access multiple workspaces (Options: static, dynamic; default: static)                                                                                                    |
+| --list-tools                | List all available tools (does not start the server).                                                                                                                                                      |
+| --tools                     | Pass a space separated list of tool names that you want the server to register.                                                                                                                            |
+| --docs-share-url            | Pass a [shared prototype](https://docs.cloud.deepset.ai/docs/share-a-pipeline-prototype) URL to customize which pipeline the Agent uses for documentation search (default: official deepset documentation) |
+| --api-key-from-auth-header  | Get the deepset API key from the request's authorization header instead of using a static key.                                                                                                            |
+| --transport                 | The type of transport to use for running the MCP server (Options: stdio, streamable-http; default: stdio)                                                                                                |
 
 
 ### Tools

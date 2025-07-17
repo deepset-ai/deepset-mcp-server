@@ -2,15 +2,14 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-import os
 from collections.abc import Callable
 from typing import Any
 
 from deepset_mcp.api.client import AsyncDeepsetClient
-from deepset_mcp.config import DEFAULT_CLIENT_HEADER
+from deepset_mcp.config import DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME
 from deepset_mcp.initialize_embedding_model import get_initialized_model
 from deepset_mcp.store import STORE
-from deepset_mcp.tool_models import MemoryType, ToolConfig
+from deepset_mcp.tool_models import DeepsetDocsConfig, MemoryType, ToolConfig
 from deepset_mcp.tools.custom_components import (
     get_latest_custom_component_installation_logs as get_latest_custom_component_installation_logs_tool,
     list_custom_component_installations as list_custom_component_installations_tool,
@@ -59,27 +58,30 @@ get_from_object_store = create_get_from_object_store(explorer=EXPLORER)
 get_slice_from_object_store = create_get_slice_from_object_store(explorer=EXPLORER)
 
 
-async def search_docs(query: str) -> str:
-    """Search the deepset platform documentation.
+def get_docs_search_tool(config: DeepsetDocsConfig) -> Callable[..., Any]:
+    """Get a docs search tool configured with the provided config."""
 
-    This tool allows you to search through deepset's official documentation to find
-    information about features, API usage, best practices, and troubleshooting guides.
-    Use this when you need to look up specific deepset functionality or help users
-    understand how to use deepset features.
+    async def search_docs(query: str) -> str:
+        """Search the deepset platform documentation.
 
-    :param query: The search query to execute against the documentation.
-    :returns: The formatted search results from the documentation.
-    """
-    async with AsyncDeepsetClient(
-        api_key=os.environ["DEEPSET_DOCS_API_KEY"], transport_config=DEFAULT_CLIENT_HEADER
-    ) as client:
-        response = await search_docs_tool(
-            client=client,
-            workspace=os.environ["DEEPSET_DOCS_WORKSPACE"],
-            pipeline_name=os.environ["DEEPSET_DOCS_PIPELINE_NAME"],
-            query=query,
-        )
-    return response
+        This tool allows you to search through deepset's official documentation to find
+        information about features, API usage, best practices, and troubleshooting guides.
+        Use this when you need to look up specific deepset functionality or help users
+        understand how to use deepset features.
+
+        :param query: The search query to execute against the documentation.
+        :returns: The formatted search results from the documentation.
+        """
+        async with AsyncDeepsetClient(api_key=config.api_key, transport_config=DEFAULT_CLIENT_HEADER) as client:
+            response = await search_docs_tool(
+                client=client,
+                workspace=config.workspace_name,
+                pipeline_name=config.pipeline_name,
+                query=query,
+            )
+        return response
+
+    return search_docs
 
 
 TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
@@ -207,5 +209,7 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "create_workspace": (create_workspace_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "get_from_object_store": (get_from_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
     "get_slice_from_object_store": (get_slice_from_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
-    "search_docs": (search_docs, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
+    DOCS_SEARCH_TOOL_NAME: (get_docs_search_tool, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
 }
+
+ALL_DEEPSET_TOOLS = set(TOOL_REGISTRY.keys())

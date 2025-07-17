@@ -31,3 +31,12 @@ class WorkspaceMode(StrEnum):
 
     STATIC = "static"  # workspace from env, no parameter in tool signature
     DYNAMIC = "dynamic"  # workspace as required parameter in tool signature
+
+
+@dataclass
+class DeepsetDocsConfig:
+    """Configuration for deepset documentation search tool."""
+
+    pipeline_name: str
+    api_key: str
+    workspace_name: str
