@@ -229,3 +229,44 @@ class TestAsyncTransport:
         await transport.close()
 
         mock_httpx_client.aclose.assert_called_once()
+
+    async def test_config_not_mutated_on_repeated_initialization(self) -> None:
+        """Test that config dict is not mutated when creating multiple AsyncTransport instances."""
+        # Create a config with headers
+        original_config = {
+            "timeout": 30.0,
+            "headers": {"Custom-Header": "value", "Another-Header": "another-value"},
+            "follow_redirects": True,
+        }
+
+        with patch("httpx.AsyncClient") as mock_client_class:
+            # First initialization - should not mutate original config
+            AsyncTransport(base_url="https://api.example.com", api_key="test-key-1", config=original_config)
+
+            # Verify the config still has headers after first initialization
+            assert "headers" in original_config
+            assert original_config["headers"] == {"Custom-Header": "value", "Another-Header": "another-value"}
+
+            # Second initialization with same config - should still work
+            AsyncTransport(base_url="https://api.example.com", api_key="test-key-2", config=original_config)
+
+            # Verify the config still has headers after second initialization
+            assert "headers" in original_config
+            assert original_config["headers"] == {"Custom-Header": "value", "Another-Header": "another-value"}
+            assert original_config["timeout"] == 30.0
+            assert original_config["follow_redirects"] is True
+
+            # Verify both clients were created with the expected headers
+            assert mock_client_class.call_count == 2
+
+            # Check first call
+            first_call_args = mock_client_class.call_args_list[0][1]
+            assert first_call_args["headers"]["Authorization"] == "Bearer test-key-1"
+            assert first_call_args["headers"]["Custom-Header"] == "value"
+            assert first_call_args["headers"]["Another-Header"] == "another-value"
+
+            # Check second call
+            second_call_args = mock_client_class.call_args_list[1][1]
+            assert second_call_args["headers"]["Authorization"] == "Bearer test-key-2"
+            assert second_call_args["headers"]["Custom-Header"] == "value"
+            assert second_call_args["headers"]["Another-Header"] == "another-value"

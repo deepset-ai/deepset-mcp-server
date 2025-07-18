@@ -6,6 +6,7 @@ import json
 import time
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Generic, Literal, Protocol, TypeVar, cast, overload
 
@@ -198,8 +199,10 @@ class AsyncTransport:
         config : dict, optional
             Configuration for httpx.AsyncClient, e.g., {'timeout': 10.0}
         """
-        config = config or {}
-        # Ensure auth header
+        # We deepcopy the config so that we don't mutate it when used for subsequent initializations
+        config = deepcopy(config) or {}
+
+        # Merge auth and other config headers
         headers = config.pop("headers", {})
         headers.setdefault("Authorization", f"Bearer {api_key}")
         # Build client kwargs
