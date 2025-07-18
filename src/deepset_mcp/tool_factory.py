@@ -155,7 +155,7 @@ def apply_memory(base_func: Callable[..., Any], config: ToolConfig) -> Callable[
 
 
 def apply_client(
-    base_func: Callable[..., Any], config: ToolConfig, use_request_context: bool = True
+    base_func: Callable[..., Any], config: ToolConfig, use_request_context: bool = True, base_url: str | None = None
 ) -> Callable[..., Any]:
     """
     Applies the deepset API client to a function.
@@ -167,6 +167,7 @@ def apply_client(
     :param base_func: The function to apply the client to.
     :param config: The ToolConfig for the function.
     :param use_request_context: Whether to collect the API key from the request context.
+    :param base_url: Base URL for the deepset API.
     :returns: Function with client injection applied and updated signature/docstring.
     :raises ValueError: If API key cannot be extracted from request context.
     """
@@ -190,7 +191,10 @@ def apply_client(
             if not api_key:
                 raise ValueError("API key cannot be empty")
 
-            async with AsyncDeepsetClient(transport_config=DEFAULT_CLIENT_HEADER, api_key=api_key) as client:
+            client_kwargs: dict[str, Any] = {"transport_config": DEFAULT_CLIENT_HEADER, "api_key": api_key}
+            if base_url:
+                client_kwargs["base_url"] = base_url
+            async with AsyncDeepsetClient(**client_kwargs) as client:
                 return await base_func(*args, client=client, **kwargs)
 
         # Remove client from signature and add ctx
@@ -218,7 +222,10 @@ def apply_client(
 
         @functools.wraps(base_func)
         async def client_wrapper_without_context(*args: Any, **kwargs: Any) -> Any:
-            async with AsyncDeepsetClient(transport_config=DEFAULT_CLIENT_HEADER) as client:
+            client_kwargs: dict[str, Any] = {"transport_config": DEFAULT_CLIENT_HEADER}
+            if base_url:
+                client_kwargs["base_url"] = base_url
+            async with AsyncDeepsetClient(**client_kwargs) as client:
                 return await base_func(*args, client=client, **kwargs)
 
         # Remove client from signature
@@ -238,6 +245,7 @@ def build_tool(
     workspace_mode: WorkspaceMode,
     workspace: str | None = None,
     use_request_context: bool = True,
+    base_url: str | None = None,
 ) -> Callable[..., Awaitable[Any]]:
     """
     Universal tool creator that handles client injection, workspace, and decorators.
@@ -249,6 +257,7 @@ def build_tool(
     :param workspace_mode: How the workspace should be handled.
     :param workspace: The workspace to use when using a static workspace.
     :param use_request_context: Whether to collect the API key from the request context.
+    :param base_url: Base URL for the deepset API.
     :returns: An enhanced, awaitable tool function with an updated signature and docstring.
     """
     enhanced_func = base_func
@@ -263,7 +272,7 @@ def build_tool(
     enhanced_func = apply_workspace(enhanced_func, config, workspace_mode, workspace)
 
     # Apply client injection (adds ctx parameter if needed)
-    enhanced_func = apply_client(enhanced_func, config, use_request_context=use_request_context)
+    enhanced_func = apply_client(enhanced_func, config, use_request_context=use_request_context, base_url=base_url)
 
     # Create final async wrapper if needed
     if not inspect.iscoroutinefunction(enhanced_func):
@@ -289,6 +298,7 @@ def register_tools(
     tool_names: set[str] | None = None,
     get_api_key_from_authorization_header: bool = True,
     docs_config: DeepsetDocsConfig | None = None,
+    base_url: str | None = None,
 ) -> None:
     """Register tools with unified configuration.
 
@@ -300,6 +310,7 @@ def register_tools(
         tool_names: Set of tool names to register (if None, registers all tools)
         get_api_key_from_authorization_header: Whether to use request context to retrieve an API key for tool execution.
         docs_config: Configuration for the deepset documentation search tool.
+        base_url: Base URL for the deepset API.
     """
     if api_key is None and not get_api_key_from_authorization_header:
         raise ValueError(
@@ -348,7 +359,7 @@ def register_tools(
             enhanced_tool = base_func(config=docs_config)
         else:
             enhanced_tool = build_tool(
-                base_func, config, workspace_mode, workspace, get_api_key_from_authorization_header
+                base_func, config, workspace_mode, workspace, get_api_key_from_authorization_header, base_url
             )
 
         mcp_server_instance.add_tool(enhanced_tool, name=tool_name, structured_output=False)

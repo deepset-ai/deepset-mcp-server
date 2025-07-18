@@ -19,6 +19,7 @@ def configure_mcp_server(
     tools_to_register: set[str],
     workspace_mode: WorkspaceMode,
     deepset_api_key: str | None = None,
+    deepset_api_url: str | None = None,
     deepset_workspace: str | None = None,
     deepset_docs_shareable_prototype_url: str | None = None,
     get_api_key_from_authorization_header: bool = False,
@@ -29,6 +30,7 @@ def configure_mcp_server(
     :param tools_to_register: Set of tool names to register with the server
     :param workspace_mode: The workspace mode (static or dynamic)
     :param deepset_api_key: Optional Deepset API key for authentication
+    :param deepset_api_url: Optional Deepset API base URL
     :param deepset_workspace: Optional workspace name for static mode
     :param deepset_docs_shareable_prototype_url: Optional URL for shared prototype
     :param get_api_key_from_authorization_header: Whether to extract API key from authorization header
@@ -70,6 +72,7 @@ def configure_mcp_server(
         docs_config=docs_config,
         get_api_key_from_authorization_header=get_api_key_from_authorization_header,
         api_key=deepset_api_key,
+        base_url=deepset_api_url,
     )
 
 

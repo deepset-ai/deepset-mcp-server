@@ -391,6 +391,81 @@ class TestApplyClient:
             call_args = mock_client_class.call_args
             assert "api_key" not in call_args[1] or call_args[1]["api_key"] is None
 
+    @pytest.mark.asyncio
+    async def test_client_with_base_url_context(self) -> None:
+        """Test that client is created with custom base_url when provided with context."""
+
+        async def sample_func(client: AsyncClientProtocol, a: int) -> str:
+            return f"client:{a}"
+
+        config = ToolConfig(needs_client=True)
+        custom_url = "https://custom.api.example.com"
+        result = apply_client(sample_func, config, use_request_context=True, base_url=custom_url)
+
+        mock_ctx = MagicMock()
+        mock_ctx.request_context.request.headers.get.return_value = "Bearer test-token"
+
+        # Mock the AsyncDeepsetClient to return our FakeClient
+        fake_client = BaseFakeClient()
+
+        with patch("deepset_mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = fake_client
+
+            await result(a=42, ctx=mock_ctx)
+
+            # Check that client was created with correct base_url
+            mock_client_class.assert_called_once()
+            call_args = mock_client_class.call_args
+            assert call_args[1]["base_url"] == custom_url
+            assert call_args[1]["api_key"] == "test-token"
+
+    @pytest.mark.asyncio
+    async def test_client_with_base_url_no_context(self) -> None:
+        """Test that client is created with custom base_url when provided without context."""
+
+        async def sample_func(client: AsyncClientProtocol, a: int) -> str:
+            return f"client:{a}"
+
+        config = ToolConfig(needs_client=True)
+        custom_url = "https://custom.api.example.com"
+        result = apply_client(sample_func, config, use_request_context=False, base_url=custom_url)
+
+        # Mock the AsyncDeepsetClient to return our FakeClient
+        fake_client = BaseFakeClient()
+
+        with patch("deepset_mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = fake_client
+
+            await result(a=42)
+
+            # Check that client was created with correct base_url
+            mock_client_class.assert_called_once()
+            call_args = mock_client_class.call_args
+            assert call_args[1]["base_url"] == custom_url
+
+    @pytest.mark.asyncio
+    async def test_client_without_base_url(self) -> None:
+        """Test that client is created without base_url when not provided."""
+
+        async def sample_func(client: AsyncClientProtocol, a: int) -> str:
+            return f"client:{a}"
+
+        config = ToolConfig(needs_client=True)
+        result = apply_client(sample_func, config, use_request_context=False, base_url=None)
+
+        # Mock the AsyncDeepsetClient to return our FakeClient
+        fake_client = BaseFakeClient()
+
+        with patch("deepset_mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = fake_client
+
+            await result(a=42)
+
+            # Check that client was created without base_url
+            mock_client_class.assert_called_once()
+            call_args = mock_client_class.call_args
+            assert "base_url" not in call_args[1]
+
 
 class TestBuildTool:
     """Test the build_tool function."""
@@ -580,3 +655,32 @@ class TestBuildTool:
         with patch("deepset_mcp.tool_factory.get_workspace_from_env", side_effect=ValueError("No workspace")):
             with pytest.raises(ValueError, match="No workspace"):
                 await result(a=42)
+
+    @pytest.mark.asyncio
+    async def test_build_tool_with_base_url(self) -> None:
+        """Test that build_tool passes base_url correctly to client."""
+
+        async def sample_func(client: AsyncClientProtocol, a: int) -> str:
+            return f"client:{a}"
+
+        config = ToolConfig(needs_client=True)
+        custom_url = "https://custom.api.example.com"
+        result = build_tool(sample_func, config, WorkspaceMode.STATIC, base_url=custom_url)
+
+        # Mock the context
+        mock_ctx = MagicMock()
+        mock_ctx.request_context.request.headers.get.return_value = "Bearer test-token"
+
+        # Mock the AsyncDeepsetClient
+        fake_client = BaseFakeClient()
+
+        with patch("deepset_mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = fake_client
+
+            await result(a=42, ctx=mock_ctx)
+
+            # Verify client was created with correct base_url
+            mock_client_class.assert_called_once()
+            call_args = mock_client_class.call_args
+            assert call_args[1]["base_url"] == custom_url
+            assert call_args[1]["api_key"] == "test-token"
