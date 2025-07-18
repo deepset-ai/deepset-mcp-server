@@ -46,6 +46,13 @@ def main(
             help="Deepset API key for authentication. Can also be set via DEEPSET_API_KEY environment variable.",
         ),
     ] = None,
+    api_url: Annotated[
+        str | None,
+        typer.Option(
+            "--api-url",
+            help="Deepset API base URL. Can also be set via DEEPSET_API_URL environment variable.",
+        ),
+    ] = None,
     docs_share_url: Annotated[
         str | None,
         typer.Option(
@@ -97,6 +104,7 @@ def main(
 
     :param workspace: Deepset workspace name
     :param api_key: Deepset API key for authentication
+    :param api_url: Deepset API base URL
     :param docs_share_url: Deepset docs search share URL
     :param workspace_mode: Whether workspace should be set statically or dynamically
     :param tools: List of tools to register
@@ -114,6 +122,7 @@ def main(
     # Prefer command line arguments, fallback to environment variables
     workspace = workspace or os.getenv("DEEPSET_WORKSPACE")
     api_key = api_key or os.getenv("DEEPSET_API_KEY")
+    api_url = api_url or os.getenv("DEEPSET_API_URL")
     docs_share_url = docs_share_url or os.getenv("DEEPSET_DOCS_SHARE_URL", DEEPSET_DOCS_DEFAULT_SHARE_URL)
 
     if tools:
@@ -151,6 +160,7 @@ def main(
         mcp_server_instance=mcp,
         workspace_mode=workspace_mode,
         deepset_api_key=api_key,
+        deepset_api_url=api_url,
         deepset_workspace=workspace,
         tools_to_register=tool_names,
         deepset_docs_shareable_prototype_url=docs_share_url,
