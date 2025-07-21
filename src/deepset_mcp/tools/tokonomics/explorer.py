@@ -18,7 +18,7 @@ from glom import GlomError, Path, T, glom
 from rich.console import Console
 from rich.pretty import Pretty
 
-from .object_store import ObjectRef, ObjectStore
+from deepset_mcp.tools.tokonomics.object_store import ObjectStore
 
 
 class RichExplorer:
@@ -58,11 +58,26 @@ class RichExplorer:
         # Validation pattern for allowed attributes
         self.allowed_attr_regex = re.compile(r"[A-Za-z][A-Za-z0-9_]*\Z")
 
+    def parse_reference(self, ref_str: str) -> tuple[str, str]:
+        """Parse @obj_id.path into (obj_id, path).
+
+        :param ref_str: Reference string like @obj_id.path or obj_id
+        :return: Tuple of (obj_id, path)
+        """
+        if not ref_str.startswith("@"):
+            return ref_str, ""  # Not a reference, return as-is
+
+        ref_str = ref_str[1:]  # Remove @
+        if "." in ref_str:
+            obj_id, path = ref_str.split(".", 1)
+            return obj_id, path
+        return ref_str, ""
+
     def explore(self, obj_id: str, path: str = "") -> str:
         """Return a string preview of the requested object.
 
         :param obj_id: Identifier obtained from the store.
-        :param path: Navigation path using ``.`` or ``[...]`` notation (e.g. ``@obj_001.path.to.attribute``).
+        :param path: Navigation path using ``.`` or ``[...]`` notation (e.g. ``@obj_id.path.to.attribute``).
         :return: String representation of the object.
         """
         obj = self._get_object_at_path(obj_id, path)
@@ -187,12 +202,11 @@ class RichExplorer:
         :param path: Navigation path (optional).
         :return: Object at path or error string.
         """
-        ref = ObjectRef.parse(obj_id)
-        # We accept @obj_001 as well as obj_001
-        if ref is None:
-            resolved_obj_id = obj_id
-        else:
-            resolved_obj_id = ref.obj_id
+        resolved_obj_id, ref_path = self.parse_reference(obj_id)
+
+        # If there's a path from the reference, combine it with the provided path
+        if ref_path:
+            path = f"{ref_path}.{path}" if path else ref_path
 
         obj = self.store.get(resolved_obj_id)
         if obj is None:

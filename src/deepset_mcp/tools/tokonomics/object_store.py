@@ -21,7 +21,6 @@ A library that equips LLM‑agents with:
 from __future__ import annotations
 
 import logging
-import re
 import time
 import uuid
 from typing import (
@@ -229,42 +228,3 @@ class ObjectStore:
     def delete(self, obj_id: str) -> bool:
         """Delete object."""
         return self._backend.delete(obj_id)
-
-
-# =============================================================================
-# 4 · Object references
-# =============================================================================
-
-
-class ObjectRef:
-    """Lightweight parser for reference strings of the form.
-
-    Examples::
-
-        @obj_042.settings.theme
-        @obj_123["settings"]["theme"]
-    """
-
-    _PATTERN = re.compile(r"^@(\w+)(.*)$")
-
-    def __init__(self, obj_id: str, path: str = "") -> None:
-        """Initialize ObjectRef with object ID and optional path."""
-        self.obj_id = obj_id
-        self.path = path
-
-    # --------------------------------------------------------------------- #
-    # Factory
-    # --------------------------------------------------------------------- #
-
-    @classmethod
-    def parse(cls, ref: str | Any) -> ObjectRef | None:
-        """Parse a reference string into an ObjectRef instance."""
-        if not isinstance(ref, str):
-            return None
-        m = cls._PATTERN.match(ref)
-        if m is None:
-            return None
-        obj_id, path = m.group(1), m.group(2) or ""
-        if path.startswith("."):
-            path = path[1:]
-        return cls(obj_id, path)

@@ -19,15 +19,15 @@ from typing import Any, TypeVar, Union, get_args, get_origin
 
 from glom import GlomError, glom
 
-from .explorer import RichExplorer
-from .object_store import Explorable, ObjectRef, ObjectStore
+from deepset_mcp.tools.tokonomics.explorer import RichExplorer
+from deepset_mcp.tools.tokonomics.object_store import Explorable, ObjectStore
 
 F = TypeVar("F", bound=Callable[..., Any])
 
 
 def _is_reference(value: Any) -> bool:
     """Check if a value is a reference string."""
-    return isinstance(value, str) and ObjectRef.parse(value) is not None
+    return isinstance(value, str) and value.startswith("@") and len(value) > 1
 
 
 def _type_allows_str(annotation: Any) -> bool:
@@ -87,10 +87,10 @@ def _enhance_docstring_for_references(original: str, param_info: dict[str, dict[
             f"    {func_name}(data={{'key': 'value'}}, threshold=10)",
             "",
             "    # Call with references",
-            f"    {func_name}(data='@obj_001', threshold='@obj_002.config.threshold')",
+            f"    {func_name}(data='@obj_123', threshold='@obj_456.config.threshold')",
             "",
             "    # Mixed call",
-            f"    {func_name}(data='@obj_001.items', threshold=10)",
+            f"    {func_name}(data='@obj_123.items', threshold=10)",
         ]
     )
 
@@ -141,7 +141,7 @@ def explorable(
     ...     return {"processed": data}
     ...
     >>> result = process_data({"input": "value"})
-    >>> # result contains a preview and object ID like "@obj_001"
+    >>> # result contains a preview and object ID like "@obj_123"
     """
 
     def decorator(func: F) -> F:
@@ -180,7 +180,7 @@ def referenceable(
 ) -> Callable[[F], F]:
     """Decorator factory that enables parameters to accept object references.
 
-    Parameters can accept reference strings like '@obj_001' or '@obj_001.path.to.value'
+    Parameters can accept reference strings like '@obj_id' or '@obj_id.path.to.value'
     which are automatically resolved before calling the function.
 
     :param object_store: The object store instance to use for lookups.
@@ -200,27 +200,25 @@ def referenceable(
     >>> process_data({"a": 1, "b": 2}, 10)
     >>>
     >>> # Call with references
-    >>> process_data("@obj_001", "@obj_002.config.threshold")
+    >>> process_data("@obj_123", "@obj_456.config.threshold")
     """
 
     def resolve_reference(ref_str: str) -> Any:
         """Resolve a reference string to its actual value."""
-        ref = ObjectRef.parse(ref_str)
-        if ref is None:
-            raise ValueError(f"Invalid reference format: {ref_str}")
+        obj_id, path = explorer.parse_reference(ref_str)
 
-        obj = object_store.get(ref.obj_id)
+        obj = object_store.get(obj_id)
         if obj is None:
-            raise ValueError(f"Object @{ref.obj_id} not found or expired")
+            raise ValueError(f"Object @{obj_id} not found or expired")
 
-        if ref.path:
+        if path:
             try:
-                explorer._validate_path(ref.path)
-                return glom(obj, explorer._parse_path(ref.path))
+                explorer._validate_path(path)
+                return glom(obj, explorer._parse_path(path))
             except GlomError as exc:
-                raise ValueError(f"Navigation error at {ref.path}: {exc}") from exc
+                raise ValueError(f"Navigation error at {path}: {exc}") from exc
             except ValueError as exc:
-                raise ValueError(f"Invalid path {ref.path}: {exc}") from exc
+                raise ValueError(f"Invalid path {path}: {exc}") from exc
 
         return obj
 
@@ -362,7 +360,7 @@ def explorable_and_referenceable(
     ...     return {**data1, **data2}
     ...
     >>> # Accepts references and returns preview with object ID
-    >>> result = merge_data("@obj_001", {"new": "data"})
+    >>> result = merge_data("@obj_123", {"new": "data"})
     >>> # result contains a preview and can be referenced as "@obj_002"
     """
 

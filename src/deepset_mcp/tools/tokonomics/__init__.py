@@ -13,7 +13,7 @@ passing capabilities for LLM agents.
 Key Features:
 - TTL-based object storage for temporary results
 - Rich object exploration with multiple rendering modes
-- Reference-based parameter passing (@obj_001.path.to.value)
+- Reference-based parameter passing (@obj_id.path.to.value)
 - Type-safe decorators that preserve function signatures
 - Configurable preview truncation and custom rendering callbacks
 
@@ -30,7 +30,7 @@ Basic explorable tool:
     >>>
     >>> result = get_data()
     >>> print(result)  # Shows rich preview
-    >>> result.obj_id  # "obj_001"
+    >>> result.obj_id  # "obj_123"
     >>> result.value   # Original data
 
 Referenceable tool that accepts references:
@@ -45,28 +45,27 @@ Referenceable tool that accepts references:
     >>> process_users([{"name": "Bob"}])
     >>>
     >>> # Use with reference
-    >>> process_users("@obj_001.users")
+    >>> process_users("@obj_123.users")
 
 Exploration utilities:
 
     >>> from deepset_mcp.tools.tokonomics import explore, search
     >>>
     >>> # Explore object structure
-    >>> explore("obj_001", mode="tree")
+    >>> explore("obj_123", mode="tree")
     >>>
     >>> # Search within objects
-    >>> search("obj_001", "Alice")
+    >>> search("obj_123", "Alice")
 """
 
 from .decorators import explorable, explorable_and_referenceable, referenceable
 from .explorer import RichExplorer
-from .object_store import Explorable, InMemoryBackend, ObjectRef, ObjectStore
+from .object_store import Explorable, InMemoryBackend, ObjectStore
 
 __all__ = [
     # Core classes
     "Explorable",
     "InMemoryBackend",
-    "ObjectRef",
     "ObjectStore",
     "RichExplorer",
     # Decorators
