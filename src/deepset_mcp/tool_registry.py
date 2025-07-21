@@ -8,6 +8,7 @@ from typing import Any
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.config import DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME
 from deepset_mcp.initialize_embedding_model import get_initialized_model
+from deepset_mcp.store import STORE
 from deepset_mcp.tool_models import DeepsetDocsConfig, MemoryType, ToolConfig
 from deepset_mcp.tools.custom_components import (
     get_latest_custom_component_installation_logs as get_latest_custom_component_installation_logs_tool,
@@ -44,11 +45,17 @@ from deepset_mcp.tools.pipeline_template import (
     search_templates as search_pipeline_templates_tool,
 )
 from deepset_mcp.tools.secrets import get_secret as get_secret_tool, list_secrets as list_secrets_tool
+from deepset_mcp.tools.tokonomics import RichExplorer
 from deepset_mcp.tools.workspace import (
     create_workspace as create_workspace_tool,
     get_workspace as get_workspace_tool,
     list_workspaces as list_workspaces_tool,
 )
+
+EXPLORER = RichExplorer(store=STORE)
+
+get_from_object_store = create_get_from_object_store(explorer=EXPLORER)
+get_slice_from_object_store = create_get_slice_from_object_store(explorer=EXPLORER)
 
 
 def get_docs_search_tool(config: DeepsetDocsConfig) -> Callable[..., Any]:
@@ -200,8 +207,8 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "list_workspaces": (list_workspaces_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "get_workspace": (get_workspace_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "create_workspace": (create_workspace_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
-    "get_from_object_store": (create_get_from_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
-    "get_slice_from_object_store": (create_get_slice_from_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
+    "get_from_object_store": (get_from_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
+    "get_slice_from_object_store": (get_slice_from_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
     DOCS_SEARCH_TOOL_NAME: (get_docs_search_tool, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
 }
 

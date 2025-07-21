@@ -95,30 +95,6 @@ def main(
             help="The type of transport to use for running the MCP server.",
         ),
     ] = TransportEnum.STDIO,
-    object_store_backend: Annotated[
-        str,
-        typer.Option(
-            "--object-store-backend",
-            help="Object store backend type: 'memory' or 'redis'. "
-            "Can also be set via DEEPSET_OBJECT_STORE_BACKEND environment variable.",
-        ),
-    ] = "memory",
-    redis_url: Annotated[
-        str | None,
-        typer.Option(
-            "--redis-url",
-            help="Redis connection URL (e.g., redis://localhost:6379). "
-            "Can also be set via DEEPSET_REDIS_URL environment variable.",
-        ),
-    ] = None,
-    object_store_ttl: Annotated[
-        int,
-        typer.Option(
-            "--object-store-ttl",
-            help="TTL in seconds for stored objects. Default: 600 (10 minutes). "
-            "Can also be set via DEEPSET_OBJECT_STORE_TTL environment variable.",
-        ),
-    ] = 600,
 ) -> None:
     """
     Run the Deepset MCP server.
@@ -135,9 +111,6 @@ def main(
     :param list_tools: List all available tools and exit
     :param api_key_from_auth_header: Get API key from authorization header
     :param transport: Type of transport to use for the MCP server
-    :param object_store_backend: Object store backend type ('memory' or 'redis')
-    :param redis_url: Redis connection URL (required if backend='redis')
-    :param object_store_ttl: TTL in seconds for stored objects
     """
     # Handle --list-tools flag early
     if list_tools:
@@ -151,11 +124,6 @@ def main(
     api_key = api_key or os.getenv("DEEPSET_API_KEY")
     api_url = api_url or os.getenv("DEEPSET_API_URL")
     docs_share_url = docs_share_url or os.getenv("DEEPSET_DOCS_SHARE_URL", DEEPSET_DOCS_DEFAULT_SHARE_URL)
-
-    # ObjectStore configuration
-    backend = object_store_backend or os.getenv("DEEPSET_OBJECT_STORE_BACKEND", "memory")
-    redis_url = redis_url or os.getenv("DEEPSET_REDIS_URL")
-    ttl = float(os.getenv("DEEPSET_OBJECT_STORE_TTL", str(object_store_ttl)))
 
     if tools:
         tool_names = set(tools)
@@ -197,9 +165,6 @@ def main(
         tools_to_register=tool_names,
         deepset_docs_shareable_prototype_url=docs_share_url,
         get_api_key_from_authorization_header=api_key_from_auth_header,
-        object_store_backend=backend,
-        redis_url=redis_url,
-        object_store_ttl=ttl,
     )
 
     mcp.run(transport=transport.value)

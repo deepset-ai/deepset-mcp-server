@@ -5,7 +5,7 @@
 import time
 from unittest.mock import patch
 
-from deepset_mcp.tools.tokonomics.object_store import InMemoryBackend, ObjectStore
+from deepset_mcp.tools.tokonomics.object_store import ObjectStore
 
 
 class TestObjectStore:
@@ -13,21 +13,19 @@ class TestObjectStore:
 
     def test_init_default_ttl(self) -> None:
         """Test ObjectStore initialization with default TTL."""
-        backend = InMemoryBackend()
-        store = ObjectStore(backend=backend)
+        store = ObjectStore()
         assert store._ttl == 3600.0
-        assert store._backend == backend
+        assert store._objects == {}
+        assert store._counter == 0
 
     def test_init_custom_ttl(self) -> None:
         """Test ObjectStore initialization with custom TTL."""
-        backend = InMemoryBackend()
-        store = ObjectStore(backend=backend, ttl=7200.0)
+        store = ObjectStore(ttl=7200.0)
         assert store._ttl == 7200.0
 
     def test_init_zero_ttl(self) -> None:
         """Test ObjectStore initialization with zero TTL (no expiry)."""
-        backend = InMemoryBackend()
-        store = ObjectStore(backend=backend, ttl=0)
+        store = ObjectStore(ttl=0)
         assert store._ttl == 0.0
 
     def test_put_single_object(self) -> None:

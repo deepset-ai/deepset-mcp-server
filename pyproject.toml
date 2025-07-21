@@ -50,7 +50,6 @@ dependencies = [
     "rich",
     "pyjwt[crypto]",
     "typer",
-    "orjson",
 ]
 
 [project.urls]
@@ -74,9 +73,6 @@ types = [
     "types-PyYAML",
     "pandas-stubs",
 ]
-
-[project.optional-dependencies]
-redis = ["redis>=4.0.0"]
 
 [tool.hatch.version]
 source = "uv-dynamic-versioning"
