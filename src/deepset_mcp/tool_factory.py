@@ -15,10 +15,15 @@ from mcp.server.fastmcp import Context, FastMCP
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.config import DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME
-from deepset_mcp.store import STORE
 from deepset_mcp.tool_models import DeepsetDocsConfig, MemoryType, ToolConfig, WorkspaceMode
 from deepset_mcp.tool_registry import TOOL_REGISTRY
-from deepset_mcp.tools.tokonomics import RichExplorer, explorable, explorable_and_referenceable, referenceable
+from deepset_mcp.tools.tokonomics import (
+    ObjectStore,
+    RichExplorer,
+    explorable,
+    explorable_and_referenceable,
+    referenceable,
+)
 
 
 def are_docs_available() -> bool:
@@ -129,19 +134,24 @@ def apply_workspace(
         return base_func
 
 
-def apply_memory(base_func: Callable[..., Any], config: ToolConfig) -> Callable[..., Any]:
+def apply_memory(
+    base_func: Callable[..., Any], config: ToolConfig, store: ObjectStore | None = None
+) -> Callable[..., Any]:
     """
     Applies memory decorators to a function if requested in the ToolConfig.
 
     :param base_func: The function to apply memory decorator to.
     :param config: The ToolConfig for the function.
+    :param store: The ObjectStore instance to use
     :returns: Function with memory decorators applied.
     :raises ValueError: If an invalid memory type is specified.
     """
     if config.memory_type == MemoryType.NO_MEMORY:
         return base_func
 
-    store = STORE
+    if store is None:
+        raise ValueError("ObjectStore instance is required for memory decorators")
+
     explorer = RichExplorer(store)
 
     if config.memory_type == MemoryType.EXPLORABLE:
@@ -246,6 +256,7 @@ def build_tool(
     workspace: str | None = None,
     use_request_context: bool = True,
     base_url: str | None = None,
+    object_store: ObjectStore | None = None,
 ) -> Callable[..., Awaitable[Any]]:
     """
     Universal tool creator that handles client injection, workspace, and decorators.
@@ -258,6 +269,7 @@ def build_tool(
     :param workspace: The workspace to use when using a static workspace.
     :param use_request_context: Whether to collect the API key from the request context.
     :param base_url: Base URL for the deepset API.
+    :param object_store: The ObjectStore instance to use for memory decorators.
     :returns: An enhanced, awaitable tool function with an updated signature and docstring.
     """
     enhanced_func = base_func
@@ -265,8 +277,8 @@ def build_tool(
     # Apply custom arguments first
     enhanced_func = apply_custom_args(enhanced_func, config)
 
-    # Apply memory decorators
-    enhanced_func = apply_memory(enhanced_func, config)
+    # Apply memory decorators with the provided store
+    enhanced_func = apply_memory(enhanced_func, config, object_store)
 
     # Apply workspace handling
     enhanced_func = apply_workspace(enhanced_func, config, workspace_mode, workspace)
@@ -299,6 +311,7 @@ def register_tools(
     get_api_key_from_authorization_header: bool = True,
     docs_config: DeepsetDocsConfig | None = None,
     base_url: str | None = None,
+    object_store: ObjectStore | None = None,
 ) -> None:
     """Register tools with unified configuration.
 
@@ -311,6 +324,7 @@ def register_tools(
         get_api_key_from_authorization_header: Whether to use request context to retrieve an API key for tool execution.
         docs_config: Configuration for the deepset documentation search tool.
         base_url: Base URL for the deepset API.
+        object_store: The ObjectStore instance to use for memory decorators.
     """
     if api_key is None and not get_api_key_from_authorization_header:
         raise ValueError(
@@ -357,9 +371,22 @@ def register_tools(
             # base_func is a factory function.
             # We configure with the docs_config to get the actual tool function.
             enhanced_tool = base_func(config=docs_config)
+        elif tool_name in ("get_from_object_store", "get_slice_from_object_store"):
+            # ObjectStore tools are factory functions that need an explorer created from the store
+            if object_store is None:
+                raise ValueError(f"ObjectStore instance is required for {tool_name}")
+
+            explorer = RichExplorer(store=object_store)
+            enhanced_tool = base_func(explorer=explorer)
         else:
             enhanced_tool = build_tool(
-                base_func, config, workspace_mode, workspace, get_api_key_from_authorization_header, base_url
+                base_func,
+                config,
+                workspace_mode,
+                workspace,
+                get_api_key_from_authorization_header,
+                base_url,
+                object_store,
             )
 
         mcp_server_instance.add_tool(enhanced_tool, name=tool_name, structured_output=False)
