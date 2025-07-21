@@ -288,7 +288,8 @@ class RichExplorer:
         if hasattr(obj, "__module__") and obj.__module__ not in ("builtins", "__main__"):
             type_name = f"{obj.__module__}.{type_name}"
 
-        location = f"@{obj_id}" + (f".{path}" if path else "")
+        location = "@" if not obj_id.startswith("@") else ""
+        location += obj_id + (f".{path}" if path else "")
 
         # Add size info for sized objects
         size_info = ""

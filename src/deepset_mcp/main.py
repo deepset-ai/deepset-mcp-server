@@ -96,13 +96,13 @@ def main(
         ),
     ] = TransportEnum.STDIO,
     object_store_backend: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--object-store-backend",
             help="Object store backend type: 'memory' or 'redis'. "
-            "Can also be set via DEEPSET_OBJECT_STORE_BACKEND environment variable.",
+            "Can also be set via DEEPSET_OBJECT_STORE_BACKEND environment variable. Default is 'memory'.",
         ),
-    ] = "memory",
+    ] = None,
     redis_url: Annotated[
         str | None,
         typer.Option(
@@ -153,7 +153,7 @@ def main(
     docs_share_url = docs_share_url or os.getenv("DEEPSET_DOCS_SHARE_URL", DEEPSET_DOCS_DEFAULT_SHARE_URL)
 
     # ObjectStore configuration
-    backend = object_store_backend or os.getenv("DEEPSET_OBJECT_STORE_BACKEND", "memory")
+    backend = str(object_store_backend or os.getenv("DEEPSET_OBJECT_STORE_BACKEND", "memory"))
     redis_url = redis_url or os.getenv("DEEPSET_REDIS_URL")
     ttl = int(os.getenv("DEEPSET_OBJECT_STORE_TTL", str(object_store_ttl)))
 
