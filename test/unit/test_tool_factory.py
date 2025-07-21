@@ -19,6 +19,7 @@ from deepset_mcp.tool_factory import (
     build_tool,
 )
 from deepset_mcp.tool_models import MemoryType, ToolConfig, WorkspaceMode
+from deepset_mcp.tools.tokonomics.object_store import InMemoryBackend, ObjectStore
 from test.unit.conftest import BaseFakeClient
 
 
@@ -64,7 +65,7 @@ class TestApplyCustomArgs:
         assert ":param b:" in doc
 
     @pytest.mark.asyncio
-    async def test_custom_args_function_behavior(self) -> None:
+    async def test_custom_args_applied_for_default(self) -> None:
         """Test that custom args function works correctly."""
 
         async def sample_func(a: int, b: str, c: bool = True) -> str:
@@ -142,23 +143,14 @@ class TestApplyWorkspace:
         output = await result(a=42)
         assert output == "test-workspace:42"
 
-    @pytest.mark.asyncio
-    async def test_static_workspace_from_env(self) -> None:
-        """Test that workspace is loaded from environment when not provided."""
-
-        async def sample_func(workspace: str, a: int) -> str:
-            return f"{workspace}:{a}"
-
-        config = ToolConfig(needs_workspace=True)
-
-        with patch("deepset_mcp.tool_factory.get_workspace_from_env", return_value="env-workspace"):
-            result = apply_workspace(sample_func, config, WorkspaceMode.STATIC, None)
-            output = await result(a=42)
-            assert output == "env-workspace:42"
-
 
 class TestApplyMemory:
     """Test the apply_memory function."""
+
+    @pytest.fixture
+    def store(self) -> ObjectStore:
+        """Create an ObjectStore for testing."""
+        return ObjectStore(backend=InMemoryBackend())
 
     def test_no_memory_returns_original(self) -> None:
         """Test that function is returned unchanged when no memory needed."""
@@ -171,7 +163,7 @@ class TestApplyMemory:
 
         assert result is sample_func
 
-    def test_invalid_memory_type_raises_error(self) -> None:
+    def test_invalid_memory_type_raises_error(self, store: ObjectStore) -> None:
         """Test that invalid memory type raises ValueError."""
 
         async def sample_func(a: int) -> str:
@@ -180,10 +172,10 @@ class TestApplyMemory:
         config = ToolConfig(memory_type="invalid")  # type: ignore
 
         with pytest.raises(ValueError, match="Invalid memory type"):
-            apply_memory(sample_func, config)
+            apply_memory(sample_func, config, store)
 
     @patch("deepset_mcp.tool_factory.explorable")
-    def test_explorable_memory_applied(self, mock_explorable: Any) -> None:
+    def test_explorable_memory_applied(self, mock_explorable: Any, store: ObjectStore) -> None:
         """Test that explorable decorator is applied."""
 
         async def sample_func(a: int) -> str:
@@ -194,13 +186,13 @@ class TestApplyMemory:
         mock_decorator.return_value = sample_func
 
         config = ToolConfig(memory_type=MemoryType.EXPLORABLE)
-        apply_memory(sample_func, config)
+        apply_memory(sample_func, config, store)
 
         mock_explorable.assert_called_once()
         mock_decorator.assert_called_once_with(sample_func)
 
     @patch("deepset_mcp.tool_factory.referenceable")
-    def test_referenceable_memory_applied(self, mock_referenceable: Any) -> None:
+    def test_referenceable_memory_applied(self, mock_referenceable: Any, store: ObjectStore) -> None:
         """Test that referenceable decorator is applied."""
 
         async def sample_func(a: int) -> str:
@@ -211,13 +203,13 @@ class TestApplyMemory:
         mock_decorator.return_value = sample_func
 
         config = ToolConfig(memory_type=MemoryType.REFERENCEABLE)
-        apply_memory(sample_func, config)
+        apply_memory(sample_func, config, store)
 
         mock_referenceable.assert_called_once()
         mock_decorator.assert_called_once_with(sample_func)
 
     @patch("deepset_mcp.tool_factory.explorable_and_referenceable")
-    def test_both_memory_applied(self, mock_both: Any) -> None:
+    def test_both_memory_applied(self, mock_both: Any, store: ObjectStore) -> None:
         """Test that both memory decorator is applied."""
 
         async def sample_func(a: int) -> str:
@@ -228,7 +220,7 @@ class TestApplyMemory:
         mock_decorator.return_value = sample_func
 
         config = ToolConfig(memory_type=MemoryType.BOTH)
-        apply_memory(sample_func, config)
+        apply_memory(sample_func, config, store)
 
         mock_both.assert_called_once()
         mock_decorator.assert_called_once_with(sample_func)
@@ -369,14 +361,40 @@ class TestApplyClient:
             assert call_args[1]["api_key"] == "test-token"
 
     @pytest.mark.asyncio
-    async def test_client_without_context_uses_env(self) -> None:
+    async def test_client_with_api_key_and_context_uses_context(self) -> None:
+        """Test that client uses API key from request context."""
+
+        async def sample_func(client: AsyncClientProtocol, a: int) -> str:
+            return f"client:{a}"
+
+        config = ToolConfig(needs_client=True)
+        result = apply_client(sample_func, config, use_request_context=True, api_key="unused-token")
+
+        mock_ctx = MagicMock()
+        mock_ctx.request_context.request.headers.get.return_value = "Bearer test-token"
+
+        # Mock the AsyncDeepsetClient to return our FakeClient
+        fake_client = BaseFakeClient()
+
+        with patch("deepset_mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = fake_client
+
+            await result(a=42, ctx=mock_ctx)
+
+            mock_client_class.assert_called_once()
+            call_args = mock_client_class.call_args
+            assert "api_key" in call_args[1]
+            assert call_args[1]["api_key"] == "test-token"
+
+    @pytest.mark.asyncio
+    async def test_client_without_context_uses_api_key(self) -> None:
         """Test that client without context uses environment variables."""
 
         async def sample_func(client: AsyncClientProtocol, a: int) -> str:
             return f"client:{a}"
 
         config = ToolConfig(needs_client=True)
-        result = apply_client(sample_func, config, use_request_context=False)
+        result = apply_client(sample_func, config, use_request_context=False, api_key="test-token")
 
         # Mock the AsyncDeepsetClient to return our FakeClient
         fake_client = BaseFakeClient()
@@ -386,10 +404,10 @@ class TestApplyClient:
 
             await result(a=42)
 
-            # Check that client was created without explicit API key
             mock_client_class.assert_called_once()
             call_args = mock_client_class.call_args
-            assert "api_key" not in call_args[1] or call_args[1]["api_key"] is None
+            assert "api_key" in call_args[1]
+            assert call_args[1]["api_key"] == "test-token"
 
     @pytest.mark.asyncio
     async def test_client_with_base_url_context(self) -> None:
@@ -469,6 +487,11 @@ class TestApplyClient:
 
 class TestBuildTool:
     """Test the build_tool function."""
+
+    @pytest.fixture
+    def object_store(self) -> ObjectStore:
+        """Create an ObjectStore for testing."""
+        return ObjectStore(backend=InMemoryBackend())
 
     @pytest.mark.asyncio
     async def test_basic_function_enhancement(self) -> None:
@@ -593,7 +616,7 @@ class TestBuildTool:
         assert output == "42:test"
 
     @pytest.mark.asyncio
-    async def test_enhanced_tool_with_memory_decorators(self) -> None:
+    async def test_enhanced_tool_with_memory_decorators(self, object_store: ObjectStore) -> None:
         """Test that enhanced tool works with memory decorators."""
 
         async def sample_func(a: int) -> str:
@@ -608,7 +631,7 @@ class TestBuildTool:
             mock_explorable.return_value = mock_decorator
             mock_decorator.return_value = sample_func
 
-            build_tool(sample_func, config, WorkspaceMode.STATIC)
+            build_tool(sample_func, config, WorkspaceMode.STATIC, object_store=object_store)
 
             # Should have applied the decorator
             mock_explorable.assert_called_once()
@@ -640,21 +663,6 @@ class TestBuildTool:
 
         with pytest.raises(ValueError, match="API key cannot be empty"):
             await result(a=42, ctx=mock_ctx)
-
-    @pytest.mark.asyncio
-    async def test_workspace_error_handling(self) -> None:
-        """Test proper error handling for workspace issues."""
-
-        async def sample_func(workspace: str, a: int) -> str:
-            return f"{workspace}:{a}"
-
-        config = ToolConfig(needs_workspace=True)
-        result = build_tool(sample_func, config, WorkspaceMode.STATIC, None)
-
-        # Test workspace loading from env fails
-        with patch("deepset_mcp.tool_factory.get_workspace_from_env", side_effect=ValueError("No workspace")):
-            with pytest.raises(ValueError, match="No workspace"):
-                await result(a=42)
 
     @pytest.mark.asyncio
     async def test_build_tool_with_base_url(self) -> None:

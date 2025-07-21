@@ -6,7 +6,7 @@ import pytest
 from glom import Path
 
 from deepset_mcp.tools.tokonomics.explorer import RichExplorer
-from deepset_mcp.tools.tokonomics.object_store import ObjectStore
+from deepset_mcp.tools.tokonomics.object_store import InMemoryBackend, ObjectStore
 
 
 class TestRichExplorer:
@@ -15,7 +15,7 @@ class TestRichExplorer:
     @pytest.fixture
     def store(self) -> ObjectStore:
         """Create an ObjectStore for testing."""
-        return ObjectStore(ttl=0)  # No expiry for tests
+        return ObjectStore(backend=InMemoryBackend(), ttl=0)  # No expiry for tests
 
     @pytest.fixture
     def explorer(self, store: ObjectStore) -> RichExplorer:
@@ -207,8 +207,8 @@ class TestRichExplorer:
 
         result = explorer.slice(obj_id, 1, 4)
 
-        assert f"@{obj_id} → tuple" in result
-        assert "Tuple slice [1:4]" in result
+        assert f"@{obj_id} → list" in result
+        assert "List slice [1:4]" in result
 
     def test_slice_non_sliceable(self, store: ObjectStore, explorer: RichExplorer) -> None:
         """Test slicing non-sliceable object."""
