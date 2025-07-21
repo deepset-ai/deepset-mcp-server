@@ -25,7 +25,7 @@ def configure_mcp_server(
     deepset_docs_shareable_prototype_url: str | None = None,
     get_api_key_from_authorization_header: bool = False,
     object_store_backend: str = "memory",
-    redis_url: str | None = None,
+    object_store_redis_url: str | None = None,
     object_store_ttl: int = 600,
 ) -> None:
     """Configure the MCP server with the specified tools and settings.
@@ -39,7 +39,7 @@ def configure_mcp_server(
     :param deepset_docs_shareable_prototype_url: Optional URL for shared prototype
     :param get_api_key_from_authorization_header: Whether to extract API key from authorization header
     :param object_store_backend: Object store backend type ('memory' or 'redis')
-    :param redis_url: Redis connection URL (required if backend='redis')
+    :param object_store_redis_url: Redis connection URL (required if backend='redis')
     :param object_store_ttl: TTL in seconds for stored objects
     :raises ValueError: If required parameters are missing or invalid
     """
@@ -72,7 +72,7 @@ def configure_mcp_server(
         docs_config = None
 
     # Initialize the store before registering tools
-    store = initialize_store(backend=object_store_backend, redis_url=redis_url, ttl=object_store_ttl)
+    store = initialize_store(backend=object_store_backend, redis_url=object_store_redis_url, ttl=object_store_ttl)
 
     register_tools(
         mcp_server_instance=mcp_server_instance,
