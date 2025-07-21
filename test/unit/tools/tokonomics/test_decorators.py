@@ -102,7 +102,7 @@ class TestHelperFunctions:
         assert "All parameters accept object references" in result
         assert "``data``: dict → dict | str" in result
         assert "``text``: str (already accepts strings)" in result
-        assert "test_func(data='@obj_001'" in result
+        assert "test_func(data='@obj_123'" in result
 
     def test_enhance_docstring_for_references_empty_original(self) -> None:
         """Test docstring enhancement with empty original docstring."""
