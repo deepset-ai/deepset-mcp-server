@@ -100,15 +100,15 @@ def main(
         typer.Option(
             "--object-store-backend",
             help="Object store backend type: 'memory' or 'redis'. "
-            "Can also be set via DEEPSET_OBJECT_STORE_BACKEND environment variable. Default is 'memory'.",
+            "Can also be set via OBJECT_STORE_BACKEND environment variable. Default is 'memory'.",
         ),
     ] = None,
-    redis_url: Annotated[
+    object_store_redis_url: Annotated[
         str | None,
         typer.Option(
-            "--redis-url",
+            "--object-store-redis-url",
             help="Redis connection URL (e.g., redis://localhost:6379). "
-            "Can also be set via DEEPSET_REDIS_URL environment variable.",
+            "Can also be set via OBJECT_STORE_REDIS_URL environment variable.",
         ),
     ] = None,
     object_store_ttl: Annotated[
@@ -116,7 +116,7 @@ def main(
         typer.Option(
             "--object-store-ttl",
             help="TTL in seconds for stored objects. Default: 600 (10 minutes). "
-            "Can also be set via DEEPSET_OBJECT_STORE_TTL environment variable.",
+            "Can also be set via OBJECT_STORE_TTL environment variable.",
         ),
     ] = 600,
 ) -> None:
@@ -136,7 +136,7 @@ def main(
     :param api_key_from_auth_header: Get API key from authorization header
     :param transport: Type of transport to use for the MCP server
     :param object_store_backend: Object store backend type ('memory' or 'redis')
-    :param redis_url: Redis connection URL (required if backend='redis')
+    :param object_store_redis_url: Redis connection URL (required if backend='redis')
     :param object_store_ttl: TTL in seconds for stored objects
     """
     # Handle --list-tools flag early
@@ -153,9 +153,9 @@ def main(
     docs_share_url = docs_share_url or os.getenv("DEEPSET_DOCS_SHARE_URL", DEEPSET_DOCS_DEFAULT_SHARE_URL)
 
     # ObjectStore configuration
-    backend = str(object_store_backend or os.getenv("DEEPSET_OBJECT_STORE_BACKEND", "memory"))
-    redis_url = redis_url or os.getenv("DEEPSET_REDIS_URL")
-    ttl = int(os.getenv("DEEPSET_OBJECT_STORE_TTL", str(object_store_ttl)))
+    backend = str(object_store_backend or os.getenv("OBJECT_STORE_BACKEND", "memory"))
+    redis_url = object_store_redis_url or os.getenv("OBJECT_STORE_REDIS_URL")
+    ttl = int(os.getenv("OBJECT_STORE_TTL", str(object_store_ttl)))
 
     if tools:
         tool_names = set(tools)
@@ -198,7 +198,7 @@ def main(
         deepset_docs_shareable_prototype_url=docs_share_url,
         get_api_key_from_authorization_header=api_key_from_auth_header,
         object_store_backend=backend,
-        redis_url=redis_url,
+        object_store_redis_url=redis_url,
         object_store_ttl=ttl,
     )
 
