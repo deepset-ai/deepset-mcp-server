@@ -19,7 +19,7 @@ from deepset_mcp.tools.tokonomics.decorators import (
     referenceable,
 )
 from deepset_mcp.tools.tokonomics.explorer import RichExplorer
-from deepset_mcp.tools.tokonomics.object_store import Explorable, InMemoryBackend, ObjectStore
+from deepset_mcp.tools.tokonomics.object_store import Explorable, ObjectStore
 
 
 class TestHelperFunctions:
@@ -136,7 +136,7 @@ class TestExplorableDecorator:
     @pytest.fixture
     def store(self) -> ObjectStore:
         """Create an ObjectStore for testing."""
-        return ObjectStore(backend=InMemoryBackend(), ttl=0)
+        return ObjectStore(ttl=0)
 
     @pytest.fixture
     def explorer(self, store: ObjectStore) -> RichExplorer:
@@ -228,7 +228,7 @@ class TestReferenceableDecorator:
     @pytest.fixture
     def store(self) -> ObjectStore:
         """Create an ObjectStore for testing."""
-        return ObjectStore(backend=InMemoryBackend(), ttl=0)
+        return ObjectStore(ttl=0)
 
     @pytest.fixture
     def explorer(self, store: ObjectStore) -> RichExplorer:
@@ -377,7 +377,7 @@ class TestExplorableAndReferenceableDecorator:
     @pytest.fixture
     def store(self) -> ObjectStore:
         """Create an ObjectStore for testing."""
-        return ObjectStore(backend=InMemoryBackend(), ttl=0)
+        return ObjectStore(ttl=0)
 
     @pytest.fixture
     def explorer(self, store: ObjectStore) -> RichExplorer:

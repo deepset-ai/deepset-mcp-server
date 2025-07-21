@@ -60,12 +60,11 @@ Exploration utilities:
 
 from .decorators import explorable, explorable_and_referenceable, referenceable
 from .explorer import RichExplorer
-from .object_store import Explorable, InMemoryBackend, ObjectRef, ObjectStore
+from .object_store import Explorable, ObjectRef, ObjectStore
 
 __all__ = [
     # Core classes
     "Explorable",
-    "InMemoryBackend",
     "ObjectRef",
     "ObjectStore",
     "RichExplorer",

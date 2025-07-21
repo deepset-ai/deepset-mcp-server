@@ -10,7 +10,6 @@ import pytest
 
 from deepset_mcp.tools.tokonomics import (
     Explorable,
-    InMemoryBackend,
     ObjectStore,
     RichExplorer,
     explorable,
@@ -25,7 +24,7 @@ class TestTokonomicsIntegration:
     @pytest.fixture
     def store(self) -> ObjectStore:
         """Create an ObjectStore for testing."""
-        return ObjectStore(backend=InMemoryBackend(), ttl=0)  # No expiry for tests
+        return ObjectStore(ttl=0)  # No expiry for tests
 
     @pytest.fixture
     def explorer(self, store: ObjectStore) -> RichExplorer:
@@ -236,7 +235,7 @@ class TestTokonomicsIntegration:
     def test_ttl_expiration_integration(self, explorer: RichExplorer) -> None:
         """Test TTL expiration in integrated workflow."""
         # Create store with short TTL
-        short_ttl_store = ObjectStore(backend=InMemoryBackend(), ttl=0.1)  # 100ms TTL
+        short_ttl_store = ObjectStore(ttl=0.1)  # 100ms TTL
         # Create explorer that uses the same store
         short_ttl_explorer = RichExplorer(short_ttl_store)
 

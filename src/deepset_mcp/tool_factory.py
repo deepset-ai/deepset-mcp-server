@@ -6,6 +6,7 @@
 
 import functools
 import inspect
+import os
 import re
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -23,6 +24,23 @@ from deepset_mcp.tools.tokonomics import (
     explorable_and_referenceable,
     referenceable,
 )
+
+
+def are_docs_available() -> bool:
+    """Checks if documentation search is available."""
+    return bool(
+        os.environ.get("DEEPSET_DOCS_WORKSPACE", False)
+        and os.environ.get("DEEPSET_DOCS_PIPELINE_NAME", False)
+        and os.environ.get("DEEPSET_DOCS_API_KEY", False)
+    )
+
+
+def get_workspace_from_env() -> str:
+    """Gets the workspace configured from environment variable."""
+    workspace = os.environ.get("DEEPSET_WORKSPACE")
+    if not workspace:
+        raise ValueError("DEEPSET_WORKSPACE environment variable not set")
+    return workspace
 
 
 def apply_custom_args(base_func: Callable[..., Any], config: ToolConfig) -> Callable[..., Any]:
@@ -99,7 +117,8 @@ def apply_workspace(
 
         @functools.wraps(base_func)
         async def workspace_wrapper(*args: Any, **kwargs: Any) -> Any:
-            return await base_func(*args, workspace=workspace, **kwargs)
+            ws = workspace or get_workspace_from_env()
+            return await base_func(*args, workspace=ws, **kwargs)
 
         # Remove workspace from signature
         original_sig = inspect.signature(base_func)
@@ -146,11 +165,7 @@ def apply_memory(
 
 
 def apply_client(
-    base_func: Callable[..., Any],
-    config: ToolConfig,
-    use_request_context: bool = True,
-    base_url: str | None = None,
-    api_key: str | None = None,
+    base_func: Callable[..., Any], config: ToolConfig, use_request_context: bool = True, base_url: str | None = None
 ) -> Callable[..., Any]:
     """
     Applies the deepset API client to a function.
@@ -163,7 +178,6 @@ def apply_client(
     :param config: The ToolConfig for the function.
     :param use_request_context: Whether to collect the API key from the request context.
     :param base_url: Base URL for the deepset API.
-    :param api_key: The API key to use.
     :returns: Function with client injection applied and updated signature/docstring.
     :raises ValueError: If API key cannot be extracted from request context.
     """
@@ -199,14 +213,26 @@ def apply_client(
         ctx_param = inspect.Parameter(name="ctx", kind=inspect.Parameter.KEYWORD_ONLY, annotation=Context)
         new_params.append(ctx_param)
         client_wrapper_with_context.__signature__ = original_sig.replace(parameters=new_params)  # type: ignore
-        client_wrapper_with_context.__doc__ = remove_params_from_docstring(base_func.__doc__, {"client"})
+
+        # Remove client from docstring
+        if base_func.__doc__:
+            import re
+
+            doc = base_func.__doc__
+            doc = re.sub(
+                r"^\s*:param\s+client.*?(?=^\s*:|^\s*$|\Z)",
+                "",
+                doc,
+                flags=re.MULTILINE | re.DOTALL,
+            )
+            client_wrapper_with_context.__doc__ = "\n".join([line.rstrip() for line in doc.strip().split("\n")])
 
         return client_wrapper_with_context
     else:
 
         @functools.wraps(base_func)
         async def client_wrapper_without_context(*args: Any, **kwargs: Any) -> Any:
-            client_kwargs: dict[str, Any] = {"transport_config": DEFAULT_CLIENT_HEADER, "api_key": api_key}
+            client_kwargs: dict[str, Any] = {"transport_config": DEFAULT_CLIENT_HEADER}
             if base_url:
                 client_kwargs["base_url"] = base_url
             async with AsyncDeepsetClient(**client_kwargs) as client:
