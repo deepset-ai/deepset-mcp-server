@@ -155,7 +155,7 @@ def main(
     # ObjectStore configuration
     backend = object_store_backend or os.getenv("DEEPSET_OBJECT_STORE_BACKEND", "memory")
     redis_url = redis_url or os.getenv("DEEPSET_REDIS_URL")
-    ttl = float(os.getenv("DEEPSET_OBJECT_STORE_TTL", str(object_store_ttl)))
+    ttl = int(os.getenv("DEEPSET_OBJECT_STORE_TTL", str(object_store_ttl)))
 
     if tools:
         tool_names = set(tools)
