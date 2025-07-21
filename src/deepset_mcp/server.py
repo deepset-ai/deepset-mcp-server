@@ -10,6 +10,7 @@ from mcp.server.fastmcp import FastMCP
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.config import DOCS_SEARCH_TOOL_NAME
+from deepset_mcp.store import initialize_store
 from deepset_mcp.tool_factory import register_tools
 from deepset_mcp.tool_models import DeepsetDocsConfig, WorkspaceMode
 
@@ -23,6 +24,9 @@ def configure_mcp_server(
     deepset_workspace: str | None = None,
     deepset_docs_shareable_prototype_url: str | None = None,
     get_api_key_from_authorization_header: bool = False,
+    object_store_backend: str = "memory",
+    redis_url: str | None = None,
+    object_store_ttl: int = 600,
 ) -> None:
     """Configure the MCP server with the specified tools and settings.
 
@@ -34,6 +38,9 @@ def configure_mcp_server(
     :param deepset_workspace: Optional workspace name for static mode
     :param deepset_docs_shareable_prototype_url: Optional URL for shared prototype
     :param get_api_key_from_authorization_header: Whether to extract API key from authorization header
+    :param object_store_backend: Object store backend type ('memory' or 'redis')
+    :param redis_url: Redis connection URL (required if backend='redis')
+    :param object_store_ttl: TTL in seconds for stored objects
     :raises ValueError: If required parameters are missing or invalid
     """
     if DOCS_SEARCH_TOOL_NAME in tools_to_register and deepset_docs_shareable_prototype_url is None:
@@ -64,6 +71,9 @@ def configure_mcp_server(
     else:
         docs_config = None
 
+    # Initialize the store before registering tools
+    store = initialize_store(backend=object_store_backend, redis_url=redis_url, ttl=object_store_ttl)
+
     register_tools(
         mcp_server_instance=mcp_server_instance,
         workspace_mode=workspace_mode,
@@ -73,6 +83,7 @@ def configure_mcp_server(
         get_api_key_from_authorization_header=get_api_key_from_authorization_header,
         api_key=deepset_api_key,
         base_url=deepset_api_url,
+        object_store=store,
     )
 
 
