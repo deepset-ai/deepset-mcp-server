@@ -19,7 +19,7 @@ from deepset_mcp.tools.tokonomics.decorators import (
     referenceable,
 )
 from deepset_mcp.tools.tokonomics.explorer import RichExplorer
-from deepset_mcp.tools.tokonomics.object_store import Explorable, InMemoryBackend, ObjectStore
+from deepset_mcp.tools.tokonomics.object_store import InMemoryBackend, ObjectStore
 
 
 class TestHelperFunctions:
@@ -152,10 +152,9 @@ class TestExplorableDecorator:
 
         result = test_func()
 
-        assert isinstance(result, Explorable)
-        assert result.obj_id == "obj_001"
-        assert result.value == {"result": "success"}
-        assert isinstance(result._preview, str)
+        assert isinstance(result, str)
+        assert "@obj_001" in result
+        assert "success" in result
 
         # Check that object is stored
         stored_obj = store.get("obj_001")
@@ -171,9 +170,9 @@ class TestExplorableDecorator:
         async def run_test() -> None:
             result = await test_func()
 
-            assert isinstance(result, Explorable)
-            assert result.obj_id == "obj_001"
-            assert result.value == {"result": "success"}
+            assert isinstance(result, str)
+            assert "@obj_001" in result
+            assert "success" in result
 
             # Check that object is stored
             stored_obj = store.get("obj_001")
@@ -218,8 +217,32 @@ class TestExplorableDecorator:
 
         result = test_func({"a": 1, "b": 2}, multiplier=3)
 
-        assert isinstance(result, Explorable)
-        assert result.value == {"a": 3, "b": 6}
+        assert isinstance(result, str)
+        assert "a" in result
+
+    def test_explorable_sync_return_type_annotation_changed_to_str(
+        self, store: ObjectStore, explorer: RichExplorer
+    ) -> None:
+        """Test that @explorable decorator changes sync function return type annotation to str."""
+
+        @explorable(object_store=store, explorer=explorer)
+        def sync_test_func() -> dict:
+            return {"test": "data"}
+
+        # Verify the return type annotation was changed to str
+        assert sync_test_func.__annotations__["return"] is str
+
+    def test_explorable_async_return_type_annotation_changed_to_str(
+        self, store: ObjectStore, explorer: RichExplorer
+    ) -> None:
+        """Test that @explorable decorator changes async function return type annotation to str."""
+
+        @explorable(object_store=store, explorer=explorer)
+        async def async_test_func() -> list:
+            return [1, 2, 3]
+
+        # Verify the return type annotation was changed to str
+        assert async_test_func.__annotations__["return"] is str
 
 
 class TestReferenceableDecorator:
@@ -398,12 +421,12 @@ class TestExplorableAndReferenceableDecorator:
         # Call with reference and direct value
         result = process_data(f"@{input_id}", 2)
 
-        # Should return Explorable (from @explorable)
-        assert isinstance(result, Explorable)
-        assert result.value == {"processed": [2, 4, 6, 8, 10]}
+        # Should return string (from @explorable)
+        assert isinstance(result, str)
 
         # Should store the result (from @explorable)
-        stored_result = store.get(result.obj_id)
+        # We need to get the latest stored object to verify it was stored
+        stored_result = store.get("obj_002")
         assert stored_result == {"processed": [2, 4, 6, 8, 10]}
 
     def test_combined_decorator_chaining(self, store: ObjectStore, explorer: RichExplorer) -> None:
@@ -419,13 +442,16 @@ class TestExplorableAndReferenceableDecorator:
 
         # Step 1: Process initial data
         initial_data = [10, 20, 30, 40, 50]
-        result1 = step1(initial_data)
+        _ = step1(initial_data)
 
-        # Step 2: Use result from step 1
-        result2 = step2(f"@{result1.obj_id}")
+        # Step 2: Use result from step 1 by reference (obj_001)
+        result2 = step2("@obj_001")
 
-        assert isinstance(result2, Explorable)
-        assert result2.value == {"average": 30.0}
+        assert isinstance(result2, str)
+
+        processed = store.get("obj_002")
+
+        assert processed == {"average": 30.0}
 
     def test_combined_decorator_docstring(self, store: ObjectStore, explorer: RichExplorer) -> None:
         """Test that combined decorator enhances docstring properly."""

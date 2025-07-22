@@ -20,7 +20,7 @@ from typing import Any, TypeVar, Union, get_args, get_origin
 from glom import GlomError, glom
 
 from deepset_mcp.tools.tokonomics.explorer import RichExplorer
-from deepset_mcp.tools.tokonomics.object_store import Explorable, ObjectStore
+from deepset_mcp.tools.tokonomics.object_store import ObjectStore
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -148,26 +148,29 @@ def explorable(
         if inspect.iscoroutinefunction(func):
 
             @wraps(func)
-            async def async_wrapper(*args: Any, **kwargs: Any) -> Explorable[Any]:
+            async def async_wrapper(*args: Any, **kwargs: Any) -> str:
                 result = await func(*args, **kwargs)
                 obj_id = object_store.put(result)
                 preview = explorer.explore(obj_id)
-                return Explorable(obj_id, result, preview)
+
+                return preview
 
             # Enhance docstring
             async_wrapper.__doc__ = _enhance_docstring_for_explorable(func.__doc__ or "", func.__name__)
+            async_wrapper.__annotations__["return"] = str
             return async_wrapper  # type: ignore[return-value]
         else:
 
             @wraps(func)
-            def sync_wrapper(*args: Any, **kwargs: Any) -> Explorable[Any]:
+            def sync_wrapper(*args: Any, **kwargs: Any) -> str:
                 result = func(*args, **kwargs)
                 obj_id = object_store.put(result)
                 preview = explorer.explore(obj_id)
-                return Explorable(obj_id, result, preview)
+                return preview
 
             # Enhance docstring
             sync_wrapper.__doc__ = _enhance_docstring_for_explorable(func.__doc__ or "", func.__name__)
+            sync_wrapper.__annotations__["return"] = str
             return sync_wrapper  # type: ignore[return-value]
 
     return decorator
