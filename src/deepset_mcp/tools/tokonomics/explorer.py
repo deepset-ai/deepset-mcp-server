@@ -91,7 +91,7 @@ class RichExplorer:
         else:
             body = self._get_pretty_repr(obj)
 
-        return f"{header}\n\n{body}"
+        return f"{header}\n\n" + body
 
     def search(self, obj_id: str, pattern: str, path: str = "", case_sensitive: bool = False) -> str:
         """Search for a pattern within a string object.
@@ -162,21 +162,21 @@ class RichExplorer:
 
         # Handle string slicing
         if isinstance(obj, str):
-            sliced: str | list[Any] | tuple[Any] = obj[start:end]
+            sliced_str: str = obj[start:end]
             actual_end = end if end is not None else len(obj)
-            body = f"String slice [{start}:{actual_end}] of length {len(sliced)}:\n\n{sliced}"
-            return f"{header}\n\n{body}"
+            body = f"String slice [{start}:{actual_end}] of length {len(sliced_str)}:\n\n{sliced_str}"
+            return f"{header}\n\n" + body
 
         # Handle list/tuple slicing
         elif isinstance(obj, list | tuple):
-            sliced = obj[start:end]
+            sliced_list = obj[start:end]
             actual_end = end if end is not None else len(obj)
 
             # Use Pretty to render the sliced list with current settings
             with self.console.capture() as cap:
                 self.console.print(
                     Pretty(
-                        sliced,
+                        sliced_list,
                         max_depth=self.max_depth,
                         max_length=None,  # Show all items in the slice
                         max_string=self.max_string_length,
@@ -187,10 +187,10 @@ class RichExplorer:
             type_name = type(obj).__name__
             body = (
                 f"{type_name.capitalize()} slice [{start}:{actual_end}] "
-                f"(showing {len(sliced)} of {len(obj)} items):\n\n"
+                f"(showing {len(sliced_list)} of {len(obj)} items):\n\n"
                 f"{cap.get().rstrip()}"
             )
-            return f"{header}\n\n{body}"
+            return f"{header}\n\n" + body
 
         else:
             return f"{header}\n\nObject of type {type(obj).__name__} does not support slicing"

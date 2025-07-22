@@ -21,7 +21,7 @@ except ImportError:
 
 from deepset_mcp.tools.tokonomics.decorators import explorable, explorable_and_referenceable, referenceable
 from deepset_mcp.tools.tokonomics.explorer import RichExplorer
-from deepset_mcp.tools.tokonomics.object_store import Explorable, InMemoryBackend, ObjectStore, RedisBackend
+from deepset_mcp.tools.tokonomics.object_store import InMemoryBackend, ObjectStore, RedisBackend
 
 pytestmark = pytest.mark.integration
 
@@ -387,21 +387,16 @@ class TestDecoratorsFunctionality:
             return {"sum": x + y, "product": x * y}
 
         # Call the decorated function
-        result: Explorable[dict[str, int]] = process_data(5, 3)  # type: ignore[assignment]
+        result: str = process_data(5, 3)  # type: ignore[assignment]
 
-        # Verify result structure
-        assert hasattr(result, "obj_id")
-        assert hasattr(result, "value")
-        assert result.value == {"sum": 8, "product": 15}
+        # Verify result is a string (preview)
+        assert isinstance(result, str)
+        assert "@" in result
+        assert "dict" in result
 
-        # Verify object is stored
-        stored = object_store.get(result.obj_id)
+        # Verify object is stored (should be obj_001)
+        stored = object_store.get("obj_001")
         assert stored == {"sum": 8, "product": 15}
-
-        # Verify preview
-        preview = str(result)
-        assert "@" in preview
-        assert "dict" in preview
 
     @pytest.mark.asyncio
     async def test_explorable_decorator_async(self, object_store: ObjectStore, explorer: RichExplorer) -> None:
@@ -414,11 +409,13 @@ class TestDecoratorsFunctionality:
             return {"id": item_id, "data": f"Item {item_id}"}
 
         # Call the decorated async function
-        result: Explorable[dict[str, Any]] = await async_fetch_data(42)  # type: ignore[assignment]
+        result: str = await async_fetch_data(42)  # type: ignore[assignment]
 
-        # Verify result
-        assert result.value == {"id": 42, "data": "Item 42"}
-        assert object_store.get(result.obj_id) == result.value
+        # Verify result is a string (preview)
+        assert isinstance(result, str)
+        assert "@" in result
+        # Verify object is stored (should be obj_001)
+        assert object_store.get("obj_001") == {"id": 42, "data": "Item 42"}
 
     @pytest.mark.asyncio
     async def test_referenceable_decorator(self, object_store: ObjectStore, explorer: RichExplorer) -> None:
@@ -500,18 +497,20 @@ class TestDecoratorsFunctionality:
         data_id = object_store.put(data)
 
         # Call with reference
-        result: Explorable[dict[str, Any]] = transform_data(f"@{data_id}", 3)  # type: ignore[assignment,arg-type]
+        result: str = transform_data(f"@{data_id}", 3)  # type: ignore[assignment,arg-type]
 
-        # Verify it returns Explorable
-        assert hasattr(result, "obj_id")
-        assert result.value == {"a": 30, "b": 60, "c": "text"}
+        # Verify it returns string (preview)
+        assert isinstance(result, str)
+        assert "@" in result
 
-        # Verify stored and can be referenced
-        assert object_store.get(result.obj_id) == result.value
+        # Verify stored and can be referenced (should be obj_002 since data_id is obj_001)
+        assert object_store.get("obj_002") == {"a": 30, "b": 60, "c": "text"}
 
         # Use the result as input to another call
-        result2: Explorable[dict[str, Any]] = transform_data(f"@{result.obj_id}", 2)  # type: ignore[assignment,arg-type]
-        assert result2.value == {"a": 60, "b": 120, "c": "text"}
+        result2: str = transform_data("@obj_002", 2)  # type: ignore[assignment,arg-type]
+        assert isinstance(result2, str)
+        assert "@" in result2
+        assert object_store.get("obj_003") == {"a": 60, "b": 120, "c": "text"}
 
     @pytest.mark.asyncio
     async def test_error_handling_invalid_references(self, object_store: ObjectStore, explorer: RichExplorer) -> None:
@@ -570,20 +569,29 @@ class TestEndToEndScenarios:
             return total / len(data)
 
         # Execute pipeline
-        raw_data: Explorable[list[dict[str, Any]]] = load_data()  # type: ignore[assignment]
+        raw_data: str = load_data()  # type: ignore[assignment]
+        assert isinstance(raw_data, str)
+        assert "@" in raw_data
 
-        # Filter high scores using reference
-        high_scores: Explorable[list[dict[str, Any]]] = filter_high_scores(f"@{raw_data.obj_id}", 80)  # type: ignore[assignment,arg-type]
+        # Filter high scores using reference (raw_data should be obj_001)
+        high_scores: str = filter_high_scores("@obj_001", 80)  # type: ignore[assignment,arg-type]
+        assert isinstance(high_scores, str)
+        assert "@" in high_scores
 
-        # Calculate average using reference
-        avg_score: Explorable[float] = calculate_average(f"@{high_scores.obj_id}")  # type: ignore[assignment,arg-type]
+        # Calculate average using reference (high_scores should be obj_002)
+        avg_score: str = calculate_average("@obj_002")  # type: ignore[assignment,arg-type]
+        assert isinstance(avg_score, str)
+        assert "@" in avg_score
 
-        # Verify results
-        assert len(high_scores.value) == 3
-        assert avg_score.value == (85 + 92 + 95) / 3
+        # Verify results by checking stored objects
+        high_scores_data = object_store.get("obj_002")
+        avg_score_data = object_store.get("obj_003")
+        assert high_scores_data is not None
+        assert len(high_scores_data) == 3
+        assert avg_score_data == (85 + 92 + 95) / 3
 
         # Explore the results
-        preview = explorer.explore(high_scores.obj_id)
+        preview = explorer.explore("obj_002")
         assert "list" in preview
         assert "length: 3" in preview
 
@@ -599,13 +607,16 @@ class TestEndToEndScenarios:
 
         # Run multiple concurrent operations
         tasks = [async_process(i) for i in range(10)]
-        results: list[Explorable[dict[str, int]]] = await asyncio.gather(*tasks)  # type: ignore[assignment]
+        results: list[str] = await asyncio.gather(*tasks)  # type: ignore[assignment]
 
-        # Verify all results are stored and retrievable
+        # Verify all results are strings and objects are stored
         for i, result in enumerate(results):
-            assert result.value == {"input": i, "output": i * i}
-            stored = object_store.get(result.obj_id)
-            assert stored == result.value
+            assert isinstance(result, str)
+            assert "@" in result
+            # Objects should be stored as obj_001, obj_002, etc.
+            obj_id = f"obj_{i + 1:03d}"
+            stored = object_store.get(obj_id)
+            assert stored == {"input": i, "output": i * i}
 
     @pytest.mark.asyncio
     async def test_complex_object_navigation(self, object_store: ObjectStore, explorer: RichExplorer) -> None:

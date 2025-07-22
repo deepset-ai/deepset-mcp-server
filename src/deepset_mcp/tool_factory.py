@@ -363,4 +363,4 @@ def register_tools(
                 object_store,
             )
 
-        mcp_server_instance.add_tool(enhanced_tool, name=tool_name, structured_output=False)
+        mcp_server_instance.add_tool(enhanced_tool, name=tool_name)

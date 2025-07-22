@@ -9,7 +9,6 @@ from typing import Any
 import pytest
 
 from deepset_mcp.tools.tokonomics import (
-    Explorable,
     InMemoryBackend,
     ObjectStore,
     RichExplorer,
@@ -60,20 +59,21 @@ class TestTokonomicsIntegration:
 
         # Step 1: Load data
         data_result = load_data()
-        assert isinstance(data_result, Explorable)
-        assert data_result.obj_id == "obj_001"
+        assert isinstance(data_result, str)
+        assert "@obj_001" in data_result
 
         # Step 2: Filter users (using reference)
-        filtered_users = filter_users_by_age(f"@{data_result.obj_id}", 30)
+        filtered_users = filter_users_by_age("@obj_001", 30)
         assert len(filtered_users) == 2  # Alice and Charlie
         assert all(user["age"] >= 30 for user in filtered_users)
 
         # Step 3: Get cities (using direct value, returns explorable)
         cities_result = get_user_cities(filtered_users)
-        assert isinstance(cities_result, Explorable)
-        assert cities_result.obj_id == "obj_002"
-        assert set(cities_result.value["cities"]) == {"New York", "Boston"}
-        assert cities_result.value["count"] == 2
+        assert isinstance(cities_result, str)
+        assert "@obj_002" in cities_result
+        stored_cities = store.get("obj_002")
+        assert set(stored_cities["cities"]) == {"New York", "Boston"}
+        assert stored_cities["count"] == 2
 
     def test_complex_path_navigation(self, store: ObjectStore, explorer: RichExplorer) -> None:
         """Test complex path navigation scenarios."""
@@ -173,7 +173,8 @@ class TestTokonomicsIntegration:
 
         # Create and store data
         result = create_test_data()
-        obj_id = result.obj_id
+        assert isinstance(result, str)
+        obj_id = "obj_001"
 
         # Test exploration
         explore_result = explorer.explore(obj_id)
@@ -219,17 +220,19 @@ class TestTokonomicsIntegration:
         async def run_async_test() -> None:
             # Test async explorable
             data_result = await async_data_loader()
-            assert isinstance(data_result, Explorable)
-            assert data_result.value["async_data"] == "loaded"
+            assert isinstance(data_result, str)
+            stored_data = store.get("obj_001")
+            assert stored_data["async_data"] == "loaded"
 
             # Test async referenceable
-            processed = await async_processor(f"@{data_result.obj_id}", "processed")
+            processed = await async_processor("@obj_001", "processed")
             assert processed == "loaded_processed"
 
             # Test async combined
-            final_result = await async_combined(f"@{data_result.obj_id}")
-            assert isinstance(final_result, Explorable)
-            assert final_result.value["status"] == "complete"
+            final_result = await async_combined("@obj_001")
+            assert isinstance(final_result, str)
+            stored_final = store.get("obj_002")
+            assert stored_final["status"] == "complete"
 
         asyncio.run(run_async_test())
 
@@ -250,7 +253,8 @@ class TestTokonomicsIntegration:
 
         # Create data
         result = create_data()
-        obj_id = result.obj_id
+        assert isinstance(result, str)
+        obj_id = "obj_001"
 
         # Should work immediately
         processed = use_data(f"@{obj_id}")
@@ -278,24 +282,26 @@ class TestTokonomicsIntegration:
 
         # Create large object
         result = create_large_data()
+        assert isinstance(result, str)
+        obj_id = "obj_001"
 
         # Preview should be truncated but accessible
-        preview = str(result)
+        preview = result
         assert len(preview) < 10000  # Should be truncated
-        assert "large_list" in preview
+        assert "large_list" in preview or "@obj_001" in preview
 
-        # Full object should be accessible via value
-        full_data = result.value
+        # Full object should be accessible via store
+        full_data = store.get(obj_id)
         assert len(full_data["large_list"]) == 1000
         assert len(full_data["large_dict"]) == 100
         assert len(full_data["long_string"]) == 2000
 
         # Explorer should handle large objects gracefully
-        explore_result = explorer.explore(result.obj_id)
-        assert f"@{result.obj_id} → dict" in explore_result
+        explore_result = explorer.explore(obj_id)
+        assert f"@{obj_id} → dict" in explore_result
 
         # Slicing should work on large structures
-        slice_result = explorer.slice(result.obj_id, 0, 10, path="large_list")
+        slice_result = explorer.slice(obj_id, 0, 10, path="large_list")
         assert "List slice [0:10]" in slice_result
 
     def test_chained_operations_with_exploration(self, store: ObjectStore, explorer: RichExplorer) -> None:
@@ -320,26 +326,30 @@ class TestTokonomicsIntegration:
 
         # Execute pipeline
         result1 = step1()
+        assert isinstance(result1, str)
 
         # Explore intermediate result
-        explore1 = explorer.explore(result1.obj_id, "numbers")
+        explore1 = explorer.explore("obj_001", "numbers")
         assert "list" in explore1
 
-        result2 = step2(f"@{result1.obj_id}", 5)
+        result2 = step2("@obj_001", 5)
+        assert isinstance(result2, str)
 
         # Explore filtered result
-        explore2 = explorer.explore(result2.obj_id, "filtered")
+        explore2 = explorer.explore("obj_002", "filtered")
         assert "6" in explore2 and "7" in explore2 and "10" in explore2
 
-        result3 = step3(f"@{result2.obj_id}")
+        result3 = step3("@obj_002")
+        assert isinstance(result3, str)
 
         # Verify final result
-        assert result3.value["doubled"] == [12, 14, 16, 18, 20]
-        assert result3.value["original_count"] == 5
-        assert result3.value["final_sum"] == 80
+        final_data = store.get("obj_003")
+        assert final_data["doubled"] == [12, 14, 16, 18, 20]
+        assert final_data["original_count"] == 5
+        assert final_data["final_sum"] == 80
 
         # Explore final result structure
-        explore3 = explorer.explore(result3.obj_id)
+        explore3 = explorer.explore("obj_003")
         assert "doubled" in explore3
         assert "final_sum" in explore3
 
@@ -439,6 +449,7 @@ class TestTokonomicsIntegration:
 
         # Test functionality with enhanced docs
         result1 = documented_explorable([10, 20, 30, 40, 50])
-        result2 = documented_referenceable(f"@{result1.obj_id}", 1)
+        assert isinstance(result1, str)
+        result2 = documented_referenceable("@obj_001", 1)
 
         assert "Count: 5, Sum: 150, Avg: 30.0" == result2
