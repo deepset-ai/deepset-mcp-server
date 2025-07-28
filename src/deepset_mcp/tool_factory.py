@@ -171,6 +171,7 @@ def apply_client(
         return base_func
 
     if use_request_context:
+
         @functools.wraps(base_func)
         async def client_wrapper_with_context(*args: Any, **kwargs: Any) -> Any:
             ctx = kwargs.pop("ctx", None)
@@ -202,6 +203,7 @@ def apply_client(
 
         return client_wrapper_with_context
     else:
+
         @functools.wraps(base_func)
         async def client_wrapper_without_context(*args: Any, **kwargs: Any) -> Any:
             client_kwargs: dict[str, Any] = {"transport_config": DEFAULT_CLIENT_HEADER, "api_key": api_key}
