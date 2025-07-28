@@ -90,26 +90,24 @@ class TestHelperFunctions:
     def test_enhance_docstring_for_references(self) -> None:
         """Test docstring enhancement for referenceable functions."""
         original = "Original docstring."
-        param_info = {
-            "data": {"original": "dict", "modified": "dict | str", "accepts_str": False},
-            "text": {"original": "str", "modified": "str", "accepts_str": True},
-        }
 
-        result = _enhance_docstring_for_references(original, param_info, "test_func")
+        result = _enhance_docstring_for_references(original, "test_func")
 
         assert "Original docstring." in result
-        assert "**Reference Support**" in result
         assert "All parameters accept object references" in result
-        assert "``data``: dict → dict | str" in result
-        assert "``text``: str (already accepts strings)" in result
         assert "test_func(data='@obj_123'" in result
+        # Should not contain the old reference support formatting
+        assert "**Reference Support**" not in result
+        assert "dict → dict | str" not in result
 
     def test_enhance_docstring_for_references_empty_original(self) -> None:
         """Test docstring enhancement with empty original docstring."""
-        result = _enhance_docstring_for_references("", {}, "test_func")
+        result = _enhance_docstring_for_references("", "test_func")
 
-        assert "test_func function with reference support." in result
-        assert "**Reference Support**" in result
+        assert "test_func function." in result
+        assert "All parameters accept object references" in result
+        # Should not contain the old reference support formatting
+        assert "**Reference Support**" not in result
 
     def test_enhance_docstring_for_explorable(self) -> None:
         """Test docstring enhancement for explorable functions."""
@@ -118,16 +116,69 @@ class TestHelperFunctions:
         result = _enhance_docstring_for_explorable(original, "test_func")
 
         assert "Original docstring." in result
-        assert "**Output Storage**" in result
         assert "automatically stored and can be referenced" in result
         assert "object ID (e.g., ``@obj_123``)" in result
+        # Should not contain the old output storage formatting
+        assert "**Output Storage**" not in result
 
     def test_enhance_docstring_for_explorable_empty_original(self) -> None:
         """Test docstring enhancement with empty original docstring."""
         result = _enhance_docstring_for_explorable("", "test_func")
 
-        assert "test_func function with stored output." in result
-        assert "**Output Storage**" in result
+        assert "test_func function." in result
+        assert "automatically stored and can be referenced" in result
+        # Should not contain the old output storage formatting
+        assert "**Output Storage**" not in result
+
+    def test_enhance_docstring_for_references_preserves_original(self) -> None:
+        """Test that _enhance_docstring_for_references preserves all original content."""
+        original = """Process data and return results.
+
+        This function processes the input data and returns processed results.
+        It may raise exceptions if the data is invalid.
+
+        :param data: Input data to process
+        :param options: Processing options
+        :return: Processed results
+        :raises ValueError: If data is invalid
+        :raises RuntimeError: If processing fails
+        """
+
+        result = _enhance_docstring_for_references(original, "test_func")
+
+        # Check that all original content is preserved exactly
+        assert "Process data and return results." in result
+        assert "This function processes the input data" in result
+        assert ":param data: Input data to process" in result
+        assert ":param options: Processing options" in result
+        assert ":return: Processed results" in result
+        assert ":raises ValueError: If data is invalid" in result
+        assert ":raises RuntimeError: If processing fails" in result
+
+        # Check that enhancement is added
+        assert "All parameters accept object references" in result
+        assert "test_func(data='@obj_123'" in result
+
+    def test_enhance_docstring_for_explorable_preserves_original(self) -> None:
+        """Test that _enhance_docstring_for_explorable preserves all original content."""
+        original = """Calculate statistics from data.
+
+        :param values: List of numbers
+        :return: Statistical summary dict
+        :raises ValueError: If values is empty
+        """
+
+        result = _enhance_docstring_for_explorable(original, "calc_stats")
+
+        # Check that all original content is preserved exactly
+        assert "Calculate statistics from data." in result
+        assert ":param values: List of numbers" in result
+        assert ":return: Statistical summary dict" in result
+        assert ":raises ValueError: If values is empty" in result
+
+        # Check that enhancement is added
+        assert "automatically stored and can be referenced" in result
+        assert "object ID (e.g., ``@obj_123``)" in result
 
 
 class TestExplorableDecorator:
@@ -205,8 +256,9 @@ class TestExplorableDecorator:
             return {}
 
         assert "Original docstring." in test_func.__doc__
-        assert "**Output Storage**" in test_func.__doc__
         assert "automatically stored" in test_func.__doc__
+        # Should not contain the old output storage formatting
+        assert "**Output Storage**" not in test_func.__doc__
 
     def test_explorable_with_args(self, store: ObjectStore, explorer: RichExplorer) -> None:
         """Test @explorable decorated function with arguments."""
@@ -390,8 +442,9 @@ class TestReferenceableDecorator:
             return "result"
 
         assert "Original docstring." in test_func.__doc__
-        assert "**Reference Support**" in test_func.__doc__
         assert "All parameters accept object references" in test_func.__doc__
+        # Should not contain the old reference support formatting
+        assert "**Reference Support**" not in test_func.__doc__
 
 
 class TestExplorableAndReferenceableDecorator:
@@ -465,8 +518,11 @@ class TestExplorableAndReferenceableDecorator:
 
         # Should contain both reference and explorable documentation
         assert "Original docstring." in docstring
-        assert "**Reference Support**" in docstring
-        assert "**Output Storage**" in docstring
+        assert "All parameters accept object references" in docstring
+        assert "automatically stored" in docstring
+        # Should not contain the old section formatting
+        assert "**Reference Support**" not in docstring
+        assert "**Output Storage**" not in docstring
 
     def test_combined_decorator_signature(self, store: ObjectStore, explorer: RichExplorer) -> None:
         """Test that combined decorator modifies signature correctly."""

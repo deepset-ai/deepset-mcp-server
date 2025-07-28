@@ -49,75 +49,54 @@ def _add_str_to_type(annotation: Any) -> Any:
     return annotation | str
 
 
-def _enhance_docstring_for_references(original: str, param_info: dict[str, dict[str, Any]], func_name: str) -> str:
-    """Add reference documentation to function docstring.
+def _enhance_docstring_for_references(original: str, func_name: str) -> str:
+    """Create complete docstring for LLM tool with reference support.
 
     :param original: Original docstring.
-    :param param_info: Parameter modification info.
     :param func_name: Function name for examples.
-    :return: Enhanced docstring.
+    :return: Complete docstring for LLM tool.
     """
     if not original:
-        original = f"{func_name} function with reference support."
+        original = f"{func_name} function."
 
-    # Build the reference section
-    ref_section = [
-        "",
-        "**Reference Support**",
+    enhancement = [
         "",
         "All parameters accept object references in the form ``@obj_id`` or ``@obj_id.path.to.value``.",
         "",
+        "Examples::",
+        "",
+        "    # Direct call with values",
+        f"    {func_name}(data={{'key': 'value'}}, threshold=10)",
+        "",
+        "    # Call with references",
+        f"    {func_name}(data='@obj_123', threshold='@obj_456.config.threshold')",
+        "",
+        "    # Mixed call",
+        f"    {func_name}(data='@obj_123.items', threshold=10)",
     ]
 
-    if param_info:
-        ref_section.append("Parameter types after decoration:")
-        ref_section.append("")
-        for name, info in param_info.items():
-            if info["accepts_str"]:
-                ref_section.append(f"- ``{name}``: {info['original']} (already accepts strings)")
-            else:
-                ref_section.append(f"- ``{name}``: {info['original']} → {info['modified']} (now accepts references)")
-        ref_section.append("")
-
-    ref_section.extend(
-        [
-            "Examples::",
-            "",
-            "    # Direct call with values",
-            f"    {func_name}(data={{'key': 'value'}}, threshold=10)",
-            "",
-            "    # Call with references",
-            f"    {func_name}(data='@obj_123', threshold='@obj_456.config.threshold')",
-            "",
-            "    # Mixed call",
-            f"    {func_name}(data='@obj_123.items', threshold=10)",
-        ]
-    )
-
-    return original.rstrip() + "\n" + "\n".join(ref_section)
+    return original.rstrip() + "\n" + "\n".join(enhancement)
 
 
 def _enhance_docstring_for_explorable(original: str, func_name: str) -> str:
-    """Add explorable documentation to function docstring.
+    """Create complete docstring for LLM tool with output storage.
 
     :param original: Original docstring.
     :param func_name: Function name.
-    :return: Enhanced docstring.
+    :return: Complete docstring for LLM tool.
     """
     if not original:
-        original = f"{func_name} function with stored output."
+        original = f"{func_name} function."
 
-    section = [
+    enhancement = [
         "",
-        "**Output Storage**",
-        "",
-        "The output of this function is automatically stored and can be referenced in other functions.",
-        "The function returns a formatted preview of the result along with an object ID (e.g., ``@obj_123``).",
-        "",
-        "Use the returned object ID to pass this result to other functions that accept references.",
+        "The output is automatically stored and can be referenced in other functions.",
+        "Returns a formatted preview with an object ID (e.g., ``@obj_123``).",
+        "Use the object store tools in combination with the object ID to view nested properties of the object.",
+        "Use the returned object ID to pass this result to other functions.",
     ]
 
-    return original.rstrip() + "\n" + "\n".join(section)
+    return original.rstrip() + "\n" + "\n".join(enhancement)
 
 
 def explorable(
@@ -290,7 +269,7 @@ def referenceable(
 
             # Update signature and docstring
             async_wrapper.__signature__ = new_sig  # type: ignore[attr-defined]
-            async_wrapper.__doc__ = _enhance_docstring_for_references(func.__doc__ or "", param_info, func.__name__)
+            async_wrapper.__doc__ = _enhance_docstring_for_references(func.__doc__ or "", func.__name__)
             return async_wrapper  # type: ignore[return-value]
         else:
 
@@ -333,7 +312,7 @@ def referenceable(
 
             # Update signature and docstring
             sync_wrapper.__signature__ = new_sig  # type: ignore[attr-defined]
-            sync_wrapper.__doc__ = _enhance_docstring_for_references(func.__doc__ or "", param_info, func.__name__)
+            sync_wrapper.__doc__ = _enhance_docstring_for_references(func.__doc__ or "", func.__name__)
             return sync_wrapper  # type: ignore[return-value]
 
     return decorator
@@ -375,26 +354,19 @@ def explorable_and_referenceable(
 
         # Combine docstrings (remove duplicate function name line)
         if ref_func.__doc__ and exp_func.__doc__:
-            # Take the reference part from ref_func and explorable part from exp_func
-            ref_lines = ref_func.__doc__.split("\n")
             exp_lines = exp_func.__doc__.split("\n")
-
-            # Find where the reference section starts
-            ref_start = next((i for i, line in enumerate(ref_lines) if "**Reference Support**" in line), len(ref_lines))
             # Find where the explorable section starts
-            exp_start = next((i for i, line in enumerate(exp_lines) if "**Output Storage**" in line), 0)
+            exp_start = next(
+                (
+                    i
+                    for i, line in enumerate(exp_lines)
+                    if "The output is automatically stored and can be referenced" in line
+                ),
+                0,
+            )
 
-            # Combine: original + reference section + explorable section
-            # Take everything from ref_func including reference section but excluding examples
-            # Find end of reference section (before examples)
-            ref_end = len(ref_lines)
-            for i in range(ref_start, len(ref_lines)):
-                if "Examples::" in ref_lines[i]:
-                    ref_end = i
-                    break
-
-            combined = ref_lines[:ref_end] + exp_lines[exp_start:]
-            exp_func.__doc__ = "\n".join(combined)
+            combined = ref_func.__doc__ + "\n".join(exp_lines[exp_start:])
+            exp_func.__doc__ = combined
 
         return exp_func
 
