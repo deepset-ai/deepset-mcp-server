@@ -549,7 +549,7 @@ class TestBuildTool:
             custom_args={"custom_arg": "injected"},
         )
 
-        result = build_tool(sample_func, config, WorkspaceMode.STATIC, "test-workspace")
+        result = build_tool(sample_func, config, WorkspaceMode.STATIC, workspace="test-workspace")
 
         # Check final signature
         sig = inspect.signature(result)
@@ -578,7 +578,9 @@ class TestBuildTool:
             needs_workspace=True,
         )
 
-        result = build_tool(sample_func, config, WorkspaceMode.STATIC, "test-workspace")
+        result = build_tool(
+            sample_func, config, WorkspaceMode.STATIC, workspace="test-workspace", use_request_context=True
+        )
 
         # Mock the context and use FakeClient
         mock_ctx = MagicMock()

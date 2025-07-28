@@ -171,7 +171,6 @@ def apply_client(
         return base_func
 
     if use_request_context:
-
         @functools.wraps(base_func)
         async def client_wrapper_with_context(*args: Any, **kwargs: Any) -> Any:
             ctx = kwargs.pop("ctx", None)
@@ -203,7 +202,6 @@ def apply_client(
 
         return client_wrapper_with_context
     else:
-
         @functools.wraps(base_func)
         async def client_wrapper_without_context(*args: Any, **kwargs: Any) -> Any:
             client_kwargs: dict[str, Any] = {"transport_config": DEFAULT_CLIENT_HEADER, "api_key": api_key}
@@ -227,6 +225,7 @@ def build_tool(
     base_func: Callable[..., Any],
     config: ToolConfig,
     workspace_mode: WorkspaceMode,
+    api_key: str | None = None,
     workspace: str | None = None,
     use_request_context: bool = True,
     base_url: str | None = None,
@@ -240,6 +239,7 @@ def build_tool(
     :param base_func: The base tool function.
     :param config: Tool configuration specifying dependencies and custom arguments.
     :param workspace_mode: How the workspace should be handled.
+    :param api_key: The deepset API key to use.
     :param workspace: The workspace to use when using a static workspace.
     :param use_request_context: Whether to collect the API key from the request context.
     :param base_url: Base URL for the deepset API.
@@ -258,7 +258,9 @@ def build_tool(
     enhanced_func = apply_workspace(enhanced_func, config, workspace_mode, workspace)
 
     # Apply client injection (adds ctx parameter if needed)
-    enhanced_func = apply_client(enhanced_func, config, use_request_context=use_request_context, base_url=base_url)
+    enhanced_func = apply_client(
+        enhanced_func, config, use_request_context=use_request_context, base_url=base_url, api_key=api_key
+    )
 
     # Create final async wrapper if needed
     if not inspect.iscoroutinefunction(enhanced_func):
@@ -354,13 +356,14 @@ def register_tools(
             enhanced_tool = base_func(explorer=explorer)
         else:
             enhanced_tool = build_tool(
-                base_func,
-                config,
-                workspace_mode,
-                workspace,
-                get_api_key_from_authorization_header,
-                base_url,
-                object_store,
+                base_func=base_func,
+                config=config,
+                workspace_mode=workspace_mode,
+                workspace=workspace,
+                use_request_context=get_api_key_from_authorization_header,
+                base_url=base_url,
+                object_store=object_store,
+                api_key=api_key,
             )
 
         mcp_server_instance.add_tool(enhanced_tool, name=tool_name)
