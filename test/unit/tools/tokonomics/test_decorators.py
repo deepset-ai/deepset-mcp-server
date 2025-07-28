@@ -90,12 +90,8 @@ class TestHelperFunctions:
     def test_enhance_docstring_for_references(self) -> None:
         """Test docstring enhancement for referenceable functions."""
         original = "Original docstring."
-        param_info = {
-            "data": {"original": "dict", "modified": "dict | str", "accepts_str": False},
-            "text": {"original": "str", "modified": "str", "accepts_str": True},
-        }
 
-        result = _enhance_docstring_for_references(original, param_info, "test_func")
+        result = _enhance_docstring_for_references(original, "test_func")
 
         assert "Original docstring." in result
         assert "All parameters accept object references" in result
@@ -106,7 +102,7 @@ class TestHelperFunctions:
 
     def test_enhance_docstring_for_references_empty_original(self) -> None:
         """Test docstring enhancement with empty original docstring."""
-        result = _enhance_docstring_for_references("", {}, "test_func")
+        result = _enhance_docstring_for_references("", "test_func")
 
         assert "test_func function." in result
         assert "All parameters accept object references" in result
@@ -148,7 +144,7 @@ class TestHelperFunctions:
         :raises RuntimeError: If processing fails
         """
 
-        result = _enhance_docstring_for_references(original, {}, "test_func")
+        result = _enhance_docstring_for_references(original, "test_func")
 
         # Check that all original content is preserved exactly
         assert "Process data and return results." in result

@@ -49,11 +49,10 @@ def _add_str_to_type(annotation: Any) -> Any:
     return annotation | str
 
 
-def _enhance_docstring_for_references(original: str, param_info: dict[str, dict[str, Any]], func_name: str) -> str:
+def _enhance_docstring_for_references(original: str, func_name: str) -> str:
     """Create complete docstring for LLM tool with reference support.
 
     :param original: Original docstring.
-    :param param_info: Parameter modification info (unused but kept for compatibility).
     :param func_name: Function name for examples.
     :return: Complete docstring for LLM tool.
     """
@@ -270,7 +269,7 @@ def referenceable(
 
             # Update signature and docstring
             async_wrapper.__signature__ = new_sig  # type: ignore[attr-defined]
-            async_wrapper.__doc__ = _enhance_docstring_for_references(func.__doc__ or "", param_info, func.__name__)
+            async_wrapper.__doc__ = _enhance_docstring_for_references(func.__doc__ or "", func.__name__)
             return async_wrapper  # type: ignore[return-value]
         else:
 
@@ -313,7 +312,7 @@ def referenceable(
 
             # Update signature and docstring
             sync_wrapper.__signature__ = new_sig  # type: ignore[attr-defined]
-            sync_wrapper.__doc__ = _enhance_docstring_for_references(func.__doc__ or "", param_info, func.__name__)
+            sync_wrapper.__doc__ = _enhance_docstring_for_references(func.__doc__ or "", func.__name__)
             return sync_wrapper  # type: ignore[return-value]
 
     return decorator
