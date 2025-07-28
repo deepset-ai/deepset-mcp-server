@@ -354,26 +354,12 @@ def explorable_and_referenceable(
 
         # Combine docstrings (remove duplicate function name line)
         if ref_func.__doc__ and exp_func.__doc__:
-            # Take the reference part from ref_func and explorable part from exp_func
-            ref_lines = ref_func.__doc__.split("\n")
             exp_lines = exp_func.__doc__.split("\n")
-
-            # Find where the reference section starts
-            ref_start = next((i for i, line in enumerate(ref_lines) if "**Reference Support**" in line), len(ref_lines))
             # Find where the explorable section starts
-            exp_start = next((i for i, line in enumerate(exp_lines) if "**Output Storage**" in line), 0)
+            exp_start = next((i for i, line in enumerate(exp_lines) if "The output is automatically stored and can be referenced" in line), 0)
 
-            # Combine: original + reference section + explorable section
-            # Take everything from ref_func including reference section but excluding examples
-            # Find end of reference section (before examples)
-            ref_end = len(ref_lines)
-            for i in range(ref_start, len(ref_lines)):
-                if "Examples::" in ref_lines[i]:
-                    ref_end = i
-                    break
-
-            combined = ref_lines[:ref_end] + exp_lines[exp_start:]
-            exp_func.__doc__ = "\n".join(combined)
+            combined = ref_func.__doc__ + "\n".join(exp_lines[exp_start:])
+            exp_func.__doc__ = combined
 
         return exp_func
 
