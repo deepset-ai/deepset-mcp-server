@@ -356,7 +356,14 @@ def explorable_and_referenceable(
         if ref_func.__doc__ and exp_func.__doc__:
             exp_lines = exp_func.__doc__.split("\n")
             # Find where the explorable section starts
-            exp_start = next((i for i, line in enumerate(exp_lines) if "The output is automatically stored and can be referenced" in line), 0)
+            exp_start = next(
+                (
+                    i
+                    for i, line in enumerate(exp_lines)
+                    if "The output is automatically stored and can be referenced" in line
+                ),
+                0,
+            )
 
             combined = ref_func.__doc__ + "\n".join(exp_lines[exp_start:])
             exp_func.__doc__ = combined
