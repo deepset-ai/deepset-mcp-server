@@ -438,14 +438,16 @@ class TestTokonomicsIntegration:
         # Check enhanced docstrings
         explorable_doc = documented_explorable.__doc__
         assert "Process a list of items" in explorable_doc
-        assert "**Output Storage**" in explorable_doc
         assert "automatically stored" in explorable_doc
+        # Should not contain the old output storage formatting
+        assert "**Output Storage**" not in explorable_doc
 
         referenceable_doc = documented_referenceable.__doc__
         assert "Format statistics" in referenceable_doc
-        assert "**Reference Support**" in referenceable_doc
         assert "All parameters accept object references" in referenceable_doc
-        assert "``stats``: <class 'dict'> → dict | str" in referenceable_doc
+        # Should not contain the old reference support formatting
+        assert "**Reference Support**" not in referenceable_doc
+        assert "dict | str" not in referenceable_doc
 
         # Test functionality with enhanced docs
         result1 = documented_explorable([10, 20, 30, 40, 50])
