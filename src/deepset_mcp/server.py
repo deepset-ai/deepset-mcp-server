@@ -9,16 +9,17 @@ import jwt
 from mcp.server.fastmcp import FastMCP
 
 from deepset_mcp.api.client import AsyncDeepsetClient
-from deepset_mcp.config import DOCS_SEARCH_TOOL_NAME
+from deepset_mcp.config import DEEPSET_DOCS_DEFAULT_SHARE_URL
 from deepset_mcp.store import initialize_store
 from deepset_mcp.tool_factory import register_tools
 from deepset_mcp.tool_models import DeepsetDocsConfig, WorkspaceMode
+from deepset_mcp.tool_registry import TOOL_REGISTRY
 
 
 def configure_mcp_server(
     mcp_server_instance: FastMCP,
-    tools_to_register: set[str],
-    workspace_mode: WorkspaceMode,
+    workspace_mode: WorkspaceMode | str,
+    tools_to_register: set[str] | None = None,
     deepset_api_key: str | None = None,
     deepset_api_url: str | None = None,
     deepset_workspace: str | None = None,
@@ -31,23 +32,28 @@ def configure_mcp_server(
     """Configure the MCP server with the specified tools and settings.
 
     :param mcp_server_instance: The FastMCP server instance to configure
-    :param tools_to_register: Set of tool names to register with the server
-    :param workspace_mode: The workspace mode (static or dynamic)
+    :param workspace_mode: The workspace mode ("static" or "dynamic")
+    :param tools_to_register: Set of tool names to register with the server.
+        Will register all tools if set to None.
     :param deepset_api_key: Optional Deepset API key for authentication
     :param deepset_api_url: Optional Deepset API base URL
     :param deepset_workspace: Optional workspace name for static mode
-    :param deepset_docs_shareable_prototype_url: Optional URL for shared prototype
+    :param deepset_docs_shareable_prototype_url: Shareable prototype URL that allows access to a docs search pipeline.
+        Will fall back to the default shareable prototype URL if set to None.
     :param get_api_key_from_authorization_header: Whether to extract API key from authorization header
     :param object_store_backend: Object store backend type ('memory' or 'redis')
     :param object_store_redis_url: Redis connection URL (required if backend='redis')
     :param object_store_ttl: TTL in seconds for stored objects
     :raises ValueError: If required parameters are missing or invalid
     """
-    if DOCS_SEARCH_TOOL_NAME in tools_to_register and deepset_docs_shareable_prototype_url is None:
-        raise ValueError(
-            f"The {DOCS_SEARCH_TOOL_NAME} tool requires a shareable prototype URL. "
-            "Please provide 'deepset_docs_shareable_prototype_url' or remove the tool from registration."
-        )
+    if tools_to_register is None:
+        tools_to_register = set(TOOL_REGISTRY.keys())
+
+    if deepset_docs_shareable_prototype_url is None:
+        deepset_docs_shareable_prototype_url = DEEPSET_DOCS_DEFAULT_SHARE_URL
+
+    if isinstance(workspace_mode, str):
+        workspace_mode = WorkspaceMode(workspace_mode)
 
     if workspace_mode == WorkspaceMode.STATIC and deepset_workspace is None:
         raise ValueError(
@@ -61,15 +67,10 @@ def configure_mcp_server(
             "Please provide 'deepset_api_key' or enable 'get_api_key_from_authorization_header'."
         )
 
-    if deepset_docs_shareable_prototype_url is not None:
-        workspace_name, pipeline_name, api_key_docs = asyncio.run(
-            fetch_shared_prototype_details(deepset_docs_shareable_prototype_url)
-        )
-        docs_config = DeepsetDocsConfig(
-            api_key=api_key_docs, workspace_name=workspace_name, pipeline_name=pipeline_name
-        )
-    else:
-        docs_config = None
+    workspace_name, pipeline_name, api_key_docs = asyncio.run(
+        fetch_shared_prototype_details(deepset_docs_shareable_prototype_url)
+    )
+    docs_config = DeepsetDocsConfig(api_key=api_key_docs, workspace_name=workspace_name, pipeline_name=pipeline_name)
 
     # Initialize the store before registering tools
     store = initialize_store(backend=object_store_backend, redis_url=object_store_redis_url, ttl=object_store_ttl)
