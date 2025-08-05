@@ -368,4 +368,4 @@ def register_tools(
                 api_key=api_key,
             )
 
-        mcp_server_instance.add_tool(enhanced_tool, name=tool_name)
+        mcp_server_instance.add_tool(enhanced_tool, name=tool_name, structured_output=False)
