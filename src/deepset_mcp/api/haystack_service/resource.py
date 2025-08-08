@@ -57,3 +57,49 @@ class HaystackServiceResource(HaystackServiceProtocol):
             raise ResourceNotFoundError(f"Component '{component_name}' not found.")
 
         return resp.json[0] if resp.json is not None else {}
+
+    async def run_component(
+        self,
+        component_type: str,
+        init_params: dict[str, Any] | None = None,
+        input_data: dict[str, Any] | None = None,
+        input_types: dict[str, str] | None = None,
+        workspace: str | None = None,
+    ) -> dict[str, Any]:
+        """Run a Haystack component with the given parameters.
+
+        :param component_type: The type of component to run (e.g., "haystack.components.builders.PromptBuilder")
+        :param init_params: Initialization parameters for the component
+        :param input_data: Input data for the component
+        :param input_types: Optional type information for inputs (inferred if not provided)
+        :param workspace: Optional workspace name to run the component in
+
+        :returns: Dictionary containing the component's output sockets
+        """
+        payload: dict[str, Any] = {
+            "component_type": component_type,
+            "init_params": init_params or {},
+            "input": input_data or {},
+        }
+
+        if input_types is not None:
+            payload["input_types"] = input_types
+
+        endpoint = "v1/haystack/components/run"
+        if workspace is not None:
+            endpoint = f"v1/workspaces/{workspace}/haystack/components/run"
+
+        resp = await self._client.request(
+            endpoint=endpoint,
+            method="POST",
+            headers={
+                "accept": "application/json",
+                "content-type": "application/json",
+            },
+            data=payload,
+            response_type=dict[str, Any],
+        )
+
+        raise_for_status(resp)
+
+        return resp.json if resp.json is not None else {}

@@ -41,3 +41,38 @@ async def test_get_component_input_output(
     assert response["name"] == "Agent"
     assert "input" in response
     assert "output" in response
+
+
+@pytest.mark.asyncio
+async def test_run_component(
+    haystack_service_resource: HaystackServiceResource,
+) -> None:
+    """Test for running a Haystack component."""
+    response = await haystack_service_resource.run_component(
+        component_type="haystack.components.builders.prompt_builder.PromptBuilder",
+        init_params={"template": "Hello, {{name}}!"},
+        input_data={"name": "deepset"},
+        input_types={"name": "str"},
+    )
+
+    assert isinstance(response, dict)
+    assert "prompt" in response
+    assert response["prompt"] == "Hello, deepset!"
+
+
+@pytest.mark.asyncio
+async def test_run_component_with_workspace(
+    haystack_service_resource: HaystackServiceResource,
+) -> None:
+    """Test for running a Haystack component in a specific workspace."""
+    response = await haystack_service_resource.run_component(
+        component_type="haystack.components.builders.prompt_builder.PromptBuilder",
+        init_params={"template": "Hello, {{name}}!"},
+        input_data={"name": "deepset"},
+        input_types={"name": "str"},
+        workspace="default",
+    )
+
+    assert isinstance(response, dict)
+    assert "prompt" in response
+    assert response["prompt"] == "Hello, deepset!"
