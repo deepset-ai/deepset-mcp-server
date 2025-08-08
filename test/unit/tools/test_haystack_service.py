@@ -13,6 +13,7 @@ from deepset_mcp.tools.haystack_service import (
     get_component_definition,
     get_custom_components,
     list_component_families,
+    run_component,
     search_component_definition,
 )
 from deepset_mcp.tools.haystack_service_models import (
@@ -545,4 +546,75 @@ async def test_get_custom_components_api_error() -> None:
 
     assert isinstance(result, str)
     assert "Error retrieving component schemas" in result
+    assert "API Error" in result
+
+
+@pytest.mark.asyncio
+async def test_run_component_success() -> None:
+    run_response = {
+        "output": {
+            "prompt": "Hello, world! This is a test prompt.",
+        }
+    }
+    resource = FakeHaystackServiceResource(run_component_response=run_response)
+    client = FakeClient(resource=resource)
+
+    result = await run_component(
+        client=client,
+        component_type="haystack.components.builders.PromptBuilder",
+        init_params={"template": "Hello, {{name}}! This is a {{type}} prompt."},
+        input_data={"name": "world", "type": "test"},
+    )
+
+    assert isinstance(result, dict)
+    assert "output" in result
+    assert result["output"]["prompt"] == "Hello, world! This is a test prompt."
+
+
+@pytest.mark.asyncio
+async def test_run_component_with_input_types() -> None:
+    run_response = {"output": {"documents": [{"content": "Test document", "meta": {}}]}}
+    resource = FakeHaystackServiceResource(run_component_response=run_response)
+    client = FakeClient(resource=resource)
+
+    result = await run_component(
+        client=client,
+        component_type="haystack.components.readers.TextFileReader",
+        init_params={},
+        input_data={"sources": ["/path/to/file.txt"]},
+        input_types={"sources": "List[str]"},
+    )
+
+    assert isinstance(result, dict)
+    assert "output" in result
+    assert "documents" in result["output"]
+    assert len(result["output"]["documents"]) == 1
+    assert result["output"]["documents"][0]["content"] == "Test document"
+
+
+@pytest.mark.asyncio
+async def test_run_component_minimal_params() -> None:
+    run_response = {"output": {"result": "success"}}
+    resource = FakeHaystackServiceResource(run_component_response=run_response)
+    client = FakeClient(resource=resource)
+
+    result = await run_component(client=client, component_type="haystack.components.readers.HTMLReader")
+
+    assert isinstance(result, dict)
+    assert result["output"]["result"] == "success"
+
+
+@pytest.mark.asyncio
+async def test_run_component_api_error() -> None:
+    resource = FakeHaystackServiceResource(exception=UnexpectedAPIError(status_code=500, message="API Error"))
+    client = FakeClient(resource=resource)
+
+    result = await run_component(
+        client=client,
+        component_type="haystack.components.builders.PromptBuilder",
+        init_params={"template": "Hello, {{name}}!"},
+    )
+
+    assert isinstance(result, str)
+    assert "Failed to run component" in result
     assert "API Error" in result
