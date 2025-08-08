@@ -18,6 +18,7 @@ from deepset_mcp.tools.haystack_service import (
     get_component_definition as get_component_definition_tool,
     get_custom_components as get_custom_components_tool,
     list_component_families as list_component_families_tool,
+    run_component as run_component_tool,
     search_component_definition as search_component_definition_tool,
 )
 from deepset_mcp.tools.indexes import (
@@ -194,6 +195,10 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "get_custom_components": (
         get_custom_components_tool,
         ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "run_component": (
+        run_component_tool,
+        ToolConfig(needs_client=True, memory_type=MemoryType.BOTH),
     ),
     "list_secrets": (list_secrets_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "get_secret": (get_secret_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),

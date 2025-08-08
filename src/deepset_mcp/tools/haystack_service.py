@@ -360,3 +360,41 @@ async def get_custom_components(*, client: AsyncClientProtocol) -> ComponentDefi
     component_definitions = [comp for comp in results if comp is not None]
 
     return ComponentDefinitionList(components=component_definitions, total_count=len(component_definitions))
+
+
+async def run_component(
+    *,
+    client: AsyncClientProtocol,
+    component_type: str,
+    init_params: dict[str, Any] | None = None,
+    input_data: dict[str, Any] | None = None,
+    input_types: dict[str, str] | None = None,
+) -> dict[str, Any] | str:
+    """Run a Haystack component with the given parameters.
+
+    This tool allows you to execute a Haystack component by providing its type
+    and initialization parameters, then passing input data to get results.
+    Use this to test components and see how they would work in your pipeline.
+
+    :param client: The API client to use
+    :param component_type: The type of component to run
+        (e.g., "haystack.components.builders.prompt_builder.PromptBuilder")
+    :param init_params: Initialization parameters for the component
+    :param input_data: Input data for the component
+    :param input_types: Optional type information for inputs (inferred if not provided). For custom types use the full
+        import path (e.g. haystack.dataclasses.document.Document for Document)
+
+    :returns: Dictionary containing the component's outputs or error message string
+    """
+    haystack_service = client.haystack_service()
+
+    try:
+        result = await haystack_service.run_component(
+            component_type=component_type,
+            init_params=init_params,
+            input_data=input_data,
+            input_types=input_types,
+        )
+        return result
+    except Exception as e:
+        return f"Failed to run component: {str(e)}"
