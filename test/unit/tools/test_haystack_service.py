@@ -53,9 +53,11 @@ class FakeHaystackServiceResource:
         get_component_schemas_response: dict[str, Any] | None = None,
         get_component_io_response: dict[str, Any] | None = None,
         exception: Exception | None = None,
+        run_component_response: dict[str, Any] | None = None,
     ):
         self._get_component_schemas_response = get_component_schemas_response
         self._get_component_io_response = get_component_io_response
+        self._run_component_response = run_component_response
         self._exception = exception
 
     async def get_component_schemas(self) -> dict[str, Any]:
@@ -70,6 +72,32 @@ class FakeHaystackServiceResource:
             raise self._exception
         if self._get_component_io_response is not None:
             return self._get_component_io_response
+        raise NotImplementedError
+
+    async def run_component(
+        self,
+        component_type: str,
+        init_params: dict[str, Any] | None = None,
+        input_data: dict[str, Any] | None = None,
+        input_types: dict[str, str] | None = None,
+        workspace: str | None = None,
+    ) -> dict[str, Any]:
+        """Run a Haystack component with the given parameters.
+
+        :param component_type: The type of component to run
+            (e.g., "haystack.components.builders.prompt_builder.PromptBuilder")
+        :param init_params: Initialization parameters for the component
+        :param input_data: Input data for the component
+        :param input_types: Optional type information for inputs (inferred if not provided)
+        :param workspace: Optional workspace name to run the component in
+
+        :returns: Dictionary containing the component's output sockets
+        """
+        if self._exception:
+            raise self._exception
+        if self._run_component_response is not None:
+            return self._run_component_response
+
         raise NotImplementedError
 
 
