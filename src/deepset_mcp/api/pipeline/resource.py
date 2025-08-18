@@ -6,13 +6,14 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
+from urllib.parse import quote
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
-from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     DeepsetSearchResponse,
     DeepsetStreamEvent,
+    LogLevel,
     PipelineList,
     PipelineLogList,
     PipelineValidationResult,
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
 
 
 class PipelineResource(PipelineResourceProtocol):
-    """Manages interactions with the deepset pipeline API."""
+    """Interact with pipelines on the deepset AI platform."""
 
     def __init__(
         self,
@@ -54,7 +55,7 @@ class PipelineResource(PipelineResourceProtocol):
         data = {"query_yaml": yaml_config}
 
         resp = await self._client.request(
-            endpoint=f"v1/workspaces/{self._workspace}/pipeline_validations",
+            endpoint=f"v1/workspaces/{quote(self._workspace, safe='')}/pipeline_validations",
             method="POST",
             data=data,
         )
@@ -92,7 +93,7 @@ class PipelineResource(PipelineResourceProtocol):
         }
 
         resp = await self._client.request(
-            endpoint=f"v1/workspaces/{self._workspace}/pipelines",
+            endpoint=f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines",
             method="GET",
             params=params,
         )
@@ -118,14 +119,18 @@ class PipelineResource(PipelineResourceProtocol):
         :param include_yaml: Whether to include YAML configuration in the response.
         :returns: DeepsetPipeline instance.
         """
-        resp = await self._client.request(endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}")
+        resp = await self._client.request(
+            endpoint=f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/{quote(pipeline_name, safe='')}"
+        )
         raise_for_status(resp)
 
         pipeline = DeepsetPipeline.model_validate(resp.json)
 
         if include_yaml:
             yaml_response = await self._client.request(
-                endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}/yaml"
+                endpoint=(
+                    f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/{quote(pipeline_name, safe='')}/yaml"
+                )
             )
 
             raise_for_status(yaml_response)
@@ -135,16 +140,16 @@ class PipelineResource(PipelineResourceProtocol):
 
         return pipeline
 
-    async def create(self, name: str, yaml_config: str) -> NoContentResponse:
+    async def create(self, pipeline_name: str, yaml_config: str) -> NoContentResponse:
         """Create a new pipeline with a name and YAML config.
 
-        :param name: Name of the new pipeline.
+        :param pipeline_name: Name of the new pipeline.
         :param yaml_config: YAML configuration for the pipeline.
         :returns: NoContentResponse indicating successful creation.
         """
-        data = {"name": name, "query_yaml": yaml_config}
+        data = {"name": pipeline_name, "query_yaml": yaml_config}
         resp = await self._client.request(
-            endpoint=f"v1/workspaces/{self._workspace}/pipelines",
+            endpoint=f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines",
             method="POST",
             data=data,
         )
@@ -170,7 +175,7 @@ class PipelineResource(PipelineResourceProtocol):
         # Handle name update first if any
         if updated_pipeline_name is not None:
             name_resp = await self._client.request(
-                endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}",
+                endpoint=f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/{quote(pipeline_name, safe='')}",
                 method="PATCH",
                 data={"name": updated_pipeline_name},
             )
@@ -184,7 +189,9 @@ class PipelineResource(PipelineResourceProtocol):
 
         if yaml_config is not None:
             yaml_resp = await self._client.request(
-                endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}/yaml",
+                endpoint=(
+                    f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/{quote(pipeline_name, safe='')}/yaml"
+                ),
                 method="PUT",
                 data={"query_yaml": yaml_config},
             )
@@ -223,7 +230,7 @@ class PipelineResource(PipelineResourceProtocol):
             params["filter"] = f"level eq '{level}' and origin eq 'querypipeline'"
 
         resp = await self._client.request(
-            endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}/logs",
+            endpoint=f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/{quote(pipeline_name, safe='')}/logs",
             method="GET",
             params=params,
         )
@@ -244,7 +251,9 @@ class PipelineResource(PipelineResourceProtocol):
         :raises UnexpectedAPIError: If the API returns an unexpected status code.
         """
         resp = await self._client.request(
-            endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}/deploy",
+            endpoint=(
+                f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/{quote(pipeline_name, safe='')}/deploy"
+            ),
             method="POST",
         )
 
@@ -274,7 +283,7 @@ class PipelineResource(PipelineResourceProtocol):
         :raises UnexpectedAPIError: If the API returns an unexpected status code.
         """
         resp = await self._client.request(
-            endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}",
+            endpoint=f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/{quote(pipeline_name, safe='')}",
             method="DELETE",
         )
 
@@ -315,7 +324,9 @@ class PipelineResource(PipelineResourceProtocol):
             data["filters"] = filters
 
         resp = await self._client.request(
-            endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}/search",
+            endpoint=(
+                f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/{quote(pipeline_name, safe='')}/search"
+            ),
             method="POST",
             data=data,
             response_type=dict[str, Any],
@@ -365,7 +376,10 @@ class PipelineResource(PipelineResourceProtocol):
             data["filters"] = filters
 
         async with self._client.stream_request(
-            endpoint=f"v1/workspaces/{self._workspace}/pipelines/{pipeline_name}/search-stream",
+            endpoint=(
+                f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/"
+                f"{quote(pipeline_name, safe='')}/search-stream"
+            ),
             method="POST",
             data=data,
         ) as resp:

@@ -237,3 +237,11 @@ class PipelineOperationWithErrors(BaseModel):
     message: str
     validation_result: PipelineValidationResult
     pipeline: DeepsetPipeline
+
+
+class LogLevel(StrEnum):
+    """Log level filter options for pipeline logs."""
+
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"

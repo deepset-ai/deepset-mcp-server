@@ -125,7 +125,7 @@ async def test_get_logs_for_deployed_pipeline(
     pipeline_name = "test-logs-pipeline"
 
     # Step 1: Create a pipeline
-    await pipeline_resource.create(name=pipeline_name, yaml_config=simple_yaml_config)
+    await pipeline_resource.create(pipeline_name=pipeline_name, yaml_config=simple_yaml_config)
 
     # Step 2: Deploy the pipeline
     deploy_result = await pipeline_resource.deploy(pipeline_name=pipeline_name)
@@ -172,7 +172,7 @@ async def test_get_logs_for_non_deployed_pipeline(
     pipeline_name = "test-logs-non-deployed-pipeline"
 
     # Create pipeline but do not deploy it
-    await pipeline_resource.create(name=pipeline_name, yaml_config=simple_yaml_config)
+    await pipeline_resource.create(pipeline_name=pipeline_name, yaml_config=simple_yaml_config)
 
     # Try to get logs for the non-deployed pipeline
     logs = await pipeline_resource.get_logs(pipeline_name=pipeline_name)
@@ -197,7 +197,7 @@ async def test_deployment_timeout_handling(
     pipeline_name = "test-timeout-pipeline"
 
     # Create and deploy pipeline
-    await pipeline_resource.create(name=pipeline_name, yaml_config=simple_yaml_config)
+    await pipeline_resource.create(pipeline_name=pipeline_name, yaml_config=simple_yaml_config)
     deploy_result = await pipeline_resource.deploy(pipeline_name=pipeline_name)
     assert deploy_result.valid is True
 
