@@ -7,10 +7,10 @@ import asyncio
 import yaml
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     DeepsetSearchResponse,
+    LogLevel,
     PipelineList,
     PipelineLogList,
     PipelineOperationWithErrors,

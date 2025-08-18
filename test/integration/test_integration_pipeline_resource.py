@@ -73,7 +73,7 @@ async def test_create_pipeline(
     pipeline_name = "test-pipeline"
 
     # Create a new pipeline
-    await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
+    await pipeline_resource.create(pipeline_name=pipeline_name, yaml_config=sample_yaml_config)
 
     # Verify the pipeline was created by retrieving it
     pipeline: DeepsetPipeline = await pipeline_resource.get(pipeline_name=pipeline_name)
@@ -93,7 +93,7 @@ async def test_list_pipelines(
     for i in range(3):
         pipeline_name = f"test-list-pipeline-{i}"
         pipeline_names.append(pipeline_name)
-        await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
+        await pipeline_resource.create(pipeline_name=pipeline_name, yaml_config=sample_yaml_config)
 
     # Test listing without pagination
     pipelines_list = await pipeline_resource.list(limit=10)
@@ -132,7 +132,7 @@ async def test_get_pipeline(
     pipeline_name = "test-get-pipeline"
 
     # Create a pipeline to retrieve
-    await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
+    await pipeline_resource.create(pipeline_name=pipeline_name, yaml_config=sample_yaml_config)
 
     # Test getting with YAML config
     pipeline_with_yaml: DeepsetPipeline = await pipeline_resource.get(pipeline_name=pipeline_name, include_yaml=True)
@@ -157,7 +157,7 @@ async def test_update_pipeline(
     updated_name = "test-update-pipeline-updated"
 
     # Create a pipeline to update
-    await pipeline_resource.create(name=original_name, yaml_config=sample_yaml_config)
+    await pipeline_resource.create(pipeline_name=original_name, yaml_config=sample_yaml_config)
 
     # Update the pipeline name
     await pipeline_resource.update(
@@ -260,7 +260,7 @@ async def test_deploy_pipeline_success(
     pipeline_name = "test-deploy-pipeline"
 
     # Create a pipeline to deploy
-    await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
+    await pipeline_resource.create(pipeline_name=pipeline_name, yaml_config=sample_yaml_config)
 
     # Deploy the pipeline
     result = await pipeline_resource.deploy(pipeline_name=pipeline_name)
@@ -294,7 +294,7 @@ async def test_delete_pipeline(
     pipeline_name = "test-delete-pipeline"
 
     # Create a pipeline to delete
-    await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
+    await pipeline_resource.create(pipeline_name=pipeline_name, yaml_config=sample_yaml_config)
 
     # Verify the pipeline exists
     pipeline = await pipeline_resource.get(pipeline_name=pipeline_name)
@@ -332,7 +332,7 @@ async def test_search_pipeline(
     pipeline_name = "test-search-pipeline"
 
     # Create a pipeline for search
-    await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
+    await pipeline_resource.create(pipeline_name=pipeline_name, yaml_config=sample_yaml_config)
 
     # Deploy the pipeline so it can be used for search
     await pipeline_resource.deploy(pipeline_name=pipeline_name)
@@ -361,7 +361,7 @@ async def test_search_pipeline_with_stream(
     pipeline_name = "test-search-pipeline"
 
     # Create a pipeline for search
-    await pipeline_resource.create(name=pipeline_name, yaml_config=sample_yaml_config)
+    await pipeline_resource.create(pipeline_name=pipeline_name, yaml_config=sample_yaml_config)
 
     # Deploy the pipeline so it can be used for search
     await pipeline_resource.deploy(pipeline_name=pipeline_name)

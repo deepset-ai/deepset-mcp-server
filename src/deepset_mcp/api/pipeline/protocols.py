@@ -5,11 +5,11 @@
 from collections.abc import AsyncIterator
 from typing import Any, Protocol
 
-from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     DeepsetSearchResponse,
     DeepsetStreamEvent,
+    LogLevel,
     PipelineList,
     PipelineLogList,
     PipelineValidationResult,

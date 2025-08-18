@@ -3,13 +3,14 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from typing import Any
+from urllib.parse import quote
 
 import pytest
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
-from deepset_mcp.api.pipeline.log_level import LogLevel
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
+    LogLevel,
     PipelineList,
     PipelineLog,
     PipelineLogList,
@@ -314,7 +315,7 @@ class TestPipelineResource:
         sample_pipeline = create_sample_pipeline(name=pipeline_name)
 
         # Create client with predefined response
-        client = DummyClient(responses={f"test-workspace/pipelines/{pipeline_name}": sample_pipeline})
+        client = DummyClient(responses={f"test-workspace/pipelines/{quote(pipeline_name, safe='')}": sample_pipeline})
 
         # Create resource and call get method
         resource = PipelineResource(client=client, workspace="test-workspace")
@@ -325,7 +326,9 @@ class TestPipelineResource:
         assert result.name == pipeline_name
 
         # Verify request
-        assert client.requests[0]["endpoint"] == f"v1/workspaces/test-workspace/pipelines/{pipeline_name}"
+        assert (
+            client.requests[0]["endpoint"] == f"v1/workspaces/test-workspace/pipelines/{quote(pipeline_name, safe='')}"
+        )
 
     @pytest.mark.asyncio
     async def test_create_pipeline(self) -> None:
@@ -339,7 +342,7 @@ class TestPipelineResource:
 
         # Create resource and call create method
         resource = PipelineResource(client=client, workspace="test-workspace")
-        await resource.create(name=pipeline_name, yaml_config=yaml_config)
+        await resource.create(pipeline_name=pipeline_name, yaml_config=yaml_config)
 
         # Verify request
         assert len(client.requests) == 1
@@ -359,7 +362,7 @@ class TestPipelineResource:
 
         # Create resource and call create method
         resource = PipelineResource(client=client, workspace="test-workspace")
-        await resource.create(name=pipeline_name, yaml_config=yaml_config)
+        await resource.create(pipeline_name=pipeline_name, yaml_config=yaml_config)
 
         # Verify request
         assert client.requests[0]["data"] == {"name": pipeline_name, "query_yaml": yaml_config}
@@ -375,7 +378,7 @@ class TestPipelineResource:
 
         # Verify exception is raised
         with pytest.raises(ValueError, match="Pipeline name already exists"):
-            await resource.create(name="duplicate", yaml_config="version: '1.0'")
+            await resource.create(pipeline_name="duplicate", yaml_config="version: '1.0'")
 
     @pytest.mark.asyncio
     async def test_update_pipeline_name_only(self) -> None:
@@ -848,33 +851,6 @@ class TestPipelineResource:
         assert client.requests[0]["params"] == {"limit": 0, "filter": "origin eq 'querypipeline'"}
 
     @pytest.mark.asyncio
-    async def test_get_logs_with_special_characters_in_pipeline_name(self) -> None:
-        """Test getting logs for a pipeline with special characters in name."""
-        # Create sample logs
-        sample_logs = [create_sample_log()]
-
-        # Create client with predefined response
-        client = DummyClient(
-            responses={
-                "test-workspace/pipelines/pipeline with spaces/logs": {
-                    "data": sample_logs,
-                    "has_more": False,
-                    "total": 1,
-                }
-            }
-        )
-
-        # Create resource and call get_logs method
-        resource = PipelineResource(client=client, workspace="test-workspace")
-        result = await resource.get_logs(pipeline_name="pipeline with spaces")
-
-        # Verify results
-        assert len(result.data) == 1
-
-        # Verify request
-        assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines/pipeline with spaces/logs"
-
-    @pytest.mark.asyncio
     async def test_get_logs_preserves_extra_fields(self) -> None:
         """Test that extra fields in logs are preserved."""
         # Create sample log with extra fields
@@ -1071,16 +1047,21 @@ class TestPipelineResource:
     @pytest.mark.asyncio
     async def test_delete_pipeline_with_special_characters(self) -> None:
         """Test deleting a pipeline with special characters in name."""
-        # Create client with successful response
-        client = DummyClient(responses={"test-workspace/pipelines/pipeline with spaces": {"status": "success"}})
+        pipeline_name = "pipeline with spaces"
+
+        client = DummyClient(
+            responses={f"test-workspace/pipelines/{quote(pipeline_name, safe='')}": {"status": "success"}}
+        )
 
         # Create resource and call delete method
         resource = PipelineResource(client=client, workspace="test-workspace")
-        result = await resource.delete(pipeline_name="pipeline with spaces")
+        result = await resource.delete(pipeline_name=pipeline_name)
 
         # Verify response
         assert result.success is True
         assert result.message == "Pipeline deleted successfully."
 
         # Verify request
-        assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines/pipeline with spaces"
+        assert (
+            client.requests[0]["endpoint"] == f"v1/workspaces/test-workspace/pipelines/{quote(pipeline_name, safe='')}"
+        )

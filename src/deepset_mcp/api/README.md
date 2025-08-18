@@ -40,13 +40,13 @@ from deepset_mcp.api.client import AsyncDeepsetClient
 async with AsyncDeepsetClient() as client:
     # Access pipeline resource for a specific workspace
     pipelines = client.pipelines(workspace="your-workspace")
-    
+
     # List all pipelines
     pipeline_list = await pipelines.list(page_number=1, limit=10)
-    
+
     # Get a specific pipeline with its YAML configuration
     pipeline = await pipelines.get("my-pipeline", include_yaml=True)
-    
+
     # Create a new pipeline
     yaml_config = """
     components:
@@ -55,9 +55,9 @@ async with AsyncDeepsetClient() as client:
         params:
           model: "sentence-transformers/all-MiniLM-L6-v2"
     """
-    
+
     response = await pipelines.create(
-        name="my-new-pipeline",
+        pipeline_name="my-new-pipeline",
         yaml_config=yaml_config
     )
 ```
@@ -135,9 +135,9 @@ async with AsyncDeepsetClient() as client:
 Monitor pipeline performance and troubleshoot issues:
 
 ```python
-from deepset_mcp.api.pipeline.log_level import LogLevel
-from deepset_mcp.api.client import AsyncDeepsetClient
 
+from deepset_mcp.api.pipeline.models import LogLevel
+from deepset_mcp.api.client import AsyncDeepsetClient
 
 async with AsyncDeepsetClient() as client:
     pipelines = client.pipelines(workspace="your-workspace")
@@ -147,7 +147,7 @@ async with AsyncDeepsetClient() as client:
         limit=50,
         level=LogLevel.ERROR  # Filter by log level
     )
-    
+
     for log_entry in logs.data:
         print(f"[{log_entry.level}] {log_entry.message}")
 ```
@@ -212,7 +212,7 @@ from deepset_mcp.api.client import AsyncDeepsetClient
 
 async with AsyncDeepsetClient() as client:
     templates = client.pipeline_templates(workspace="your-workspace")
-    
+
     # List available templates
     template_list = await templates.list_templates(
         limit=20,
@@ -220,15 +220,15 @@ async with AsyncDeepsetClient() as client:
         order="DESC",
         filter="category eq 'RAG'"  # OData filter
     )
-    
+
     # Get a specific template with its YAML configuration
     template = await templates.get_template("template-name")
-    
+
     # Use the template YAML to create a new pipeline
     if template.yaml_config:
         pipelines = client.pipelines(workspace="your-workspace")
         await pipelines.create(
-            name="pipeline-from-template",
+            pipeline_name="pipeline-from-template",
             yaml_config=template.yaml_config
         )
 ```
@@ -451,11 +451,11 @@ from deepset_mcp.api.client import AsyncDeepsetClient
 async with AsyncDeepsetClient() as client:
     # Development workspace
     dev_pipelines = client.pipelines("development")
-    dev_pipeline = await dev_pipelines.create(name="test-pipeline", yaml_config=config)
-    
+    dev_pipeline = await dev_pipelines.create(pipeline_name="test-pipeline", yaml_config=config)
+
     # Production workspace
     prod_pipelines = client.pipelines("production")
-    prod_pipeline = await prod_pipelines.create(name="prod-pipeline", yaml_config=config)
+    prod_pipeline = await prod_pipelines.create(pipeline_name="prod-pipeline", yaml_config=config)
 ```
 
 ### Validation Before Deployment
@@ -465,18 +465,17 @@ Always validate pipeline configurations before deployment:
 ```python
 from deepset_mcp.api.client import AsyncDeepsetClient
 
-
 async with AsyncDeepsetClient() as client:
     pipelines = client.pipelines(workspace="your-workspace")
 
     # Validate configuration
     validation_result = await pipelines.validate(yaml_config)
-    
+
     if validation_result.valid:
         # Create and deploy pipeline
-        await pipelines.create(name="my-pipeline", yaml_config=yaml_config)
+        await pipelines.create(pipeline_name="my-pipeline", yaml_config=yaml_config)
         deployment_result = await pipelines.deploy("my-pipeline")
-        
+
         if deployment_result.valid:
             print("Pipeline deployed successfully")
         else:
