@@ -161,13 +161,13 @@ from deepset_mcp.api.client import AsyncDeepsetClient
 
 async with AsyncDeepsetClient() as client:
     indexes = client.indexes(workspace="your-workspace")
-    
+
     # List all indexes
     index_list = await indexes.list()
-    
+
     # Get a specific index
     index = await indexes.get("my-index")
-    
+
     # Create a new index
     index_yaml = """
     document_store:
@@ -178,14 +178,14 @@ async with AsyncDeepsetClient() as client:
         converter:
           type: TextFileToDocument
     """
-    
+
     await indexes.create(
-        name="my-new-index",
+        index_name="my-new-index",
         yaml_config=index_yaml,
         description="My document index"
     )
-    
-        updated_yaml = """
+
+    updated_yaml = """
     document_store:
       type: OpenSearchDocumentStore
     indexing_pipeline:
@@ -194,13 +194,13 @@ async with AsyncDeepsetClient() as client:
         converter:
           type: TextFileToDocument
     """
-    
-    # Update an existing index
-    await indexes.update(
-        index_name="my-index",
-        updated_index_name="my-renamed-index",
-        yaml_config=updated_yaml
-    )
+
+# Update an existing index
+await indexes.update(
+    index_name="my-index",
+    updated_index_name="my-renamed-index",
+    yaml_config=updated_yaml
+)
 ```
 
 ### Pipeline Templates
