@@ -192,7 +192,9 @@ class TestIndexResource:
         )
 
         resource = IndexResource(fake_client, workspace)
-        result = await resource.create(name="test-index", yaml_config="yaml: content", description="Test description")
+        result = await resource.create(
+            index_name="test-index", yaml_config="yaml: content", description="Test description"
+        )
 
         assert isinstance(result, Index)
         assert result.name == "test-index"
@@ -239,7 +241,7 @@ class TestIndexResource:
         """Test that creating an index with invalid parameters raises an error."""
         resource = IndexResource(fake_client, workspace)
         with pytest.raises(BadRequestError):
-            await resource.create(name="invalid-index", yaml_config="invalid: yaml")
+            await resource.create(index_name="invalid-index", yaml_config="invalid: yaml")
 
     async def test_update_nonexistent_index(
         self, fake_client: BaseFakeClient, workspace: str, fake_update_404_response: None

@@ -20,7 +20,7 @@ def valid_index_config() -> str:
     """Return a valid index YAML configuration for testing."""
     return json.dumps(
         {
-            "config_yaml": """
+            "yaml_config": """
 components:
   file_classifier:
     type: haystack.components.routers.file_type_router.FileTypeRouter
@@ -212,14 +212,14 @@ async def test_create_index(
     # Create a new index
     config = json.loads(valid_index_config)
     await index_resource.create(
-        name=default_index_name, yaml_config=config["config_yaml"], description="Test index description"
+        index_name=default_index_name, yaml_config=config["yaml_config"], description="Test index description"
     )
 
     # Verify the index was created by retrieving it
     index: Index = await index_resource.get(index_name=default_index_name)
 
     assert index.name == default_index_name
-    assert index.config_yaml == config["config_yaml"]
+    assert index.yaml_config == config["yaml_config"]
 
 
 @pytest.mark.asyncio
@@ -234,7 +234,7 @@ async def test_list_indexes(
     for i in range(3):
         index_name = f"test-list-index-{i}"
         index_names.append(index_name)
-        await index_resource.create(name=index_name, yaml_config=config["config_yaml"])
+        await index_resource.create(index_name=index_name, yaml_config=config["yaml_config"])
 
     # Test listing without pagination
     indexes = await index_resource.list(limit=10)
@@ -268,12 +268,12 @@ async def test_get_index(
     """Test getting a single index by name."""
     # Create an index to retrieve
     config = json.loads(valid_index_config)
-    await index_resource.create(name=default_index_name, yaml_config=config["config_yaml"])
+    await index_resource.create(index_name=default_index_name, yaml_config=config["yaml_config"])
 
     # Test getting the index
     index: Index = await index_resource.get(index_name=default_index_name)
     assert index.name == default_index_name
-    assert index.config_yaml == config["config_yaml"]
+    assert index.yaml_config == config["yaml_config"]
 
 
 @pytest.mark.asyncio
@@ -287,7 +287,7 @@ async def test_update_index(
 
     # Create an index to update
     config = json.loads(valid_index_config)
-    await index_resource.create(name=original_name, yaml_config=config["config_yaml"])
+    await index_resource.create(index_name=original_name, yaml_config=config["yaml_config"])
 
     # Update the index name
     await index_resource.update(
@@ -300,7 +300,7 @@ async def test_update_index(
     assert updated_index.name == updated_name
 
     # Update the index config
-    modified_yaml = config["config_yaml"].replace("split_length: 250", "split_length: 300")
+    modified_yaml = config["yaml_config"].replace("split_length: 250", "split_length: 300")
     await index_resource.update(
         index_name=updated_name,
         yaml_config=modified_yaml,
@@ -308,7 +308,7 @@ async def test_update_index(
 
     # Verify the config was updated
     updated_index = await index_resource.get(index_name=updated_name)
-    assert updated_index.config_yaml == modified_yaml
+    assert updated_index.yaml_config == modified_yaml
 
 
 @pytest.mark.asyncio
@@ -333,7 +333,7 @@ async def test_delete_index(
 
     # Create an index to delete
     config = json.loads(valid_index_config)
-    await index_resource.create(name=index_name, yaml_config=config["config_yaml"])
+    await index_resource.create(index_name=index_name, yaml_config=config["yaml_config"])
 
     # Verify the index exists
     index: Index = await index_resource.get(index_name=index_name)
@@ -357,7 +357,7 @@ async def test_deploy_index_success(
 
     # Create an index to deploy
     config = json.loads(valid_index_config)
-    await index_resource.create(name=index_name, yaml_config=config["config_yaml"])
+    await index_resource.create(index_name=index_name, yaml_config=config["yaml_config"])
 
     # Deploy the index
     result = await index_resource.deploy(index_name=index_name)

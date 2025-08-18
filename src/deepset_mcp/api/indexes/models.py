@@ -5,7 +5,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from rich.repr import Result
 
 from deepset_mcp.api.shared_models import DeepsetUser
@@ -27,7 +27,7 @@ class Index(BaseModel):
     pipeline_index_id: str
     name: str
     description: str | None = None
-    config_yaml: str
+    yaml_config: str = Field(alias="config_yaml")
     workspace_id: str
     settings: dict[str, Any]
     desired_status: str
@@ -56,7 +56,7 @@ class Index(BaseModel):
             else None,
         )
         yield "last_edited_at", self.last_edited_at.strftime("%m/%d/%Y %I:%M:%S %p") if self.last_edited_at else None
-        yield "config_yaml", self.config_yaml if self.config_yaml is not None else "Get full index to see config."
+        yield "yaml_config", self.yaml_config if self.yaml_config is not None else "Get full index to see config."
 
 
 class IndexList(BaseModel):

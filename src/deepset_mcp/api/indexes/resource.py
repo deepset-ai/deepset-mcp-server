@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from urllib.parse import quote
+
 from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.indexes.models import Index, IndexList
 from deepset_mcp.api.indexes.protocols import IndexResourceProtocol
@@ -35,7 +37,9 @@ class IndexResource(IndexResourceProtocol):
             "page_number": page_number,
         }
 
-        response = await self._client.request(f"/v1/workspaces/{self._workspace}/indexes", params=params)
+        response = await self._client.request(
+            f"/v1/workspaces/{quote(self._workspace, safe='')}/indexes", params=params
+        )
 
         raise_for_status(response)
 
@@ -48,28 +52,32 @@ class IndexResource(IndexResourceProtocol):
 
         :returns: Index details.
         """
-        response = await self._client.request(f"/v1/workspaces/{self._workspace}/indexes/{index_name}")
+        response = await self._client.request(
+            f"/v1/workspaces/{quote(self._workspace, safe='')}/indexes/{quote(index_name, safe='')}"
+        )
 
         raise_for_status(response)
 
         return Index.model_validate(response.json)
 
-    async def create(self, name: str, yaml_config: str, description: str | None = None) -> Index:
+    async def create(self, index_name: str, yaml_config: str, description: str | None = None) -> Index:
         """Create a new index with the given name and configuration.
 
-        :param name: Name of the index
+        :param index_name: Name of the index
         :param yaml_config: YAML configuration for the index
         :param description: Optional description for the index
         :returns: Created index details
         """
         data = {
-            "name": name,
+            "name": index_name,
             "config_yaml": yaml_config,
         }
         if description is not None:
             data["description"] = description
 
-        response = await self._client.request(f"v1/workspaces/{self._workspace}/indexes", method="POST", data=data)
+        response = await self._client.request(
+            f"v1/workspaces/{quote(self._workspace, safe='')}/indexes", method="POST", data=data
+        )
 
         raise_for_status(response)
 
@@ -95,7 +103,9 @@ class IndexResource(IndexResourceProtocol):
             raise ValueError("At least one of updated_index_name or yaml_config must be provided")
 
         response = await self._client.request(
-            f"/v1/workspaces/{self._workspace}/indexes/{index_name}", method="PATCH", data=data
+            f"/v1/workspaces/{quote(self._workspace, safe='')}/indexes/{quote(index_name, safe='')}",
+            method="PATCH",
+            data=data,
         )
 
         raise_for_status(response)
@@ -107,7 +117,9 @@ class IndexResource(IndexResourceProtocol):
 
         :param index_name: Name of the index to delete.
         """
-        response = await self._client.request(f"/v1/workspaces/{self._workspace}/indexes/{index_name}", method="DELETE")
+        response = await self._client.request(
+            f"/v1/workspaces/{quote(self._workspace, safe='')}/indexes/{quote(index_name, safe='')}", method="DELETE"
+        )
 
         raise_for_status(response)
 
@@ -119,7 +131,7 @@ class IndexResource(IndexResourceProtocol):
         :raises UnexpectedAPIError: If the API returns an unexpected status code.
         """
         resp = await self._client.request(
-            endpoint=f"v1/workspaces/{self._workspace}/indexes/{index_name}/deploy",
+            endpoint=f"v1/workspaces/{quote(self._workspace, safe='')}/indexes/{quote(index_name, safe='')}/deploy",
             method="POST",
         )
 

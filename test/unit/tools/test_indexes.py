@@ -2,15 +2,13 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-from datetime import datetime
 
 import pytest
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.indexes.models import Index, IndexList, IndexStatus
+from deepset_mcp.api.indexes.models import Index, IndexList
 from deepset_mcp.api.indexes.protocols import IndexResourceProtocol
 from deepset_mcp.api.pipeline.models import PipelineValidationResult, ValidationError
-from deepset_mcp.api.shared_models import DeepsetUser
 from deepset_mcp.tools.indexes import create_index, deploy_index, get_index, list_indexes, update_index
 from test.unit.conftest import BaseFakeClient
 
@@ -94,34 +92,34 @@ class FakeClient(BaseFakeClient):
 def create_test_index(
     name: str = "test_index",
     description: str | None = "Test index description",
-    config_yaml: str = "config: value",
+    yaml_config: str = "config: value",
 ) -> Index:
     """Helper function to create a complete Index object for testing."""
-    user = DeepsetUser(user_id="u1", given_name="Test", family_name="User")
-    status = IndexStatus(
-        pending_file_count=0,
-        failed_file_count=0,
-        indexed_no_documents_file_count=0,
-        indexed_file_count=10,
-        total_file_count=10,
-    )
 
-    return Index(
-        pipeline_index_id="idx_123",
-        name=name,
-        description=description,
-        config_yaml=config_yaml,
-        workspace_id="ws_123",
-        settings={"key": "value"},
-        desired_status="DEPLOYED",
-        deployed_at=datetime(2023, 1, 1, 12, 0),
-        last_edited_at=datetime(2023, 1, 2, 14, 30),
-        max_index_replica_count=3,
-        created_at=datetime(2023, 1, 1, 10, 0),
-        updated_at=datetime(2023, 1, 2, 14, 30),
-        created_by=user,
-        last_edited_by=user,
-        status=status,
+    return Index.model_validate(
+        {
+            "pipeline_index_id": "idx_123",
+            "name": name,
+            "description": description,
+            "config_yaml": yaml_config,
+            "workspace_id": "ws_123",
+            "settings": {"key": "value"},
+            "desired_status": "DEPLOYED",
+            "deployed_at": "2023-01-01T12:00:00Z",
+            "last_edited_at": "2023-01-02T14:30:00Z",
+            "max_index_replica_count": 3,
+            "created_at": "2023-01-01T10:00:00Z",
+            "updated_at": "2023-01-02T14:30:00Z",
+            "created_by": {"user_id": "u1", "given_name": "Test", "family_name": "User"},
+            "last_edited_by": {"user_id": "u1", "given_name": "Test", "family_name": "User"},
+            "status": {
+                "pending_file_count": 0,
+                "failed_file_count": 0,
+                "indexed_no_documents_file_count": 0,
+                "indexed_file_count": 10,
+                "total_file_count": 10,
+            },
+        }
     )
 
 
