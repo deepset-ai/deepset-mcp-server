@@ -39,6 +39,18 @@ def extract_component_texts(*, component_def: dict[str, Any]) -> tuple[str, str]
     return component_type, f"{name} {description}"
 
 
+def _format_type(type_: str | list[str]) -> str:
+    """Formats the component type as a single string.
+
+    :param type_: The component type
+    :return: The component type formatted as a single string
+    """
+    if isinstance(type_, str):
+        return type_
+
+    return " | ".join(type_)
+
+
 async def _build_component_definition(
     *, component_def: dict[str, Any], component_type: str, haystack_service: Any, schema: dict[str, Any] | None = None
 ) -> ComponentDefinition | str:
@@ -79,7 +91,7 @@ async def _build_component_definition(
                         name=prop_name,
                         annotation=prop_info.get("_annotation", prop_info.get("type", "Unknown")),
                         description=prop_info.get("description", "No description available."),
-                        type=prop_info.get("type", "Unknown"),
+                        type=_format_type(prop_info.get("type", "Unknown")),
                         required=prop_name in input_required,
                     )
                     for prop_name, prop_info in input_props.items()
