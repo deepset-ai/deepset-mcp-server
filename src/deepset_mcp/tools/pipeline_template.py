@@ -35,7 +35,8 @@ async def list_templates(
     """
     try:
         return await client.pipeline_templates(workspace=workspace).list(
-            limit=limit, filter=f"pipeline_type eq '{pipeline_type}'" if pipeline_type else None, # TODO: after=after
+            limit=limit,
+            filter=f"pipeline_type eq '{pipeline_type}'" if pipeline_type else None,  # TODO: after=after
         )
     except ResourceNotFoundError:
         return f"There is no workspace named '{workspace}'. Did you mean to configure it?"
