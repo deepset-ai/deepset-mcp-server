@@ -5,9 +5,10 @@
 from typing import Any
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
-from deepset_mcp.api.pipeline_template.models import PipelineTemplate, PipelineTemplateList
+from deepset_mcp.api.pipeline_template.models import PipelineTemplate
 from deepset_mcp.api.pipeline_template.protocols import PipelineTemplateResourceProtocol
 from deepset_mcp.api.protocols import AsyncClientProtocol
+from deepset_mcp.api.shared_models import PaginatedResponse
 from deepset_mcp.api.transport import raise_for_status
 
 
@@ -46,47 +47,58 @@ class PipelineTemplateResource(PipelineTemplateResourceProtocol):
 
         return PipelineTemplate.model_validate(data)
 
-    async def list_templates(
-        self, limit: int = 100, field: str = "created_at", order: str = "DESC", filter: str | None = None
-    ) -> PipelineTemplateList:
-        """List pipeline templates in the configured workspace.
+    async def list(
+        self,
+        limit: int = 10,
+        after: str | None = None,
+        field: str = "created_at",
+        order: str = "DESC",
+        filter: str | None = None,
+    ) -> PaginatedResponse[PipelineTemplate]:
+        """Lists pipeline templates and returns the first page of results.
 
-        Parameters
-        ----------
-        limit : int, optional (default=100)
-            Maximum number of templates to return
-        field : str, optional (default="created_at")
-            Field to sort by
-        order : str, optional (default="DESC")
-            Sort order (ASC or DESC)
-        filter : str | None, optional (default=None)
-            OData filter expression for filtering templates
+        The returned object can be iterated over to fetch subsequent pages.
 
-        Returns
-        -------
-        PipelineTemplateList
-            List of pipeline templates with metadata
+        :param limit: The maximum number of pipeline templates to return per page.
+        :param after: The cursor to fetch the next page of results.
+        :param field: Field to sort by (default: "created_at").
+        :param order: Sort order, either "ASC" or "DESC" (default: "DESC").
+        :param filter: OData filter expression for filtering templates.
+        :returns: A `PaginatedResponse` object containing the first page of pipeline templates.
         """
-        params = {"limit": limit, "page_number": 1, "field": field, "order": order}
+        # TODO: Remove when fixed
+        if after is not None:
+            raise ValueError("Pagination using 'after' parameter is currently not supported by the deepset platform.")
 
+        # 1. Prepare arguments for the initial API call
+        # TODO: Pagination in the deepset API is currently implemented in an unintuitive way.
+        # TODO: The cursor is always time based (created_at) and after signifies templates older than the current cursor
+        # TODO: while 'before' signals templates younger than the current cursor.
+        # TODO: This is applied irrespective of any sort (e.g. name) that would conflict with this approach.
+        # TODO: Change this to 'after' once the behaviour is fixed on the deepset API
+        request_params = {"limit": limit, "before": after, "field": field, "order": order}
         if filter is not None:
-            params["filter"] = filter
+            request_params["filter"] = filter
+        request_params = {k: v for k, v in request_params.items() if v is not None}
 
-        response = await self._client.request(
-            f"/v1/workspaces/{self._workspace}/pipeline_templates",
-            method="GET",
-            params=params,
+        # 2. Make the first API call using a private, stateless method
+        page = await self._list_api_call(**request_params)
+
+        # 3. Inject the logic needed for subsequent fetches into the response object
+        page._inject_paginator(
+            fetch_func=self._list_api_call,
+            # Base args for the *next* fetch don't include initial cursors
+            base_args={"limit": limit, "field": field, "order": order, "filter": filter},
         )
+        return page
 
-        raise_for_status(response)
-
-        if response.json is None:
-            raise UnexpectedAPIError(message="Unexpected API response, no templates returned.")
-
-        response_data: dict[str, Any] = response.json
-
-        return PipelineTemplateList(
-            data=[PipelineTemplate.model_validate(template) for template in response_data["data"]],
-            has_more=response_data.get("has_more", False),
-            total=response_data.get("total", len(response_data["data"])),
+    async def _list_api_call(self, **kwargs: Any) -> PaginatedResponse[PipelineTemplate]:
+        """A private, stateless method that performs the raw API call."""
+        resp = await self._client.request(
+            endpoint=f"v1/workspaces/{self._workspace}/pipeline_templates", method="GET", params=kwargs
         )
+        raise_for_status(resp)
+        if resp.json is None:
+            raise UnexpectedAPIError(status_code=resp.status_code, message="Empty response", detail=None)
+
+        return PaginatedResponse[PipelineTemplate].create_with_cursor_field(resp.json, "name")

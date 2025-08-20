@@ -6,8 +6,9 @@ import pytest
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.api.exceptions import ResourceNotFoundError
-from deepset_mcp.api.pipeline_template.models import PipelineTemplate, PipelineTemplateList
+from deepset_mcp.api.pipeline_template.models import PipelineTemplate
 from deepset_mcp.api.pipeline_template.resource import PipelineTemplateResource
+from deepset_mcp.api.shared_models import PaginatedResponse
 
 pytestmark = pytest.mark.integration
 
@@ -30,7 +31,7 @@ async def test_get_template(
     First lists all templates, then gets the first one by name.
     """
     # Get all templates to find an existing one
-    templates_list = await template_resource.list_templates()
+    templates_list = await template_resource.list()
 
     # Skip if no templates are available
     if not templates_list.data:
@@ -68,10 +69,9 @@ async def test_list_templates(
 ) -> None:
     """Test listing templates."""
     # Test listing templates with default limit
-    templates_list = await template_resource.list_templates()
+    templates_list = await template_resource.list()
 
-    # Verify that the templates are returned as a PipelineTemplateList
-    assert isinstance(templates_list, PipelineTemplateList)
+    assert isinstance(templates_list, PaginatedResponse)
     assert isinstance(templates_list.data, list)
 
     # Skip further checks if no templates are available
@@ -94,10 +94,10 @@ async def test_list_templates_with_limit(
     """Test listing templates with a specific limit."""
     # Test with a small limit
     limit = 1
-    templates_list = await template_resource.list_templates(limit=limit)
+    templates_list = await template_resource.list(limit=limit)
 
     # Verify that the number of templates is not more than the limit
-    assert isinstance(templates_list, PipelineTemplateList)
+    assert isinstance(templates_list, PaginatedResponse)
     assert len(templates_list.data) <= limit
 
 
@@ -107,10 +107,10 @@ async def test_list_templates_with_filter(
 ) -> None:
     """Test listing templates with a pipeline type filter."""
     # Test filtering by QUERY pipeline type
-    query_templates_list = await template_resource.list_templates(filter="pipeline_type eq 'QUERY'")
+    query_templates_list = await template_resource.list(filter="pipeline_type eq 'QUERY'")
 
     # Verify that all returned templates are QUERY type
-    assert isinstance(query_templates_list, PipelineTemplateList)
+    assert isinstance(query_templates_list, PaginatedResponse)
     assert isinstance(query_templates_list.data, list)
 
     # If templates are available, verify they are all QUERY type
@@ -119,10 +119,10 @@ async def test_list_templates_with_filter(
         assert template.pipeline_type == "query"
 
     # Test filtering by INDEXING pipeline type
-    indexing_templates_list = await template_resource.list_templates(filter="pipeline_type eq 'INDEXING'")
+    indexing_templates_list = await template_resource.list(filter="pipeline_type eq 'INDEXING'")
 
     # Verify that all returned templates are INDEXING type
-    assert isinstance(indexing_templates_list, PipelineTemplateList)
+    assert isinstance(indexing_templates_list, PaginatedResponse)
     assert isinstance(indexing_templates_list.data, list)
 
     # If templates are available, verify they are all INDEXING type
@@ -137,10 +137,9 @@ async def test_list_templates_with_custom_sorting(
 ) -> None:
     """Test listing templates with custom sorting."""
     # Test sorting by name in ascending order
-    templates_list = await template_resource.list_templates(field="name", order="ASC", limit=5)
+    templates_list = await template_resource.list(field="name", order="ASC", limit=5)
 
-    # Verify that the templates are returned as a PipelineTemplateList
-    assert isinstance(templates_list, PipelineTemplateList)
+    assert isinstance(templates_list, PaginatedResponse)
     assert isinstance(templates_list.data, list)
 
     # If we have multiple templates, verify they are sorted correctly
@@ -158,7 +157,7 @@ async def test_get_indexing_template(
     First lists all indexing templates, then gets the first one by name.
     """
     # Get all indexing templates
-    indexing_templates_list = await template_resource.list_templates(filter="pipeline_type eq 'INDEXING'")
+    indexing_templates_list = await template_resource.list(filter="pipeline_type eq 'INDEXING'")
 
     # Skip if no indexing templates are available
     if not indexing_templates_list.data:
@@ -186,10 +185,10 @@ async def test_list_indexing_templates_with_filter(
 ) -> None:
     """Test listing templates with an indexing pipeline type filter."""
     # Test filtering by INDEXING pipeline type
-    indexing_templates_list = await template_resource.list_templates(filter="pipeline_type eq 'INDEXING'")
+    indexing_templates_list = await template_resource.list(filter="pipeline_type eq 'INDEXING'")
 
     # Verify that all returned templates are INDEXING type
-    assert isinstance(indexing_templates_list, PipelineTemplateList)
+    assert isinstance(indexing_templates_list, PaginatedResponse)
     assert isinstance(indexing_templates_list.data, list)
 
     # If templates are available, verify they are all INDEXING type
@@ -205,7 +204,7 @@ async def test_mixed_pipeline_types_integration(
 ) -> None:
     """Test that query and indexing templates can be retrieved together."""
     # Get all templates
-    all_templates = await template_resource.list_templates()
+    all_templates = await template_resource.list()
 
     # Skip if no templates are available
     if not all_templates.data:
@@ -230,3 +229,72 @@ async def test_mixed_pipeline_types_integration(
 
     # Verify that the total matches the sum of individual types
     assert len(query_templates) + len(indexing_templates) == len(all_templates.data)
+
+
+@pytest.mark.skip("Cursor-based pagination for pipeline templates needs to be fixed on deepset platform.")
+@pytest.mark.asyncio
+async def test_list_pagination_integration(
+    template_resource: PipelineTemplateResource,
+) -> None:
+    """Test pagination with real API responses."""
+    # Test with a very small limit to force pagination
+    first_page = await template_resource.list(limit=1)
+
+    # Verify that the first page is returned as a PaginatedResponse
+    assert isinstance(first_page, PaginatedResponse)
+    assert isinstance(first_page.data, list)
+
+    # Skip further pagination tests if no templates are available
+    if not first_page.data:
+        pytest.skip("No templates available in the test environment")
+
+    # Verify the first template has the expected structure
+    template = first_page.data[0]
+    assert isinstance(template, PipelineTemplate)
+    assert template.template_name is not None
+
+    # If there are more results, test pagination
+    if first_page.has_more:
+        # Get next page using cursor
+        assert first_page.next_cursor is not None
+        second_page = await template_resource.list(limit=1, after=first_page.next_cursor)
+
+        assert isinstance(second_page, PaginatedResponse)
+        assert len(second_page.data) <= 1
+
+        # Verify we got different results
+        if second_page.data:
+            assert second_page.data[0].template_name != first_page.data[0].template_name
+
+
+@pytest.mark.skip("Cursor-based pagination for pipeline templates needs to be fixed on deepset platform.")
+@pytest.mark.asyncio
+async def test_list_all_templates_with_pagination(
+    template_resource: PipelineTemplateResource,
+) -> None:
+    """Test collecting all templates through pagination."""
+    all_templates = []
+    current_cursor = None
+
+    # Collect all templates using pagination
+    while True:
+        page = await template_resource.list(limit=2, after=current_cursor)
+        assert isinstance(page, PaginatedResponse)
+
+        all_templates.extend(page.data)
+
+        if not page.has_more:
+            break
+
+        current_cursor = page.next_cursor
+        assert current_cursor is not None
+
+        # Safety check to prevent infinite loops
+        if len(all_templates) > 100:
+            break
+
+    # Verify we collected templates
+    assert isinstance(all_templates, list)
+    for template in all_templates:
+        assert isinstance(template, PipelineTemplate)
+        assert template.template_name is not None

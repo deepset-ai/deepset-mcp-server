@@ -4,7 +4,8 @@
 
 from typing import Protocol
 
-from deepset_mcp.api.pipeline_template.models import PipelineTemplate, PipelineTemplateList
+from deepset_mcp.api.pipeline_template.models import PipelineTemplate
+from deepset_mcp.api.shared_models import PaginatedResponse
 
 
 class PipelineTemplateResourceProtocol(Protocol):
@@ -14,8 +15,13 @@ class PipelineTemplateResourceProtocol(Protocol):
         """Fetch a single pipeline template by its name."""
         ...
 
-    async def list_templates(
-        self, limit: int = 100, field: str = "created_at", order: str = "DESC", filter: str | None = None
-    ) -> PipelineTemplateList:
-        """List pipeline templates in the configured workspace."""
+    async def list(
+        self,
+        limit: int = 10,
+        after: str | None = None,
+        field: str = "created_at",
+        order: str = "DESC",
+        filter: str | None = None,
+    ) -> PaginatedResponse[PipelineTemplate]:
+        """Lists pipeline templates and returns the first page of results with pagination support."""
         ...

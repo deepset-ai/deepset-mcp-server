@@ -64,14 +64,6 @@ class PipelineTemplate(BaseModel):
         return values
 
 
-class PipelineTemplateList(BaseModel):
-    """Response model for listing pipeline templates."""
-
-    data: list[PipelineTemplate]
-    has_more: bool
-    total: int
-
-
 class PipelineTemplateSearchResult(BaseModel):
     """Model representing a search result for pipeline templates."""
 
