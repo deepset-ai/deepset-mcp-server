@@ -3,23 +3,29 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.indexes.models import Index, IndexList
+from deepset_mcp.api.indexes.models import Index
 from deepset_mcp.api.pipeline import PipelineValidationResult
 from deepset_mcp.api.protocols import AsyncClientProtocol
+from deepset_mcp.api.shared_models import PaginatedResponse
 
 
-async def list_indexes(*, client: AsyncClientProtocol, workspace: str) -> IndexList | str:
-    """Use this to list available indexes on the deepset platform in your workspace.
+async def list_indexes(
+    *, client: AsyncClientProtocol, workspace: str, after: str | None = None
+) -> PaginatedResponse[Index] | str:
+    """Retrieves a list of all indexes available within the currently configured deepset workspace.
 
-    :param client: Deepset API client to use for requesting indexes.
-    :param workspace: Workspace of which to list indexes.
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param after: The cursor to fetch the next page of results.
+        If there are more results to fetch, the cursor will appear as `next_cursor` on the response.
+    :returns: List of indexes or error message.
     """
     try:
-        result = await client.indexes(workspace=workspace).list()
-    except ResourceNotFoundError as e:
-        return f"Error listing indexes. Error: {e.message} ({e.status_code})"
-
-    return result
+        return await client.indexes(workspace=workspace).list(after=after)
+    except ResourceNotFoundError:
+        return f"There is no workspace named '{workspace}'. Did you mean to configure it?"
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to list indexes: {e}"
 
 
 async def get_index(*, client: AsyncClientProtocol, workspace: str, index_name: str) -> Index | str:
@@ -55,7 +61,7 @@ async def create_index(
     """
     try:
         result = await client.indexes(workspace=workspace).create(
-            name=index_name, yaml_config=yaml_configuration, description=description
+            index_name=index_name, yaml_config=yaml_configuration, description=description
         )
     except ResourceNotFoundError:
         return f"There is no workspace named '{workspace}'. Did you mean to configure it?"

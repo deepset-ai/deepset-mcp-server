@@ -4,14 +4,15 @@
 
 from typing import Protocol
 
-from deepset_mcp.api.indexes.models import Index, IndexList
+from deepset_mcp.api.indexes.models import Index
 from deepset_mcp.api.pipeline.models import PipelineValidationResult
+from deepset_mcp.api.shared_models import PaginatedResponse
 
 
 class IndexResourceProtocol(Protocol):
     """Protocol defining the implementation for IndexResource."""
 
-    async def list(self, limit: int = 10, page_number: int = 1) -> IndexList:
+    async def list(self, limit: int = 10, after: str | None = None) -> PaginatedResponse[Index]:
         """List indexes in the configured workspace."""
         ...
 
@@ -19,10 +20,10 @@ class IndexResourceProtocol(Protocol):
         """Fetch a single index by its name."""
         ...
 
-    async def create(self, name: str, yaml_config: str, description: str | None = None) -> Index:
+    async def create(self, index_name: str, yaml_config: str, description: str | None = None) -> Index:
         """Create a new index with the given name and configuration.
 
-        :param name: Name of the index
+        :param index_name: Name of the index
         :param yaml_config: YAML configuration for the index
         :param description: Optional description for the index
         :returns: Created index details

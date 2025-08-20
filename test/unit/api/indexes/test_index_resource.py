@@ -8,16 +8,103 @@ from typing import Any
 import pytest
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.indexes.models import Index, IndexList
+from deepset_mcp.api.indexes.models import Index
 from deepset_mcp.api.indexes.resource import IndexResource
 from deepset_mcp.api.pipeline.models import PipelineValidationResult
+from deepset_mcp.api.shared_models import PaginatedResponse
 from deepset_mcp.api.transport import TransportResponse
 from test.unit.conftest import BaseFakeClient
+
+
+class DummyIndexClient(BaseFakeClient):
+    """Dummy client for testing that implements AsyncClientProtocol."""
+
+    def __init__(self, responses: dict[str, Any] | None = None) -> None:
+        super().__init__(responses)
+        self.response_queue: list[TransportResponse[Any]] = []
+        self.response_index = 0
+        # Store all available index data for cursor-based pagination
+        self.all_index_data: list[dict[str, Any]] = []
+
+    def set_responses(self, responses: list[TransportResponse[Any]]) -> None:
+        """Set a queue of responses for sequential requests."""
+        self.response_queue = responses
+        self.response_index = 0
+
+    def set_index_data(self, all_indexes: list[dict[str, Any]]) -> None:
+        """Set all index data for cursor-based pagination testing."""
+        self.all_index_data = all_indexes
+
+    async def request(self, endpoint: str, **kwargs: Any) -> TransportResponse[Any]:
+        """Override to use queued responses when available, or handle pagination logic for indexes."""
+
+        if self.response_queue and self.response_index < len(self.response_queue):
+            # Always record the request like the parent class
+            self.requests.append({"endpoint": endpoint, **kwargs})
+            response = self.response_queue[self.response_index]
+            self.response_index += 1
+            return response
+
+        # Handle cursor-based pagination for index listing (only when no static response is available)
+        if (
+            endpoint.endswith("/indexes")
+            and kwargs.get("method", "GET") == "GET"
+            and self.all_index_data
+            and not self._has_static_response(endpoint)
+        ):
+            # Always record the request like the parent class
+            self.requests.append({"endpoint": endpoint, **kwargs})
+            return await self._handle_paginated_indexes(**kwargs)
+
+        # Let parent handle the request and recording
+        return await super().request(endpoint, **kwargs)
+
+    def _has_static_response(self, endpoint: str) -> bool:
+        """Check if there's a static response configured for this endpoint."""
+        # Check if there's a response in the responses dict for this endpoint
+        if self.responses:
+            for key in self.responses.keys():
+                if endpoint.endswith(key):
+                    return True
+        return False
+
+    async def _handle_paginated_indexes(self, **kwargs: Any) -> TransportResponse[Any]:
+        """Handle pagination logic for index listing."""
+        params = kwargs.get("params", {})
+        limit = params.get("limit", 10)
+        before_cursor = params.get("before")
+
+        # Find start index based on cursor
+        start_index = 0
+        if before_cursor:
+            # Find the index with this ID and start after it
+            for i, index in enumerate(self.all_index_data):
+                if index["pipeline_index_id"] == before_cursor:
+                    start_index = i + 1
+                    break
+
+        # Get the slice of data
+        end_index = start_index + limit
+        page_data = self.all_index_data[start_index:end_index]
+        has_more = end_index < len(self.all_index_data)
+
+        response_data = {
+            "data": page_data,
+            "has_more": has_more,
+            "total": len(self.all_index_data),
+        }
+
+        return TransportResponse(status_code=200, json=response_data, text="")
 
 
 @pytest.fixture()
 def fake_client() -> BaseFakeClient:
     return BaseFakeClient()
+
+
+@pytest.fixture()
+def dummy_index_client() -> DummyIndexClient:
+    return DummyIndexClient()
 
 
 @pytest.fixture
@@ -132,6 +219,47 @@ def fake_update_400_response(fake_client: BaseFakeClient, workspace: str) -> Non
     )
 
 
+def create_sample_index(
+    pipeline_index_id: str = "test-index-id",
+    name: str = "test-index",
+    description: str | None = None,
+) -> dict[str, Any]:
+    """Create a sample index response dictionary for testing."""
+    return {
+        "pipeline_index_id": pipeline_index_id,
+        "name": name,
+        "description": description,
+        "config_yaml": "yaml: content",
+        "workspace_id": "test-workspace",
+        "settings": {},
+        "desired_status": "DEPLOYED",
+        "deployed_at": "2025-01-01T00:00:00Z",
+        "last_edited_at": "2025-01-01T00:00:00Z",
+        "max_index_replica_count": 10,
+        "created_at": "2025-01-01T00:00:00Z",
+        "updated_at": "2025-01-01T00:00:00Z",
+        "created_by": {
+            "user_id": "test-user",
+            "given_name": "Test",
+            "family_name": "User",
+            "email": "test@example.com",
+        },
+        "last_edited_by": {
+            "user_id": "test-user",
+            "given_name": "Test",
+            "family_name": "User",
+            "email": "test@example.com",
+        },
+        "status": {
+            "pending_file_count": 0,
+            "failed_file_count": 0,
+            "indexed_no_documents_file_count": 0,
+            "indexed_file_count": 10,
+            "total_file_count": 10,
+        },
+    }
+
+
 class TestIndexResource:
     """Test the IndexResource."""
 
@@ -144,13 +272,13 @@ class TestIndexResource:
         assert isinstance(result, Index)
         assert result.name == "test-index"
 
-    async def test_list_indexes_returns_list(
+    async def test_list_indexes_returns_paginated_response(
         self, fake_client: BaseFakeClient, workspace: str, fake_list_successful_response: None
     ) -> None:
-        """Test that listing indexes returns an IndexList instance."""
+        """Test that listing indexes returns a PaginatedResponse instance."""
         resource = IndexResource(fake_client, workspace)
         result = await resource.list()
-        assert isinstance(result, IndexList)
+        assert isinstance(result, PaginatedResponse)
         assert len(result.data) == 1
         assert isinstance(result.data[0], Index)
         assert result.total == 1
@@ -177,11 +305,11 @@ class TestIndexResource:
     ) -> None:
         """Test that parameters are passed to the client in list method."""
         resource = IndexResource(fake_client, workspace)
-        await resource.list(limit=20, page_number=2)
+        await resource.list(limit=20, after="cursor123")
 
         # Check the last request's parameters
         last_request = fake_client.requests[-1]
-        assert last_request["params"] == {"limit": 20, "page_number": 2}
+        assert last_request["params"] == {"limit": 20, "before": "cursor123"}
 
     async def test_create_index_successful(
         self, fake_client: BaseFakeClient, workspace: str, index_response: dict[str, Any]
@@ -416,3 +544,114 @@ class TestIndexResource:
         assert len(result.errors) == 1
         assert result.errors[0].code == "DEPLOYMENT_ERROR"
         assert result.errors[0].message == "HTTP 400 error"
+
+    async def test_list_indexes_default_params(self) -> None:
+        """Test listing indexes with default parameters."""
+        # Create sample data
+        sample_indexes = [
+            create_sample_index(pipeline_index_id="1", name="Index 1"),
+            create_sample_index(pipeline_index_id="2", name="Index 2"),
+        ]
+
+        # Create client with predefined response
+        client = DummyIndexClient(
+            responses={
+                "test-workspace/indexes": {
+                    "data": sample_indexes,
+                    "has_more": False,
+                    "total": 2,
+                }
+            }
+        )
+
+        # Create resource and call list method
+        resource = IndexResource(client=client, workspace="test-workspace")
+        result = await resource.list()
+
+        # Verify results
+        assert isinstance(result, PaginatedResponse)
+        assert len(result.data) == 2
+        assert isinstance(result.data[0], Index)
+        assert result.data[0].pipeline_index_id == "1"
+        assert result.data[0].name == "Index 1"
+
+        # Verify request
+        assert len(client.requests) == 1
+        assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/indexes"
+        assert client.requests[0]["method"] == "GET"
+        assert client.requests[0]["params"] == {"limit": 10}
+
+    async def test_list_indexes_with_pagination(self) -> None:
+        """Test listing indexes with custom pagination parameters."""
+        # Create sample data
+        sample_indexes = [
+            create_sample_index(pipeline_index_id="3", name="Index 3"),
+            create_sample_index(pipeline_index_id="4", name="Index 4"),
+        ]
+
+        # Create client with predefined response
+        client = DummyIndexClient(
+            responses={
+                "test-workspace/indexes": {
+                    "data": sample_indexes,
+                    "has_more": False,
+                    "total": 10,
+                }
+            }
+        )
+
+        # Create resource and call list method with pagination
+        resource = IndexResource(client=client, workspace="test-workspace")
+        result = await resource.list(limit=5, after="some_cursor")
+
+        # Verify results
+        assert isinstance(result, PaginatedResponse)
+        assert len(result.data) == 2
+        assert result.data[0].pipeline_index_id == "3"
+        assert result.data[1].pipeline_index_id == "4"
+
+        # Verify request
+        assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/indexes"
+        # TODO: change to after when problem with deepset API pagination is fixed
+        assert client.requests[0]["params"] == {"limit": 5, "before": "some_cursor"}
+
+    async def test_list_indexes_empty_result(self) -> None:
+        """Test listing indexes when there are no indexes."""
+        # Create client with empty response
+        client = DummyIndexClient(responses={"test-workspace/indexes": {"data": [], "has_more": False, "total": 0}})
+
+        # Create resource and call list method
+        resource = IndexResource(client=client, workspace="test-workspace")
+        result = await resource.list()
+
+        # Verify empty results
+        assert isinstance(result, PaginatedResponse)
+        assert len(result.data) == 0
+
+    async def test_list_indexes_cursor_population(self) -> None:
+        """Test that cursors are properly populated from index IDs."""
+        # Create sample data
+        all_indexes = [create_sample_index(pipeline_index_id=f"index-{i}", name=f"Index {i}") for i in range(3)]
+
+        # Create a client with index data
+        client = DummyIndexClient()
+        client.set_index_data(all_indexes)
+
+        # Create resource and test different scenarios
+        resource = IndexResource(client=client, workspace="test-workspace")
+
+        # Test first page with more data available
+        first_page = await resource.list(limit=2)
+        assert first_page.next_cursor == "index-1"  # Last element, since has_more=True
+        assert first_page.has_more is True
+
+        # Test last page (no more data)
+        last_page = await resource.list(limit=5)  # Request more than available
+        assert last_page.next_cursor is None  # No next cursor since has_more=False
+        assert last_page.has_more is False
+
+        # Test single item page
+        client.set_index_data([all_indexes[0]])  # Only one index
+        single_page = await resource.list(limit=10)
+        assert single_page.next_cursor is None  # No next cursor since has_more=False
+        assert single_page.has_more is False

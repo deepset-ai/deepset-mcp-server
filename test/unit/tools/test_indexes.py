@@ -6,9 +6,10 @@
 import pytest
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.indexes.models import Index, IndexList
+from deepset_mcp.api.indexes.models import Index
 from deepset_mcp.api.indexes.protocols import IndexResourceProtocol
 from deepset_mcp.api.pipeline.models import PipelineValidationResult, ValidationError
+from deepset_mcp.api.shared_models import PaginatedResponse
 from deepset_mcp.tools.indexes import create_index, deploy_index, get_index, list_indexes, update_index
 from test.unit.conftest import BaseFakeClient
 
@@ -16,7 +17,7 @@ from test.unit.conftest import BaseFakeClient
 class FakeIndexResource(IndexResourceProtocol):
     def __init__(
         self,
-        list_response: IndexList | None = None,
+        list_response: PaginatedResponse[Index] | None = None,
         get_response: Index | None = None,
         create_response: Index | None = None,
         update_response: Index | None = None,
@@ -38,12 +39,12 @@ class FakeIndexResource(IndexResourceProtocol):
         self._update_exception = update_exception
         self._deploy_exception = deploy_exception
 
-    async def list(self, limit: int = 10, page_number: int = 1) -> IndexList:
+    async def list(self, limit: int = 10, after: str | None = None) -> PaginatedResponse[Index]:
         if self._list_exception:
             raise self._list_exception
         if self._list_response is not None:
             return self._list_response
-        return IndexList(data=[], has_more=False, total=0)
+        return PaginatedResponse(data=[], has_more=False, total=0)
 
     async def get(self, index_name: str) -> Index:
         if self._get_exception:
@@ -52,7 +53,7 @@ class FakeIndexResource(IndexResourceProtocol):
             return self._get_response
         raise NotImplementedError
 
-    async def create(self, name: str, yaml_config: str, description: str | None = None) -> Index:
+    async def create(self, index_name: str, yaml_config: str, description: str | None = None) -> Index:
         if self._create_exception:
             raise self._create_exception
         if self._create_response is not None:
@@ -125,12 +126,12 @@ def create_test_index(
 
 @pytest.mark.asyncio
 async def test_list_indexes_without_indexes() -> None:
-    resource = FakeIndexResource(list_response=IndexList(data=[], has_more=False, total=0))
+    resource = FakeIndexResource(list_response=PaginatedResponse(data=[], has_more=False, total=0))
     client = FakeClient(resource)
 
     result = await list_indexes(client=client, workspace="test")
 
-    assert isinstance(result, IndexList)
+    assert isinstance(result, PaginatedResponse)
     assert len(result.data) == 0
 
 
@@ -139,15 +140,33 @@ async def test_list_indexes_returns_indexes() -> None:
     index1 = create_test_index(name="index1", description="First index")
     index2 = create_test_index(name="index2", description="Second index")
 
-    resource = FakeIndexResource(list_response=IndexList(data=[index1, index2], has_more=False, total=2))
+    resource = FakeIndexResource(list_response=PaginatedResponse(data=[index1, index2], has_more=False, total=2))
     client = FakeClient(resource)
 
     result = await list_indexes(client=client, workspace="test")
 
-    assert isinstance(result, IndexList)
+    assert isinstance(result, PaginatedResponse)
     assert len(result.data) == 2
     assert result.data[0].name == index1.name
     assert result.data[1].name == index2.name
+
+
+@pytest.mark.asyncio
+async def test_list_indexes_with_cursor() -> None:
+    index1 = create_test_index(name="index1", description="First index")
+    index2 = create_test_index(name="index2", description="Second index")
+
+    resource = FakeIndexResource(
+        list_response=PaginatedResponse(data=[index1, index2], has_more=True, total=5, next_cursor="cursor123")
+    )
+    client = FakeClient(resource)
+
+    result = await list_indexes(client=client, workspace="test", after="cursor456")
+
+    assert isinstance(result, PaginatedResponse)
+    assert len(result.data) == 2
+    assert result.has_more is True
+    assert result.next_cursor == "cursor123"
 
 
 @pytest.mark.asyncio
@@ -158,7 +177,7 @@ async def test_list_indexes_returns_string_on_non_existant_workspace() -> None:
     result = await list_indexes(client=client, workspace="test")
 
     assert isinstance(result, str)
-    assert result == "Error listing indexes. Error: Resource not found. (404)"
+    assert result == "There is no workspace named 'test'. Did you mean to configure it?"
 
 
 @pytest.mark.asyncio
