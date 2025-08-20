@@ -11,11 +11,11 @@ import pytest
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.pipeline_template.models import (
     PipelineTemplate,
-    PipelineTemplateList,
     PipelineTemplateSearchResults,
     PipelineTemplateTag,
     PipelineType,
 )
+from deepset_mcp.api.shared_models import PaginatedResponse
 from deepset_mcp.tools.model_protocol import ModelProtocol
 from deepset_mcp.tools.pipeline_template import (
     get_template,
@@ -57,18 +57,24 @@ class FakePipelineTemplateResource:
         self._get_exception = get_exception
         self.last_list_call_params: dict[str, Any] = {}
 
-    async def list_templates(
-        self, limit: int = 100, field: str = "created_at", order: str = "DESC", filter: str | None = None
-    ) -> PipelineTemplateList:
+    async def list(
+        self,
+        limit: int = 10,
+        after: str | None = None,
+        field: str = "created_at",
+        order: str = "DESC",
+        filter: str | None = None,
+    ) -> PaginatedResponse[PipelineTemplate]:
         # Store the parameters for verification
-        self.last_list_call_params = {"limit": limit, "field": field, "order": order, "filter": filter}
+        self.last_list_call_params = {"limit": limit, "after": after, "field": field, "order": order, "filter": filter}
 
         if self._list_exception:
             raise self._list_exception
         if self._list_response is not None:
-            return PipelineTemplateList(
-                data=self._list_response, has_more=len(self._list_response) == limit, total=len(self._list_response)
-            )
+            # Create a simple paginated response
+            template_dicts = [t.model_dump(by_alias=True) for t in self._list_response]
+            response_data = {"data": template_dicts, "has_more": False}
+            return PaginatedResponse[PipelineTemplate].create_with_cursor_field(response_data, "pipeline_template_id")
         raise NotImplementedError
 
     async def get_template(self, template_name: str) -> PipelineTemplate:
@@ -118,7 +124,7 @@ async def test_list_pipeline_templates_returns_template_list() -> None:
     client = FakeClient(resource)
     result = await list_templates(client=client, workspace="ws1")
 
-    assert isinstance(result, PipelineTemplateList)
+    assert isinstance(result, PaginatedResponse)
     assert len(result.data) == 2
     assert result.data[0].template_name == "template1"
     assert result.data[1].template_name == "template2"
@@ -235,12 +241,12 @@ async def test_list_pipeline_templates_with_custom_sorting() -> None:
     resource = FakePipelineTemplateResource(list_response=[template])
     client = FakeClient(resource)
 
-    await list_templates(client=client, workspace="ws1", limit=50, field="name", order="ASC")
+    await list_templates(client=client, workspace="ws1", limit=50)
 
     # Verify parameters were passed correctly
     assert resource.last_list_call_params["limit"] == 50
-    assert resource.last_list_call_params["field"] == "name"
-    assert resource.last_list_call_params["order"] == "ASC"
+    assert resource.last_list_call_params["field"] == "created_at"  # default value
+    assert resource.last_list_call_params["order"] == "DESC"  # default value
     assert resource.last_list_call_params["filter"] is None
 
 
@@ -262,14 +268,12 @@ async def test_list_pipeline_templates_with_pipeline_type_and_sorting() -> None:
     resource = FakePipelineTemplateResource(list_response=[template])
     client = FakeClient(resource)
 
-    await list_templates(
-        client=client, workspace="ws1", limit=25, field="name", order="ASC", pipeline_type=PipelineType.QUERY
-    )
+    await list_templates(client=client, workspace="ws1", limit=25, pipeline_type=PipelineType.QUERY)
 
     # Verify all parameters were passed correctly
     assert resource.last_list_call_params["limit"] == 25
-    assert resource.last_list_call_params["field"] == "name"
-    assert resource.last_list_call_params["order"] == "ASC"
+    assert resource.last_list_call_params["field"] == "created_at"  # default value
+    assert resource.last_list_call_params["order"] == "DESC"  # default value
     assert resource.last_list_call_params["filter"] == "pipeline_type eq 'query'"
 
 
@@ -386,7 +390,7 @@ async def test_list_indexing_templates() -> None:
     client = FakeClient(resource)
     result = await list_templates(client=client, workspace="ws1", pipeline_type=PipelineType.INDEXING)
 
-    assert isinstance(result, PipelineTemplateList)
+    assert isinstance(result, PaginatedResponse)
     assert len(result.data) == 2
     assert result.data[0].template_name == "indexing_template1"
     assert result.data[1].template_name == "indexing_template2"
@@ -519,7 +523,7 @@ async def test_list_templates_mixed_pipeline_types() -> None:
     client = FakeClient(resource)
     result = await list_templates(client=client, workspace="ws1")
 
-    assert isinstance(result, PipelineTemplateList)
+    assert isinstance(result, PaginatedResponse)
     assert len(result.data) == 2
     assert result.data[0].pipeline_type == PipelineType.QUERY
     assert result.data[1].pipeline_type == PipelineType.INDEXING

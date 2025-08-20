@@ -7,12 +7,12 @@ import numpy as np
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.pipeline_template.models import (
     PipelineTemplate,
-    PipelineTemplateList,
     PipelineTemplateSearchResult,
     PipelineTemplateSearchResults,
     PipelineType,
 )
 from deepset_mcp.api.protocols import AsyncClientProtocol
+from deepset_mcp.api.shared_models import PaginatedResponse
 from deepset_mcp.tools.model_protocol import ModelProtocol
 
 
@@ -21,27 +21,22 @@ async def list_templates(
     client: AsyncClientProtocol,
     workspace: str,
     limit: int = 100,
-    field: str = "created_at",
-    order: str = "DESC",
     pipeline_type: PipelineType | str | None = None,
-) -> PipelineTemplateList | str:
+    # after: str | None = None TODO
+) -> PaginatedResponse[PipelineTemplate] | str:
     """Retrieves a list of all available pipeline and indexing templates.
 
     :param client: The async client for API requests.
     :param workspace: The workspace to list templates from.
     :param limit: Maximum number of templates to return (default: 100).
-    :param field: Field to sort by (default: "created_at").
-    :param order: Sort order, either "ASC" or "DESC" (default: "DESC").
     :param pipeline_type: The type of pipeline to return.
 
     :returns: List of pipeline templates or error message.
     """
     try:
-        return await client.pipeline_templates(workspace=workspace).list_templates(
+        return await client.pipeline_templates(workspace=workspace).list(
             limit=limit,
-            field=field,
-            order=order,
-            filter=f"pipeline_type eq '{pipeline_type}'" if pipeline_type else None,
+            filter=f"pipeline_type eq '{pipeline_type}'" if pipeline_type else None,  # TODO: after=after
         )
     except ResourceNotFoundError:
         return f"There is no workspace named '{workspace}'. Did you mean to configure it?"
@@ -87,18 +82,21 @@ async def search_templates(
     :returns: Search results with similarity scores or error message.
     """
     try:
-        response = await client.pipeline_templates(workspace=workspace).list_templates(
-            filter=f"pipeline_type eq '{pipeline_type}'"
-        )
+        response = await client.pipeline_templates(workspace=workspace).list()
+        templates = response.data
+
+        # Filter by pipeline_type if specified
+        if pipeline_type:
+            templates = [t for t in templates if t.pipeline_type == pipeline_type]
     except UnexpectedAPIError as e:
         return f"Failed to retrieve pipeline templates: {e}"
 
-    if not response.data:
+    if not templates:
         return PipelineTemplateSearchResults(results=[], query=query, total_found=0)
 
     # Extract text for embedding from all templates
     template_texts: list[tuple[str, str]] = [
-        (template.template_name, f"{template.template_name} {template.description}") for template in response.data
+        (template.template_name, f"{template.template_name} {template.description}") for template in templates
     ]
     template_names: list[str] = [t[0] for t in template_texts]
 
@@ -122,7 +120,7 @@ async def search_templates(
     search_results = []
     for template_name, sim in top_templates:
         # Find the template object by name
-        template = next((t for t in response.data if t.template_name == template_name), None)
+        template = next((t for t in templates if t.template_name == template_name), None)
         if template:
             search_results.append(PipelineTemplateSearchResult(template=template, similarity_score=float(sim)))
 

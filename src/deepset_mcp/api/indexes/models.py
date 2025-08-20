@@ -57,11 +57,3 @@ class Index(BaseModel):
         )
         yield "last_edited_at", self.last_edited_at.strftime("%m/%d/%Y %I:%M:%S %p") if self.last_edited_at else None
         yield "yaml_config", self.yaml_config if self.yaml_config is not None else "Get full index to see config."
-
-
-class IndexList(BaseModel):
-    """Response model for listing indexes."""
-
-    data: list[Index]
-    has_more: bool
-    total: int
