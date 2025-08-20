@@ -2,13 +2,15 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from typing import Any
 from urllib.parse import quote
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
-from deepset_mcp.api.indexes.models import Index, IndexList
+from deepset_mcp.api.indexes.models import Index
 from deepset_mcp.api.indexes.protocols import IndexResourceProtocol
 from deepset_mcp.api.pipeline.models import PipelineValidationResult, ValidationError
 from deepset_mcp.api.protocols import AsyncClientProtocol
+from deepset_mcp.api.shared_models import PaginatedResponse
 from deepset_mcp.api.transport import raise_for_status
 
 
@@ -24,26 +26,45 @@ class IndexResource(IndexResourceProtocol):
         self._client = client
         self._workspace = workspace
 
-    async def list(self, limit: int = 10, page_number: int = 1) -> IndexList:
-        """List all indexes.
+    async def list(self, limit: int = 10, after: str | None = None) -> PaginatedResponse[Index]:
+        """Lists indexes and returns the first page of results.
 
-        :param limit: Maximum number of indexes to return.
-        :param page_number: Page number for pagination.
+        The returned object can be iterated over to fetch subsequent pages.
 
-        :returns: List of indexes.
+        :param limit: The maximum number of indexes to return per page.
+        :param after: The cursor to fetch the next page of results.
+        :returns: A `PaginatedResponse` object containing the first page of indexes.
         """
-        params = {
-            "limit": limit,
-            "page_number": page_number,
-        }
+        # 1. Prepare arguments for the initial API call
+        # TODO: Pagination in the deepset API is currently implemented in an unintuitive way.
+        # TODO: The cursor is always time based (created_at) and after signifies indexes older than the current cursor
+        # TODO: while 'before' signals indexes younger than the current cursor.
+        # TODO: This is applied irrespective of any sort (e.g. name) that would conflict with this approach.
+        # TODO: Change this to 'after' once the behaviour is fixed on the deepset API
+        request_params = {"limit": limit, "before": after}
+        request_params = {k: v for k, v in request_params.items() if v is not None}
 
-        response = await self._client.request(
-            f"/v1/workspaces/{quote(self._workspace, safe='')}/indexes", params=params
+        # 2. Make the first API call using a private, stateless method
+        page = await self._list_api_call(**request_params)
+
+        # 3. Inject the logic needed for subsequent fetches into the response object
+        page._inject_paginator(
+            fetch_func=self._list_api_call,
+            # Base args for the *next* fetch don't include initial cursors
+            base_args={"limit": limit},
         )
+        return page
 
-        raise_for_status(response)
+    async def _list_api_call(self, **kwargs: Any) -> PaginatedResponse[Index]:
+        """A private, stateless method that performs the raw API call."""
+        resp = await self._client.request(
+            endpoint=f"v1/workspaces/{quote(self._workspace, safe='')}/indexes", method="GET", params=kwargs
+        )
+        raise_for_status(resp)
+        if resp.json is None:
+            raise UnexpectedAPIError(status_code=resp.status_code, message="Empty response", detail=None)
 
-        return IndexList.model_validate(response.json)
+        return PaginatedResponse[Index].create_with_cursor_field(resp.json, "pipeline_index_id")
 
     async def get(self, index_name: str) -> Index:
         """Get a specific index.

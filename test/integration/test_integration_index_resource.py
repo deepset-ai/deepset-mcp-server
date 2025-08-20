@@ -11,6 +11,7 @@ from deepset_mcp.api.exceptions import ResourceNotFoundError
 from deepset_mcp.api.indexes.models import Index
 from deepset_mcp.api.indexes.resource import IndexResource
 from deepset_mcp.api.pipeline.models import PipelineValidationResult
+from deepset_mcp.api.shared_models import PaginatedResponse
 
 pytestmark = pytest.mark.integration
 
@@ -238,6 +239,7 @@ async def test_list_indexes(
 
     # Test listing without pagination
     indexes = await index_resource.list(limit=10)
+    assert isinstance(indexes, PaginatedResponse)
     assert len(indexes.data) == 3
 
     # Verify our created indexes are in the list
@@ -245,18 +247,40 @@ async def test_list_indexes(
     for name in index_names:
         assert name in retrieved_names
 
-    # Test pagination
-    if len(indexes.data) > 1:
-        # Get the first page with 1 item
-        first_page = await index_resource.list(limit=1)
-        assert len(first_page.data) == 1
 
-        # Get the second page
-        second_page = await index_resource.list(page_number=2, limit=1)
-        assert len(second_page.data) == 1
+@pytest.mark.asyncio
+async def test_pagination_iteration(
+    index_resource: IndexResource,
+    valid_index_config: str,
+) -> None:
+    """Test iterating over multiple pages of indexes using the async iterator."""
+    # Create several test indexes
+    config = json.loads(valid_index_config)
+    index_names = []
+    for i in range(5):
+        index_name = f"test-pagination-index-{i}"
+        index_names.append(index_name)
+        await index_resource.create(index_name=index_name, yaml_config=config["yaml_config"])
 
-        # Verify they're different indexes
-        assert first_page.data[0].pipeline_index_id != second_page.data[0].pipeline_index_id
+    # Get the first page with a small limit to ensure pagination
+    paginator = await index_resource.list(limit=2)
+
+    # Collect all indexes by iterating through pages
+    all_indexes = []
+    async for index in paginator:
+        all_indexes.append(index)
+
+    # Verify we got all our created indexes (at least 5)
+    assert len(all_indexes) >= 5
+
+    # Verify all indexes are Index instances
+    for index in all_indexes:
+        assert isinstance(index, Index)
+
+    # Verify our created indexes are in the results
+    retrieved_names = [p.name for p in all_indexes]
+    for name in index_names:
+        assert name in retrieved_names
 
 
 @pytest.mark.asyncio
