@@ -22,7 +22,7 @@ async def list_templates(
     workspace: str,
     limit: int = 100,
     pipeline_type: PipelineType | str | None = None,
-    after: str | None = None,
+    # after: str | None = None TODO
 ) -> PaginatedResponse[PipelineTemplate] | str:
     """Retrieves a list of all available pipeline and indexing templates.
 
@@ -30,14 +30,12 @@ async def list_templates(
     :param workspace: The workspace to list templates from.
     :param limit: Maximum number of templates to return (default: 100).
     :param pipeline_type: The type of pipeline to return.
-    :param after: The cursor to fetch the next page of results.
-        If there are more results to fetch, the cursor will appear as `next_cursor` on the response.
 
     :returns: List of pipeline templates or error message.
     """
     try:
         return await client.pipeline_templates(workspace=workspace).list(
-            limit=limit, filter=f"pipeline_type eq '{pipeline_type}'" if pipeline_type else None, after=after
+            limit=limit, filter=f"pipeline_type eq '{pipeline_type}'" if pipeline_type else None, # TODO: after=after
         )
     except ResourceNotFoundError:
         return f"There is no workspace named '{workspace}'. Did you mean to configure it?"
