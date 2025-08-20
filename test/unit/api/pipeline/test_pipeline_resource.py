@@ -11,7 +11,6 @@ from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     LogLevel,
-    PipelineList,
     PipelineLog,
     PipelineLogList,
     PipelineServiceLevel,
@@ -19,12 +18,90 @@ from deepset_mcp.api.pipeline.models import (
 )
 from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
 from deepset_mcp.api.pipeline.resource import PipelineResource
+from deepset_mcp.api.shared_models import PaginatedResponse
 from deepset_mcp.api.transport import TransportResponse
 from test.unit.conftest import BaseFakeClient
 
 
 class DummyClient(BaseFakeClient):
     """Dummy client for testing that implements AsyncClientProtocol."""
+
+    def __init__(self, responses: dict[str, Any] | None = None) -> None:
+        super().__init__(responses)
+        self.response_queue: list[TransportResponse[Any]] = []
+        self.response_index = 0
+        # Store all available pipeline data for cursor-based pagination
+        self.all_pipeline_data: list[dict[str, Any]] = []
+
+    def set_responses(self, responses: list[TransportResponse[Any]]) -> None:
+        """Set a queue of responses for sequential requests."""
+        self.response_queue = responses
+        self.response_index = 0
+
+    def set_pipeline_data(self, all_pipelines: list[dict[str, Any]]) -> None:
+        """Set all pipeline data for cursor-based pagination testing."""
+        self.all_pipeline_data = all_pipelines
+
+    async def request(self, endpoint: str, **kwargs: Any) -> TransportResponse[Any]:
+        """Override to use queued responses when available, or handle pagination logic for pipelines."""
+
+        if self.response_queue and self.response_index < len(self.response_queue):
+            # Always record the request like the parent class
+            self.requests.append({"endpoint": endpoint, **kwargs})
+            response = self.response_queue[self.response_index]
+            self.response_index += 1
+            return response
+
+        # Handle cursor-based pagination for pipeline listing (only when no static response is available)
+        if (
+            endpoint.endswith("/pipelines")
+            and kwargs.get("method", "GET") == "GET"
+            and self.all_pipeline_data
+            and not self._has_static_response(endpoint)
+        ):
+            # Always record the request like the parent class
+            self.requests.append({"endpoint": endpoint, **kwargs})
+            return await self._handle_paginated_pipelines(**kwargs)
+
+        # Let parent handle the request and recording
+        return await super().request(endpoint, **kwargs)
+
+    def _has_static_response(self, endpoint: str) -> bool:
+        """Check if there's a static response configured for this endpoint."""
+        # Check if there's a response in the responses dict for this endpoint
+        if self.responses:
+            for key in self.responses.keys():
+                if endpoint.endswith(key):
+                    return True
+        return False
+
+    async def _handle_paginated_pipelines(self, **kwargs: Any) -> TransportResponse[Any]:
+        """Handle pagination logic for pipeline listing."""
+        params = kwargs.get("params", {})
+        limit = params.get("limit", 10)
+        after_cursor = params.get("after")
+
+        # Find start index based on cursor
+        start_index = 0
+        if after_cursor:
+            # Find the pipeline with this ID and start after it
+            for i, pipeline in enumerate(self.all_pipeline_data):
+                if pipeline["pipeline_id"] == after_cursor:
+                    start_index = i + 1
+                    break
+
+        # Get the slice of data
+        end_index = start_index + limit
+        page_data = self.all_pipeline_data[start_index:end_index]
+        has_more = end_index < len(self.all_pipeline_data)
+
+        response_data = {
+            "data": page_data,
+            "has_more": has_more,
+            "total": len(self.all_pipeline_data),
+        }
+
+        return TransportResponse(status_code=200, json=response_data, text="")
 
     def pipelines(self, workspace: str) -> PipelineResourceProtocol:
         return PipelineResource(client=self, workspace=workspace)
@@ -126,7 +203,7 @@ class TestPipelineResource:
         result = await resource.list()
 
         # Verify results
-        assert isinstance(result, PipelineList)
+        assert isinstance(result, PaginatedResponse)
         assert len(result.data) == 2
         assert isinstance(result.data[0], DeepsetPipeline)
         assert result.data[0].id == "1"
@@ -136,7 +213,7 @@ class TestPipelineResource:
         assert len(client.requests) == 1
         assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines"
         assert client.requests[0]["method"] == "GET"
-        assert client.requests[0]["params"] == {"page_number": 1, "limit": 10}
+        assert client.requests[0]["params"] == {"limit": 10}
 
     @pytest.mark.asyncio
     async def test_list_pipelines_with_pagination(self) -> None:
@@ -160,17 +237,18 @@ class TestPipelineResource:
 
         # Create resource and call list method with pagination
         resource = PipelineResource(client=client, workspace="test-workspace")
-        result = await resource.list(page_number=2, limit=5)
+        result = await resource.list(limit=5, after="some_cursor")
 
         # Verify results
-        assert isinstance(result, PipelineList)
+        assert isinstance(result, PaginatedResponse)
         assert len(result.data) == 2
         assert result.data[0].id == "3"
         assert result.data[1].id == "4"
 
         # Verify request
         assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines"
-        assert client.requests[0]["params"] == {"page_number": 2, "limit": 5}
+        # TODO: change to after when problem with deepset API pagination is fixed
+        assert client.requests[0]["params"] == {"limit": 5, "before": "some_cursor"}
 
     @pytest.mark.asyncio
     async def test_list_pipelines_empty_result(self) -> None:
@@ -183,7 +261,7 @@ class TestPipelineResource:
         result = await resource.list()
 
         # Verify empty results
-        assert isinstance(result, PipelineList)
+        assert isinstance(result, PaginatedResponse)
         assert len(result.data) == 0
 
     @pytest.mark.asyncio
@@ -199,23 +277,72 @@ class TestPipelineResource:
         with pytest.raises(ValueError, match="API Error"):
             await resource.list()
 
+    @pytest.mark.skip("See before/after TODO in pipeline resource. Needs to be resolved first.")
     @pytest.mark.asyncio
-    async def test_list_pipelines_with_zero_limit(self) -> None:
-        """Test listing pipelines with a limit of zero (edge case)."""
-        # Create client
-        client = DummyClient(responses={"test-workspace/pipelines": {"data": [], "has_more": False, "total": 10}})
+    async def test_list_pipelines_iteration(self) -> None:
+        """Test iterating over pipelines using cursor-based pagination."""
+        # Create sample data for multiple pages
+        all_pipelines = [create_sample_pipeline(pipeline_id=f"pipeline-{i}", name=f"Pipeline {i}") for i in range(5)]
 
-        # Create resource and call list method with limit=0
+        # Create a client with all pipeline data for cursor-based pagination
+        client = DummyClient()
+        client.set_pipeline_data(all_pipelines)
+
+        # Create resource and call list method with limit=2 to force pagination
         resource = PipelineResource(client=client, workspace="test-workspace")
-        result = await resource.list(limit=0)
+        paginator = await resource.list(limit=2)
 
-        # Verify empty results
-        assert isinstance(result, PipelineList)
-        assert len(result.data) == 0
+        # Verify first page
+        assert isinstance(paginator, PaginatedResponse)
+        assert len(paginator.data) == 2
+        assert paginator.data[0].id == "pipeline-0"
+        assert paginator.data[1].id == "pipeline-1"
+        assert paginator.has_more is True
+        # Check that next cursor is populated from the data
+        assert paginator.next_cursor == "pipeline-1"  # Last element's ID (since has_more=True)
 
-        # Verify request
-        assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines"
-        assert client.requests[0]["params"] == {"page_number": 1, "limit": 0}
+        # Iterate over all pipelines
+        all_retrieved_pipelines = [p async for p in paginator]
+
+        # Verify all pipelines were retrieved through iteration
+        assert len(all_retrieved_pipelines) == 5
+        assert all_retrieved_pipelines[0].id == "pipeline-0"
+        assert all_retrieved_pipelines[4].id == "pipeline-4"
+
+        # Verify that multiple requests were made with proper cursor logic
+        assert len(client.requests) >= 2
+        assert client.requests[0]["params"] == {"limit": 2}
+        # Second request should use the cursor from the last element of first page
+        assert client.requests[1]["params"] == {"limit": 2, "after": "pipeline-1"}
+
+    @pytest.mark.asyncio
+    async def test_list_pipelines_cursor_population(self) -> None:
+        """Test that cursors are properly populated from pipeline IDs."""
+        # Create sample data
+        all_pipelines = [create_sample_pipeline(pipeline_id=f"pipeline-{i}", name=f"Pipeline {i}") for i in range(3)]
+
+        # Create a client with pipeline data
+        client = DummyClient()
+        client.set_pipeline_data(all_pipelines)
+
+        # Create resource and test different scenarios
+        resource = PipelineResource(client=client, workspace="test-workspace")
+
+        # Test first page with more data available
+        first_page = await resource.list(limit=2)
+        assert first_page.next_cursor == "pipeline-1"  # Last element, since has_more=True
+        assert first_page.has_more is True
+
+        # Test last page (no more data)
+        last_page = await resource.list(limit=5)  # Request more than available
+        assert last_page.next_cursor is None  # No next cursor since has_more=False
+        assert last_page.has_more is False
+
+        # Test single item page
+        client.set_pipeline_data([all_pipelines[0]])  # Only one pipeline
+        single_page = await resource.list(limit=10)
+        assert single_page.next_cursor is None  # No next cursor since has_more=False
+        assert single_page.has_more is False
 
     @pytest.mark.asyncio
     async def test_get_pipeline_with_yaml(self) -> None:
@@ -629,14 +756,19 @@ class TestPipelineResource:
         yaml_config = "version: '1.0'"
 
         # Create response for unknown error
-        unknown_error_response: TransportResponse[None] = TransportResponse(text="", status_code=500, json=None)
+        unknown_error_response: TransportResponse[None] = TransportResponse(
+            text="Internal server error", status_code=500, json=None
+        )
 
         client = DummyClient(responses={"test-workspace/pipeline_validations": unknown_error_response})
 
         # Run the validation and expect an exception
         resource = PipelineResource(client=client, workspace="test-workspace")
-        with pytest.raises(UnexpectedAPIError):
+        with pytest.raises(UnexpectedAPIError) as exc_info:
             await resource.validate(yaml_config=yaml_config)
+
+        assert exc_info.value.status_code == 500
+        assert "Internal server error" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_get_logs_default_params(self) -> None:

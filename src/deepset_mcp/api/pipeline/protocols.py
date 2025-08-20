@@ -10,11 +10,10 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetSearchResponse,
     DeepsetStreamEvent,
     LogLevel,
-    PipelineList,
     PipelineLogList,
     PipelineValidationResult,
 )
-from deepset_mcp.api.shared_models import NoContentResponse
+from deepset_mcp.api.shared_models import NoContentResponse, PaginatedResponse
 
 
 class PipelineResourceProtocol(Protocol):
@@ -28,11 +27,7 @@ class PipelineResourceProtocol(Protocol):
         """Fetch a single pipeline by its name."""
         ...
 
-    async def list(
-        self,
-        page_number: int = 1,
-        limit: int = 10,
-    ) -> PipelineList:
+    async def list(self, limit: int = 10, after: str | None = None) -> PaginatedResponse[DeepsetPipeline]:
         """List pipelines in the configured workspace with optional pagination."""
         ...
 

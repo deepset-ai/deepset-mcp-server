@@ -6,8 +6,9 @@ import pytest
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.api.exceptions import ResourceNotFoundError
-from deepset_mcp.api.pipeline.models import DeepsetPipeline, DeepsetSearchResponse, DeepsetStreamEvent, PipelineList
+from deepset_mcp.api.pipeline.models import DeepsetPipeline, DeepsetSearchResponse, DeepsetStreamEvent
 from deepset_mcp.api.pipeline.resource import PipelineResource
+from deepset_mcp.api.shared_models import PaginatedResponse
 from test.integration.test_integration_pipeline_logs import wait_for_pipeline_deployment
 
 pytestmark = pytest.mark.integration
@@ -97,7 +98,7 @@ async def test_list_pipelines(
 
     # Test listing without pagination
     pipelines_list = await pipeline_resource.list(limit=10)
-    assert isinstance(pipelines_list, PipelineList)
+    assert isinstance(pipelines_list, PaginatedResponse)
     assert len(pipelines_list.data) == 3
 
     # Verify our created pipelines are in the list
@@ -105,22 +106,39 @@ async def test_list_pipelines(
     for name in pipeline_names:
         assert name in retrieved_names
 
-    # Test pagination
-    if len(pipelines_list.data) > 1:
-        # Get the first page with 1 item
-        first_page = await pipeline_resource.list(limit=1)
-        assert isinstance(first_page, PipelineList)
-        assert len(first_page.data) == 1
-        assert isinstance(first_page.data[0], DeepsetPipeline)
 
-        # Get the second page
-        second_page = await pipeline_resource.list(page_number=2, limit=1)
-        assert isinstance(second_page, PipelineList)
-        assert len(second_page.data) == 1
-        assert isinstance(second_page.data[0], DeepsetPipeline)
+@pytest.mark.asyncio
+async def test_pagination_iteration(
+    pipeline_resource: PipelineResource,
+    sample_yaml_config: str,
+) -> None:
+    """Test iterating over multiple pages of pipelines using the async iterator."""
+    # Create several test pipelines
+    pipeline_names = []
+    for i in range(5):
+        pipeline_name = f"test-pagination-{i}"
+        pipeline_names.append(pipeline_name)
+        await pipeline_resource.create(pipeline_name=pipeline_name, yaml_config=sample_yaml_config)
 
-        # Verify they're different pipelines
-        assert first_page.data[0].id != second_page.data[0].id
+    # Get the first page with a small limit to ensure pagination
+    paginator = await pipeline_resource.list(limit=2)
+
+    # Collect all pipelines by iterating through pages
+    all_pipelines = []
+    async for pipeline in paginator:
+        all_pipelines.append(pipeline)
+
+    # Verify we got all our created pipelines (at least 5)
+    assert len(all_pipelines) >= 5
+
+    # Verify all pipelines are DeepsetPipeline instances
+    for pipeline in all_pipelines:
+        assert isinstance(pipeline, DeepsetPipeline)
+
+    # Verify our created pipelines are in the results
+    retrieved_names = [p.name for p in all_pipelines]
+    for name in pipeline_names:
+        assert name in retrieved_names
 
 
 @pytest.mark.asyncio

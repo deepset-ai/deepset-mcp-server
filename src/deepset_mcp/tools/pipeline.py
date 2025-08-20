@@ -11,24 +11,28 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     DeepsetSearchResponse,
     LogLevel,
-    PipelineList,
     PipelineLogList,
     PipelineOperationWithErrors,
     PipelineValidationResult,
     PipelineValidationResultWithYaml,
 )
 from deepset_mcp.api.protocols import AsyncClientProtocol
+from deepset_mcp.api.shared_models import PaginatedResponse
 
 
-async def list_pipelines(*, client: AsyncClientProtocol, workspace: str) -> PipelineList | str:
+async def list_pipelines(
+    *, client: AsyncClientProtocol, workspace: str, after: str | None = None
+) -> PaginatedResponse[DeepsetPipeline] | str:
     """Retrieves a list of all pipeline available within the currently configured deepset workspace.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
+    :param after: The cursor to fetch the next page of results.
+        If there are more results to fetch, the cursor will appear as `next_cursor` on the response.
     :returns: List of pipelines or error message.
     """
     try:
-        return await client.pipelines(workspace=workspace).list()
+        return await client.pipelines(workspace=workspace).list(after=after)
     except ResourceNotFoundError:
         return f"There is no workspace named '{workspace}'. Did you mean to configure it?"
     except (BadRequestError, UnexpectedAPIError) as e:

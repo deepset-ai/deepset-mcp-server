@@ -14,13 +14,12 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetSearchResponse,
     DeepsetStreamEvent,
     LogLevel,
-    PipelineList,
     PipelineLogList,
     PipelineValidationResult,
     ValidationError,
 )
 from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
-from deepset_mcp.api.shared_models import NoContentResponse
+from deepset_mcp.api.shared_models import NoContentResponse, PaginatedResponse
 from deepset_mcp.api.transport import raise_for_status
 
 logger = logging.getLogger(__name__)
@@ -76,41 +75,45 @@ class PipelineResource(PipelineResourceProtocol):
 
         raise UnexpectedAPIError(status_code=resp.status_code, message=resp.text, detail=resp.json)
 
-    async def list(
-        self,
-        page_number: int = 1,
-        limit: int = 10,
-    ) -> PipelineList:
-        """Retrieve pipeline in the configured workspace with optional pagination.
+    async def list(self, limit: int = 10, after: str | None = None) -> PaginatedResponse[DeepsetPipeline]:
+        """Lists pipelines and returns the first page of results.
 
-        :param page_number: Page number for paging.
-        :param limit: Max number of items to return.
-        :returns: PipelineList with pipelines and metadata.
+        The returned object can be iterated over to fetch subsequent pages.
+
+        :param limit: The maximum number of pipelines to return per page.
+        :param after: The cursor to fetch the next page of results.
+        :returns: A `PaginatedResponse` object containing the first page of pipelines.
         """
-        params: dict[str, Any] = {
-            "page_number": page_number,
-            "limit": limit,
-        }
+        # 1. Prepare arguments for the initial API call
+        # TODO: Pagination in the deepset API is currently implemented in an unintuitive way.
+        # TODO: The cursor is always time based (created_at) and after signifies pipelines older than the current cursor
+        # TODO: while 'before' signals pipelines younger than the current cursor.
+        # TODO: This is applied irrespective of any sort (e.g. name) that would conflict with this approach.
+        # TODO: Change this to 'after' once the behaviour is fixed on the deepset API
+        request_params = {"limit": limit, "before": after}
+        request_params = {k: v for k, v in request_params.items() if v is not None}
 
-        resp = await self._client.request(
-            endpoint=f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines",
-            method="GET",
-            params=params,
+        # 2. Make the first API call using a private, stateless method
+        page = await self._list_api_call(**request_params)
+
+        # 3. Inject the logic needed for subsequent fetches into the response object
+        page._inject_paginator(
+            fetch_func=self._list_api_call,
+            # Base args for the *next* fetch don't include initial cursors
+            base_args={"limit": limit},
         )
+        return page
 
+    async def _list_api_call(self, **kwargs: Any) -> PaginatedResponse[DeepsetPipeline]:
+        """A private, stateless method that performs the raw API call."""
+        resp = await self._client.request(
+            endpoint=f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines", method="GET", params=kwargs
+        )
         raise_for_status(resp)
+        if resp.json is None:
+            raise UnexpectedAPIError(status_code=resp.status_code, message="Empty response", detail=None)
 
-        response = resp.json
-
-        if response is not None:
-            pipelines = [DeepsetPipeline.model_validate(item) for item in response.get("data", [])]
-            return PipelineList(
-                data=pipelines,
-                has_more=response.get("has_more", False),
-                total=response.get("total", len(pipelines)),
-            )
-        else:
-            return PipelineList(data=[], has_more=False, total=0)
+        return PaginatedResponse[DeepsetPipeline].create_with_cursor_field(resp.json, "pipeline_id")
 
     async def get(self, pipeline_name: str, include_yaml: bool = True) -> DeepsetPipeline:
         """Fetch a single pipeline by its name.

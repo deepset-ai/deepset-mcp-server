@@ -21,7 +21,6 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetStreamEvent,
     ExceptionInfo,
     LogLevel,
-    PipelineList,
     PipelineLog,
     PipelineLogList,
     PipelineOperationWithErrors,
@@ -30,7 +29,7 @@ from deepset_mcp.api.pipeline.models import (
     PipelineValidationResultWithYaml,
     ValidationError,
 )
-from deepset_mcp.api.shared_models import DeepsetUser, NoContentResponse
+from deepset_mcp.api.shared_models import DeepsetUser, NoContentResponse, PaginatedResponse
 
 # Adjust the import path below to match your project structure
 from deepset_mcp.tools.pipeline import (
@@ -84,11 +83,15 @@ class FakePipelineResource:
         self._search_exception = search_exception
         self._list_exception = list_exception
 
-    async def list(self, page_number: int = 1, limit: int = 10) -> PipelineList:
+    async def list(
+        self, limit: int = 10, after: str | None = None, before: str | None = None
+    ) -> PaginatedResponse[DeepsetPipeline]:
         if self._list_exception:
             raise self._list_exception
         if self._list_response is not None:
-            return PipelineList(data=self._list_response, has_more=False, total=len(self._list_response))
+            return PaginatedResponse[DeepsetPipeline](
+                data=self._list_response, has_more=False, total=len(self._list_response)
+            )
         raise NotImplementedError
 
     async def get(self, pipeline_name: str, include_yaml: bool = True) -> DeepsetPipeline:
@@ -222,7 +225,7 @@ async def test_list_pipelines_returns_pipeline_list() -> None:
     resource = FakePipelineResource(list_response=[pipeline1, pipeline2])
     client = FakeClient(resource)
     result = await list_pipelines(client=client, workspace="ws1")
-    assert isinstance(result, PipelineList)
+    assert isinstance(result, PaginatedResponse)
     assert len(result.data) == 2
     assert result.data[0].name == "pipeline1"
     assert result.data[1].name == "pipeline2"

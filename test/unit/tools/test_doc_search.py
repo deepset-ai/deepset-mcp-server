@@ -14,12 +14,11 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetSearchResponse,
     DeepsetStreamEvent,
     LogLevel,
-    PipelineList,
     PipelineLogList,
     PipelineValidationResult,
 )
 from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
-from deepset_mcp.api.shared_models import NoContentResponse
+from deepset_mcp.api.shared_models import NoContentResponse, PaginatedResponse
 from deepset_mcp.tools.doc_search import search_docs
 from test.unit.conftest import BaseFakeClient
 
@@ -72,7 +71,9 @@ class FakeDocsPipelineResource(PipelineResourceProtocol):
     async def validate(self, yaml_config: str) -> PipelineValidationResult:
         raise NotImplementedError
 
-    async def list(self, page_number: int = 1, limit: int = 10) -> PipelineList:
+    async def list(
+        self, limit: int = 10, after: str | None = None, before: str | None = None
+    ) -> PaginatedResponse[DeepsetPipeline]:
         raise NotImplementedError
 
     async def create(self, name: str, yaml_config: str) -> NoContentResponse:

@@ -216,14 +216,6 @@ class DeepsetStreamEvent(BaseModel):
     error: str | None = None
 
 
-class PipelineList(BaseModel):
-    """Response model for listing pipelines."""
-
-    data: list[DeepsetPipeline]
-    has_more: bool
-    total: int
-
-
 class PipelineValidationResultWithYaml(BaseModel):
     """Model for pipeline validation result that includes the original YAML."""
 
