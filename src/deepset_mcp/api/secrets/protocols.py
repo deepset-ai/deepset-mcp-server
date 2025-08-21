@@ -4,8 +4,8 @@
 
 from typing import Protocol
 
-from deepset_mcp.api.secrets.models import Secret, SecretList
-from deepset_mcp.api.shared_models import NoContentResponse
+from deepset_mcp.api.secrets.models import Secret
+from deepset_mcp.api.shared_models import NoContentResponse, PaginatedResponse
 
 
 class SecretResourceProtocol(Protocol):
@@ -16,7 +16,8 @@ class SecretResourceProtocol(Protocol):
         limit: int = 10,
         field: str = "created_at",
         order: str = "DESC",
-    ) -> SecretList:
+        after: str | None = None,
+    ) -> PaginatedResponse[Secret]:
         """List secrets with pagination."""
         ...
 

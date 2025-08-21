@@ -9,9 +9,9 @@ import pytest
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.integrations.models import Integration, IntegrationList, IntegrationProvider
 from deepset_mcp.api.integrations.protocols import IntegrationResourceProtocol
-from deepset_mcp.api.secrets.models import Secret, SecretList
+from deepset_mcp.api.secrets.models import Secret
 from deepset_mcp.api.secrets.protocols import SecretResourceProtocol
-from deepset_mcp.api.shared_models import NoContentResponse
+from deepset_mcp.api.shared_models import NoContentResponse, PaginatedResponse
 from deepset_mcp.tools.secrets import EnvironmentSecret, EnvironmentSecretList, get_secret, list_secrets
 from test.unit.conftest import BaseFakeClient
 
@@ -19,7 +19,7 @@ from test.unit.conftest import BaseFakeClient
 class FakeSecretResource(SecretResourceProtocol):
     def __init__(
         self,
-        list_response: SecretList | None = None,
+        list_response: PaginatedResponse[Secret] | None = None,
         get_response: Secret | None = None,
         list_exception: Exception | None = None,
         get_exception: Exception | None = None,
@@ -31,11 +31,17 @@ class FakeSecretResource(SecretResourceProtocol):
         self.get_call_count = 0
         self.last_secret_id: str | None = None
 
-    async def list(self, limit: int = 10, field: str = "created_at", order: str = "DESC") -> SecretList:
+    async def list(
+        self,
+        limit: int = 10,
+        field: str = "created_at",
+        order: str = "DESC",
+        after: str | None = None,
+    ) -> PaginatedResponse[Secret]:
         if self.list_exception:
             raise self.list_exception
         if self.list_response is None:
-            return SecretList(data=[], has_more=False, total=0)
+            return PaginatedResponse[Secret](data=[], has_more=False, total=0)
         return self.list_response
 
     async def get(self, secret_id: str) -> Secret:
@@ -103,7 +109,7 @@ class FakeClient(BaseFakeClient):
 async def test_list_secrets_and_integrations() -> None:
     """Test listing secrets and integrations successfully."""
     secrets_data = [Secret(name="api-key", secret_id="secret-1")]
-    secret_list = SecretList(data=secrets_data, has_more=False, total=1)
+    secret_list = PaginatedResponse[Secret](data=secrets_data, has_more=False, total=1)
 
     integration_id = uuid.uuid4()
     integrations_data = [
@@ -146,7 +152,7 @@ async def test_list_secrets_only() -> None:
         Secret(name="api-key", secret_id="secret-1"),
         Secret(name="db-pass", secret_id="secret-2"),
     ]
-    secret_list = SecretList(data=secrets_data, has_more=True, total=5)
+    secret_list = PaginatedResponse[Secret](data=secrets_data, has_more=True, total=5)
     client = FakeClient(secret_resource=FakeSecretResource(list_response=secret_list))
 
     result = await list_secrets(client=client)

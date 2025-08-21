@@ -5,9 +5,9 @@
 import pytest
 
 from deepset_mcp.api.exceptions import ResourceNotFoundError
-from deepset_mcp.api.secrets.models import Secret, SecretList
+from deepset_mcp.api.secrets.models import Secret
 from deepset_mcp.api.secrets.resource import SecretResource
-from deepset_mcp.api.shared_models import NoContentResponse
+from deepset_mcp.api.shared_models import NoContentResponse, PaginatedResponse
 from deepset_mcp.api.transport import TransportResponse
 from test.unit.conftest import BaseFakeClient
 
@@ -34,7 +34,7 @@ async def test_list_secrets() -> None:
     resource = fake_client.secrets()
     result = await resource.list()
 
-    assert isinstance(result, SecretList)
+    assert isinstance(result, PaginatedResponse)
     assert len(result.data) == 2
     assert result.has_more is False
     assert result.total == 2
@@ -61,7 +61,7 @@ async def test_list_secrets_with_params() -> None:
     resource = fake_client.secrets()
     result = await resource.list(limit=1, field="name", order="ASC")
 
-    assert isinstance(result, SecretList)
+    assert isinstance(result, PaginatedResponse)
     assert len(result.data) == 1
     assert result.has_more is True
     assert result.total == 5
@@ -91,7 +91,7 @@ async def test_list_secrets_empty() -> None:
     resource = fake_client.secrets()
     result = await resource.list()
 
-    assert isinstance(result, SecretList)
+    assert isinstance(result, PaginatedResponse)
     assert len(result.data) == 0
     assert result.has_more is False
     assert result.total == 0
@@ -208,3 +208,78 @@ async def test_delete_secret() -> None:
     request = fake_client.requests[0]
     assert request["endpoint"] == "v2/secrets/secret-123"
     assert request["method"] == "DELETE"
+
+
+@pytest.mark.asyncio
+async def test_list_secrets_with_pagination() -> None:
+    """Test listing secrets with cursor-based pagination."""
+    mock_secrets_data = {
+        "data": [
+            {"name": "secret-3", "secret_id": "id-3"},
+            {"name": "secret-4", "secret_id": "id-4"},
+        ],
+        "has_more": False,
+        "total": 10,
+    }
+
+    fake_client = BaseFakeClient(responses={"v2/secrets": mock_secrets_data})
+
+    def secrets() -> SecretResource:
+        return SecretResource(client=fake_client)
+
+    fake_client.secrets = secrets  # type: ignore[method-assign]
+
+    resource = fake_client.secrets()
+    result = await resource.list(limit=5, after="some_cursor")
+
+    assert isinstance(result, PaginatedResponse)
+    assert len(result.data) == 2
+    assert result.data[0].secret_id == "id-3"
+    assert result.data[1].secret_id == "id-4"
+
+    # Verify request was made with correct parameters
+    # TODO: change to after when problem with deepset API pagination is fixed
+    assert len(fake_client.requests) == 1
+    request = fake_client.requests[0]
+    assert request["endpoint"] == "v2/secrets"
+    assert request["params"]["limit"] == "5"
+    assert request["params"]["before"] == "some_cursor"
+
+
+@pytest.mark.asyncio
+async def test_list_secrets_cursor_population() -> None:
+    """Test that cursors are properly populated from secret IDs."""
+    mock_secrets_data = {
+        "data": [
+            {"name": "secret-1", "secret_id": "id-1"},
+            {"name": "secret-2", "secret_id": "id-2"},
+        ],
+        "has_more": True,
+        "total": 5,
+    }
+
+    fake_client = BaseFakeClient(responses={"v2/secrets": mock_secrets_data})
+
+    def secrets() -> SecretResource:
+        return SecretResource(client=fake_client)
+
+    fake_client.secrets = secrets  # type: ignore[method-assign]
+
+    resource = fake_client.secrets()
+    result = await resource.list(limit=2)
+
+    # Verify cursor is populated from last element when has_more=True
+    assert result.next_cursor == "id-2"  # Last element's secret_id
+    assert result.has_more is True
+
+    # Test single item without more data
+    mock_single_data = {
+        "data": [{"name": "secret-1", "secret_id": "id-1"}],
+        "has_more": False,
+        "total": 1,
+    }
+
+    fake_client.responses = {"v2/secrets": mock_single_data}
+    single_result = await resource.list(limit=10)
+    assert single_result.next_cursor is None  # No cursor since has_more=False
+    assert single_result.has_more is False

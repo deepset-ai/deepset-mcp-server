@@ -23,9 +23,12 @@ class EnvironmentSecretList(BaseModel):
     data: list[EnvironmentSecret]
     has_more: bool
     total: int
+    next_cursor: str | None = None
 
 
-async def list_secrets(*, client: AsyncClientProtocol, limit: int = 10) -> EnvironmentSecretList | str:
+async def list_secrets(
+    *, client: AsyncClientProtocol, limit: int = 10, after: str | None = None
+) -> EnvironmentSecretList | str:
     """Lists all secrets available in the user's deepset organization.
 
     Use this tool to retrieve a list of secrets with their names and IDs.
@@ -33,29 +36,35 @@ async def list_secrets(*, client: AsyncClientProtocol, limit: int = 10) -> Envir
 
     :param client: The deepset API client
     :param limit: Maximum number of secrets to return (default: 10)
+    :param after: The cursor to fetch the next page of results
 
     :returns: List of secrets or error message
     """
     try:
-        secrets_list = await client.secrets().list(limit=limit)
-        integrations_list = await client.integrations().list()
+        secrets_list = await client.secrets().list(limit=limit, after=after)
 
         env_secrets = [EnvironmentSecret(name=secret.name, id=secret.secret_id) for secret in secrets_list.data]
-        for integration in integrations_list.integrations:
-            env_vars = TOKEN_DOMAIN_MAPPING.get(integration.provider_domain, [])
-            for env_var in env_vars:
-                env_secrets.append(
-                    EnvironmentSecret(
-                        name=env_var,
-                        id=str(integration.model_registry_token_id),
-                        invalid=integration.invalid,
+
+        # Only fetch integrations if no cursor is provided (first page)
+        # This optimizes performance by skipping the integrations call for subsequent pages
+        if after is None:
+            integrations_list = await client.integrations().list()
+            for integration in integrations_list.integrations:
+                env_vars = TOKEN_DOMAIN_MAPPING.get(integration.provider_domain, [])
+                for env_var in env_vars:
+                    env_secrets.append(
+                        EnvironmentSecret(
+                            name=env_var,
+                            id=str(integration.model_registry_token_id),
+                            invalid=integration.invalid,
+                        )
                     )
-                )
 
         return EnvironmentSecretList(
             data=env_secrets,
             has_more=secrets_list.has_more,
             total=len(env_secrets),
+            next_cursor=secrets_list.next_cursor,
         )
     except ResourceNotFoundError as e:
         return f"Error: {str(e)}"

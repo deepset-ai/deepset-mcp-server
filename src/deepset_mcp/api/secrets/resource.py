@@ -6,9 +6,9 @@ from typing import Any
 
 from deepset_mcp.api.exceptions import ResourceNotFoundError
 from deepset_mcp.api.protocols import AsyncClientProtocol
-from deepset_mcp.api.secrets.models import Secret, SecretList
+from deepset_mcp.api.secrets.models import Secret
 from deepset_mcp.api.secrets.protocols import SecretResourceProtocol
-from deepset_mcp.api.shared_models import NoContentResponse
+from deepset_mcp.api.shared_models import NoContentResponse, PaginatedResponse
 from deepset_mcp.api.transport import raise_for_status
 
 
@@ -27,26 +27,51 @@ class SecretResource(SecretResourceProtocol):
         limit: int = 10,
         field: str = "created_at",
         order: str = "DESC",
-    ) -> SecretList:
+        after: str | None = None,
+    ) -> PaginatedResponse[Secret]:
         """List secrets with pagination.
+
+        The returned object can be iterated over to fetch subsequent pages.
 
         :param limit: Maximum number of secrets to return.
         :param field: Field to sort by.
         :param order: Sort order (ASC or DESC).
+        :param after: The cursor to fetch the next page of results.
 
-        :returns: List of secrets with pagination info.
+        :returns: A `PaginatedResponse` object containing the first page of secrets.
         """
-        params = {
+        # 1. Prepare arguments for the initial API call
+        # TODO: Pagination in the deepset API is currently implemented in an unintuitive way.
+        # TODO: The cursor is always time based (created_at) and after signifies secrets older than the current cursor
+        # TODO: while 'before' signals secrets younger than the current cursor.
+        # TODO: This is applied irrespective of any sort (e.g. name) that would conflict with this approach.
+        # TODO: Change this to 'after' once the behaviour is fixed on the deepset API
+        request_params = {
             "limit": str(limit),
             "field": field,
             "order": order,
+            "before": after,
         }
+        request_params = {k: v for k, v in request_params.items() if v is not None}
 
+        # 2. Make the first API call using a private, stateless method
+        page = await self._list_api_call(**request_params)
+
+        # 3. Inject the logic needed for subsequent fetches into the response object
+        page._inject_paginator(
+            fetch_func=self._list_api_call,
+            # Base args for the *next* fetch don't include initial cursors
+            base_args={"limit": str(limit), "field": field, "order": order},
+        )
+        return page
+
+    async def _list_api_call(self, **kwargs: Any) -> PaginatedResponse[Secret]:
+        """A private, stateless method that performs the raw API call."""
         resp = await self._client.request(
             endpoint="v2/secrets",
             method="GET",
             response_type=dict[str, Any],
-            params=params,
+            params=kwargs,
         )
 
         raise_for_status(resp)
@@ -54,7 +79,7 @@ class SecretResource(SecretResourceProtocol):
         if resp.json is None:
             raise ResourceNotFoundError("Failed to retrieve secrets.")
 
-        return SecretList(**resp.json)
+        return PaginatedResponse[Secret].create_with_cursor_field(resp.json, "secret_id")
 
     async def create(self, name: str, secret: str) -> NoContentResponse:
         """Create a new secret.
