@@ -17,14 +17,25 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
     - uses: actions/checkout@v5
+
     - uses: actions/setup-python@v5
       with:
-        python-version: '3.12'
-    - run: pip install mkdocs mkdocs-material mkdocstrings[python]
-    - run: mkdocs build
+        python-version: '3.11'
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+
+    - name: Install project and docs dependencies
+      run: make install
+
+    - name: Build documentation
+      run: uv run mkdocs build
+
     - uses: actions/configure-pages@v5
+
     - uses: actions/upload-pages-artifact@v3
       with:
         path: ./site
+
     - id: deployment
       uses: actions/deploy-pages@v4
