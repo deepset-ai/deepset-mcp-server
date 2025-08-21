@@ -6,9 +6,9 @@ import pytest
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.secrets.models import Secret, SecretList
+from deepset_mcp.api.secrets.models import Secret
 from deepset_mcp.api.secrets.resource import SecretResource
-from deepset_mcp.api.shared_models import NoContentResponse
+from deepset_mcp.api.shared_models import NoContentResponse, PaginatedResponse
 
 pytestmark = pytest.mark.integration
 
@@ -47,7 +47,7 @@ async def test_create_and_get_secret(
         assert create_result.success is True
 
         # List secrets to find our created secret
-        secrets: SecretList = await secret_resource.list()
+        secrets: PaginatedResponse[Secret] = await secret_resource.list()
 
         # Find our secret in the list
         created_secret = None
@@ -96,7 +96,7 @@ async def test_list_secrets(secret_resource: SecretResource) -> None:
                     break
 
         # Test listing all secrets
-        all_secrets: SecretList = await secret_resource.list()
+        all_secrets: PaginatedResponse[Secret] = await secret_resource.list()
         assert len(all_secrets.data) >= 3
 
         # Verify our created secrets are in the list
@@ -105,12 +105,12 @@ async def test_list_secrets(secret_resource: SecretResource) -> None:
             assert name in secret_names
 
         # Test listing with limit
-        limited_secrets: SecretList = await secret_resource.list(limit=2)
+        limited_secrets: PaginatedResponse[Secret] = await secret_resource.list(limit=2)
         assert len(limited_secrets.data) <= 2
 
         # Test with different sort order
-        asc_secrets: SecretList = await secret_resource.list(order="ASC")
-        desc_secrets: SecretList = await secret_resource.list(order="DESC")
+        asc_secrets: PaginatedResponse[Secret] = await secret_resource.list(order="ASC")
+        desc_secrets: PaginatedResponse[Secret] = await secret_resource.list(order="DESC")
 
         # At least verify we got results (can't easily test order without knowing full dataset)
         assert len(asc_secrets.data) >= 0
@@ -139,7 +139,7 @@ async def test_delete_secret(
         await secret_resource.create(name=test_secret_name, secret=test_secret_value)
 
         # Find the created secret
-        secrets: SecretList = await secret_resource.list()
+        secrets: PaginatedResponse[Secret] = await secret_resource.list()
         secret_to_delete = None
         for secret in secrets.data:
             if secret.name == test_secret_name:
@@ -196,3 +196,59 @@ async def test_delete_nonexistent_secret(secret_resource: SecretResource) -> Non
         # This is acceptable behavior for DELETE operations
         # API might return 404 or other error codes for nonexistent resources
         pass
+
+
+@pytest.mark.asyncio
+async def test_pagination_iteration(
+    secret_resource: SecretResource,
+) -> None:
+    """Test iterating over multiple pages of secrets using the async iterator."""
+    # Create several test secrets
+    test_secrets = [
+        ("test-pagination-secret-1", "value-1"),
+        ("test-pagination-secret-2", "value-2"),
+        ("test-pagination-secret-3", "value-3"),
+        ("test-pagination-secret-4", "value-4"),
+        ("test-pagination-secret-5", "value-5"),
+    ]
+
+    created_secret_ids = []
+
+    try:
+        # Create test secrets
+        for name, value in test_secrets:
+            await secret_resource.create(name=name, secret=value)
+            # Find the created secret ID for cleanup
+            secrets = await secret_resource.list()
+            for secret in secrets.data:
+                if secret.name == name and secret.secret_id not in created_secret_ids:
+                    created_secret_ids.append(secret.secret_id)
+                    break
+
+        # Get the first page with a small limit to ensure pagination
+        paginator = await secret_resource.list(limit=2)
+
+        # Collect all secrets by iterating through pages
+        all_secrets = []
+        async for secret in paginator:
+            all_secrets.append(secret)
+
+        # Verify we got at least our created secrets (might have more from other tests)
+        assert len(all_secrets) >= 5
+
+        # Verify all secrets are Secret instances
+        for secret in all_secrets:
+            assert isinstance(secret, Secret)
+
+        # Verify our created secrets are in the results
+        retrieved_names = [s.name for s in all_secrets]
+        for name, _ in test_secrets:
+            assert name in retrieved_names
+
+    finally:
+        # Clean up created secrets
+        for secret_id in created_secret_ids:
+            try:
+                await secret_resource.delete(secret_id)
+            except Exception as e:
+                print(f"Failed to delete test secret {secret_id}: {e}")

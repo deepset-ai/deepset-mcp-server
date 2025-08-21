@@ -10,11 +10,3 @@ class Secret(BaseModel):
 
     name: str
     secret_id: str
-
-
-class SecretList(BaseModel):
-    """Model representing a list of secrets with pagination."""
-
-    data: list[Secret]
-    has_more: bool
-    total: int
