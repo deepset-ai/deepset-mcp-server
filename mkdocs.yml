@@ -1,0 +1,20 @@
+site_name: deepset MCP Documentation
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.expand
+    - search.suggest
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: sphinx  # or numpy/sphinx
+            show_source: false
+
+nav:
+  - Home: index.md
+  - API Reference: reference.md
