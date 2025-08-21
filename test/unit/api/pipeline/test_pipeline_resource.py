@@ -12,7 +12,6 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     LogLevel,
     PipelineLog,
-    PipelineLogList,
     PipelineServiceLevel,
     PipelineValidationResult,
 )
@@ -795,7 +794,7 @@ class TestPipelineResource:
         result = await resource.get_logs(pipeline_name="test-pipeline")
 
         # Verify results
-        assert isinstance(result, PipelineLogList)
+        assert isinstance(result, PaginatedResponse)
         assert len(result.data) == 2
         assert isinstance(result.data[0], PipelineLog)
         assert result.data[0].log_id == "log1"
@@ -1007,6 +1006,85 @@ class TestPipelineResource:
         # Verify extra fields are preserved
         assert "custom_field" in result.data[0].extra_fields
         assert result.data[0].extra_fields["custom_field"] == "custom_value"
+
+    @pytest.mark.asyncio
+    async def test_get_logs_with_pagination(self) -> None:
+        """Test getting logs with pagination parameters."""
+        # Create sample logs
+        sample_logs = [
+            create_sample_log(log_id="log1", message="First log entry"),
+            create_sample_log(log_id="log2", message="Second log entry"),
+        ]
+
+        # Create client with predefined response
+        client = DummyClient(
+            responses={
+                "test-workspace/pipelines/test-pipeline/logs": {
+                    "data": sample_logs,
+                    "has_more": True,
+                    "total": 10,
+                }
+            }
+        )
+
+        # Create resource and call get_logs method with pagination
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        result = await resource.get_logs(pipeline_name="test-pipeline", limit=5, after="some_cursor")
+
+        # Verify results
+        assert isinstance(result, PaginatedResponse)
+        assert len(result.data) == 2
+        assert result.data[0].log_id == "log1"
+        assert result.data[1].log_id == "log2"
+        assert result.has_more is True
+        assert result.total == 10
+
+        # Verify request
+        assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines/test-pipeline/logs"
+        # Logs should use 'after' parameter (not 'before' like pipelines)
+        assert client.requests[0]["params"] == {
+            "limit": 5,
+            "filter": "origin eq 'querypipeline'",
+            "after": "some_cursor",
+        }
+
+    @pytest.mark.asyncio
+    async def test_get_logs_pagination_with_level_filter(self) -> None:
+        """Test getting logs with both pagination and level filter."""
+        # Create sample error logs
+        sample_logs = [
+            create_sample_log(log_id="error1", message="First error", level="error"),
+            create_sample_log(log_id="error2", message="Second error", level="error"),
+        ]
+
+        # Create client with predefined response
+        client = DummyClient(
+            responses={
+                "test-workspace/pipelines/test-pipeline/logs": {
+                    "data": sample_logs,
+                    "has_more": False,
+                    "total": 2,
+                }
+            }
+        )
+
+        # Create resource and call get_logs method with level filter and pagination
+        resource = PipelineResource(client=client, workspace="test-workspace")
+        result = await resource.get_logs(
+            pipeline_name="test-pipeline", limit=10, level=LogLevel.ERROR, after="some_cursor"
+        )
+
+        # Verify results
+        assert len(result.data) == 2
+        assert all(log.level == "error" for log in result.data)
+
+        # Verify request with both level filter and cursor
+        expected_params = {
+            "limit": 10,
+            "filter": "level eq 'error' and origin eq 'querypipeline'",
+            "after": "some_cursor",
+        }
+        assert client.requests[0]["params"] == expected_params
 
     @pytest.mark.asyncio
     async def test_deploy_pipeline_success(self) -> None:

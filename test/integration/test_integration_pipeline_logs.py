@@ -7,8 +7,9 @@ import asyncio
 import pytest
 
 from deepset_mcp.api.client import AsyncDeepsetClient
-from deepset_mcp.api.pipeline.models import DeepsetPipeline, PipelineLogList
+from deepset_mcp.api.pipeline.models import DeepsetPipeline
 from deepset_mcp.api.pipeline.resource import PipelineResource
+from deepset_mcp.api.shared_models import PaginatedResponse
 
 pytestmark = pytest.mark.integration
 
@@ -145,7 +146,7 @@ async def test_get_logs_for_deployed_pipeline(
     logs = await pipeline_resource.get_logs(pipeline_name=pipeline_name)
 
     # Verify the response structure
-    assert isinstance(logs, PipelineLogList)
+    assert isinstance(logs, PaginatedResponse)
     assert isinstance(logs.data, list)
     assert isinstance(logs.has_more, bool)
     assert isinstance(logs.total, int)
@@ -178,7 +179,7 @@ async def test_get_logs_for_non_deployed_pipeline(
     logs = await pipeline_resource.get_logs(pipeline_name=pipeline_name)
 
     # Should return a valid response structure even if empty
-    assert isinstance(logs, PipelineLogList)
+    assert isinstance(logs, PaginatedResponse)
     assert isinstance(logs.data, list)
     assert isinstance(logs.has_more, bool)
     assert isinstance(logs.total, int)
@@ -209,3 +210,73 @@ async def test_deployment_timeout_handling(
             timeout_seconds=1,  # Very short timeout
             poll_interval=1,
         )
+
+
+@pytest.mark.extra_slow
+@pytest.mark.asyncio
+async def test_get_logs_pagination(
+    pipeline_resource: PipelineResource,
+    simple_yaml_config: str,
+) -> None:
+    """
+    Test pagination functionality for pipeline logs.
+
+    This test:
+    1. Creates and deploys a pipeline
+    2. Waits for deployment and potentially some logs
+    3. Tests pagination by requesting logs with small limit
+    4. Verifies cursor-based pagination works correctly
+    """
+    pipeline_name = "test-logs-pagination-pipeline"
+
+    # Step 1: Create and deploy a pipeline
+    await pipeline_resource.create(pipeline_name=pipeline_name, yaml_config=simple_yaml_config)
+    deploy_result = await pipeline_resource.deploy(pipeline_name=pipeline_name)
+    assert deploy_result.valid is True, f"Pipeline deployment failed: {deploy_result.errors}"
+
+    # Step 2: Wait for the pipeline to be deployed
+    deployed_pipeline = await wait_for_pipeline_deployment(
+        pipeline_resource=pipeline_resource,
+        pipeline_name=pipeline_name,
+        timeout_seconds=300,  # 5 minutes timeout
+        poll_interval=15,  # Check every 15 seconds
+    )
+
+    assert deployed_pipeline.status == "DEPLOYED"
+
+    # Step 3: Get first page of logs with small limit to test pagination
+    first_page = await pipeline_resource.get_logs(pipeline_name=pipeline_name, limit=5)
+
+    # Verify the response structure
+    assert isinstance(first_page, PaginatedResponse)
+    assert isinstance(first_page.data, list)
+    assert isinstance(first_page.has_more, bool)
+    assert isinstance(first_page.total, int | type(None))
+
+    # Step 4: If there are more logs available, test cursor-based pagination
+    if first_page.has_more and first_page.next_cursor:
+        second_page = await pipeline_resource.get_logs(
+            pipeline_name=pipeline_name, limit=5, after=first_page.next_cursor
+        )
+
+        # Verify second page structure
+        assert isinstance(second_page, PaginatedResponse)
+        assert isinstance(second_page.data, list)
+
+        # Ensure we got different logs (no duplicates between pages)
+        first_page_log_ids = {log.log_id for log in first_page.data}
+        second_page_log_ids = {log.log_id for log in second_page.data}
+
+        # There should be no overlap between pages
+        assert first_page_log_ids.isdisjoint(second_page_log_ids), "Found duplicate logs across pages"
+
+    # Step 5: Test async iteration over all logs
+    all_logs_via_iteration = []
+    async for log in first_page:
+        all_logs_via_iteration.append(log)
+        # Limit to avoid infinite loops in case of issues
+        if len(all_logs_via_iteration) > 100:
+            break
+
+    # Should have at least the logs from the first page
+    assert len(all_logs_via_iteration) >= len(first_page.data)

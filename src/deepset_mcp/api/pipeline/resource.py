@@ -14,7 +14,7 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetSearchResponse,
     DeepsetStreamEvent,
     LogLevel,
-    PipelineLogList,
+    PipelineLog,
     PipelineValidationResult,
     ValidationError,
 )
@@ -215,36 +215,62 @@ class PipelineResource(PipelineResourceProtocol):
         pipeline_name: str,
         limit: int = 30,
         level: LogLevel | None = None,
-    ) -> PipelineLogList:
-        """Fetch logs for a specific pipeline.
+        after: str | None = None,
+    ) -> PaginatedResponse[PipelineLog]:
+        """Fetch logs for a specific pipeline and returns the first page of results.
+
+        The returned object can be iterated over to fetch subsequent pages.
 
         :param pipeline_name: Name of the pipeline to fetch logs for.
-        :param limit: Maximum number of log entries to return.
+        :param limit: Maximum number of log entries to return per page.
         :param level: Filter logs by level. If None, returns all levels.
-        :returns: A PipelineLogList containing the log entries.
+        :param after: The cursor to fetch the next page of results.
+        :returns: A `PaginatedResponse` object containing the first page of logs.
         """
-        params: dict[str, Any] = {
+        # 1. Prepare arguments for the initial API call
+        request_params = {
             "limit": limit,
             "filter": "origin eq 'querypipeline'",
         }
 
         # Add level filter if specified
         if level is not None:
-            params["filter"] = f"level eq '{level}' and origin eq 'querypipeline'"
+            request_params["filter"] = f"level eq '{level}' and origin eq 'querypipeline'"
 
+        # Add cursor if provided
+        if after is not None:
+            request_params["after"] = after
+
+        # Remove None values
+        request_params = {k: v for k, v in request_params.items() if v is not None}
+
+        # 2. Make the first API call using a private, stateless method
+        page = await self._get_logs_api_call(pipeline_name, **request_params)
+
+        # 3. Inject the logic needed for subsequent fetches into the response object
+        page._inject_paginator(
+            fetch_func=lambda **kwargs: self._get_logs_api_call(pipeline_name, **kwargs),
+            # Base args for the *next* fetch don't include initial cursors
+            base_args={"limit": limit, "filter": request_params["filter"]},
+            cursor_param="after",  # Logs use 'after' cursor, not 'before' like pipelines
+        )
+        return page
+
+    async def _get_logs_api_call(self, pipeline_name: str, **kwargs: Any) -> PaginatedResponse[PipelineLog]:
+        """A private, stateless method that performs the raw API call for logs."""
         resp = await self._client.request(
             endpoint=f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/{quote(pipeline_name, safe='')}/logs",
             method="GET",
-            params=params,
+            params=kwargs,
         )
 
         raise_for_status(resp)
 
         if resp.json is not None:
-            return PipelineLogList.model_validate(resp.json)
+            return PaginatedResponse[PipelineLog].create_with_cursor_field(resp.json, "logged_at")
         else:
-            # Return empty log list if no response
-            return PipelineLogList(data=[], has_more=False, total=0)
+            # Return empty paginated response if no JSON data
+            return PaginatedResponse[PipelineLog](data=[], has_more=False, total=0)
 
     async def deploy(self, pipeline_name: str) -> PipelineValidationResult:
         """Deploy a pipeline to production.

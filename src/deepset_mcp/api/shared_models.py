@@ -43,6 +43,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
     # --- Internal Paginator State (Defaults to None) ---
     _fetch_func: Callable[..., Coroutine[Any, Any, "PaginatedResponse[T]"]] | None = PrivateAttr(default=None)
     _base_args: dict[str, Any] | None = PrivateAttr(default=None)
+    _cursor_param: str = PrivateAttr(default="before")
 
     @model_validator(mode="before")
     @classmethod
@@ -72,7 +73,10 @@ class PaginatedResponse(BaseModel, Generic[T]):
         return cls.model_validate(data_copy)
 
     def _inject_paginator(
-        self, fetch_func: Callable[..., Awaitable["PaginatedResponse[T]"]], base_args: dict[str, Any]
+        self,
+        fetch_func: Callable[..., Awaitable["PaginatedResponse[T]"]],
+        base_args: dict[str, Any],
+        cursor_param: str = "before",
     ) -> None:
         """Injects the necessary components to make this object iterable."""
         # Convert Awaitable to Coroutine for typing compatibility
@@ -80,6 +84,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
             # This is a runtime check - mypy doesn't understand the callable compatibility
             self._fetch_func = fetch_func  # type: ignore
         self._base_args = {k: v for k, v in base_args.items() if v is not None}
+        self._cursor_param = cursor_param
 
     async def _get_next_page(self) -> "PaginatedResponse[T] | None":
         """Fetches the next page of results using the stored fetch function."""
@@ -97,10 +102,10 @@ class PaginatedResponse(BaseModel, Generic[T]):
         # TODO: while 'before' signals pipelines younger than the current cursor.
         # TODO: This is applied irrespective of any sort (e.g. name) that would conflict with this approach.
         # TODO: Change this to 'after' once the behaviour is fixed on the deepset API
-        args["before"] = self.next_cursor
+        args[self._cursor_param] = self.next_cursor
 
         next_page = await self._fetch_func(**args)
-        next_page._inject_paginator(self._fetch_func, self._base_args)
+        next_page._inject_paginator(self._fetch_func, self._base_args, self._cursor_param)
         return next_page
 
     async def items(self) -> AsyncIterator[T]:
