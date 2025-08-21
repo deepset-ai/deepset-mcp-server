@@ -2,14 +2,15 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from typing import Any
+
 import pytest
 
 from deepset_mcp.api.custom_components.models import (
     CustomComponentInstallation,
-    CustomComponentInstallationList,
 )
 from deepset_mcp.api.exceptions import UnexpectedAPIError
-from deepset_mcp.api.shared_models import DeepsetUser
+from deepset_mcp.api.shared_models import DeepsetUser, PaginatedResponse
 from deepset_mcp.tools.custom_components import (
     get_latest_custom_component_installation_logs,
     list_custom_component_installations,
@@ -20,7 +21,7 @@ from test.unit.conftest import BaseFakeClient
 class FakeCustomComponentsResource:
     def __init__(
         self,
-        installations_response: CustomComponentInstallationList | None = None,
+        installations_response: PaginatedResponse[CustomComponentInstallation] | None = None,
         latest_logs_response: str | None = None,
         exception: Exception | None = None,
     ):
@@ -29,8 +30,8 @@ class FakeCustomComponentsResource:
         self._exception = exception
 
     async def list_installations(
-        self, limit: int = 20, page_number: int = 1, field: str = "created_at", order: str = "DESC"
-    ) -> CustomComponentInstallationList:
+        self, limit: int = 20, after: str | None = None, field: str = "created_at", order: str = "DESC"
+    ) -> PaginatedResponse[CustomComponentInstallation]:
         if self._exception:
             raise self._exception
         if self._installations_response is not None:
@@ -84,7 +85,7 @@ class FakeClient(BaseFakeClient):
 @pytest.mark.asyncio
 async def test_list_custom_component_installations() -> None:
     """Test listing custom component installations."""
-    mock_installations = CustomComponentInstallationList(
+    mock_installations = PaginatedResponse[CustomComponentInstallation](
         data=[
             CustomComponentInstallation(
                 custom_component_id="comp_123",
@@ -134,7 +135,7 @@ async def test_list_custom_component_installations() -> None:
 
     result = await list_custom_component_installations(client=client, workspace="test-workspace")
 
-    assert isinstance(result, CustomComponentInstallationList)
+    assert isinstance(result, PaginatedResponse)
     assert len(result.data) == 2
     assert result.total == 2
     assert result.has_more is False
@@ -168,7 +169,7 @@ async def test_list_custom_component_installations() -> None:
 @pytest.mark.asyncio
 async def test_list_custom_component_installations_empty() -> None:
     """Test listing custom component installations when none exist."""
-    mock_installations = CustomComponentInstallationList(
+    mock_installations = PaginatedResponse[CustomComponentInstallation](
         data=[],
         total=0,
         has_more=False,
@@ -183,7 +184,7 @@ async def test_list_custom_component_installations_empty() -> None:
 
     result = await list_custom_component_installations(client=client, workspace="test-workspace")
 
-    assert isinstance(result, CustomComponentInstallationList)
+    assert isinstance(result, PaginatedResponse)
     assert len(result.data) == 0
     assert result.total == 0
     assert result.has_more is False
@@ -192,7 +193,7 @@ async def test_list_custom_component_installations_empty() -> None:
 @pytest.mark.asyncio
 async def test_list_custom_component_installations_user_fetch_error() -> None:
     """Test listing custom component installations when user fetch fails."""
-    mock_installations = CustomComponentInstallationList(
+    mock_installations = PaginatedResponse[CustomComponentInstallation](
         data=[
             CustomComponentInstallation(
                 custom_component_id="comp_123",
@@ -216,7 +217,7 @@ async def test_list_custom_component_installations_user_fetch_error() -> None:
 
     result = await list_custom_component_installations(client=client, workspace="test-workspace")
 
-    assert isinstance(result, CustomComponentInstallationList)
+    assert isinstance(result, PaginatedResponse)
     assert len(result.data) == 1
     assert result.data[0].created_by_user_id == "user_unknown"
     assert result.data[0].user_info is None  # User fetch failed, so user_info should be None
@@ -271,3 +272,62 @@ async def test_get_latest_custom_component_installation_logs_api_error() -> None
 
     result = await get_latest_custom_component_installation_logs(client=client, workspace="test-workspace")
     assert result == "Failed to retrieve latest installation logs: API Error (Status Code: 500)"
+
+
+@pytest.mark.asyncio
+async def test_list_custom_component_installations_with_pagination_params() -> None:
+    """Test listing custom component installations with pagination parameters."""
+    mock_installations = PaginatedResponse[CustomComponentInstallation](
+        data=[
+            CustomComponentInstallation(
+                custom_component_id="comp_123",
+                status="installed",
+                version="1.0.0",
+                created_by_user_id="user_123",
+                organization_id="org-123",
+                logs=[{"level": "INFO", "msg": "Installation complete"}],
+            )
+        ],
+        total=1,
+        has_more=False,
+    )
+
+    # Create a custom resource that tracks the parameters passed
+    class TrackingCustomComponentsResource(FakeCustomComponentsResource):
+        def __init__(self, installations_response: PaginatedResponse[CustomComponentInstallation]) -> None:
+            super().__init__(installations_response=installations_response)
+            self.called_with: dict[str, Any] = {}
+
+        async def list_installations(
+            self, limit: int = 20, after: str | None = None, field: str = "created_at", order: str = "DESC"
+        ) -> PaginatedResponse[CustomComponentInstallation]:
+            self.called_with = {"limit": limit, "after": after, "field": field, "order": order}
+            return await super().list_installations(limit, after, field, order)
+
+    custom_components_resource = TrackingCustomComponentsResource(installations_response=mock_installations)
+    user_resource = FakeUserResource(
+        users={
+            "user_123": DeepsetUser(
+                user_id="user_123", given_name="John", family_name="Doe", email="john.doe@example.com"
+            )
+        }
+    )
+    client = FakeClient(
+        custom_components_resource=custom_components_resource,
+        user_resource=user_resource,
+    )
+
+    # Test with custom parameters
+    result = await list_custom_component_installations(
+        client=client, workspace="test-workspace", limit=50, after="cursor_123"
+    )
+
+    # Verify the parameters were passed correctly
+    assert custom_components_resource.called_with["limit"] == 50
+    assert custom_components_resource.called_with["after"] == "cursor_123"
+    assert custom_components_resource.called_with["field"] == "created_at"  # default
+    assert custom_components_resource.called_with["order"] == "DESC"  # default
+
+    # Verify the result
+    assert isinstance(result, PaginatedResponse)
+    assert len(result.data) == 1

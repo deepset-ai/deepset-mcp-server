@@ -4,10 +4,8 @@
 
 import pytest
 
-from deepset_mcp.api.custom_components.models import (
-    CustomComponentInstallationList,
-)
 from deepset_mcp.api.custom_components.resource import CustomComponentsResource
+from deepset_mcp.api.shared_models import PaginatedResponse
 from test.unit.conftest import BaseFakeClient
 
 
@@ -29,9 +27,7 @@ async def test_list_installations() -> None:
         "has_more": False,
     }
 
-    fake_client = BaseFakeClient(
-        responses={"v2/custom_components?limit=20&page_number=1&field=created_at&order=DESC": mock_data}
-    )
+    fake_client = BaseFakeClient(responses={"v2/custom_components?limit=20&field=created_at&order=DESC": mock_data})
 
     def custom_components(workspace: str) -> CustomComponentsResource:
         return CustomComponentsResource(client=fake_client)
@@ -41,7 +37,7 @@ async def test_list_installations() -> None:
     resource = fake_client.custom_components("test-workspace")
     result = await resource.list_installations()
 
-    assert isinstance(result, CustomComponentInstallationList)
+    assert isinstance(result, PaginatedResponse)
     assert len(result.data) == 1
     assert result.total == 1
     assert not result.has_more
@@ -63,9 +59,7 @@ async def test_list_installations_empty() -> None:
         "has_more": False,
     }
 
-    fake_client = BaseFakeClient(
-        responses={"v2/custom_components?limit=20&page_number=1&field=created_at&order=DESC": mock_data}
-    )
+    fake_client = BaseFakeClient(responses={"v2/custom_components?limit=20&field=created_at&order=DESC": mock_data})
 
     def custom_components(workspace: str) -> CustomComponentsResource:
         return CustomComponentsResource(client=fake_client)
@@ -75,7 +69,7 @@ async def test_list_installations_empty() -> None:
     resource = fake_client.custom_components("test-workspace")
     result = await resource.list_installations()
 
-    assert isinstance(result, CustomComponentInstallationList)
+    assert isinstance(result, PaginatedResponse)
     assert len(result.data) == 0
     assert result.total == 0
     assert not result.has_more
@@ -91,7 +85,7 @@ async def test_list_installations_with_params() -> None:
     }
 
     fake_client = BaseFakeClient(
-        responses={"v2/custom_components?limit=50&page_number=2&field=status&order=ASC": mock_data}
+        responses={"v2/custom_components?limit=50&field=status&order=ASC&before=cursor_123": mock_data}
     )
 
     def custom_components(workspace: str) -> CustomComponentsResource:
@@ -100,13 +94,13 @@ async def test_list_installations_with_params() -> None:
     fake_client.custom_components = custom_components  # type: ignore[method-assign]
 
     resource = fake_client.custom_components("test-workspace")
-    await resource.list_installations(limit=50, page_number=2, field="status", order="ASC")
+    await resource.list_installations(limit=50, after="cursor_123", field="status", order="ASC")
 
     # Check that the request was made with the correct parameters
     assert len(fake_client.requests) == 1
     request = fake_client.requests[0]
     assert "limit=50" in request["endpoint"]
-    assert "page_number=2" in request["endpoint"]
+    assert "before=cursor_123" in request["endpoint"]  # after becomes before due to API quirk
     assert "field=status" in request["endpoint"]
     assert "order=ASC" in request["endpoint"]
 

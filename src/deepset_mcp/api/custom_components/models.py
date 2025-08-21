@@ -19,11 +19,3 @@ class CustomComponentInstallation(BaseModel):
     logs: list[dict[str, Any]]
     organization_id: str
     user_info: DeepsetUser | None = None
-
-
-class CustomComponentInstallationList(BaseModel):
-    """Model representing a list of custom component installations."""
-
-    data: list[CustomComponentInstallation]
-    total: int
-    has_more: bool
