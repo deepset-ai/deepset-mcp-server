@@ -14,7 +14,7 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetSearchResponse,
     DeepsetStreamEvent,
     LogLevel,
-    PipelineLogList,
+    PipelineLog,
     PipelineValidationResult,
 )
 from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
@@ -92,7 +92,8 @@ class FakeDocsPipelineResource(PipelineResourceProtocol):
         pipeline_name: str,
         limit: int = 30,
         level: LogLevel | None = None,
-    ) -> PipelineLogList:
+        after: str | None = None,
+    ) -> PaginatedResponse[PipelineLog]:
         raise NotImplementedError
 
     async def deploy(self, pipeline_name: str) -> PipelineValidationResult:

@@ -11,7 +11,7 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     DeepsetSearchResponse,
     LogLevel,
-    PipelineLogList,
+    PipelineLog,
     PipelineOperationWithErrors,
     PipelineValidationResult,
     PipelineValidationResultWithYaml,
@@ -211,8 +211,14 @@ async def update_pipeline(
 
 
 async def get_pipeline_logs(
-    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str, limit: int = 30, level: LogLevel | None = None
-) -> PipelineLogList | str:
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    limit: int = 30,
+    level: LogLevel | None = None,
+    after: str | None = None,
+) -> PaginatedResponse[PipelineLog] | str:
     """Fetches logs for a specific pipeline.
 
     Retrieves log entries for the specified pipeline, with optional filtering by log level.
@@ -223,12 +229,13 @@ async def get_pipeline_logs(
     :param pipeline_name: Name of the pipeline to fetch logs for.
     :param limit: Maximum number of log entries to return (default: 30).
     :param level: Filter logs by level. If None, returns all levels.
+    :param after: The cursor to fetch the next page of results.
 
     :returns: Pipeline logs or error message.
     """
     try:
         return await client.pipelines(workspace=workspace).get_logs(
-            pipeline_name=pipeline_name, limit=limit, level=level
+            pipeline_name=pipeline_name, limit=limit, level=level, after=after
         )
     except ResourceNotFoundError:
         return f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}'."

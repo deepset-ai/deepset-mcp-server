@@ -22,13 +22,13 @@ from deepset_mcp.api.pipeline.models import (
     ExceptionInfo,
     LogLevel,
     PipelineLog,
-    PipelineLogList,
     PipelineOperationWithErrors,
     PipelineServiceLevel,
     PipelineValidationResult,
     PipelineValidationResultWithYaml,
     ValidationError,
 )
+from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
 from deepset_mcp.api.shared_models import DeepsetUser, NoContentResponse, PaginatedResponse
 
 # Adjust the import path below to match your project structure
@@ -54,7 +54,7 @@ class FakePipelineResource:
         validate_response: PipelineValidationResult | None = None,
         create_response: NoContentResponse | None = None,
         update_response: NoContentResponse | None = None,
-        logs_response: PipelineLogList | None = None,
+        logs_response: PaginatedResponse[PipelineLog] | None = None,
         deploy_response: PipelineValidationResult | None = None,
         search_response: DeepsetSearchResponse | None = None,
         get_exception: Exception | None = None,
@@ -141,7 +141,8 @@ class FakePipelineResource:
         pipeline_name: str,
         limit: int = 30,
         level: LogLevel | None = None,
-    ) -> PipelineLogList:
+        after: str | None = None,
+    ) -> PaginatedResponse[PipelineLog]:
         if self._logs_exception:
             raise self._logs_exception
         if self._logs_response is not None:
@@ -193,7 +194,7 @@ class FakeClient(BaseFakeClient):
         self._resource = resource
         super().__init__()
 
-    def pipelines(self, workspace: str) -> FakePipelineResource:
+    def pipelines(self, workspace: str) -> PipelineResourceProtocol:
         return self._resource
 
 
@@ -693,14 +694,14 @@ async def test_get_pipeline_logs_success() -> None:
         exceptions=[ExceptionInfo(type="bla", value="bla", trace=[])],
         extra_fields={"component": "reader"},
     )
-    logs = PipelineLogList(data=[log1, log2], has_more=False, total=2)
+    logs = PaginatedResponse[PipelineLog](data=[log1, log2], has_more=False, total=2)
 
     resource = FakePipelineResource(logs_response=logs)
     client = FakeClient(resource)
 
     result = await get_pipeline_logs(client=client, workspace="ws", pipeline_name="test-pipeline")
 
-    assert isinstance(result, PipelineLogList)
+    assert isinstance(result, PaginatedResponse)
     assert len(result.data) == 2
     assert result.data[0].message == "Pipeline started"
     assert result.data[1].message == "Error occurred"
@@ -710,28 +711,28 @@ async def test_get_pipeline_logs_success() -> None:
 
 @pytest.mark.asyncio
 async def test_get_pipeline_logs_empty() -> None:
-    logs = PipelineLogList(data=[], has_more=False, total=0)
+    logs = PaginatedResponse[PipelineLog](data=[], has_more=False, total=0)
 
     resource = FakePipelineResource(logs_response=logs)
     client = FakeClient(resource)
 
     result = await get_pipeline_logs(client=client, workspace="ws", pipeline_name="test-pipeline")
 
-    assert isinstance(result, PipelineLogList)
+    assert isinstance(result, PaginatedResponse)
     assert len(result.data) == 0
     assert result.total == 0
 
 
 @pytest.mark.asyncio
 async def test_get_pipeline_logs_with_level_filter() -> None:
-    logs = PipelineLogList(data=[], has_more=False, total=0)
+    logs = PaginatedResponse[PipelineLog](data=[], has_more=False, total=0)
 
     resource = FakePipelineResource(logs_response=logs)
     client = FakeClient(resource)
 
     result = await get_pipeline_logs(client=client, workspace="ws", pipeline_name="test-pipeline", level=LogLevel.ERROR)
 
-    assert isinstance(result, PipelineLogList)
+    assert isinstance(result, PaginatedResponse)
     assert len(result.data) == 0
 
 
@@ -763,6 +764,44 @@ async def test_get_pipeline_logs_unexpected_error() -> None:
     result = await get_pipeline_logs(client=client, workspace="ws", pipeline_name="test-pipeline")
 
     assert "Failed to fetch logs for pipeline 'test-pipeline': Internal server error" in result
+
+
+@pytest.mark.asyncio
+async def test_get_pipeline_logs_with_after_param() -> None:
+    """Test getting pipeline logs with after cursor parameter."""
+    log1 = PipelineLog(
+        log_id="log1",
+        message="First log entry",
+        logged_at=datetime(2023, 1, 1, 12, 0, 0),
+        level="info",
+        origin="querypipeline",
+        exceptions=None,
+        extra_fields={},
+    )
+    log2 = PipelineLog(
+        log_id="log2",
+        message="Second log entry",
+        logged_at=datetime(2023, 1, 1, 12, 1, 0),
+        level="info",
+        origin="querypipeline",
+        exceptions=None,
+        extra_fields={},
+    )
+    logs = PaginatedResponse[PipelineLog](data=[log1, log2], has_more=True, total=10)
+
+    resource = FakePipelineResource(logs_response=logs)
+    client = FakeClient(resource)
+
+    result = await get_pipeline_logs(
+        client=client, workspace="ws", pipeline_name="test-pipeline", limit=5, after="some_cursor"
+    )
+
+    assert isinstance(result, PaginatedResponse)
+    assert len(result.data) == 2
+    assert result.data[0].log_id == "log1"
+    assert result.data[1].log_id == "log2"
+    assert result.has_more is True
+    assert result.total == 10
 
 
 @pytest.mark.asyncio

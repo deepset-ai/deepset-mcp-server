@@ -10,7 +10,7 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetSearchResponse,
     DeepsetStreamEvent,
     LogLevel,
-    PipelineLogList,
+    PipelineLog,
     PipelineValidationResult,
 )
 from deepset_mcp.api.shared_models import NoContentResponse, PaginatedResponse
@@ -49,7 +49,8 @@ class PipelineResourceProtocol(Protocol):
         pipeline_name: str,
         limit: int = 30,
         level: LogLevel | None = None,
-    ) -> PipelineLogList:
+        after: str | None = None,
+    ) -> PaginatedResponse[PipelineLog]:
         """Fetch logs for a specific pipeline."""
         ...
 
