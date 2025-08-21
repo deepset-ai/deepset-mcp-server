@@ -76,6 +76,12 @@ types = [
     "pandas-stubs",
 ]
 
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocstrings[python]",
+]
+
 [project.optional-dependencies]
 redis = ["redis>=4.0.0"]
 
