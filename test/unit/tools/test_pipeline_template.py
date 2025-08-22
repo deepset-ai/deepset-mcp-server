@@ -11,13 +11,13 @@ import pytest
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.pipeline_template.models import (
     PipelineTemplate,
-    PipelineTemplateSearchResults,
     PipelineTemplateTag,
     PipelineType,
 )
 from deepset_mcp.api.shared_models import PaginatedResponse
 from deepset_mcp.tools.model_protocol import ModelProtocol
 from deepset_mcp.tools.pipeline_template import (
+    PipelineTemplateSearchResults,
     get_template,
     list_templates,
     search_templates,

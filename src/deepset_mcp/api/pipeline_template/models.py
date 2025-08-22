@@ -74,23 +74,3 @@ class PipelineTemplate(BaseModel):
             values["yaml_config"] = yaml_config
 
         return values
-
-
-class PipelineTemplateSearchResult(BaseModel):
-    """Model representing a search result for pipeline templates."""
-
-    template: PipelineTemplate
-    "Pipeline template that matched the search criteria"
-    similarity_score: float
-    "Relevance score indicating how well the template matches the search"
-
-
-class PipelineTemplateSearchResults(BaseModel):
-    """Response model for pipeline template search results."""
-
-    results: list[PipelineTemplateSearchResult]
-    "List of pipeline templates matching the search criteria"
-    query: str
-    "Original search query string"
-    total_found: int
-    "Total number of templates found matching the search criteria"
