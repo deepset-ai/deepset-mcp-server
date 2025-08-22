@@ -7,7 +7,7 @@
 import logging
 from typing import TYPE_CHECKING
 
-from deepset_mcp.api.integrations.models import Integration, IntegrationList, IntegrationProvider
+from deepset_mcp.api.integrations.models import Integration, IntegrationProvider
 from deepset_mcp.api.integrations.protocols import IntegrationResourceProtocol
 from deepset_mcp.api.transport import raise_for_status
 
@@ -27,10 +27,10 @@ class IntegrationResource(IntegrationResourceProtocol):
         """
         self._client = client
 
-    async def list(self) -> IntegrationList:
+    async def list(self) -> list[Integration]:
         """Retrieve all integrations.
 
-        :returns: IntegrationList containing all available integrations.
+        :returns: list containing all available integrations.
         """
         resp = await self._client.request(
             endpoint="v1/model_registry_tokens",
@@ -41,9 +41,9 @@ class IntegrationResource(IntegrationResourceProtocol):
 
         if resp.json is not None:
             integrations = [Integration.model_validate(item) for item in resp.json]
-            return IntegrationList(integrations=integrations)
+            return integrations
         else:
-            return IntegrationList(integrations=[])
+            return []
 
     async def get(self, provider: IntegrationProvider) -> Integration:
         """Retrieve a specific integration by provider.

@@ -9,7 +9,7 @@ from uuid import UUID
 import pytest
 
 from deepset_mcp.api.exceptions import DeepsetAPIError, ResourceNotFoundError
-from deepset_mcp.api.integrations.models import Integration, IntegrationList, IntegrationProvider
+from deepset_mcp.api.integrations.models import Integration, IntegrationProvider
 from deepset_mcp.api.integrations.resource import IntegrationResource
 from deepset_mcp.api.transport import TransportResponse
 from test.unit.conftest import BaseFakeClient
@@ -50,18 +50,18 @@ class TestIntegrationResource:
         result = await client.integrations().list()
 
         # Assert
-        assert isinstance(result, IntegrationList)
+        assert isinstance(result, list)
         assert len(result) == 2
 
-        assert result.integrations[0].invalid is False
-        assert result.integrations[0].model_registry_token_id == UUID("3fa85f64-5717-4562-b3fc-2c963f66afa6")
-        assert result.integrations[0].provider == IntegrationProvider.AWS_BEDROCK
-        assert result.integrations[0].provider_domain == "us-east-1"
+        assert result[0].invalid is False
+        assert result[0].model_registry_token_id == UUID("3fa85f64-5717-4562-b3fc-2c963f66afa6")
+        assert result[0].provider == IntegrationProvider.AWS_BEDROCK
+        assert result[0].provider_domain == "us-east-1"
 
-        assert result.integrations[1].invalid is True
-        assert result.integrations[1].model_registry_token_id == UUID("4fa85f64-5717-4562-b3fc-2c963f66afa7")
-        assert result.integrations[1].provider == IntegrationProvider.OPENAI
-        assert result.integrations[1].provider_domain == "api.openai.com"
+        assert result[1].invalid is True
+        assert result[1].model_registry_token_id == UUID("4fa85f64-5717-4562-b3fc-2c963f66afa7")
+        assert result[1].provider == IntegrationProvider.OPENAI
+        assert result[1].provider_domain == "api.openai.com"
 
     async def test_list_integrations_empty_response(self) -> None:
         """Test listing integrations with empty response."""
@@ -72,9 +72,8 @@ class TestIntegrationResource:
         result = await client.integrations().list()
 
         # Assert
-        assert isinstance(result, IntegrationList)
+        assert isinstance(result, list)
         assert len(result) == 0
-        assert result.integrations == []
 
     async def test_list_integrations_none_response(self) -> None:
         """Test listing integrations with None response."""
@@ -87,9 +86,8 @@ class TestIntegrationResource:
         result = await client.integrations().list()
 
         # Assert
-        assert isinstance(result, IntegrationList)
+        assert isinstance(result, list)
         assert len(result) == 0
-        assert result.integrations == []
 
     async def test_list_integrations_api_error(self) -> None:
         """Test listing integrations with API error."""

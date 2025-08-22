@@ -42,17 +42,3 @@ class Integration(BaseModel):
     "The integration provider type (e.g., OpenAI, Azure, etc.)"
     provider_domain: str
     "Domain or endpoint URL for the integration provider"
-
-
-class IntegrationList(BaseModel):
-    """Model representing a list of integrations."""
-
-    integrations: list[Integration]
-    "List of available integrations"
-
-    def __len__(self) -> int:
-        """Return the length of the list.
-
-        :returns: Number of integrations.
-        """
-        return len(self.integrations)
