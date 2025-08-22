@@ -13,17 +13,24 @@ class EnvironmentSecret(BaseModel):
     """Model representing a secret or an integration."""
 
     name: str
+    "Human-readable name of the secret or integration"
     id: str
+    "Unique identifier for the secret or integration"
     invalid: bool | None = None
+    "Whether the secret or integration is invalid (None for secrets)"
 
 
 class EnvironmentSecretList(BaseModel):
     """Model representing a list of secrets and integrations."""
 
     data: list[EnvironmentSecret]
+    "List of secrets and integrations for the current page"
     has_more: bool
+    "Whether there are more items available beyond this page"
     total: int
+    "Total number of secrets and integrations"
     next_cursor: str | None = None
+    "Cursor for fetching the next page of results"
 
 
 async def list_secrets(

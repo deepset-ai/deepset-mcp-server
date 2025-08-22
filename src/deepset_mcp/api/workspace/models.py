@@ -14,14 +14,21 @@ class Workspace(BaseModel):
     """Model representing a workspace on the deepset platform."""
 
     name: str
+    "Human-readable name of the workspace"
     workspace_id: UUID
+    "Unique identifier for the workspace"
     languages: dict[str, Any]
+    "Supported languages and their configuration settings"
     default_idle_timeout_in_seconds: int
+    "Default timeout in seconds before workspace becomes idle"
 
 
 class WorkspaceList(BaseModel):
     """Model representing a list of workspaces."""
 
     data: list[Workspace]
+    "List of workspace objects for the current page"
     has_more: bool = False
+    "Whether there are more workspaces available beyond this page"
     total: int
+    "Total number of workspaces across all pages"

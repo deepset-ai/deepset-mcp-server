@@ -9,4 +9,6 @@ class Secret(BaseModel):
     """Model representing a secret in deepset."""
 
     name: str
+    "Human-readable name of the secret"
     secret_id: str
+    "Unique identifier for the secret"

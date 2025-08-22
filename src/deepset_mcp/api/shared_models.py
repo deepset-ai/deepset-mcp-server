@@ -12,16 +12,22 @@ class NoContentResponse(BaseModel):
     """Response model for an empty response."""
 
     success: bool = True
+    "Indicates whether the operation was successful"
     message: str = "No content"
+    "Human-readable message describing the response"
 
 
 class DeepsetUser(BaseModel):
     """Model representing a user on the deepset platform."""
 
     id: str = Field(alias="user_id")
+    "Unique identifier for the user"
     given_name: str | None = None
+    "User's given (first) name"
     family_name: str | None = None
+    "User's family (last) name"
     email: str | None = None
+    "User's email address"
 
 
 T = TypeVar("T")
@@ -36,9 +42,13 @@ class PaginatedResponse(BaseModel, Generic[T]):
 
     # --- Public Data Fields ---
     data: list[T]
+    "List of items for the current page"
     has_more: bool
+    "Whether there are more items available beyond this page"
     total: int | None = None
+    "Total number of items across all pages, if known"
     next_cursor: str | None = None
+    "Cursor for fetching the next page of results"
 
     # --- Internal Paginator State (Defaults to None) ---
     _fetch_func: Callable[..., Coroutine[Any, Any, "PaginatedResponse[T]"]] | None = PrivateAttr(default=None)

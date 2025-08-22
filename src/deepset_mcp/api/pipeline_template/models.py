@@ -20,22 +20,34 @@ class PipelineTemplateTag(BaseModel):
     """Model representing a tag on a pipeline template."""
 
     name: str
+    "Human-readable name of the tag"
     tag_id: UUID
+    "Unique identifier for the tag"
 
 
 class PipelineTemplate(BaseModel):
     """Model representing a pipeline template."""
 
     author: str
+    "Name of the template author or creator"
     best_for: list[str]
+    "List of use cases this template is best suited for"
     description: str
+    "Detailed description of the pipeline template"
     template_name: str = Field(alias="pipeline_name")
+    "Internal name identifier for the template"
     display_name: str = Field(alias="name")
+    "User-friendly display name for the template"
     pipeline_template_id: UUID = Field(alias="pipeline_template_id")
+    "Unique identifier for the pipeline template"
     potential_applications: list[str] = Field(alias="potential_applications")
+    "List of potential applications and scenarios for this template"
     yaml_config: str | None = None
+    "YAML configuration defining the pipeline structure"
     tags: list[PipelineTemplateTag]
+    "List of tags associated with the template for categorization"
     pipeline_type: PipelineType
+    "Type of pipeline (query or indexing)"
 
     @model_validator(mode="before")
     @classmethod
@@ -68,12 +80,17 @@ class PipelineTemplateSearchResult(BaseModel):
     """Model representing a search result for pipeline templates."""
 
     template: PipelineTemplate
+    "Pipeline template that matched the search criteria"
     similarity_score: float
+    "Relevance score indicating how well the template matches the search"
 
 
 class PipelineTemplateSearchResults(BaseModel):
     """Response model for pipeline template search results."""
 
     results: list[PipelineTemplateSearchResult]
+    "List of pipeline templates matching the search criteria"
     query: str
+    "Original search query string"
     total_found: int
+    "Total number of templates found matching the search criteria"

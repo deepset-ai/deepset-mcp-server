@@ -2,3 +2,6 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from .resource import HaystackServiceResource
+
+__all__ = ["HaystackServiceResource"]

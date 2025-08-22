@@ -29,7 +29,27 @@ T = TypeVar("T")
 
 
 class AsyncDeepsetClient(AsyncClientProtocol):
-    """Async Client for interacting with the deepset API."""
+    """Async Client for interacting with the deepset API.
+
+    This client provides asynchronous access to most deepset API endpoints
+    and resources through a convenient interface.
+
+    **Example usage:**
+
+    ```python
+    from deepset_mcp.api import AsyncDeepsetClient
+
+    async with AsyncDeepsetClient() as client:
+        pipes = await client.pipelines(workspace="example-workspace")
+        all_pipelines = await pipes.list()
+        example_pipeline = await pipes.get(pipeline_name="example-pipeline")
+        await pipes.create(pipeline_name="example-pipeline-v2", yaml_config="...")
+
+        indexes = await client.indexes(workspace="example-workspace")
+        all_indexes = await indexes.list()
+        example_index = await indexes.get(index_name="example-index")
+    ```
+    """
 
     def __init__(
         self,
@@ -38,19 +58,13 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         transport: TransportProtocol | None = None,
         transport_config: dict[str, Any] | None = None,
     ) -> None:
-        """
-        Initialize an instance of the AsyncDeepsetClient.
+        """Initialize an instance of the AsyncDeepsetClient.
 
-        Parameters
-        ----------
-        api_key : str, optional
-            API key or token. Falls back to DEEPSET_API_KEY env var.
-        base_url : str, optional
-            Base URL for the deepset API.
-        transport : TransportProtocol, optional
-            Custom transport implementation.
-        transport_config : dict, optional
-            Configuration for default transport (e.g. timeout).
+        :param api_key: API key or token. Falls back to DEEPSET_API_KEY env var
+        :param base_url: Base URL for the deepset API
+        :param transport: Custom transport implementation
+        :param transport_config: Configuration for default transport (e.g. timeout). All configuration parameters are
+            forwarded to httpx.AsyncClient.
         """
         self.api_key = api_key or os.environ.get("DEEPSET_API_KEY")
         if not self.api_key:
@@ -64,6 +78,73 @@ class AsyncDeepsetClient(AsyncClientProtocol):
                 api_key=self.api_key,
                 config=transport_config,
             )
+
+    def pipelines(self, workspace: str) -> PipelineResource:
+        """Resource to interact with pipelines in the specified workspace.
+
+        :param workspace: Workspace identifier
+        :returns: Pipeline resource instance
+        """
+        return PipelineResource(client=self, workspace=workspace)
+
+    def indexes(self, workspace: str) -> IndexResource:
+        """Resource to interact with indexes in the specified workspace.
+
+        :param workspace: Workspace identifier
+        :returns: Index resource instance
+        """
+        return IndexResource(client=self, workspace=workspace)
+
+    def pipeline_templates(self, workspace: str) -> PipelineTemplateResource:
+        """Resource to interact with pipeline templates in the specified workspace.
+
+        :param workspace: Workspace identifier
+        :returns: Pipeline template resource instance
+        """
+        return PipelineTemplateResource(client=self, workspace=workspace)
+
+    def haystack_service(self) -> HaystackServiceResource:
+        """Resource to interact with the Haystack service API.
+
+        :returns: Haystack service resource instance
+        """
+        return HaystackServiceResource(client=self)
+
+    def integrations(self) -> IntegrationResource:
+        """Resource to interact with integrations.
+
+        :returns: Integration resource instance
+        """
+        return IntegrationResource(client=self)
+
+    def custom_components(self, workspace: str) -> CustomComponentsResource:
+        """Resource to interact with custom components in the specified workspace.
+
+        :param workspace: Workspace identifier
+        :returns: Custom components resource instance
+        """
+        return CustomComponentsResource(client=self)
+
+    def secrets(self) -> SecretResource:
+        """Resource to interact with secrets.
+
+        :returns: Secret resource instance
+        """
+        return SecretResource(client=self)
+
+    def workspaces(self) -> WorkspaceResource:
+        """Resource to interact with workspaces.
+
+        :returns: Workspace resource instance
+        """
+        return WorkspaceResource(client=self)
+
+    def users(self) -> UserResource:
+        """Resource to interact with users.
+
+        :returns: User resource instance
+        """
+        return UserResource(client=self)
 
     @overload
     async def request(
@@ -102,31 +183,17 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         timeout: float | None | Literal["config"] = "config",
         **kwargs: Any,
     ) -> TransportResponse[Any]:
-        """
-        Make a regular (non-streaming) request to the deepset API.
+        """Make a regular (non-streaming) request to the deepset API.
 
-        Parameters
-        ----------
-        endpoint : str
-            API endpoint path
-        method : str, default="GET"
-            HTTP method
-        data : dict, optional
-            JSON data to send in request body
-        headers : dict, optional
-            Additional headers to include
-        response_type : type[T], optional
-            Expected response type for type checking
-        timeout : float | None | Literal["config"], optional
-            Request timeout in seconds. If "config", uses transport config timeout.
-            If None, disables timeout. If float, uses specific timeout.
-        **kwargs : Any
-            Additional arguments to pass to transport
-
-        Returns
-        -------
-        TransportResponse[T]
-            Response with parsed JSON if available
+        :param endpoint: API endpoint path
+        :param method: HTTP method
+        :param data: JSON data to send in request body
+        :param headers: Additional headers to include
+        :param response_type: Expected response type for type checking
+        :param timeout: Request timeout in seconds. If "config", uses transport config timeout.
+            If None, disables timeout. If float, uses specific timeout
+        :param kwargs: Additional arguments to pass to transport
+        :returns: Response with parsed JSON if available
         """
         if not endpoint.startswith("/"):
             endpoint = f"/{endpoint}"
@@ -163,41 +230,29 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         headers: dict[str, str] | None = None,
         **kwargs: Any,
     ) -> AbstractAsyncContextManager[StreamingResponse]:
-        """
-        Make a streaming request to the deepset API.
+        """Make a streaming request to the deepset API.
 
         Must be used as an async context manager to ensure proper cleanup.
 
-        Parameters
-        ----------
-        endpoint : str
-            API endpoint path
-        method : str, default="POST"
-            HTTP method (usually POST for streaming)
-        data : dict, optional
-            JSON data to send in request body
-        headers : dict, optional
-            Additional headers to include
-        **kwargs : Any
-            Additional arguments to pass to transport
+        Example::
 
-        Yields
-        ------
-        StreamingResponse
-            Response object with streaming capabilities
+            async with client.stream_request("/pipelines/search-stream", data={"query": "AI"}) as response:
+                if response.success:
+                    async for line in response.iter_lines():
+                        # Process each line of the stream
+                        data = json.loads(line)
+                        print(data)
+                else:
+                    # Handle error
+                    error_body = await response.read_body()
+                    print(f"Error {response.status_code}: {error_body}")
 
-        Examples
-        --------
-        async with client.stream_request("/pipelines/search-stream", data={"query": "AI"}) as response:
-            if response.success:
-                async for line in response.iter_lines():
-                    # Process each line of the stream
-                    data = json.loads(line)
-                    print(data)
-            else:
-                # Handle error
-                error_body = await response.read_body()
-                print(f"Error {response.status_code}: {error_body}")
+        :param endpoint: API endpoint path
+        :param method: HTTP method (usually POST for streaming)
+        :param data: JSON data to send in request body
+        :param headers: Additional headers to include
+        :param kwargs: Additional arguments to pass to transport
+        :returns: Response object with streaming capabilities
         """
 
         @asynccontextmanager
@@ -243,39 +298,3 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         """Exit the AsyncContextmanager and clean up resources."""
         await self.close()
         return False
-
-    def pipelines(self, workspace: str) -> PipelineResource:
-        """Resource to interact with pipelines in the specified workspace."""
-        return PipelineResource(client=self, workspace=workspace)
-
-    def haystack_service(self) -> HaystackServiceResource:
-        """Resource to interact with the Haystack service API."""
-        return HaystackServiceResource(client=self)
-
-    def pipeline_templates(self, workspace: str) -> PipelineTemplateResource:
-        """Resource to interact with pipeline templates in the specified workspace."""
-        return PipelineTemplateResource(client=self, workspace=workspace)
-
-    def indexes(self, workspace: str) -> IndexResource:
-        """Resource to interact with indexes in the specified workspace."""
-        return IndexResource(client=self, workspace=workspace)
-
-    def custom_components(self, workspace: str) -> CustomComponentsResource:
-        """Resource to interact with custom components in the specified workspace."""
-        return CustomComponentsResource(client=self)
-
-    def users(self) -> UserResource:
-        """Resource to interact with users."""
-        return UserResource(client=self)
-
-    def secrets(self) -> SecretResource:
-        """Resource to interact with secrets."""
-        return SecretResource(client=self)
-
-    def workspaces(self) -> WorkspaceResource:
-        """Resource to interact with workspaces."""
-        return WorkspaceResource(client=self)
-
-    def integrations(self) -> IntegrationResource:
-        """Resource to interact with integrations."""
-        return IntegrationResource(client=self)

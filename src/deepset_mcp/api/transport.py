@@ -187,17 +187,11 @@ class AsyncTransport:
         api_key: str,
         config: dict[str, Any] | None = None,
     ):
-        """
-        Initialize an instance of AsyncTransport.
+        """Initialize an instance of AsyncTransport.
 
-        Parameters
-        ----------
-        base_url : str
-            Base URL for the API
-        api_key : str
-            Bearer token for authentication
-        config : dict, optional
-            Configuration for httpx.AsyncClient, e.g., {'timeout': 10.0}
+        :param base_url: Base URL for the API
+        :param api_key: Bearer token for authentication
+        :param config: Configuration for httpx.AsyncClient, e.g., {'timeout': 10.0}
         """
         # We deepcopy the config so that we don't mutate it when used for subsequent initializations
         config = deepcopy(config) or {}
@@ -244,27 +238,15 @@ class AsyncTransport:
         timeout: float | None | Literal["config"] = "config",
         **kwargs: Any,
     ) -> TransportResponse[Any]:
-        """
-        Send a regular HTTP request and return the response.
+        """Send a regular HTTP request and return the response.
 
-        Parameters
-        ----------
-        method : str
-            HTTP method
-        url : str
-            URL endpoint
-        response_type : type[T], optional
-            Expected response type for type checking
-        timeout : float | None | Literal["config"], optional
-            Request timeout in seconds. If "config", uses transport config timeout.
-            If None, disables timeout. If float, uses specific timeout.
-        **kwargs : Any
-            Additional arguments to pass to httpx
-
-        Returns
-        -------
-        TransportResponse[T]
-            The response with parsed JSON if available
+        :param method: HTTP method
+        :param url: URL endpoint
+        :param response_type: Expected response type for type checking
+        :param timeout: Request timeout in seconds. If "config", uses transport config timeout.
+                       If None, disables timeout. If float, uses specific timeout.
+        :param kwargs: Additional arguments to pass to httpx
+        :returns: The response with parsed JSON if available
         """
         if timeout != "config":
             kwargs["timeout"] = timeout
@@ -300,32 +282,22 @@ class AsyncTransport:
         return TransportResponse(text=response.text, status_code=response.status_code, json=untyped_response)
 
     def stream(self, method: str, url: str, **kwargs: Any) -> AbstractAsyncContextManager[StreamingResponse]:
-        """
-        Open a streaming HTTP connection.
+        """Open a streaming HTTP connection.
 
-        Parameters
-        ----------
-        method : str
-            HTTP method
-        url : str
-            URL endpoint
-        **kwargs : Any
-            Additional arguments to pass to httpx.stream()
+        :param method: HTTP method
+        :param url: URL endpoint
+        :param kwargs: Additional arguments to pass to httpx.stream()
+        :yields: Response object with streaming capabilities
 
-        Yields
-        ------
-        StreamingResponse
-            Response object with streaming capabilities
+        .. code-block:: python
 
-        Examples
-        --------
-        async with transport.stream("POST", "/api/stream", json=data) as response:
-            if response.success:
-                async for line in response.iter_lines():
-                    process_line(line)
-            else:
-                error = await response.read_body()
-                handle_error(error)
+            async with transport.stream("POST", "/api/stream", json=data) as response:
+                if response.success:
+                    async for line in response.iter_lines():
+                        process_line(line)
+                else:
+                    error = await response.read_body()
+                    handle_error(error)
         """
 
         @asynccontextmanager
