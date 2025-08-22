@@ -13,16 +13,12 @@ This guide shows you how to authenticate and configure the AsyncDeepsetClient fo
 **Using environment variables (recommended):**
 
 ```python
-import asyncio
 from deepset_mcp.api import AsyncDeepsetClient
 
-async def main():
-    # Reads DEEPSET_API_KEY from environment
-    async with AsyncDeepsetClient() as client:
-        workspaces = await client.workspaces().list()
-        print(f"Available workspaces: {len(workspaces.data)}")
-
-asyncio.run(main())
+# Reads DEEPSET_API_KEY from environment
+async with AsyncDeepsetClient() as client:
+    workspaces = await client.workspaces().list()
+    print(f"Available workspaces: {len(workspaces)}")
 ```
 
 **Providing credentials directly:**
@@ -185,7 +181,7 @@ async with AsyncDeepsetClient() as client:
     
     # List all workspaces
     workspaces = await workspaces_client.list()
-    for workspace in workspaces.data:
+    for workspace in workspaces:
         print(f"Workspace: {workspace.name} (ID: {workspace.workspace_id})")
     
     # Use workspace-specific resources
@@ -380,6 +376,24 @@ async with AsyncDeepsetClient() as client:
     
     for log_entry in logs.data:
         print(f"[{log_entry.timestamp}] {log_entry.level}: {log_entry.message}")
+```
+
+### How to Use in Synchronous Environments
+
+This guide shows how to make API requests through the client in synchronous contexts.
+
+```python
+import asyncio
+from deepset_mcp.api import AsyncDeepsetClient
+
+client = AsyncDeepsetClient()
+pipelines = client.pipelines("my-workspace")
+my_pipeline = asyncio.run(pipelines.get("my-pipeline"))
+
+valid = asyncio.run(pipelines.validate(my_pipeline.yaml_config))
+
+if valid.valid:
+    print("The pipeline is valid!")
 ```
 
 
