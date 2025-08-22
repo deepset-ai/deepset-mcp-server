@@ -8,7 +8,7 @@ import pytest
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.shared_models import NoContentResponse
-from deepset_mcp.api.workspace.models import Workspace, WorkspaceList
+from deepset_mcp.api.workspace.models import Workspace
 from deepset_mcp.api.workspace.protocols import WorkspaceResourceProtocol
 from deepset_mcp.tools.workspace import create_workspace, get_workspace, list_workspaces
 from test.unit.conftest import BaseFakeClient
@@ -37,12 +37,12 @@ class FakeWorkspaceResource(WorkspaceResourceProtocol):
         self._create_exception = create_exception
         self._delete_exception = delete_exception
 
-    async def list(self) -> WorkspaceList:
+    async def list(self) -> list[Workspace]:
         """List all workspaces."""
         if self._list_exception:
             raise self._list_exception
         if self._list_response is not None:
-            return WorkspaceList(data=self._list_response, has_more=False, total=len(self._list_response))
+            return self._list_response
         raise NotImplementedError
 
     async def get(self, workspace_name: str) -> Workspace:
@@ -101,12 +101,10 @@ async def test_list_workspaces_returns_workspace_list() -> None:
 
     result = await list_workspaces(client=client)
 
-    assert isinstance(result, WorkspaceList)
-    assert len(result.data) == 2
-    assert result.data[0].name == "workspace1"
-    assert result.data[1].name == "workspace2"
-    assert result.total == 2
-    assert result.has_more is False
+    assert isinstance(result, list)
+    assert len(result) == 2
+    assert result[0].name == "workspace1"
+    assert result[1].name == "workspace2"
 
 
 @pytest.mark.asyncio
@@ -237,7 +235,5 @@ async def test_list_workspaces_empty_response() -> None:
 
     result = await list_workspaces(client=client)
 
-    assert isinstance(result, WorkspaceList)
-    assert len(result.data) == 0
-    assert result.total == 0
-    assert result.has_more is False
+    assert isinstance(result, list)
+    assert len(result) == 0

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from deepset_mcp.api.shared_models import NoContentResponse
 from deepset_mcp.api.transport import raise_for_status
-from deepset_mcp.api.workspace.models import Workspace, WorkspaceList
+from deepset_mcp.api.workspace.models import Workspace
 from deepset_mcp.api.workspace.protocols import WorkspaceResourceProtocol
 
 logger = logging.getLogger(__name__)
@@ -28,10 +28,10 @@ class WorkspaceResource(WorkspaceResourceProtocol):
         """
         self._client = client
 
-    async def list(self) -> WorkspaceList:
+    async def list(self) -> list[Workspace]:
         """List all workspaces.
 
-        :returns: A WorkspaceList containing all workspaces.
+        :returns: A list containing all workspaces.
         """
         resp = await self._client.request(
             endpoint="v1/workspaces",
@@ -42,13 +42,9 @@ class WorkspaceResource(WorkspaceResourceProtocol):
 
         if resp.json is not None and isinstance(resp.json, list):
             workspaces = [Workspace.model_validate(item) for item in resp.json]
-            return WorkspaceList(
-                data=workspaces,
-                has_more=False,
-                total=len(workspaces),
-            )
+            return workspaces
         else:
-            return WorkspaceList(data=[], has_more=False, total=0)
+            return []
 
     async def get(self, workspace_name: str) -> Workspace:
         """Get a specific workspace by name.

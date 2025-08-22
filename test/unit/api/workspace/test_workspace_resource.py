@@ -11,7 +11,7 @@ import pytest
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.shared_models import NoContentResponse
 from deepset_mcp.api.transport import TransportResponse
-from deepset_mcp.api.workspace.models import Workspace, WorkspaceList
+from deepset_mcp.api.workspace.models import Workspace
 from deepset_mcp.api.workspace.resource import WorkspaceResource
 from test.unit.conftest import BaseFakeClient
 
@@ -52,22 +52,20 @@ class TestWorkspaceResourceList:
         result = await resource.list()
 
         # Assert
-        assert isinstance(result, WorkspaceList)
-        assert len(result.data) == 2
-        assert result.total == 2
-        assert not result.has_more
+        assert isinstance(result, list)
+        assert len(result) == 2
 
         # Check first workspace
-        assert result.data[0].name == "copilot-testing"
-        assert result.data[0].workspace_id == UUID("76d361b5-a551-40e3-a5c9-fdbc20028021")
-        assert result.data[0].languages == {}
-        assert result.data[0].default_idle_timeout_in_seconds == 43200
+        assert result[0].name == "copilot-testing"
+        assert result[0].workspace_id == UUID("76d361b5-a551-40e3-a5c9-fdbc20028021")
+        assert result[0].languages == {}
+        assert result[0].default_idle_timeout_in_seconds == 43200
 
         # Check second workspace
-        assert result.data[1].name == "default"
-        assert result.data[1].workspace_id == UUID("91ee7798-004d-4808-906a-1777ea262d1c")
-        assert result.data[1].languages == {}
-        assert result.data[1].default_idle_timeout_in_seconds == 43200
+        assert result[1].name == "default"
+        assert result[1].workspace_id == UUID("91ee7798-004d-4808-906a-1777ea262d1c")
+        assert result[1].languages == {}
+        assert result[1].default_idle_timeout_in_seconds == 43200
 
         # Verify request was made correctly
         assert len(client.requests) == 1
@@ -93,10 +91,8 @@ class TestWorkspaceResourceList:
         result = await resource.list()
 
         # Assert
-        assert isinstance(result, WorkspaceList)
-        assert len(result.data) == 0
-        assert result.total == 0
-        assert not result.has_more
+        assert isinstance(result, list)
+        assert len(result) == 0
 
     @pytest.mark.asyncio
     async def test_list_null_response(self) -> None:
@@ -117,10 +113,8 @@ class TestWorkspaceResourceList:
         result = await resource.list()
 
         # Assert
-        assert isinstance(result, WorkspaceList)
-        assert len(result.data) == 0
-        assert result.total == 0
-        assert not result.has_more
+        assert isinstance(result, list)
+        assert len(result) == 0
 
     @pytest.mark.asyncio
     async def test_list_error_response(self) -> None:
