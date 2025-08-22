@@ -1,4 +1,4 @@
-# API Reference
+# API SDK
 
 ## Main Client
 ::: deepset_mcp.api.client
