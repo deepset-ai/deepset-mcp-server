@@ -22,10 +22,8 @@ from deepset_mcp.api.pipeline.models import (
     ExceptionInfo,
     LogLevel,
     PipelineLog,
-    PipelineOperationWithErrors,
     PipelineServiceLevel,
     PipelineValidationResult,
-    PipelineValidationResultWithYaml,
     ValidationError,
 )
 from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
@@ -33,6 +31,8 @@ from deepset_mcp.api.shared_models import DeepsetUser, NoContentResponse, Pagina
 
 # Adjust the import path below to match your project structure
 from deepset_mcp.tools.pipeline import (
+    PipelineOperationWithErrors,
+    PipelineValidationResultWithYaml,
     create_pipeline,
     deploy_pipeline,
     get_pipeline,
