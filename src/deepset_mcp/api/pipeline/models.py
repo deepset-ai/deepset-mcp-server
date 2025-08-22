@@ -136,17 +136,6 @@ class PipelineLog(BaseModel):
     "Additional metadata fields associated with the log entry"
 
 
-class PipelineLogList(BaseModel):
-    """Model representing a paginated list of pipeline logs."""
-
-    data: list[PipelineLog]
-    "List of pipeline log entries for the current page"
-    has_more: bool
-    "Whether there are more log entries available beyond this page"
-    total: int
-    "Total number of log entries across all pages"
-
-
 # Search-related models
 
 
