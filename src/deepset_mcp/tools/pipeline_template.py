@@ -3,12 +3,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import numpy as np
+from pydantic import BaseModel
 
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.pipeline_template.models import (
     PipelineTemplate,
-    PipelineTemplateSearchResult,
-    PipelineTemplateSearchResults,
     PipelineType,
 )
 from deepset_mcp.api.protocols import AsyncClientProtocol
@@ -59,6 +58,26 @@ async def get_template(*, client: AsyncClientProtocol, workspace: str, template_
         return f"There is no pipeline template named '{template_name}' in workspace '{workspace}'."
     except UnexpectedAPIError as e:
         return f"Failed to fetch pipeline template '{template_name}': {e}"
+
+
+class PipelineTemplateSearchResult(BaseModel):
+    """Model representing a search result for pipeline templates."""
+
+    template: PipelineTemplate
+    "Pipeline template that matched the search criteria"
+    similarity_score: float
+    "Relevance score indicating how well the template matches the search"
+
+
+class PipelineTemplateSearchResults(BaseModel):
+    """Response model for pipeline template search results."""
+
+    results: list[PipelineTemplateSearchResult]
+    "List of pipeline templates matching the search criteria"
+    query: str
+    "Original search query string"
+    total_found: int
+    "Total number of templates found matching the search criteria"
 
 
 async def search_templates(
