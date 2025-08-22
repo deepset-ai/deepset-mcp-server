@@ -7,7 +7,7 @@ import uuid
 import pytest
 
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.integrations.models import Integration, IntegrationList, IntegrationProvider
+from deepset_mcp.api.integrations.models import Integration, IntegrationProvider
 from deepset_mcp.api.integrations.protocols import IntegrationResourceProtocol
 from deepset_mcp.api.secrets.models import Secret
 from deepset_mcp.api.secrets.protocols import SecretResourceProtocol
@@ -63,7 +63,7 @@ class FakeSecretResource(SecretResourceProtocol):
 class FakeIntegrationResource(IntegrationResourceProtocol):
     def __init__(
         self,
-        list_response: IntegrationList | None = None,
+        list_response: list[Integration] | None = None,
         get_response: Integration | None = None,
         list_exception: Exception | None = None,
         get_exception: Exception | None = None,
@@ -73,11 +73,11 @@ class FakeIntegrationResource(IntegrationResourceProtocol):
         self.list_exception = list_exception
         self.get_exception = get_exception
 
-    async def list(self) -> IntegrationList:
+    async def list(self) -> list[Integration]:
         if self.list_exception:
             raise self.list_exception
         if self.list_response is None:
-            return IntegrationList(integrations=[])
+            return []
         return self.list_response
 
     async def get(self, provider: IntegrationProvider) -> Integration:
@@ -112,7 +112,7 @@ async def test_list_secrets_and_integrations() -> None:
     secret_list = PaginatedResponse[Secret](data=secrets_data, has_more=False, total=1)
 
     integration_id = uuid.uuid4()
-    integrations_data = [
+    integration_list = [
         Integration(
             invalid=False,
             model_registry_token_id=integration_id,
@@ -120,7 +120,6 @@ async def test_list_secrets_and_integrations() -> None:
             provider_domain="api.openai.com",
         )
     ]
-    integration_list = IntegrationList(integrations=integrations_data)
 
     client = FakeClient(
         secret_resource=FakeSecretResource(list_response=secret_list),
@@ -169,7 +168,7 @@ async def test_list_secrets_only() -> None:
 async def test_list_integrations_only() -> None:
     """Test listing only integrations when no secrets exist."""
     integration_id = uuid.uuid4()
-    integrations_data = [
+    integration_list = [
         Integration(
             invalid=True,
             model_registry_token_id=integration_id,
@@ -177,7 +176,6 @@ async def test_list_integrations_only() -> None:
             provider_domain="api.cohere.ai",
         )
     ]
-    integration_list = IntegrationList(integrations=integrations_data)
     client = FakeClient(integration_resource=FakeIntegrationResource(list_response=integration_list))
 
     result = await list_secrets(client=client)
@@ -238,7 +236,7 @@ async def test_get_secret_by_id_success() -> None:
 async def test_get_integration_by_id_success() -> None:
     """Test successful retrieval of an integration by its ID."""
     integration_id = uuid.uuid4()
-    integrations_data = [
+    integration_list = [
         Integration(
             invalid=False,
             model_registry_token_id=integration_id,
@@ -246,7 +244,6 @@ async def test_get_integration_by_id_success() -> None:
             provider_domain="api.openai.com",
         )
     ]
-    integration_list = IntegrationList(integrations=integrations_data)
 
     client = FakeClient(
         secret_resource=FakeSecretResource(get_exception=ResourceNotFoundError("Not found")),

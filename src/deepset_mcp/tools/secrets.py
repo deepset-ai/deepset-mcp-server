@@ -56,7 +56,7 @@ async def list_secrets(
         # This optimizes performance by skipping the integrations call for subsequent pages
         if after is None:
             integrations_list = await client.integrations().list()
-            for integration in integrations_list.integrations:
+            for integration in integrations_list:
                 env_vars = TOKEN_DOMAIN_MAPPING.get(integration.provider_domain, [])
                 for env_var in env_vars:
                     env_secrets.append(
@@ -98,7 +98,7 @@ async def get_secret(*, client: AsyncClientProtocol, secret_id: str) -> Environm
     except ResourceNotFoundError:
         try:
             integrations_list = await client.integrations().list()
-            for integration in integrations_list.integrations:
+            for integration in integrations_list:
                 if str(integration.model_registry_token_id) == secret_id:
                     env_vars = TOKEN_DOMAIN_MAPPING.get(integration.provider_domain, [])
                     if env_vars:

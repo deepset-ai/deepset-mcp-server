@@ -6,7 +6,7 @@
 
 from typing import TYPE_CHECKING, Protocol
 
-from deepset_mcp.api.integrations.models import Integration, IntegrationList, IntegrationProvider
+from deepset_mcp.api.integrations.models import Integration, IntegrationProvider
 
 if TYPE_CHECKING:
     pass
@@ -15,10 +15,10 @@ if TYPE_CHECKING:
 class IntegrationResourceProtocol(Protocol):
     """Protocol for integration resource operations."""
 
-    async def list(self) -> IntegrationList:
+    async def list(self) -> list[Integration]:
         """Retrieve all integrations.
 
-        :returns: IntegrationList containing all available integrations.
+        :returns: list containing all available integrations.
         """
         ...
 
