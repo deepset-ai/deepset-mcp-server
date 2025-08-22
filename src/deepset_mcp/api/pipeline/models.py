@@ -269,26 +269,6 @@ class DeepsetStreamEvent(BaseModel):
     "Error message if type is 'error'"
 
 
-class PipelineValidationResultWithYaml(BaseModel):
-    """Model for pipeline validation result that includes the original YAML."""
-
-    validation_result: PipelineValidationResult
-    "Result of validating the pipeline configuration"
-    yaml_config: str
-    "Original YAML configuration that was validated"
-
-
-class PipelineOperationWithErrors(BaseModel):
-    """Model for pipeline operations that complete with validation errors."""
-
-    message: str
-    "Descriptive message about the pipeline operation"
-    validation_result: PipelineValidationResult
-    "Validation errors encountered during the operation"
-    pipeline: DeepsetPipeline
-    "Pipeline object after the operation completed"
-
-
 class LogLevel(StrEnum):
     """Log level filter options for pipeline logs."""
 

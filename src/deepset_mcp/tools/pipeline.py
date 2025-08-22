@@ -5,6 +5,7 @@
 import asyncio
 
 import yaml
+from pydantic import BaseModel
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.pipeline.models import (
@@ -12,9 +13,7 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetSearchResponse,
     LogLevel,
     PipelineLog,
-    PipelineOperationWithErrors,
     PipelineValidationResult,
-    PipelineValidationResultWithYaml,
 )
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.shared_models import PaginatedResponse
@@ -55,6 +54,15 @@ async def get_pipeline(*, client: AsyncClientProtocol, workspace: str, pipeline_
         return f"Failed to fetch pipeline '{pipeline_name}': {e}"
 
 
+class PipelineValidationResultWithYaml(BaseModel):
+    """Model for pipeline validation result that includes the original YAML."""
+
+    validation_result: PipelineValidationResult
+    "Result of validating the pipeline configuration"
+    yaml_config: str
+    "Original YAML configuration that was validated"
+
+
 async def validate_pipeline(
     *, client: AsyncClientProtocol, workspace: str, yaml_configuration: str
 ) -> PipelineValidationResultWithYaml | str:
@@ -80,6 +88,17 @@ async def validate_pipeline(
         return f"There is no workspace named '{workspace}'. Did you mean to configure it?"
     except (BadRequestError, UnexpectedAPIError) as e:
         return f"Failed to validate pipeline: {e}"
+
+
+class PipelineOperationWithErrors(BaseModel):
+    """Model for pipeline operations that complete with validation errors."""
+
+    message: str
+    "Descriptive message about the pipeline operation"
+    validation_result: PipelineValidationResult
+    "Validation errors encountered during the operation"
+    pipeline: DeepsetPipeline
+    "Pipeline object after the operation completed"
 
 
 async def create_pipeline(
