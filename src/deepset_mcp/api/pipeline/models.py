@@ -4,7 +4,7 @@
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
@@ -259,7 +259,7 @@ class DeepsetStreamEvent(BaseModel):
 
     query_id: str | UUID | None = None
     "Unique identifier for the associated query"
-    type: str  # "delta", "result", or "error"
+    type: Literal["delta", "result", "error"]
     "Event type: 'delta', 'result', or 'error'"
     delta: StreamDelta | None = None
     "Streaming text delta if type is 'delta'"
