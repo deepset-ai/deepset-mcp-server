@@ -3,3 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Integration API resources and models."""
+
+from .resource import IntegrationResource
+
+__all__ = ["IntegrationResource"]

@@ -2,3 +2,6 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from .client import AsyncDeepsetClient
+
+__all__ = ["AsyncDeepsetClient"]

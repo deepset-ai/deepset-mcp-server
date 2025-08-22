@@ -25,17 +25,26 @@ class DeepsetPipeline(BaseModel):
     """Model representing a pipeline on the deepset platform."""
 
     id: str = Field(alias="pipeline_id")
+    "Unique identifier for the pipeline"
     name: str
+    "Human-readable name of the pipeline"
     status: str
+    "Current operational status of the pipeline"
     service_level: PipelineServiceLevel
+    "Service level indicating the deployment stage"
 
     created_at: datetime
+    "Timestamp when the pipeline was created"
     last_updated_at: datetime | None = Field(None, alias="last_edited_at")  # Map API's last_edited_at
+    "Timestamp when the pipeline was last modified"
 
     created_by: DeepsetUser
+    "User who created the pipeline"
     last_updated_by: DeepsetUser | None = Field(None, alias="last_edited_by")  # Map API's last_edited_by
+    "User who last modified the pipeline"
 
     yaml_config: str | None = None
+    "YAML configuration defining the pipeline structure"
 
     class Config:
         """Configuration for serialization and deserialization."""
@@ -67,14 +76,18 @@ class ValidationError(BaseModel):
     """Model representing a validation error from the pipeline validation API."""
 
     code: str
+    "Error code identifying the type of validation error"
     message: str
+    "Human-readable description of the validation error"
 
 
 class PipelineValidationResult(BaseModel):
     """Result of validating a pipeline configuration."""
 
     valid: bool
+    "Whether the pipeline configuration is valid"
     errors: list[ValidationError] = []
+    "List of validation errors if the pipeline is invalid"
 
     def __rich_repr__(self) -> Result:
         """Used to display the model in an LLM friendly way."""
@@ -86,36 +99,52 @@ class TraceFrame(BaseModel):
     """Model representing a single frame in a stack trace."""
 
     filename: str
+    "Name of the file where the trace frame occurred"
     line_number: int
+    "Line number in the file where the trace frame occurred"
     name: str
+    "Function or method name where the trace frame occurred"
 
 
 class ExceptionInfo(BaseModel):
     """Model representing exception information."""
 
     type: str
+    "Exception class name"
     value: str
+    "Exception message or string representation"
     trace: list[TraceFrame]
+    "Stack trace frames leading to the exception"
 
 
 class PipelineLog(BaseModel):
     """Model representing a single log entry from a pipeline."""
 
     log_id: str
+    "Unique identifier for the log entry"
     message: str
+    "Log message content"
     logged_at: datetime
+    "Timestamp when the log entry was created"
     level: str
+    "Log level (e.g., INFO, WARNING, ERROR)"
     origin: str
+    "Source component or service that generated the log"
     exceptions: list[ExceptionInfo] | None = None
+    "Exception information if the log contains error details"
     extra_fields: dict[str, Any] = Field(default_factory=dict)
+    "Additional metadata fields associated with the log entry"
 
 
 class PipelineLogList(BaseModel):
     """Model representing a paginated list of pipeline logs."""
 
     data: list[PipelineLog]
+    "List of pipeline log entries for the current page"
     has_more: bool
+    "Whether there are more log entries available beyond this page"
     total: int
+    "Total number of log entries across all pages"
 
 
 # Search-related models
@@ -125,48 +154,76 @@ class OffsetRange(BaseModel):
     """Model representing an offset range."""
 
     start: int
+    "Starting position of the offset range"
     end: int
+    "Ending position of the offset range"
 
 
 class DeepsetAnswer(BaseModel):
     """Model representing a search answer."""
 
     answer: str  # Required field
+    "The generated answer text"
     context: str | None = None
+    "Context text used to generate the answer"
     document_id: str | None = None
+    "Identifier of the source document"
     document_ids: list[str] | None = None
+    "List of source document identifiers"
     file: dict[str, Any] | None = None
+    "File metadata associated with the answer"
     files: list[dict[str, Any]] | None = None
+    "List of file metadata associated with the answer"
     meta: dict[str, Any] | None = None
+    "Additional metadata about the answer"
     offsets_in_context: list[OffsetRange] | None = None
+    "Character offset ranges within the context text"
     offsets_in_document: list[OffsetRange] | None = None
+    "Character offset ranges within the source document"
     prompt: str | None = None
+    "Prompt used to generate the answer"
     result_id: UUID | None = None
+    "Unique identifier for this result"
     score: float | None = None
+    "Confidence or relevance score for the answer"
     type: str | None = None
+    "Type classification of the answer"
 
 
 class DeepsetDocument(BaseModel):
     """Model representing a search document."""
 
     content: str  # Required field
+    "Text content of the document"
     meta: dict[str, Any]  # Required field - can hold any value
+    "Metadata dictionary containing document properties"
     embedding: list[float] | None = None
+    "Vector embedding representation of the document"
     file: dict[str, Any] | None = None
+    "File metadata if the document originated from a file"
     id: str | None = None
+    "Unique identifier for the document"
     result_id: UUID | None = None
+    "Unique identifier for this search result"
     score: float | None = None
+    "Relevance or similarity score for the document"
 
 
 class DeepsetSearchResponse(BaseModel):
     """Model representing a single search result."""
 
     debug: dict[str, Any] | None = Field(default=None, alias="_debug")
+    "Debug information for the search operation"
     answers: list[DeepsetAnswer] = Field(default_factory=list)
+    "List of generated answers from the search"
     documents: list[DeepsetDocument] = Field(default_factory=list)
+    "List of retrieved documents from the search"
     prompts: dict[str, str] | None = None
+    "Prompts used during the search operation"
     query: str | None = None
+    "Original search query text"
     query_id: UUID | None = None
+    "Unique identifier for the search query"
 
     @model_validator(mode="before")
     @classmethod
@@ -203,32 +260,44 @@ class StreamDelta(BaseModel):
     """Model representing a streaming delta."""
 
     text: str
+    "Incremental text content for streaming responses"
     meta: dict[str, Any] | None = None
+    "Metadata associated with the streaming delta"
 
 
 class DeepsetStreamEvent(BaseModel):
     """Model representing a stream event."""
 
     query_id: str | UUID | None = None
+    "Unique identifier for the associated query"
     type: str  # "delta", "result", or "error"
+    "Event type: 'delta', 'result', or 'error'"
     delta: StreamDelta | None = None
+    "Streaming text delta if type is 'delta'"
     result: DeepsetSearchResponse | None = None
+    "Complete search result if type is 'result'"
     error: str | None = None
+    "Error message if type is 'error'"
 
 
 class PipelineValidationResultWithYaml(BaseModel):
     """Model for pipeline validation result that includes the original YAML."""
 
     validation_result: PipelineValidationResult
+    "Result of validating the pipeline configuration"
     yaml_config: str
+    "Original YAML configuration that was validated"
 
 
 class PipelineOperationWithErrors(BaseModel):
     """Model for pipeline operations that complete with validation errors."""
 
     message: str
+    "Descriptive message about the pipeline operation"
     validation_result: PipelineValidationResult
+    "Validation errors encountered during the operation"
     pipeline: DeepsetPipeline
+    "Pipeline object after the operation completed"
 
 
 class LogLevel(StrEnum):

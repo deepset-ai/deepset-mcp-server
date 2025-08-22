@@ -35,15 +35,20 @@ class Integration(BaseModel):
     """Model representing an integration."""
 
     invalid: bool
+    "Whether the integration configuration is invalid or misconfigured"
     model_registry_token_id: UUID
+    "Unique identifier for the model registry token"
     provider: IntegrationProvider
+    "The integration provider type (e.g., OpenAI, Azure, etc.)"
     provider_domain: str
+    "Domain or endpoint URL for the integration provider"
 
 
 class IntegrationList(BaseModel):
     """Model representing a list of integrations."""
 
     integrations: list[Integration]
+    "List of available integrations"
 
     def __len__(self) -> int:
         """Return the length of the list.

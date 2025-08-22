@@ -4,7 +4,7 @@
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.indexes.models import Index
-from deepset_mcp.api.pipeline import PipelineValidationResult
+from deepset_mcp.api.pipeline.models import PipelineValidationResult
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.shared_models import PaginatedResponse
 

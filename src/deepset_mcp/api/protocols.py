@@ -4,18 +4,20 @@
 
 from contextlib import AbstractAsyncContextManager
 from types import TracebackType
-from typing import Any, Literal, Protocol, Self, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Literal, Protocol, Self, TypeVar, overload
 
-from deepset_mcp.api.custom_components.protocols import CustomComponentsProtocol
-from deepset_mcp.api.haystack_service.protocols import HaystackServiceProtocol
-from deepset_mcp.api.indexes.protocols import IndexResourceProtocol
-from deepset_mcp.api.integrations.protocols import IntegrationResourceProtocol
-from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
-from deepset_mcp.api.pipeline_template.protocols import PipelineTemplateResourceProtocol
-from deepset_mcp.api.secrets.protocols import SecretResourceProtocol
 from deepset_mcp.api.transport import StreamingResponse, TransportResponse
-from deepset_mcp.api.user.protocols import UserResourceProtocol
-from deepset_mcp.api.workspace.protocols import WorkspaceResourceProtocol
+
+if TYPE_CHECKING:
+    from deepset_mcp.api.custom_components.protocols import CustomComponentsProtocol
+    from deepset_mcp.api.haystack_service.protocols import HaystackServiceProtocol
+    from deepset_mcp.api.indexes.protocols import IndexResourceProtocol
+    from deepset_mcp.api.integrations.protocols import IntegrationResourceProtocol
+    from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
+    from deepset_mcp.api.pipeline_template.protocols import PipelineTemplateResourceProtocol
+    from deepset_mcp.api.secrets.protocols import SecretResourceProtocol
+    from deepset_mcp.api.user.protocols import UserResourceProtocol
+    from deepset_mcp.api.workspace.protocols import WorkspaceResourceProtocol
 
 T = TypeVar("T")
 
