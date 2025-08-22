@@ -10,7 +10,7 @@ import pytest
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.api.exceptions import ResourceNotFoundError
-from deepset_mcp.api.workspace.models import Workspace, WorkspaceList
+from deepset_mcp.api.workspace.models import Workspace
 
 pytestmark = pytest.mark.integration
 
@@ -23,13 +23,11 @@ class TestWorkspaceResourceIntegration:
         """Test listing workspaces."""
         async with AsyncDeepsetClient() as client:
             workspaces = await client.workspaces().list()
-            assert isinstance(workspaces, WorkspaceList)
-            assert isinstance(workspaces.data, list)
-            assert workspaces.total >= 0
+            assert isinstance(workspaces, list)
 
             # If we have workspaces, verify their structure
-            if workspaces.data:
-                workspace = workspaces.data[0]
+            if workspaces:
+                workspace = workspaces[0]
                 assert isinstance(workspace, Workspace)
                 assert isinstance(workspace.name, str)
                 assert isinstance(workspace.workspace_id, uuid.UUID)

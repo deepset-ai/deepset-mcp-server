@@ -7,10 +7,10 @@
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.shared_models import NoContentResponse
-from deepset_mcp.api.workspace.models import Workspace, WorkspaceList
+from deepset_mcp.api.workspace.models import Workspace
 
 
-async def list_workspaces(*, client: AsyncClientProtocol) -> WorkspaceList | str:
+async def list_workspaces(*, client: AsyncClientProtocol) -> list[Workspace] | str:
     """Retrieves a list of all workspaces available to the user.
 
     This tool provides an overview of all workspaces that the user has access to.

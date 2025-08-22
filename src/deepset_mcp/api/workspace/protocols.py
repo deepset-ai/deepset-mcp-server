@@ -7,16 +7,16 @@
 from typing import Protocol
 
 from deepset_mcp.api.shared_models import NoContentResponse
-from deepset_mcp.api.workspace.models import Workspace, WorkspaceList
+from deepset_mcp.api.workspace.models import Workspace
 
 
 class WorkspaceResourceProtocol(Protocol):
     """Protocol defining the interface for workspace resources."""
 
-    async def list(self) -> WorkspaceList:
+    async def list(self) -> list[Workspace]:
         """List all workspaces.
 
-        :returns: A WorkspaceList containing all workspaces.
+        :returns: A list containing all workspaces.
         """
         ...
 
