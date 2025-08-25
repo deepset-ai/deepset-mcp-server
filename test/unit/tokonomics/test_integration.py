@@ -8,14 +8,14 @@ from typing import Any
 
 import pytest
 
-from deepset_mcp.tools.tokonomics import (
+from deepset_mcp.tokonomics import (
     InMemoryBackend,
     ObjectStore,
     RichExplorer,
     explorable,
     referenceable,
 )
-from deepset_mcp.tools.tokonomics.decorators import explorable_and_referenceable
+from deepset_mcp.tokonomics.decorators import explorable_and_referenceable
 
 
 class TestTokonomicsIntegration:

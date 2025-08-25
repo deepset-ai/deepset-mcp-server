@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from deepset_mcp.api.protocols import AsyncClientProtocol
+from deepset_mcp.tokonomics import InMemoryBackend, ObjectStore
 from deepset_mcp.tool_factory import (
     apply_client,
     apply_custom_args,
@@ -19,7 +20,6 @@ from deepset_mcp.tool_factory import (
     build_tool,
 )
 from deepset_mcp.tool_models import MemoryType, ToolConfig, WorkspaceMode
-from deepset_mcp.tools.tokonomics.object_store import InMemoryBackend, ObjectStore
 from test.unit.conftest import BaseFakeClient
 
 
@@ -219,7 +219,7 @@ class TestApplyMemory:
         mock_both.return_value = mock_decorator
         mock_decorator.return_value = sample_func
 
-        config = ToolConfig(memory_type=MemoryType.BOTH)
+        config = ToolConfig(memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE)
         apply_memory(sample_func, config, store)
 
         mock_both.assert_called_once()
