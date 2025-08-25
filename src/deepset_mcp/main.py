@@ -12,7 +12,6 @@ from mcp.server.fastmcp import FastMCP
 
 from deepset_mcp.config import DEEPSET_DOCS_DEFAULT_SHARE_URL, DOCS_SEARCH_TOOL_NAME
 from deepset_mcp.mcp.server import configure_mcp_server
-from deepset_mcp.mcp.tool_models import WorkspaceMode
 from deepset_mcp.mcp.tool_registry import TOOL_REGISTRY
 
 
@@ -60,13 +59,6 @@ def main(
             help="Deepset docs search share URL. Can also be set via DEEPSET_DOCS_SHARE_URL environment variable.",
         ),
     ] = None,
-    workspace_mode: Annotated[
-        WorkspaceMode,
-        typer.Option(
-            "--workspace-mode",
-            help="Whether workspace should be set statically or dynamically provided during a tool call.",
-        ),
-    ] = WorkspaceMode.STATIC,
     tools: Annotated[
         list[str] | None,
         typer.Option(
@@ -126,11 +118,10 @@ def main(
     The Deepset MCP server provides tools to interact with the deepset AI platform,
     allowing you to create, debug, and learn about pipelines on the platform.
 
-    :param workspace: Deepset workspace name
+    :param workspace: Deepset workspace name. Pass if you only want to run the tools on a specific workspace.
     :param api_key: Deepset API key for authentication
     :param api_url: Deepset API base URL
     :param docs_share_url: Deepset docs search share URL
-    :param workspace_mode: Whether workspace should be set statically or dynamically
     :param tools: List of tools to register
     :param list_tools: List all available tools and exit
     :param api_key_from_auth_header: Get API key from authorization header
@@ -171,13 +162,8 @@ def main(
         )
         raise typer.Exit(1)
 
-    if workspace_mode == WorkspaceMode.STATIC and not workspace:
-        typer.echo(
-            "Error: Workspace is required when using static workspace mode. "
-            "Set --workspace or DEEPSET_WORKSPACE environment variable.",
-            err=True,
-        )
-        raise typer.Exit(1)
+    if not workspace:
+        logging.info("No workspace specified. Workspace needs to be provided during tool calling.")
 
     if DOCS_SEARCH_TOOL_NAME in tool_names and docs_share_url is None:
         typer.echo(
@@ -190,7 +176,6 @@ def main(
     mcp = FastMCP("deepset AI platform MCP server")
     configure_mcp_server(
         mcp_server_instance=mcp,
-        workspace_mode=workspace_mode,
         deepset_api_key=api_key,
         deepset_api_url=api_url,
         deepset_workspace=workspace,

@@ -7,7 +7,6 @@
 from unittest.mock import MagicMock, patch
 
 from deepset_mcp.mcp.server import configure_mcp_server
-from deepset_mcp.mcp.tool_models import WorkspaceMode
 
 
 class TestConfigureMcpServerBaseUrl:
@@ -22,7 +21,6 @@ class TestConfigureMcpServerBaseUrl:
         configure_mcp_server(
             mcp_server_instance=mock_server,
             tools_to_register={"list_pipelines"},
-            workspace_mode=WorkspaceMode.STATIC,
             deepset_api_key="test-key",
             deepset_api_url=custom_url,
             deepset_workspace="test-workspace",
@@ -41,7 +39,6 @@ class TestConfigureMcpServerBaseUrl:
         configure_mcp_server(
             mcp_server_instance=mock_server,
             tools_to_register={"list_pipelines"},
-            workspace_mode=WorkspaceMode.STATIC,
             deepset_api_key="test-key",
             deepset_workspace="test-workspace",
         )

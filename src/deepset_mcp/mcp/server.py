@@ -12,13 +12,12 @@ from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.config import DEEPSET_DOCS_DEFAULT_SHARE_URL
 from deepset_mcp.mcp.store import initialize_or_get_initialized_store
 from deepset_mcp.mcp.tool_factory import register_tools
-from deepset_mcp.mcp.tool_models import DeepsetDocsConfig, WorkspaceMode
+from deepset_mcp.mcp.tool_models import DeepsetDocsConfig
 from deepset_mcp.mcp.tool_registry import TOOL_REGISTRY
 
 
 def configure_mcp_server(
     mcp_server_instance: FastMCP,
-    workspace_mode: WorkspaceMode | str,
     tools_to_register: set[str] | None = None,
     deepset_api_key: str | None = None,
     deepset_api_url: str | None = None,
@@ -32,12 +31,11 @@ def configure_mcp_server(
     """Configure the MCP server with the specified tools and settings.
 
     :param mcp_server_instance: The FastMCP server instance to configure
-    :param workspace_mode: The workspace mode ("static" or "dynamic")
     :param tools_to_register: Set of tool names to register with the server.
         Will register all tools if set to None.
     :param deepset_api_key: Optional Deepset API key for authentication
     :param deepset_api_url: Optional Deepset API base URL
-    :param deepset_workspace: Optional workspace name for static mode
+    :param deepset_workspace: Pass a deepset workspace name if you only want to run the tools on a specific workspace.
     :param deepset_docs_shareable_prototype_url: Shareable prototype URL that allows access to a docs search pipeline.
         Will fall back to the default shareable prototype URL if set to None.
     :param get_api_key_from_authorization_header: Whether to extract API key from authorization header
@@ -51,15 +49,6 @@ def configure_mcp_server(
 
     if deepset_docs_shareable_prototype_url is None:
         deepset_docs_shareable_prototype_url = DEEPSET_DOCS_DEFAULT_SHARE_URL
-
-    if isinstance(workspace_mode, str):
-        workspace_mode = WorkspaceMode(workspace_mode)
-
-    if workspace_mode == WorkspaceMode.STATIC and deepset_workspace is None:
-        raise ValueError(
-            "Static workspace mode requires a workspace name. "
-            "Please provide 'deepset_workspace' when using WorkspaceMode.STATIC."
-        )
 
     if deepset_api_key is None and not get_api_key_from_authorization_header:
         raise ValueError(
@@ -79,7 +68,6 @@ def configure_mcp_server(
 
     register_tools(
         mcp_server_instance=mcp_server_instance,
-        workspace_mode=workspace_mode,
         workspace=deepset_workspace,
         tool_names=tools_to_register,
         docs_config=docs_config,

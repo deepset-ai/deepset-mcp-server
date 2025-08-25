@@ -14,7 +14,7 @@ from mcp.server.fastmcp import Context, FastMCP
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.config import DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME
-from deepset_mcp.mcp.tool_models import DeepsetDocsConfig, MemoryType, ToolConfig, WorkspaceMode
+from deepset_mcp.mcp.tool_models import DeepsetDocsConfig, MemoryType, ToolConfig
 from deepset_mcp.mcp.tool_registry import TOOL_REGISTRY
 from deepset_mcp.tokonomics import (
     ObjectStore,
@@ -274,7 +274,6 @@ def build_tool(
 
 def register_tools(
     mcp_server_instance: FastMCP,
-    workspace_mode: WorkspaceMode,
     api_key: str | None = None,
     workspace: str | None = None,
     tool_names: set[str] | None = None,
@@ -287,9 +286,8 @@ def register_tools(
 
     Args:
         mcp_server_instance: FastMCP server instance
-        workspace_mode: How workspace should be handled
         api_key: An api key for the deepset AI platform; only needs to be provided when not read from request context.
-        workspace: Workspace to use; only needs to be provided if using a static workspace.
+        workspace: Pass a deepset workspace name if you only want to run the tools on a specific workspace.
         tool_names: Set of tool names to register (if None, registers all tools)
         get_api_key_from_authorization_header: Whether to use request context to retrieve an API key for tool execution.
         docs_config: Configuration for the deepset documentation search tool.
@@ -300,12 +298,6 @@ def register_tools(
         raise ValueError(
             "'api_key' cannot be 'None' when 'use_request_context' is False. "
             "Either pass 'api_key' or 'use_request_context'."
-        )
-
-    if workspace_mode == WorkspaceMode.STATIC and workspace is None:
-        raise ValueError(
-            "'workspace_mode' set to 'static' but no workspace provided. "
-            "You need to set a deepset workspace name as 'workspace'."
         )
 
     if docs_config is None and tool_names is None:
