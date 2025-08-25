@@ -89,7 +89,7 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
         ToolConfig(
             needs_client=True,
             needs_workspace=True,
-            memory_type=MemoryType.BOTH,
+            memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE,
             custom_args={"skip_validation_errors": True},
         ),
     ),
@@ -98,7 +98,7 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
         ToolConfig(
             needs_client=True,
             needs_workspace=True,
-            memory_type=MemoryType.BOTH,
+            memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE,
             custom_args={"skip_validation_errors": True},
         ),
     ),
@@ -117,7 +117,7 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     ),
     "validate_pipeline": (
         validate_pipeline_tool,
-        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.BOTH),
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
     ),
     "get_pipeline_logs": (
         get_pipeline_logs_tool,
@@ -137,11 +137,11 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     ),
     "create_index": (
         create_index_tool,
-        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.BOTH),
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
     ),
     "update_index": (
         update_index_tool,
-        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.BOTH),
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
     ),
     "deploy_index": (
         deploy_index_tool,
@@ -198,7 +198,7 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     ),
     "run_component": (
         run_component_tool,
-        ToolConfig(needs_client=True, memory_type=MemoryType.BOTH),
+        ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
     ),
     "list_secrets": (list_secrets_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "get_secret": (get_secret_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),

@@ -7,7 +7,7 @@
 import functools
 import logging
 
-from deepset_mcp.tools.tokonomics.object_store import InMemoryBackend, ObjectStore, ObjectStoreBackend, RedisBackend
+from deepset_mcp.tokonomics import InMemoryBackend, ObjectStore, ObjectStoreBackend, RedisBackend
 
 logger = logging.getLogger(__name__)
 

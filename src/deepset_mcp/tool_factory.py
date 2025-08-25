@@ -14,15 +14,15 @@ from mcp.server.fastmcp import Context, FastMCP
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.config import DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME
-from deepset_mcp.tool_models import DeepsetDocsConfig, MemoryType, ToolConfig, WorkspaceMode
-from deepset_mcp.tool_registry import TOOL_REGISTRY
-from deepset_mcp.tools.tokonomics import (
+from deepset_mcp.tokonomics import (
     ObjectStore,
     RichExplorer,
     explorable,
     explorable_and_referenceable,
     referenceable,
 )
+from deepset_mcp.tool_models import DeepsetDocsConfig, MemoryType, ToolConfig, WorkspaceMode
+from deepset_mcp.tool_registry import TOOL_REGISTRY
 
 
 def apply_custom_args(base_func: Callable[..., Any], config: ToolConfig) -> Callable[..., Any]:
@@ -139,7 +139,7 @@ def apply_memory(
         return explorable(object_store=store, explorer=explorer)(base_func)
     elif config.memory_type == MemoryType.REFERENCEABLE:
         return referenceable(object_store=store, explorer=explorer)(base_func)
-    elif config.memory_type == MemoryType.BOTH:
+    elif config.memory_type == MemoryType.EXPLORABLE_AND_REFERENCEABLE:
         return explorable_and_referenceable(object_store=store, explorer=explorer)(base_func)
     else:
         raise ValueError(f"Invalid memory type: {config.memory_type}")

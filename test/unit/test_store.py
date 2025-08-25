@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from deepset_mcp.store import create_redis_backend, initialize_store
-from deepset_mcp.tools.tokonomics.object_store import InMemoryBackend, ObjectStore
+from deepset_mcp.tokonomics import InMemoryBackend, ObjectStore
 
 
 class TestStoreInitialization:

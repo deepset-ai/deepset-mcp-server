@@ -5,7 +5,7 @@
 from collections.abc import Callable
 from typing import Any
 
-from deepset_mcp.tools.tokonomics import RichExplorer
+from deepset_mcp.tokonomics import RichExplorer
 
 
 def create_get_from_object_store(explorer: RichExplorer) -> Callable[..., Any]:

@@ -18,7 +18,7 @@ from glom import GlomError, Path, T, glom
 from rich.console import Console
 from rich.pretty import Pretty
 
-from deepset_mcp.tools.tokonomics.object_store import ObjectStore
+from deepset_mcp.tokonomics.object_store import ObjectStore
 
 
 class RichExplorer:

@@ -4,12 +4,14 @@
 
 from .decorators import explorable, explorable_and_referenceable, referenceable
 from .explorer import RichExplorer
-from .object_store import InMemoryBackend, ObjectStore
+from .object_store import InMemoryBackend, ObjectStore, RedisBackend, ObjectStoreBackend
 
 __all__ = [
     # Core classes
     "InMemoryBackend",
+    "RedisBackend",
     "ObjectStore",
+    "ObjectStoreBackend",
     "RichExplorer",
     # Decorators
     "explorable",
