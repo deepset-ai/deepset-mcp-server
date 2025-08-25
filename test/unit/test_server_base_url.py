@@ -6,14 +6,14 @@
 
 from unittest.mock import MagicMock, patch
 
-from deepset_mcp.server import configure_mcp_server
-from deepset_mcp.tool_models import WorkspaceMode
+from deepset_mcp.mcp.server import configure_mcp_server
+from deepset_mcp.mcp.tool_models import WorkspaceMode
 
 
 class TestConfigureMcpServerBaseUrl:
     """Test the configure_mcp_server function with base_url parameter."""
 
-    @patch("deepset_mcp.server.register_tools")
+    @patch("deepset_mcp.mcp.server.register_tools")
     def test_configure_mcp_server_passes_base_url(self, mock_register_tools: MagicMock) -> None:
         """Test that configure_mcp_server passes base_url to register_tools."""
         mock_server = MagicMock()
@@ -33,7 +33,7 @@ class TestConfigureMcpServerBaseUrl:
         call_args = mock_register_tools.call_args
         assert call_args[1]["base_url"] == custom_url
 
-    @patch("deepset_mcp.server.register_tools")
+    @patch("deepset_mcp.mcp.server.register_tools")
     def test_configure_mcp_server_without_base_url(self, mock_register_tools: MagicMock) -> None:
         """Test that configure_mcp_server works without base_url."""
         mock_server = MagicMock()

@@ -8,7 +8,7 @@ from typing import Any
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.config import DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME
 from deepset_mcp.initialize_embedding_model import get_initialized_model
-from deepset_mcp.tool_models import DeepsetDocsConfig, MemoryType, ToolConfig
+from deepset_mcp.mcp.tool_models import DeepsetDocsConfig, MemoryType, ToolConfig
 from deepset_mcp.tools.custom_components import (
     get_latest_custom_component_installation_logs as get_latest_custom_component_installation_logs_tool,
     list_custom_component_installations as list_custom_component_installations_tool,

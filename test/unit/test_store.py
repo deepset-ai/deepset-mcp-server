@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from deepset_mcp.store import create_redis_backend, initialize_store
+from deepset_mcp.mcp.store import create_redis_backend, initialize_or_get_initialized_store
 from deepset_mcp.tokonomics import InMemoryBackend, ObjectStore
 
 
@@ -15,7 +15,7 @@ class TestStoreInitialization:
 
     def test_initialize_store_memory_backend(self) -> None:
         """Test initializing store with memory backend."""
-        store = initialize_store(backend="memory", ttl=1800)
+        store = initialize_or_get_initialized_store(backend="memory", ttl=1800)
 
         assert isinstance(store, ObjectStore)
         assert isinstance(store._backend, InMemoryBackend)
@@ -23,7 +23,7 @@ class TestStoreInitialization:
 
     def test_initialize_store_default_backend(self) -> None:
         """Test initializing store with default backend."""
-        store = initialize_store()
+        store = initialize_or_get_initialized_store()
 
         assert isinstance(store, ObjectStore)
         assert isinstance(store._backend, InMemoryBackend)
@@ -35,7 +35,7 @@ class TestStoreInitialization:
         mock_redis_client.ping.return_value = True
 
         with patch("redis.from_url", return_value=mock_redis_client):
-            store = initialize_store(backend="redis", redis_url="redis://localhost:6379", ttl=7200)
+            store = initialize_or_get_initialized_store(backend="redis", redis_url="redis://localhost:6379", ttl=7200)
 
             assert isinstance(store, ObjectStore)
             assert store._ttl == 7200
@@ -44,7 +44,7 @@ class TestStoreInitialization:
     def test_initialize_store_redis_backend_no_url(self) -> None:
         """Test initializing store with Redis backend but no URL."""
         with pytest.raises(ValueError, match="redis_url.*is None"):
-            initialize_store(backend="redis", redis_url=None)
+            initialize_or_get_initialized_store(backend="redis", redis_url=None)
 
     def test_initialize_store_redis_backend_connection_failure(self) -> None:
         """Test initializing store with Redis backend connection failure."""
@@ -53,7 +53,7 @@ class TestStoreInitialization:
 
         with patch("redis.from_url", return_value=mock_redis_client):
             with pytest.raises(Exception, match="Connection failed"):
-                initialize_store(backend="redis", redis_url="redis://localhost:6379")
+                initialize_or_get_initialized_store(backend="redis", redis_url="redis://localhost:6379")
 
     def test_create_redis_backend_success(self) -> None:
         """Test creating Redis backend successfully."""
@@ -85,10 +85,10 @@ class TestStoreInitialization:
     def test_initialize_store_caching(self) -> None:
         """Test that initialize_store uses caching."""
         # Clear any existing cache
-        initialize_store.cache_clear()
+        initialize_or_get_initialized_store.cache_clear()
 
-        store1 = initialize_store(backend="memory", ttl=1800)
-        store2 = initialize_store(backend="memory", ttl=1800)
+        store1 = initialize_or_get_initialized_store(backend="memory", ttl=1800)
+        store2 = initialize_or_get_initialized_store(backend="memory", ttl=1800)
 
         # Should return the same instance due to caching
         assert store1 is store2
@@ -96,10 +96,10 @@ class TestStoreInitialization:
     def test_initialize_store_different_params_different_instances(self) -> None:
         """Test that different parameters create different instances."""
         # Clear any existing cache
-        initialize_store.cache_clear()
+        initialize_or_get_initialized_store.cache_clear()
 
-        store1 = initialize_store(backend="memory", ttl=1800)
-        store2 = initialize_store(backend="memory", ttl=3600)
+        store1 = initialize_or_get_initialized_store(backend="memory", ttl=1800)
+        store2 = initialize_or_get_initialized_store(backend="memory", ttl=3600)
 
         # Should return different instances due to different parameters
         assert store1 is not store2
@@ -108,7 +108,7 @@ class TestStoreInitialization:
 
     def test_initialize_store_unknown_backend(self) -> None:
         """Test initializing store with unknown backend defaults to memory."""
-        store = initialize_store(backend="unknown", ttl=1800)
+        store = initialize_or_get_initialized_store(backend="unknown", ttl=1800)
 
         assert isinstance(store, ObjectStore)
         assert isinstance(store._backend, InMemoryBackend)

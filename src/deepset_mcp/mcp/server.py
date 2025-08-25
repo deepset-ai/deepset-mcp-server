@@ -10,10 +10,10 @@ from mcp.server.fastmcp import FastMCP
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.config import DEEPSET_DOCS_DEFAULT_SHARE_URL
-from deepset_mcp.store import initialize_store
-from deepset_mcp.tool_factory import register_tools
-from deepset_mcp.tool_models import DeepsetDocsConfig, WorkspaceMode
-from deepset_mcp.tool_registry import TOOL_REGISTRY
+from deepset_mcp.mcp.store import initialize_or_get_initialized_store
+from deepset_mcp.mcp.tool_factory import register_tools
+from deepset_mcp.mcp.tool_models import DeepsetDocsConfig, WorkspaceMode
+from deepset_mcp.mcp.tool_registry import TOOL_REGISTRY
 
 
 def configure_mcp_server(
@@ -73,7 +73,9 @@ def configure_mcp_server(
     docs_config = DeepsetDocsConfig(api_key=api_key_docs, workspace_name=workspace_name, pipeline_name=pipeline_name)
 
     # Initialize the store before registering tools
-    store = initialize_store(backend=object_store_backend, redis_url=object_store_redis_url, ttl=object_store_ttl)
+    store = initialize_or_get_initialized_store(
+        backend=object_store_backend, redis_url=object_store_redis_url, ttl=object_store_ttl
+    )
 
     register_tools(
         mcp_server_instance=mcp_server_instance,
