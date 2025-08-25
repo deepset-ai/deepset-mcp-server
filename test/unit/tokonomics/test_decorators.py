@@ -8,7 +8,8 @@ from typing import Any
 
 import pytest
 
-from deepset_mcp.tools.tokonomics.decorators import (
+from deepset_mcp.tokonomics import InMemoryBackend, ObjectStore, RichExplorer
+from deepset_mcp.tokonomics.decorators import (
     _add_str_to_type,
     _enhance_docstring_for_explorable,
     _enhance_docstring_for_references,
@@ -18,8 +19,6 @@ from deepset_mcp.tools.tokonomics.decorators import (
     explorable_and_referenceable,
     referenceable,
 )
-from deepset_mcp.tools.tokonomics.explorer import RichExplorer
-from deepset_mcp.tools.tokonomics.object_store import InMemoryBackend, ObjectStore
 
 
 class TestHelperFunctions:

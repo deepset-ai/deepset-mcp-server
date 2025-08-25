@@ -5,8 +5,7 @@
 import pytest
 from glom import Path
 
-from deepset_mcp.tools.tokonomics.explorer import RichExplorer
-from deepset_mcp.tools.tokonomics.object_store import InMemoryBackend, ObjectStore
+from deepset_mcp.tokonomics import InMemoryBackend, ObjectStore, RichExplorer
 
 
 class TestRichExplorer:

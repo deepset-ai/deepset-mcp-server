@@ -141,5 +141,5 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # These tests intentionally test runtime decorator behavior that mypy cannot understand
-module = ["test.unit.tools.tokonomics.*"]
+module = ["test.unit.tokonomics.*"]
 disable_error_code = ["arg-type", "attr-defined", "operator", "misc", "type-arg", "no-any-return", "assignment"]

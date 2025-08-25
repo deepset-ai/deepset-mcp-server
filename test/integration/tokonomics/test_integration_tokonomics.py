@@ -19,9 +19,8 @@ except ImportError:
     docker = None
     NotFound = Exception
 
-from deepset_mcp.tools.tokonomics.decorators import explorable, explorable_and_referenceable, referenceable
-from deepset_mcp.tools.tokonomics.explorer import RichExplorer
-from deepset_mcp.tools.tokonomics.object_store import InMemoryBackend, ObjectStore, RedisBackend
+from deepset_mcp.tokonomics import InMemoryBackend, ObjectStore, RedisBackend, RichExplorer
+from deepset_mcp.tokonomics.decorators import explorable, explorable_and_referenceable, referenceable
 
 pytestmark = pytest.mark.integration
 
@@ -65,7 +64,7 @@ def redis_container(docker_client: Any) -> Generator[Any, None, None]:
     for i in range(max_retries):
         try:
             # Try to connect
-            from deepset_mcp.tools.tokonomics.object_store import RedisBackend
+            from deepset_mcp.tokonomics import RedisBackend
 
             RedisBackend("redis://localhost:16379/0")
             break

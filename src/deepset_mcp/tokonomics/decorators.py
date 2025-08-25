@@ -19,8 +19,8 @@ from typing import Any, TypeVar, Union, get_args, get_origin
 
 from glom import GlomError, glom
 
-from deepset_mcp.tools.tokonomics.explorer import RichExplorer
-from deepset_mcp.tools.tokonomics.object_store import ObjectStore
+from deepset_mcp.tokonomics.explorer import RichExplorer
+from deepset_mcp.tokonomics.object_store import ObjectStore
 
 F = TypeVar("F", bound=Callable[..., Any])
 

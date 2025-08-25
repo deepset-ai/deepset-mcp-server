@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from deepset_mcp.tools.tokonomics.object_store import (
+from deepset_mcp.tokonomics import (
     InMemoryBackend,
     ObjectStore,
     RedisBackend,
