@@ -27,11 +27,9 @@ from deepset_mcp.tools.model_protocol import ModelProtocol
 def extract_component_texts(*, component_def: dict[str, Any]) -> tuple[str, str]:
     """Extracts the component name and description for embedding.
 
-    Args:
-        component_def: The component definition
+    :param component_def: The component definition
 
-    Returns:
-        A tuple containing the component name and description
+    :returns: A tuple containing the component name and description
     """
     component_type = component_def["properties"]["type"]["const"]
     name = component_def.get("title", "")
@@ -170,13 +168,11 @@ async def _build_component_definition(
 async def get_component_definition(*, client: AsyncClientProtocol, component_type: str) -> ComponentDefinition | str:
     """Returns the definition of a specific Haystack component.
 
-    Args:
-        client: The API client to use
-        component_type: Fully qualified component type
-            (e.g. haystack.components.routers.conditional_router.ConditionalRouter)
+    :param client: The API client to use
+    :param component_type: Fully qualified component type
+        (e.g. haystack.components.routers.conditional_router.ConditionalRouter)
 
-    Returns:
-        ComponentDefinition model or error message string
+    :returns: ComponentDefinition model or error message string
     """
     haystack_service = client.haystack_service()
 
@@ -207,14 +203,12 @@ async def search_component_definition(
 ) -> ComponentSearchResults | str:
     """Searches for components based on name or description using semantic similarity.
 
-    Args:
-        client: The API client to use
-        query: The search query
-        model: The model to use for computing embeddings
-        top_k: Maximum number of results to return (default: 5)
+    :param client: The API client to use
+    :param query: The search query
+    :param model: The model to use for computing embeddings
+    :param top_k: Maximum number of results to return (default: 5)
 
-    Returns:
-        ComponentSearchResults model or error message string
+    :returns: ComponentSearchResults model or error message string
     """
     haystack_service = client.haystack_service()
 
@@ -273,11 +267,9 @@ async def search_component_definition(
 async def list_component_families(*, client: AsyncClientProtocol) -> ComponentFamilyList | str:
     """Lists all Haystack component families that are available on deepset.
 
-    Args:
-        client: The API client to use
+    :param client: The API client to use
 
-    Returns:
-        ComponentFamilyList model or error message string
+    :returns: ComponentFamilyList model or error message string
     """
     haystack_service = client.haystack_service()
 
