@@ -14,6 +14,8 @@ from mcp.server.fastmcp import Context, FastMCP
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.config import DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME
+from deepset_mcp.mcp.tool_models import DeepsetDocsConfig, MemoryType, ToolConfig, WorkspaceMode
+from deepset_mcp.mcp.tool_registry import TOOL_REGISTRY
 from deepset_mcp.tokonomics import (
     ObjectStore,
     RichExplorer,
@@ -21,8 +23,6 @@ from deepset_mcp.tokonomics import (
     explorable_and_referenceable,
     referenceable,
 )
-from deepset_mcp.tool_models import DeepsetDocsConfig, MemoryType, ToolConfig, WorkspaceMode
-from deepset_mcp.tool_registry import TOOL_REGISTRY
 
 
 def apply_custom_args(base_func: Callable[..., Any], config: ToolConfig) -> Callable[..., Any]:
@@ -78,41 +78,35 @@ def remove_params_from_docstring(docstring: str | None, params_to_remove: set[st
 
 
 def apply_workspace(
-    base_func: Callable[..., Any], config: ToolConfig, workspace_mode: WorkspaceMode, workspace: str | None = None
+    base_func: Callable[..., Any], config: ToolConfig, workspace: str | None = None
 ) -> Callable[..., Any]:
     """
-    Applies a deepset workspace to the function depending on the workspace mode and the ToolConfig.
+    Applies a deepset workspace to the function depending on the ToolConfig.
 
     Removes the workspace argument from the function's signature and docstring if applied.
 
     :param base_func: The function to apply workspace to.
     :param config: The ToolConfig for the function.
-    :param workspace_mode: The WorkspaceMode for the function.
-    :param workspace: The workspace to use for static mode.
+    :param workspace: The workspace to use.
     :returns: Function with workspace handling applied and updated signature/docstring.
     :raises ValueError: If workspace is required but not available.
     """
-    if not config.needs_workspace:
+    if not config.needs_workspace or not workspace:
         return base_func
 
-    if workspace_mode == WorkspaceMode.STATIC:
+    @functools.wraps(base_func)
+    async def workspace_wrapper(*args: Any, **kwargs: Any) -> Any:
+        return await base_func(*args, workspace=workspace, **kwargs)
 
-        @functools.wraps(base_func)
-        async def workspace_wrapper(*args: Any, **kwargs: Any) -> Any:
-            return await base_func(*args, workspace=workspace, **kwargs)
+    # Remove workspace from signature
+    original_sig = inspect.signature(base_func)
+    new_params = [p for name, p in original_sig.parameters.items() if name != "workspace"]
+    workspace_wrapper.__signature__ = original_sig.replace(parameters=new_params)  # type: ignore
 
-        # Remove workspace from signature
-        original_sig = inspect.signature(base_func)
-        new_params = [p for name, p in original_sig.parameters.items() if name != "workspace"]
-        workspace_wrapper.__signature__ = original_sig.replace(parameters=new_params)  # type: ignore
+    # Remove workspace from docstring
+    workspace_wrapper.__doc__ = remove_params_from_docstring(base_func.__doc__, {"workspace"})
 
-        # Remove workspace from docstring
-        workspace_wrapper.__doc__ = remove_params_from_docstring(base_func.__doc__, {"workspace"})
-
-        return workspace_wrapper
-    else:
-        # For dynamic mode, workspace is passed as parameter
-        return base_func
+    return workspace_wrapper
 
 
 def apply_memory(
@@ -226,7 +220,6 @@ def apply_client(
 def build_tool(
     base_func: Callable[..., Any],
     config: ToolConfig,
-    workspace_mode: WorkspaceMode,
     api_key: str | None = None,
     workspace: str | None = None,
     use_request_context: bool = True,
@@ -240,7 +233,6 @@ def build_tool(
 
     :param base_func: The base tool function.
     :param config: Tool configuration specifying dependencies and custom arguments.
-    :param workspace_mode: How the workspace should be handled.
     :param api_key: The deepset API key to use.
     :param workspace: The workspace to use when using a static workspace.
     :param use_request_context: Whether to collect the API key from the request context.
@@ -257,7 +249,7 @@ def build_tool(
     enhanced_func = apply_memory(enhanced_func, config, object_store)
 
     # Apply workspace handling
-    enhanced_func = apply_workspace(enhanced_func, config, workspace_mode, workspace)
+    enhanced_func = apply_workspace(base_func=enhanced_func, config=config, workspace=workspace)
 
     # Apply client injection (adds ctx parameter if needed)
     enhanced_func = apply_client(
@@ -360,7 +352,6 @@ def register_tools(
             enhanced_tool = build_tool(
                 base_func=base_func,
                 config=config,
-                workspace_mode=workspace_mode,
                 workspace=workspace,
                 use_request_context=get_api_key_from_authorization_header,
                 base_url=base_url,

@@ -30,12 +30,12 @@ def create_redis_backend(url: str) -> ObjectStoreBackend:
 
 
 @functools.lru_cache(maxsize=1)
-def initialize_store(
+def initialize_or_get_initialized_store(
     backend: str = "memory",
     redis_url: str | None = None,
     ttl: int = 600,
 ) -> ObjectStore:
-    """Initialize the object store.
+    """Initializes the object store or gets an existing object store instance if it was initialized before.
 
     :param backend: Backend type ('memory' or 'redis')
     :param redis_url: Redis connection URL (required if backend='redis')

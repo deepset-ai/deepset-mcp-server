@@ -11,9 +11,9 @@ import typer
 from mcp.server.fastmcp import FastMCP
 
 from deepset_mcp.config import DEEPSET_DOCS_DEFAULT_SHARE_URL, DOCS_SEARCH_TOOL_NAME
-from deepset_mcp.server import configure_mcp_server
-from deepset_mcp.tool_models import WorkspaceMode
-from deepset_mcp.tool_registry import TOOL_REGISTRY
+from deepset_mcp.mcp.server import configure_mcp_server
+from deepset_mcp.mcp.tool_models import WorkspaceMode
+from deepset_mcp.mcp.tool_registry import TOOL_REGISTRY
 
 
 class TransportEnum(StrEnum):

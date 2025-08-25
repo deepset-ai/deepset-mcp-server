@@ -11,15 +11,15 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from deepset_mcp.api.protocols import AsyncClientProtocol
-from deepset_mcp.tokonomics import InMemoryBackend, ObjectStore
-from deepset_mcp.tool_factory import (
+from deepset_mcp.mcp.tool_factory import (
     apply_client,
     apply_custom_args,
     apply_memory,
     apply_workspace,
     build_tool,
 )
-from deepset_mcp.tool_models import MemoryType, ToolConfig, WorkspaceMode
+from deepset_mcp.mcp.tool_models import MemoryType, ToolConfig, WorkspaceMode
+from deepset_mcp.tokonomics import InMemoryBackend, ObjectStore
 from test.unit.conftest import BaseFakeClient
 
 
@@ -89,7 +89,7 @@ class TestApplyWorkspace:
             return str(a)
 
         config = ToolConfig(needs_workspace=False)
-        result = apply_workspace(sample_func, config, WorkspaceMode.STATIC)
+        result = apply_workspace(sample_func, config, workspace="some_workspace")
 
         assert result is sample_func
 
@@ -100,7 +100,7 @@ class TestApplyWorkspace:
             return f"{workspace}:{a}"
 
         config = ToolConfig(needs_workspace=True)
-        result = apply_workspace(sample_func, config, WorkspaceMode.DYNAMIC)
+        result = apply_workspace(sample_func, config)
 
         assert result is sample_func
 
@@ -116,7 +116,7 @@ class TestApplyWorkspace:
             return f"{workspace}:{a}"
 
         config = ToolConfig(needs_workspace=True)
-        result = apply_workspace(sample_func, config, WorkspaceMode.STATIC, "test-workspace")
+        result = apply_workspace(sample_func, config, "test-workspace")
 
         # Check signature was updated
         sig = inspect.signature(result)
@@ -137,7 +137,7 @@ class TestApplyWorkspace:
             return f"{workspace}:{a}"
 
         config = ToolConfig(needs_workspace=True)
-        result = apply_workspace(sample_func, config, WorkspaceMode.STATIC, "test-workspace")
+        result = apply_workspace(sample_func, config, "test-workspace")
 
         # Call should work with workspace injected
         output = await result(a=42)
@@ -174,7 +174,7 @@ class TestApplyMemory:
         with pytest.raises(ValueError, match="Invalid memory type"):
             apply_memory(sample_func, config, store)
 
-    @patch("deepset_mcp.tool_factory.explorable")
+    @patch("deepset_mcp.mcp.tool_factory.explorable")
     def test_explorable_memory_applied(self, mock_explorable: Any, store: ObjectStore) -> None:
         """Test that explorable decorator is applied."""
 
@@ -191,7 +191,7 @@ class TestApplyMemory:
         mock_explorable.assert_called_once()
         mock_decorator.assert_called_once_with(sample_func)
 
-    @patch("deepset_mcp.tool_factory.referenceable")
+    @patch("deepset_mcp.mcp.tool_factory.referenceable")
     def test_referenceable_memory_applied(self, mock_referenceable: Any, store: ObjectStore) -> None:
         """Test that referenceable decorator is applied."""
 
@@ -208,7 +208,7 @@ class TestApplyMemory:
         mock_referenceable.assert_called_once()
         mock_decorator.assert_called_once_with(sample_func)
 
-    @patch("deepset_mcp.tool_factory.explorable_and_referenceable")
+    @patch("deepset_mcp.mcp.tool_factory.explorable_and_referenceable")
     def test_both_memory_applied(self, mock_both: Any, store: ObjectStore) -> None:
         """Test that both memory decorator is applied."""
 
@@ -350,7 +350,7 @@ class TestApplyClient:
         # Mock the AsyncDeepsetClient to return our FakeClient
         fake_client = BaseFakeClient()
 
-        with patch("deepset_mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
+        with patch("deepset_mcp.mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = fake_client
 
             await result(a=42, ctx=mock_ctx)
@@ -376,7 +376,7 @@ class TestApplyClient:
         # Mock the AsyncDeepsetClient to return our FakeClient
         fake_client = BaseFakeClient()
 
-        with patch("deepset_mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
+        with patch("deepset_mcp.mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = fake_client
 
             await result(a=42, ctx=mock_ctx)
@@ -399,7 +399,7 @@ class TestApplyClient:
         # Mock the AsyncDeepsetClient to return our FakeClient
         fake_client = BaseFakeClient()
 
-        with patch("deepset_mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
+        with patch("deepset_mcp.mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = fake_client
 
             await result(a=42)
@@ -426,7 +426,7 @@ class TestApplyClient:
         # Mock the AsyncDeepsetClient to return our FakeClient
         fake_client = BaseFakeClient()
 
-        with patch("deepset_mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
+        with patch("deepset_mcp.mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = fake_client
 
             await result(a=42, ctx=mock_ctx)
@@ -451,7 +451,7 @@ class TestApplyClient:
         # Mock the AsyncDeepsetClient to return our FakeClient
         fake_client = BaseFakeClient()
 
-        with patch("deepset_mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
+        with patch("deepset_mcp.mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = fake_client
 
             await result(a=42)
@@ -474,7 +474,7 @@ class TestApplyClient:
         # Mock the AsyncDeepsetClient to return our FakeClient
         fake_client = BaseFakeClient()
 
-        with patch("deepset_mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
+        with patch("deepset_mcp.mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = fake_client
 
             await result(a=42)
@@ -588,7 +588,7 @@ class TestBuildTool:
 
         fake_client = BaseFakeClient()
 
-        with patch("deepset_mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
+        with patch("deepset_mcp.mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = fake_client
 
             output = await result(a=42, ctx=mock_ctx)
@@ -628,7 +628,7 @@ class TestBuildTool:
             memory_type=MemoryType.EXPLORABLE,
         )
 
-        with patch("deepset_mcp.tool_factory.explorable") as mock_explorable:
+        with patch("deepset_mcp.mcp.tool_factory.explorable") as mock_explorable:
             mock_decorator = MagicMock()
             mock_explorable.return_value = mock_decorator
             mock_decorator.return_value = sample_func
@@ -684,7 +684,7 @@ class TestBuildTool:
         # Mock the AsyncDeepsetClient
         fake_client = BaseFakeClient()
 
-        with patch("deepset_mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
+        with patch("deepset_mcp.mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
             mock_client_class.return_value.__aenter__.return_value = fake_client
 
             await result(a=42, ctx=mock_ctx)
