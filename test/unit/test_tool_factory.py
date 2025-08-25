@@ -18,7 +18,7 @@ from deepset_mcp.mcp.tool_factory import (
     apply_workspace,
     build_tool,
 )
-from deepset_mcp.mcp.tool_models import MemoryType, ToolConfig, WorkspaceMode
+from deepset_mcp.mcp.tool_models import MemoryType, ToolConfig
 from deepset_mcp.tokonomics import InMemoryBackend, ObjectStore
 from test.unit.conftest import BaseFakeClient
 
@@ -501,7 +501,7 @@ class TestBuildTool:
             return str(a)
 
         config = ToolConfig()
-        result = build_tool(sample_func, config, WorkspaceMode.STATIC)
+        result = build_tool(sample_func, config)
 
         # Should return async function
         assert inspect.iscoroutinefunction(result)
@@ -518,7 +518,7 @@ class TestBuildTool:
             return str(a)
 
         config = ToolConfig()
-        result = build_tool(sample_func, config, WorkspaceMode.STATIC)
+        result = build_tool(sample_func, config)
 
         # Should return async function
         assert inspect.iscoroutinefunction(result)
@@ -549,7 +549,7 @@ class TestBuildTool:
             custom_args={"custom_arg": "injected"},
         )
 
-        result = build_tool(sample_func, config, WorkspaceMode.STATIC, workspace="test-workspace")
+        result = build_tool(sample_func, config, workspace="test-workspace")
 
         # Check final signature
         sig = inspect.signature(result)
@@ -578,9 +578,7 @@ class TestBuildTool:
             needs_workspace=True,
         )
 
-        result = build_tool(
-            sample_func, config, WorkspaceMode.STATIC, workspace="test-workspace", use_request_context=True
-        )
+        result = build_tool(sample_func, config, workspace="test-workspace", use_request_context=True)
 
         # Mock the context and use FakeClient
         mock_ctx = MagicMock()
@@ -611,7 +609,7 @@ class TestBuildTool:
             needs_workspace=False,
         )
 
-        result = build_tool(sample_func, config, WorkspaceMode.STATIC)
+        result = build_tool(sample_func, config)
 
         # Should work without ctx
         output = await result(a=42, b="test")
@@ -633,7 +631,7 @@ class TestBuildTool:
             mock_explorable.return_value = mock_decorator
             mock_decorator.return_value = sample_func
 
-            build_tool(sample_func, config, WorkspaceMode.STATIC, object_store=object_store)
+            build_tool(sample_func, config, object_store=object_store)
 
             # Should have applied the decorator
             mock_explorable.assert_called_once()
@@ -647,7 +645,7 @@ class TestBuildTool:
             return str(a)
 
         config = ToolConfig(needs_client=True)
-        result = build_tool(sample_func, config, WorkspaceMode.STATIC)
+        result = build_tool(sample_func, config)
 
         # Test missing context
         with pytest.raises(ValueError, match="Context is required"):
@@ -675,7 +673,7 @@ class TestBuildTool:
 
         config = ToolConfig(needs_client=True)
         custom_url = "https://custom.api.example.com"
-        result = build_tool(sample_func, config, WorkspaceMode.STATIC, base_url=custom_url)
+        result = build_tool(sample_func, config, base_url=custom_url)
 
         # Mock the context
         mock_ctx = MagicMock()

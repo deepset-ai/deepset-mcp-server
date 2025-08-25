@@ -48,13 +48,6 @@ class ToolConfig:
     """Any other arguments that should be passed to the tool at registration time instead of being passed by the LLM."""
 
 
-class WorkspaceMode(StrEnum):
-    """Configuration for how workspace is provided to tools."""
-
-    STATIC = "static"  # workspace from env, no parameter in tool signature
-    DYNAMIC = "dynamic"  # workspace as required parameter in tool signature
-
-
 @dataclass
 class DeepsetDocsConfig:
     """Configuration for deepset documentation search tool."""
