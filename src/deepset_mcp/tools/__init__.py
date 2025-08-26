@@ -11,7 +11,7 @@ from .haystack_service import (
     run_component,
     search_component_definition,
 )
-from .indexes import create_index, deploy_index, get_index, list_indexes, update_index
+from .indexes import create_index, deploy_index, get_index, list_indexes, update_index, validate_index
 from .object_store import create_get_from_object_store, create_get_slice_from_object_store
 from .pipeline import (
     create_pipeline,
@@ -41,6 +41,7 @@ __all__ = [
     "update_index",
     "create_index",
     "get_index",
+    "validate_index",
     "create_get_from_object_store",
     "create_get_slice_from_object_store",
     "list_pipelines",

@@ -27,6 +27,7 @@ from deepset_mcp.tools.indexes import (
     get_index as get_index_tool,
     list_indexes as list_indexes_tool,
     update_index as update_index_tool,
+    validate_index as validate_index_tool,
 )
 from deepset_mcp.tools.object_store import create_get_from_object_store, create_get_slice_from_object_store
 from deepset_mcp.tools.pipeline import (
@@ -146,6 +147,10 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "deploy_index": (
         deploy_index_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "validate_index": (
+        validate_index_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
     ),
     "list_templates": (
         list_pipeline_templates_tool,
