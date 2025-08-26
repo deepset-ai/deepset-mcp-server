@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+import yaml
 from pydantic import BaseModel
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
@@ -9,6 +10,15 @@ from deepset_mcp.api.indexes.models import Index
 from deepset_mcp.api.pipeline.models import PipelineValidationResult
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.shared_models import PaginatedResponse
+
+
+class IndexValidationResultWithYaml(BaseModel):
+    """Model for index validation result that includes the original YAML."""
+
+    validation_result: PipelineValidationResult
+    "Result of validating the index configuration"
+    yaml_config: str
+    "Original YAML configuration that was validated"
 
 
 class IndexOperationWithErrors(BaseModel):
@@ -54,6 +64,33 @@ async def get_index(*, client: AsyncClientProtocol, workspace: str, index_name: 
         return f"There is no index named '{index_name}'. Did you mean to create it?"
 
     return response
+
+
+async def validate_index(
+    *, client: AsyncClientProtocol, workspace: str, yaml_configuration: str
+) -> IndexValidationResultWithYaml | str:
+    """Validates the provided index YAML configuration against the deepset API.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param yaml_configuration: The YAML configuration to validate.
+    :returns: Validation result with original YAML or error message.
+    """
+    if not yaml_configuration or not yaml_configuration.strip():
+        return "You need to provide a YAML configuration to validate."
+
+    try:
+        yaml.safe_load(yaml_configuration)
+    except yaml.YAMLError as e:
+        return f"Invalid YAML provided: {e}"
+
+    try:
+        response = await client.indexes(workspace=workspace).validate(yaml_configuration)
+        return IndexValidationResultWithYaml(validation_result=response, yaml_config=yaml_configuration)
+    except ResourceNotFoundError:
+        return f"There is no workspace named '{workspace}'. Did you mean to configure it?"
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to validate index: {e}"
 
 
 async def create_index(
@@ -137,15 +174,24 @@ async def update_index(
     )
 
     try:
-        # Note: We don't have a validate endpoint for indexes like we do for pipelines
-        # So we'll skip validation for now and attempt the update directly
+        validation_response = await client.indexes(workspace=workspace).validate(updated_yaml_configuration)
+
+        if not validation_response.valid and not skip_validation_errors:
+            error_messages = [f"{error.code}: {error.message}" for error in validation_response.errors]
+            return "Index validation failed:\n" + "\n".join(error_messages)
 
         await client.indexes(workspace=workspace).update(index_name=index_name, yaml_config=updated_yaml_configuration)
 
         # Get the full index after update
         index = await client.indexes(workspace=workspace).get(index_name)
 
-        # Return just the index since we don't have validation
+        # If validation failed but we proceeded anyway, return the special model
+        if not validation_response.valid:
+            return IndexOperationWithErrors(
+                message="The operation completed with errors", validation_result=validation_response, index=index
+            )
+
+        # Otherwise return just the index
         return index
 
     except ResourceNotFoundError:

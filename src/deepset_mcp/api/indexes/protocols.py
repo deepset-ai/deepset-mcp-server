@@ -50,6 +50,14 @@ class IndexResourceProtocol(Protocol):
         """
         ...
 
+    async def validate(self, yaml_config: str) -> PipelineValidationResult:
+        """Validate an index's YAML configuration against the API.
+
+        :param yaml_config: The YAML configuration string to validate.
+        :returns: PipelineValidationResult containing validation status and any errors.
+        """
+        ...
+
     async def delete(self, index_name: str) -> None:
         """Delete an index.
 

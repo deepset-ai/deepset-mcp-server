@@ -173,3 +173,34 @@ class IndexResource(IndexResourceProtocol):
             return PipelineValidationResult(valid=False, errors=errors)
 
         raise UnexpectedAPIError(status_code=resp.status_code, message=resp.text, detail=resp.json)
+
+    async def validate(self, yaml_config: str) -> PipelineValidationResult:
+        """Validate an index's YAML configuration against the API.
+
+        :param yaml_config: The YAML configuration string to validate.
+        :returns: PipelineValidationResult containing validation status and any errors.
+        :raises ValueError: If the YAML is not valid (422 error) or contains syntax errors.
+        """
+        data = {"indexing_yaml": yaml_config}
+
+        resp = await self._client.request(
+            endpoint=f"v1/workspaces/{quote(self._workspace, safe='')}/pipeline_validations",
+            method="POST",
+            data=data,
+        )
+
+        # If successful (status 200), the YAML is valid
+        if resp.success:
+            return PipelineValidationResult(valid=True)
+
+        if resp.status_code == 400 and resp.json is not None and isinstance(resp.json, dict) and "details" in resp.json:
+            errors = [ValidationError(code=error["code"], message=error["message"]) for error in resp.json["details"]]
+
+            return PipelineValidationResult(valid=False, errors=errors)
+
+        if resp.status_code == 422:
+            errors = [ValidationError(code="YAML_ERROR", message="Syntax error in YAML")]
+
+            return PipelineValidationResult(valid=False, errors=errors)
+
+        raise UnexpectedAPIError(status_code=resp.status_code, message=resp.text, detail=resp.json)

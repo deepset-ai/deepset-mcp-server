@@ -405,3 +405,62 @@ async def test_deploy_nonexistent_index(
     assert isinstance(result, PipelineValidationResult)
     assert result.valid is False
     assert len(result.errors) > 0
+
+
+@pytest.mark.asyncio
+async def test_validation_valid_yaml(index_resource: IndexResource, valid_index_config: str) -> None:
+    """Test validating a valid index YAML configuration."""
+    config = json.loads(valid_index_config)
+    result = await index_resource.validate(yaml_config=config["yaml_config"])
+
+    assert result.valid is True
+    assert len(result.errors) == 0
+
+
+@pytest.mark.asyncio
+async def test_validation_invalid_yaml(
+    index_resource: IndexResource,
+) -> None:
+    """Test validating an invalid index YAML configuration."""
+    # Create an invalid YAML with missing required fields
+    invalid_yaml = """
+components:
+  document_embedder:
+    # Missing 'type' field
+    init_parameters:
+      model: intfloat/e5-base-v2
+
+inputs:
+  files:
+    - document_embedder.documents
+
+max_runs_per_component: 100
+"""
+
+    result = await index_resource.validate(yaml_config=invalid_yaml)
+
+    # Check that validation failed with errors
+    assert result.valid is False
+    assert len(result.errors) > 0
+
+    # Should have a schema error (currently returns PIPELINE_SCHEMA_ERROR for indexes too)
+    assert result.errors[0].code == "PIPELINE_SCHEMA_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_validation_syntax_error(
+    index_resource: IndexResource,
+) -> None:
+    """Test validating a YAML with syntax errors."""
+    invalid_yaml_syntax = """
+components:
+  document_embedder:
+    type: haystack.components.embedders.sentence_transformers_document_embedder.SentenceTransformersDocumentEmbedder
+    init_parameters
+      model: intfloat/e5-base-v2
+"""
+
+    resp = await index_resource.validate(yaml_config=invalid_yaml_syntax)
+
+    assert resp.valid is False
+    assert resp.errors[0].code == "YAML_ERROR"
