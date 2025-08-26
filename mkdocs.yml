@@ -44,12 +44,14 @@ plugins:
 
 nav:
   - Home: index.md
+  - Installation: installation.md
   - Guides:
       - MCP Server: guides/mcp_server.md
       - API SDK: guides/api_sdk.md
   - Concepts:
+      - MCP Server: concepts/mcp_server_concepts.md
       - API SDK: concepts/sdk_concepts.md
   - Reference:
       - Server Reference: reference/mcp_reference.md
       - Tool Reference: reference/tool_reference.md
-      - API SDK Reference: reference/reference.md
+      - API SDK Reference: reference/api_sdk_reference.md
