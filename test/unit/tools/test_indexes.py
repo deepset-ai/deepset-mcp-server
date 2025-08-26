@@ -10,7 +10,13 @@ from deepset_mcp.api.indexes.models import Index
 from deepset_mcp.api.indexes.protocols import IndexResourceProtocol
 from deepset_mcp.api.pipeline.models import PipelineValidationResult, ValidationError
 from deepset_mcp.api.shared_models import PaginatedResponse
-from deepset_mcp.tools.indexes import create_index, deploy_index, get_index, list_indexes, update_index
+from deepset_mcp.tools.indexes import (
+    create_index,
+    deploy_index,
+    get_index,
+    list_indexes,
+    update_index,
+)
 from test.unit.conftest import BaseFakeClient
 
 
@@ -19,6 +25,7 @@ class FakeIndexResource(IndexResourceProtocol):
         self,
         list_response: PaginatedResponse[Index] | None = None,
         get_response: Index | None = None,
+        get_responses: list[Index] | None = None,  # For sequential responses during waiting
         create_response: Index | None = None,
         update_response: Index | None = None,
         deploy_response: PipelineValidationResult | None = None,
@@ -30,6 +37,8 @@ class FakeIndexResource(IndexResourceProtocol):
     ) -> None:
         self._list_response = list_response
         self._get_response = get_response
+        self._get_responses = get_responses or []
+        self._get_call_count = 0
         self._create_response = create_response
         self._update_response = update_response
         self._deploy_response = deploy_response
@@ -49,6 +58,17 @@ class FakeIndexResource(IndexResourceProtocol):
     async def get(self, index_name: str) -> Index:
         if self._get_exception:
             raise self._get_exception
+
+        # If we have multiple responses for sequential calls (used for update tests)
+        if self._get_responses:
+            if self._get_call_count < len(self._get_responses):
+                response = self._get_responses[self._get_call_count]
+                self._get_call_count += 1
+                return response
+            else:
+                # Return the last response if we've exhausted the list
+                return self._get_responses[-1]
+
         if self._get_response is not None:
             return self._get_response
         raise NotImplementedError
@@ -251,65 +271,151 @@ async def test_create_index_returns_error_message(
 
 
 @pytest.mark.asyncio
-async def test_update_index_returns_success_message() -> None:
-    resource = FakeIndexResource(update_response=create_test_index(name="new_test_index"))
+async def test_update_index_not_found_on_get() -> None:
+    resource = FakeIndexResource(get_exception=ResourceNotFoundError())
     client = FakeClient(resource)
-
     result = await update_index(
-        client=client,
-        workspace="test",
-        index_name="test_index",
-        updated_index_name="new_test_index",
-        yaml_configuration="new_config",
+        client=client, workspace="ws", index_name="np", original_config_snippet="x", replacement_config_snippet="y"
     )
-
-    assert isinstance(result, dict)
-    assert isinstance(result.get("message"), str)
-
-    index = result.get("index")
-    assert isinstance(index, Index)
-    assert index.name == "new_test_index"
+    assert isinstance(result, str)
+    assert "no index named 'np'" in result.lower()
 
 
 @pytest.mark.asyncio
-async def test_update_index_returns_error_message_when_no_changes_provided() -> None:
-    resource = FakeIndexResource()
+async def test_update_index_no_occurrences() -> None:
+    original = create_test_index(
+        name="np",
+        yaml_config="foo: bar",
+    )
+    resource = FakeIndexResource(get_response=original)
     client = FakeClient(resource)
-
     result = await update_index(
         client=client,
-        workspace="test",
-        index_name="test_index",
+        workspace="ws",
+        index_name="np",
+        original_config_snippet="baz",
+        replacement_config_snippet="qux",
     )
+    assert "No occurrences" in result
 
-    assert "You must provide either a new name or a new configuration to update the index." == result
 
-
-@pytest.mark.parametrize(
-    "error_class,expected_message",
-    [
-        (ResourceNotFoundError, "There is no index named 'test_index'"),
-        (BadRequestError, "Failed to update index 'test_index'"),
-        (UnexpectedAPIError, "Failed to update index 'test_index'"),
-    ],
-)
 @pytest.mark.asyncio
-async def test_update_index_returns_error_message(
-    error_class: type[Exception],
-    expected_message: str,
-) -> None:
-    resource = FakeIndexResource(update_exception=error_class("Error details"))
+async def test_update_index_multiple_occurrences() -> None:
+    yaml = "dup: x\ndup: x"
+    original = create_test_index(
+        name="np",
+        yaml_config=yaml,
+    )
+    resource = FakeIndexResource(get_response=original)
     client = FakeClient(resource)
-
     result = await update_index(
         client=client,
-        workspace="test",
-        index_name="test_index",
-        updated_index_name="new_test_index",
-        yaml_configuration="new_config",
+        workspace="ws",
+        index_name="np",
+        original_config_snippet="dup: x",
+        replacement_config_snippet="z",
+    )
+    assert "Multiple occurrences (2)" in result
+
+
+@pytest.mark.asyncio
+async def test_update_index_no_yaml_config() -> None:
+    original = create_test_index(
+        name="np",
+        yaml_config="",
+    )
+    # Manually set yaml_config to None to test this case
+    original.yaml_config = None  # type: ignore[assignment]
+    resource = FakeIndexResource(get_response=original)
+    client = FakeClient(resource)
+    result = await update_index(
+        client=client,
+        workspace="ws",
+        index_name="np",
+        original_config_snippet="foo: 1",
+        replacement_config_snippet="foo: 2",
+    )
+    assert "does not have a YAML configuration" in result
+
+
+@pytest.mark.asyncio
+async def test_update_index_exceptions_on_update() -> None:
+    orig_yaml = "foo: 1"
+    original = create_test_index(
+        name="np",
+        yaml_config=orig_yaml,
     )
 
-    assert expected_message in result
+    # ResourceNotFoundError
+    res_not_found = FakeIndexResource(get_response=original, update_exception=ResourceNotFoundError())
+    client_not_found = FakeClient(res_not_found)
+    r1 = await update_index(
+        client=client_not_found,
+        workspace="ws",
+        index_name="np",
+        original_config_snippet="foo: 1",
+        replacement_config_snippet="foo: 2",
+    )
+    assert isinstance(r1, str)
+    assert "no index named 'np'" in r1.lower()
+
+    # BadRequestError
+    res_bad = FakeIndexResource(get_response=original, update_exception=BadRequestError("bad request"))
+    client_bad = FakeClient(res_bad)
+    r2 = await update_index(
+        client=client_bad,
+        workspace="ws",
+        index_name="np",
+        original_config_snippet="foo: 1",
+        replacement_config_snippet="foo: 2",
+    )
+    assert "Failed to update" in r2
+    assert "bad request" in r2
+
+    # UnexpectedAPIError
+    res_unexp = FakeIndexResource(
+        get_response=original,
+        update_exception=UnexpectedAPIError(status_code=500, message="oops"),
+    )
+    client_unexp = FakeClient(res_unexp)
+    r3 = await update_index(
+        client=client_unexp,
+        workspace="ws",
+        index_name="np",
+        original_config_snippet="foo: 1",
+        replacement_config_snippet="foo: 2",
+    )
+    assert "Failed to update" in r3
+    assert "oops" in r3
+
+
+@pytest.mark.asyncio
+async def test_update_index_success_response() -> None:
+    orig_yaml = "foo: 1"
+    original = create_test_index(
+        name="np",
+        yaml_config=orig_yaml,
+    )
+    updated = create_test_index(
+        name="np",
+        yaml_config="foo: 2",
+    )
+
+    # success
+    res_succ = FakeIndexResource(
+        get_responses=[original, updated],  # First get returns original, second returns updated
+        update_response=updated,
+    )
+    client_succ = FakeClient(res_succ)
+    r_success = await update_index(
+        client=client_succ,
+        workspace="ws",
+        index_name="np",
+        original_config_snippet="foo: 1",
+        replacement_config_snippet="foo: 2",
+    )
+    assert isinstance(r_success, Index)
+    assert r_success.yaml_config == "foo: 2"
 
 
 @pytest.mark.asyncio
@@ -354,24 +460,6 @@ async def test_create_index_with_detailed_error_messages() -> None:
     assert "Failed to create index 'unavailable_index'" in result_unexpected
     assert "Service unavailable" in result_unexpected
     assert "503" in result_unexpected
-
-
-@pytest.mark.asyncio
-async def test_update_index_with_detailed_error_messages() -> None:
-    # Test with detailed BadRequestError
-    resource = FakeIndexResource(update_exception=BadRequestError(message="Name already exists"))
-    client = FakeClient(resource)
-
-    result = await update_index(
-        client=client,
-        workspace="test",
-        index_name="existing_index",
-        updated_index_name="duplicate_name",
-    )
-
-    assert "Failed to update index 'existing_index'" in result
-    assert "Name already exists" in result
-    assert "400" in result
 
 
 @pytest.mark.asyncio

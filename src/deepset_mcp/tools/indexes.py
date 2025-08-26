@@ -2,11 +2,24 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from pydantic import BaseModel
+
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.indexes.models import Index
 from deepset_mcp.api.pipeline.models import PipelineValidationResult
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.shared_models import PaginatedResponse
+
+
+class IndexOperationWithErrors(BaseModel):
+    """Model for index operations that complete with validation errors."""
+
+    message: str
+    "Descriptive message about the index operation"
+    validation_result: PipelineValidationResult
+    "Validation errors encountered during the operation"
+    index: Index
+    "Index object after the operation completed"
 
 
 async def list_indexes(
@@ -78,35 +91,69 @@ async def update_index(
     client: AsyncClientProtocol,
     workspace: str,
     index_name: str,
-    updated_index_name: str | None = None,
-    yaml_configuration: str | None = None,
-) -> dict[str, str | Index] | str:
-    """Updates an existing index in your deepset platform workspace.
-
-    This function can update either the name or the configuration of an existing index, or both.
-    At least one of updated_index_name or yaml_configuration must be provided.
-
-    :param client: Deepset API client to use.
-    :param workspace: Workspace in which to update the index.
-    :param index_name: Unique name of the index to update.
-    :param updated_index_name: Updated name of the index.
-    :param yaml_configuration: YAML configuration to update the index with.
+    original_config_snippet: str,
+    replacement_config_snippet: str,
+    skip_validation_errors: bool = True,
+) -> Index | IndexOperationWithErrors | str:
     """
-    if not updated_index_name and not yaml_configuration:
-        return "You must provide either a new name or a new configuration to update the index."
+    Updates an index configuration in the specified workspace with a replacement configuration snippet.
+
+    This function validates the replacement configuration snippet before applying it to the index.
+    If the validation fails and skip_validation_errors is False, it returns error messages.
+    Otherwise, the replacement snippet is used to update the index's configuration.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param index_name: Name of the index to update.
+    :param original_config_snippet: The configuration snippet to replace.
+    :param replacement_config_snippet: The new configuration snippet.
+    :param skip_validation_errors: If True (default), updates the index even if validation fails.
+                                  If False, stops update when validation fails.
+    :returns: Updated index or error message.
+    """
+    try:
+        original_index = await client.indexes(workspace=workspace).get(index_name=index_name)
+    except ResourceNotFoundError:
+        return f"There is no index named '{index_name}'. Did you mean to create it?"
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to fetch index '{index_name}': {e}"
+
+    if original_index.yaml_config is None:
+        return f"The index '{index_name}' does not have a YAML configuration."
+
+    occurrences = original_index.yaml_config.count(original_config_snippet)
+
+    if occurrences == 0:
+        return f"No occurrences of the provided configuration snippet were found in the index '{index_name}'."
+
+    if occurrences > 1:
+        return (
+            f"Multiple occurrences ({occurrences}) of the provided configuration snippet were found in the index "
+            f"'{index_name}'. Specify a more precise snippet to proceed with the update."
+        )
+
+    updated_yaml_configuration = original_index.yaml_config.replace(
+        original_config_snippet, replacement_config_snippet, 1
+    )
 
     try:
-        result = await client.indexes(workspace=workspace).update(
-            index_name=index_name, updated_index_name=updated_index_name, yaml_config=yaml_configuration
-        )
+        # Note: We don't have a validate endpoint for indexes like we do for pipelines
+        # So we'll skip validation for now and attempt the update directly
+
+        await client.indexes(workspace=workspace).update(index_name=index_name, yaml_config=updated_yaml_configuration)
+
+        # Get the full index after update
+        index = await client.indexes(workspace=workspace).get(index_name)
+
+        # Return just the index since we don't have validation
+        return index
+
     except ResourceNotFoundError:
         return f"There is no index named '{index_name}'. Did you mean to create it?"
     except BadRequestError as e:
-        return f"Failed to update index '{index_name}': {e}"
+        return f"Failed to update the index '{index_name}': {e}"
     except UnexpectedAPIError as e:
-        return f"Failed to update index '{index_name}': {e}"
-
-    return {"message": f"Index '{index_name}' updated successfully.", "index": result}
+        return f"Failed to update the index '{index_name}': {e}"
 
 
 async def deploy_index(

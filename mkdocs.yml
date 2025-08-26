@@ -26,8 +26,8 @@ plugins:
             show_source: false
             show_signature_annotations: true
             show_root_heading: false
-            show_root_full_path: false        # Don't show full module paths
-            show_root_members_full_path: false # Don't show full paths for members
+            show_root_full_path: true        # Don't show full module paths
+            show_root_members_full_path: true # Don't show full paths for members
             show_root_toc_entry: false
             separate_signature: true  # ← Separates signature from docstring
             signature_crossrefs: true
