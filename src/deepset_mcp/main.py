@@ -20,6 +20,7 @@ class TransportEnum(StrEnum):
 
     STDIO = "stdio"
     STREAMABLE_HTTP = "streamable-http"
+    SSE = "sse"
 
 
 app = typer.Typer(
