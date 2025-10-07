@@ -9,6 +9,7 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+from mcp.server.fastmcp import Context
 
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.mcp.tool_factory import (
@@ -265,6 +266,11 @@ class TestApplyClient:
         assert ":param client:" not in result.__doc__
         assert ":param a:" in result.__doc__
 
+        # Check annotations were updated
+        assert "client" not in result.__annotations__
+        assert "ctx" in result.__annotations__
+        assert result.__annotations__["ctx"] == Context
+
     def test_client_signature_updated_without_context(self) -> None:
         """Test that client parameter is removed without ctx."""
 
@@ -288,6 +294,10 @@ class TestApplyClient:
         # Check docstring was updated
         assert result.__doc__ is not None
         assert ":param client:" not in result.__doc__
+
+        # Check annotations were updated
+        assert "client" not in result.__annotations__
+        assert "ctx" not in result.__annotations__
 
     @pytest.mark.asyncio
     async def test_client_context_missing_raises_error(self) -> None:
