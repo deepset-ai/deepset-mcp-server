@@ -193,7 +193,14 @@ def apply_client(
         ctx_param = inspect.Parameter(name="ctx", kind=inspect.Parameter.KEYWORD_ONLY, annotation=Context)
         new_params.append(ctx_param)
         client_wrapper_with_context.__signature__ = original_sig.replace(parameters=new_params)  # type: ignore
+
+        # Remove client from docstring
         client_wrapper_with_context.__doc__ = remove_params_from_docstring(base_func.__doc__, {"client"})
+
+        # Remove client from annotations and add ctx
+        new_annotations = {k: v for k, v in base_func.__annotations__.items() if k != "client"}
+        new_annotations["ctx"] = Context
+        client_wrapper_with_context.__annotations__ = new_annotations
 
         return client_wrapper_with_context
     else:
@@ -213,6 +220,10 @@ def apply_client(
 
         # Remove client from docstring
         client_wrapper_without_context.__doc__ = remove_params_from_docstring(base_func.__doc__, {"client"})
+
+        # Remove client from annotations
+        new_annotations = {k: v for k, v in base_func.__annotations__.items() if k != "client"}
+        client_wrapper_without_context.__annotations__ = new_annotations
 
         return client_wrapper_without_context
 
