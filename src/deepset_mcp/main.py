@@ -112,6 +112,20 @@ def main(
             "Can also be set via OBJECT_STORE_TTL environment variable.",
         ),
     ] = 600,
+    host: Annotated[
+        str,
+        typer.Option(
+            "--host",
+            help="Host address to bind the server to. Default: 0.0.0.0",
+        ),
+    ] = "0.0.0.0",
+    port: Annotated[
+        int | None,
+        typer.Option(
+            "--port",
+            help="Port number to bind the server to. If not specified, uses default port for the transport.",
+        ),
+    ] = None,
 ) -> None:
     """
     Run the Deepset MCP server.
@@ -130,6 +144,8 @@ def main(
     :param object_store_backend: Object store backend type ('memory' or 'redis')
     :param object_store_redis_url: Redis connection URL (required if backend='redis')
     :param object_store_ttl: TTL in seconds for stored objects
+    :param host: Host address to bind the server to
+    :param port: Port number to bind the server to
     """
     # Handle --list-tools flag early
     if list_tools:
@@ -187,6 +203,9 @@ def main(
         object_store_redis_url=redis_url,
         object_store_ttl=ttl,
     )
+    mcp.settings.host = host
+    if port is not None:
+        mcp.settings.port = port
 
     mcp.run(transport=transport.value)
 
