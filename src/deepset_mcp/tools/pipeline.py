@@ -369,12 +369,18 @@ async def search_pipeline(
     except Exception as e:
         return f"An unexpected error occurred while searching with pipeline '{pipeline_name}': {str(e)}"
 
+
 async def search_pipeline_with_filters(
-    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str, query: str, filters: dict[str, Any] | None = None
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    query: str,
+    filters: dict[str, Any] | None = None,
 ) -> DeepsetSearchResponse | str:
     """Searches using a pipeline with filters.
 
-    Uses the specified pipeline to perform a search with the given query and filters. 
+    Uses the specified pipeline to perform a search with the given query and filters.
     Filters follow the Haystack filter syntax: https://docs.haystack.deepset.ai/docs/metadata-filtering.
     Before executing the search, checks if the pipeline is deployed (status = DEPLOYED).
     Returns search results.
@@ -399,7 +405,9 @@ async def search_pipeline_with_filters(
             )
 
         # Execute the search
-        return await client.pipelines(workspace=workspace).search(pipeline_name=pipeline_name, query=query, filters=filters)
+        return await client.pipelines(workspace=workspace).search(
+            pipeline_name=pipeline_name, query=query, filters=filters if filters is not None else None
+        )
 
     except ResourceNotFoundError:
         return f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}'."
@@ -409,4 +417,3 @@ async def search_pipeline_with_filters(
         return f"Failed to search using pipeline '{pipeline_name}': {e}"
     except Exception as e:
         return f"An unexpected error occurred while searching with pipeline '{pipeline_name}': {str(e)}"
-
