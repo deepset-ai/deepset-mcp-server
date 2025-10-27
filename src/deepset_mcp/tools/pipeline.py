@@ -374,7 +374,8 @@ async def search_pipeline_with_filters(
 ) -> DeepsetSearchResponse | str:
     """Searches using a pipeline with filters.
 
-    Uses the specified pipeline to perform a search with the given query.
+    Uses the specified pipeline to perform a search with the given query and filters. 
+    Filters follow the Haystack filter syntax: https://docs.haystack.deepset.ai/docs/metadata-filtering.
     Before executing the search, checks if the pipeline is deployed (status = DEPLOYED).
     Returns search results.
 
