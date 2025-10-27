@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import asyncio
+from typing import Any
 
 import yaml
 from pydantic import BaseModel
@@ -367,3 +368,44 @@ async def search_pipeline(
         return f"Failed to search using pipeline '{pipeline_name}': {e}"
     except Exception as e:
         return f"An unexpected error occurred while searching with pipeline '{pipeline_name}': {str(e)}"
+
+async def search_pipeline_with_filters(
+    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str, query: str, filters: dict[str, Any] | None = None
+) -> DeepsetSearchResponse | str:
+    """Searches using a pipeline with filters.
+
+    Uses the specified pipeline to perform a search with the given query.
+    Before executing the search, checks if the pipeline is deployed (status = DEPLOYED).
+    Returns search results.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline to use for search.
+    :param query: The search query to execute.
+    :param filters: The filters to apply to the search.
+
+    :returns: Search results or error message.
+    """
+    try:
+        # First, check if the pipeline exists and get its status
+        pipeline = await client.pipelines(workspace=workspace).get(pipeline_name=pipeline_name)
+
+        # Check if pipeline is deployed
+        if pipeline.status != "DEPLOYED":
+            return (
+                f"Pipeline '{pipeline_name}' is not deployed (current status: {pipeline.status}). "
+                f"Please deploy the pipeline first using the deploy_pipeline tool before attempting to search."
+            )
+
+        # Execute the search
+        return await client.pipelines(workspace=workspace).search(pipeline_name=pipeline_name, query=query, filters=filters)
+
+    except ResourceNotFoundError:
+        return f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}'."
+    except BadRequestError as e:
+        return f"Failed to search using pipeline '{pipeline_name}': {e}"
+    except UnexpectedAPIError as e:
+        return f"Failed to search using pipeline '{pipeline_name}': {e}"
+    except Exception as e:
+        return f"An unexpected error occurred while searching with pipeline '{pipeline_name}': {str(e)}"
+

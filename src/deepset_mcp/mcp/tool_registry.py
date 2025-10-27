@@ -37,6 +37,7 @@ from deepset_mcp.tools.pipeline import (
     get_pipeline_logs as get_pipeline_logs_tool,
     list_pipelines as list_pipelines_tool,
     search_pipeline as search_pipeline_tool,
+    search_pipeline_with_filters as search_pipeline_with_filters_tool,
     update_pipeline as update_pipeline_tool,
     validate_pipeline as validate_pipeline_tool,
 )
@@ -126,6 +127,10 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     ),
     "search_pipeline": (
         search_pipeline_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "search_pipeline_with_filters": (
+        search_pipeline_with_filters_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
     "list_indexes": (
