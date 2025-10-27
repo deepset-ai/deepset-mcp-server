@@ -20,6 +20,7 @@ from .pipeline import (
     get_pipeline_logs,
     list_pipelines,
     search_pipeline,
+    search_pipeline_with_filters,
     update_pipeline,
     validate_pipeline,
 )
@@ -49,6 +50,7 @@ __all__ = [
     "get_pipeline_logs",
     "deploy_pipeline",
     "search_pipeline",
+    "search_pipeline_with_filters",
     "create_pipeline",
     "update_pipeline",
     "validate_pipeline",
