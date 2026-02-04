@@ -21,6 +21,7 @@ from .pipeline import (
     list_pipelines,
     search_pipeline,
     search_pipeline_with_filters,
+    search_pipeline_with_params,
     update_pipeline,
     validate_pipeline,
 )
@@ -51,6 +52,7 @@ __all__ = [
     "deploy_pipeline",
     "search_pipeline",
     "search_pipeline_with_filters",
+    "search_pipeline_with_params",
     "create_pipeline",
     "update_pipeline",
     "validate_pipeline",
