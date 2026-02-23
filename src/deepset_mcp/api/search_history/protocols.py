@@ -13,9 +13,7 @@ from deepset_mcp.api.shared_models import PaginatedResponse
 class SearchHistoryResourceProtocol(Protocol):
     """Protocol defining the interface for search history resources."""
 
-    async def list(
-        self, limit: int = 10, after: str | None = None
-    ) -> PaginatedResponse[SearchHistoryEntry]:
+    async def list(self, limit: int = 10, after: str | None = None) -> PaginatedResponse[SearchHistoryEntry]:
         """List search history entries in the workspace.
 
         :param limit: Maximum number of entries to return per page.
