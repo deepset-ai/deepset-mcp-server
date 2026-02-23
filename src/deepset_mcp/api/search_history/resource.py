@@ -32,11 +32,11 @@ class SearchHistoryResource(SearchHistoryResourceProtocol):
         return f"v1/workspaces/{quote(self._workspace, safe='')}/search_history"
 
     def _pipeline_path(self, pipeline_name: str) -> str:
-        return f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/{quote(pipeline_name, safe='')}/search_history"
+        return (
+            f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/{quote(pipeline_name, safe='')}/search_history"
+        )
 
-    async def list(
-        self, limit: int = 10, after: str | None = None
-    ) -> PaginatedResponse[SearchHistoryEntry]:
+    async def list(self, limit: int = 10, after: str | None = None) -> PaginatedResponse[SearchHistoryEntry]:
         """List search history entries in the workspace.
 
         :param limit: Maximum number of entries to return per page.
