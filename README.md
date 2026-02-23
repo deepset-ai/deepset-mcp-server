@@ -29,6 +29,37 @@ pipx install uv
 uv sync --locked --all-extras --all-groups
 ```
 
+### Local Development
+
+If you want to test your changes locally, follow these steps:
+
+1. Add a script run-deepset-mcp.sh that uses the binary from the project's virtual env
+
+```bash
+#!/usr/bin/env bash
+# Wrapper to run the local deepset-mcp server for Cursor MCP.
+# Use this as command so it doesn't depend on uv or PATH.
+set -e
+cd "$(dirname "$0")"
+exec .venv/bin/deepset-mcp
+```
+
+2. Use it this way in Cursor:
+
+```bash
+    "deepset": {
+      "command": "/bin/bash",
+      "args": ["/Users/*****/****/deepset-mcp-server/run-deepset-mcp.sh"],
+      "cwd": "/Users/*****/****/deepset-mcp-server",
+      "env": {
+        "DEEPSET_WORKSPACE": "WORKSPACE",
+        "DEEPSET_API_KEY": "API_KEY"
+      }
+    }
+```
+
+Note: If you change the codebase, make sure to restart the MCP server.
+
 ### Code Quality & Testing
 
 Run code quality checks and tests using the Makefile:
@@ -60,6 +91,3 @@ Documentation is built using [MkDocs](https://www.mkdocs.org/) with the Material
 - Content: `docs/` directory
 - Auto-generated API docs via [mkdocstrings](https://mkdocstrings.github.io/)
 - Deployed via GitHub Pages (automated via GitHub Actions on push to main branch)
-
-
-
