@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from deepset_mcp.api.integrations.protocols import IntegrationResourceProtocol
     from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
     from deepset_mcp.api.pipeline_template.protocols import PipelineTemplateResourceProtocol
+    from deepset_mcp.api.search_history.protocols import SearchHistoryResourceProtocol
     from deepset_mcp.api.secrets.protocols import SecretResourceProtocol
     from deepset_mcp.api.user.protocols import UserResourceProtocol
     from deepset_mcp.api.workspace.protocols import WorkspaceResourceProtocol
@@ -125,4 +126,8 @@ class AsyncClientProtocol(Protocol):
 
     def integrations(self) -> "IntegrationResourceProtocol":
         """Access integrations."""
+        ...
+
+    def search_history(self, workspace: str) -> "SearchHistoryResourceProtocol":
+        """Access search history in the specified workspace."""
         ...

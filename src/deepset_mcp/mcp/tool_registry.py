@@ -47,6 +47,10 @@ from deepset_mcp.tools.pipeline_template import (
     list_templates as list_pipeline_templates_tool,
     search_templates as search_pipeline_templates_tool,
 )
+from deepset_mcp.tools.search_history import (
+    list_pipeline_search_history as list_pipeline_search_history_tool,
+    list_search_history as list_search_history_tool,
+)
 from deepset_mcp.tools.secrets import get_secret as get_secret_tool, list_secrets as list_secrets_tool
 from deepset_mcp.tools.workspace import (
     create_workspace as create_workspace_tool,
@@ -183,6 +187,14 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
             memory_type=MemoryType.EXPLORABLE,
             custom_args={"model": get_initialized_model()},
         ),
+    ),
+    "list_search_history": (
+        list_search_history_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "list_pipeline_search_history": (
+        list_pipeline_search_history_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
     "list_custom_component_installations": (
         list_custom_component_installations_tool,
