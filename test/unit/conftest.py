@@ -15,6 +15,7 @@ from deepset_mcp.api.integrations.protocols import IntegrationResourceProtocol
 from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
 from deepset_mcp.api.pipeline_template.protocols import PipelineTemplateResourceProtocol
 from deepset_mcp.api.protocols import AsyncClientProtocol
+from deepset_mcp.api.search_history.protocols import SearchHistoryResourceProtocol
 from deepset_mcp.api.secrets.protocols import SecretResourceProtocol
 from deepset_mcp.api.transport import StreamingResponse, StreamReaderProtocol, TransportResponse
 from deepset_mcp.api.user.protocols import UserResourceProtocol
@@ -282,4 +283,8 @@ class BaseFakeClient(AsyncClientProtocol):
 
     def integrations(self) -> IntegrationResourceProtocol:
         """Overwrite this method when testing IntegrationResource."""
+        raise NotImplementedError
+
+    def search_history(self, workspace: str) -> SearchHistoryResourceProtocol:
+        """Overwrite this method when testing SearchHistoryResource."""
         raise NotImplementedError

@@ -15,6 +15,7 @@ from deepset_mcp.api.integrations.resource import IntegrationResource
 from deepset_mcp.api.pipeline.resource import PipelineResource
 from deepset_mcp.api.pipeline_template.resource import PipelineTemplateResource
 from deepset_mcp.api.protocols import AsyncClientProtocol
+from deepset_mcp.api.search_history.resource import SearchHistoryResource
 from deepset_mcp.api.secrets.resource import SecretResource
 from deepset_mcp.api.transport import (
     AsyncTransport,
@@ -102,6 +103,14 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         :returns: Pipeline template resource instance
         """
         return PipelineTemplateResource(client=self, workspace=workspace)
+
+    def search_history(self, workspace: str) -> SearchHistoryResource:
+        """Resource to interact with search history in the specified workspace.
+
+        :param workspace: Workspace identifier
+        :returns: Search history resource instance
+        """
+        return SearchHistoryResource(client=self, workspace=workspace)
 
     def haystack_service(self) -> HaystackServiceResource:
         """Resource to interact with the Haystack service API.

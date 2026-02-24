@@ -26,6 +26,7 @@ from .pipeline import (
     validate_pipeline,
 )
 from .pipeline_template import get_template, list_templates, search_templates
+from .search_history import list_pipeline_search_history, list_search_history
 from .secrets import get_secret, list_secrets
 from .workspace import get_workspace, list_workspaces
 
@@ -59,6 +60,8 @@ __all__ = [
     "list_templates",
     "get_template",
     "search_templates",
+    "list_search_history",
+    "list_pipeline_search_history",
     "get_secret",
     "list_secrets",
     "list_workspaces",
