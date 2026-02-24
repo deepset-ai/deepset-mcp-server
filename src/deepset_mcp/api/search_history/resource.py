@@ -51,6 +51,7 @@ class SearchHistoryResource(SearchHistoryResourceProtocol):
             endpoint=self._base_path(),
             method="GET",
             params=params,
+            timeout=70.0,
         )
 
         raise_for_status(resp)
@@ -98,6 +99,7 @@ class SearchHistoryResource(SearchHistoryResourceProtocol):
             endpoint=f"{self._pipeline_path(pipeline_name)}_archive",
             method="GET",
             params=params,
+            timeout=70.0,
         )
 
         raise_for_status(resp)
