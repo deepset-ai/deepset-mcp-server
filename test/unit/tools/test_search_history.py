@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from typing import Any
+
 import pytest
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
@@ -56,7 +58,7 @@ def create_search_history_entry(
     answer: str | None = "test answer",
     created_at: str | None = "2023-01-01T12:00:00Z",
     pipeline_name: str | None = "test-pipeline",
-    feedback: list[dict] | None = None,
+    feedback: list[dict[str, Any]] | None = None,
 ) -> SearchHistoryEntry:
     """Helper to create a SearchHistoryEntry for tests."""
     return SearchHistoryEntry(
