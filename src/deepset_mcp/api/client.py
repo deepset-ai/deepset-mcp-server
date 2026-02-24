@@ -56,7 +56,6 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         self,
         api_key: str | None = None,
         base_url: str = "https://api.cloud.deepset.ai/api",
-        # base_url: str = "https://api.dev.cloud.dpst.dev/api/",
         transport: TransportProtocol | None = None,
         transport_config: dict[str, Any] | None = None,
     ) -> None:
