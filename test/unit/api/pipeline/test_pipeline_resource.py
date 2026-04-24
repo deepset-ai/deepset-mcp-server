@@ -507,145 +507,140 @@ class TestPipelineResource:
             await resource.create(pipeline_name="duplicate", yaml_config="version: '1.0'")
 
     @pytest.mark.asyncio
-    async def test_update_pipeline_name_only(self) -> None:
-        """Test updating only a pipeline's name."""
-        # Setup test data
-        old_name = "old-pipeline"
-        new_name = "renamed-pipeline"
-
-        # Create client with successful response
-        client = DummyClient(responses={f"test-workspace/pipelines/{old_name}": {"status": "success"}})
-
-        # Create resource and call update method
-        resource = PipelineResource(client=client, workspace="test-workspace")
-        await resource.update(pipeline_name=old_name, updated_pipeline_name=new_name)
-
-        # Verify request
-        assert len(client.requests) == 1
-        assert client.requests[0]["endpoint"] == f"v1/workspaces/test-workspace/pipelines/{old_name}"
-        assert client.requests[0]["method"] == "PATCH"
-        assert client.requests[0]["data"] == {"name": new_name}
-
-    @pytest.mark.asyncio
-    async def test_update_pipeline_yaml_only(self) -> None:
-        """Test updating only a pipeline's YAML config."""
-        # Setup test data
+    async def test_list_versions_sends_correct_request(self) -> None:
+        """Test that list_versions sends the correct GET request."""
         pipeline_name = "test-pipeline"
-        yaml_config = "version: '1.0'\npipeline:\n  name: updated-test"
-
-        # Create client with successful response
-        client = DummyClient(responses={f"test-workspace/pipelines/{pipeline_name}/yaml": {"status": "success"}})
-
-        # Create resource and call update method
+        version_data = {
+            "data": [
+                {
+                    "version_id": "00000000-0000-0000-0000-000000000001",
+                    "version_number": 2,
+                    "config_yaml": "foo: bar",
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "created_by": {"user_id": "u1", "given_name": "A", "family_name": "B"},
+                    "supports_prompt": False,
+                }
+            ],
+            "has_more": False,
+            "total": 1,
+        }
+        client = DummyClient(responses={f"test-workspace/pipelines/{pipeline_name}/versions": version_data})
         resource = PipelineResource(client=client, workspace="test-workspace")
-        await resource.update(pipeline_name=pipeline_name, yaml_config=yaml_config)
 
-        # Verify request
-        assert len(client.requests) == 1
-        assert client.requests[0]["endpoint"] == f"v1/workspaces/test-workspace/pipelines/{pipeline_name}/yaml"
-        assert client.requests[0]["method"] == "PUT"
-        assert client.requests[0]["data"] == {"query_yaml": yaml_config}
+        result = await resource.list_versions(pipeline_name=pipeline_name)
+
+        assert len(result.data) == 1
+        assert result.data[0].version_number == 2
+        assert client.requests[0]["endpoint"] == f"v1/workspaces/test-workspace/pipelines/{pipeline_name}/versions"
+        assert client.requests[0]["method"] == "GET"
 
     @pytest.mark.asyncio
-    async def test_update_pipeline_name_and_yaml(self) -> None:
-        """Test updating both a pipeline's name and YAML config."""
-        # Setup test data
-        old_name = "old-pipeline"
-        new_name = "renamed-pipeline"
-        yaml_config = "version: '1.0'\npipeline:\n  name: updated-test"
-
-        # Create client with successful responses
-        client = DummyClient(
-            responses={
-                f"test-workspace/pipelines/{old_name}": {"status": "success"},
-                f"test-workspace/pipelines/{new_name}/yaml": {"status": "success"},
-            }
-        )
-
-        # Create resource and call update method
-        resource = PipelineResource(client=client, workspace="test-workspace")
-        await resource.update(pipeline_name=old_name, updated_pipeline_name=new_name, yaml_config=yaml_config)
-
-        # Verify requests
-        assert len(client.requests) == 2
-
-        # First request should update the name
-        assert client.requests[0]["endpoint"] == f"v1/workspaces/test-workspace/pipelines/{old_name}"
-        assert client.requests[0]["method"] == "PATCH"
-        assert client.requests[0]["data"] == {"name": new_name}
-
-        # Second request should update the YAML using the new name
-        assert client.requests[1]["endpoint"] == f"v1/workspaces/test-workspace/pipelines/{new_name}/yaml"
-        assert client.requests[1]["method"] == "PUT"
-        assert client.requests[1]["data"] == {"query_yaml": yaml_config}
-
-    @pytest.mark.asyncio
-    async def test_update_pipeline_no_changes(self) -> None:
-        """Test updating a pipeline with no changes (edge case)."""
-        # Setup test data
+    async def test_create_version_sends_correct_request(self) -> None:
+        """Test that create_version sends the correct POST request."""
         pipeline_name = "test-pipeline"
-
-        # Create client
-        client = DummyClient()
-
-        # Create resource and call update method with no changes
+        config_yaml = "foo: bar"
+        version_response = {
+            "version_id": "00000000-0000-0000-0000-000000000002",
+            "version_number": 3,
+            "config_yaml": config_yaml,
+            "created_at": "2024-01-02T00:00:00Z",
+            "created_by": {"user_id": "u1", "given_name": "A", "family_name": "B"},
+            "supports_prompt": False,
+        }
+        client = DummyClient(responses={f"test-workspace/pipelines/{pipeline_name}/versions": version_response})
         resource = PipelineResource(client=client, workspace="test-workspace")
 
-        with pytest.raises(ValueError):
-            await resource.update(pipeline_name=pipeline_name)
+        result = await resource.create_version(pipeline_name=pipeline_name, config_yaml=config_yaml, description="v3")
+
+        assert result.version_number == 3
+        assert result.config_yaml == config_yaml
+        assert client.requests[0]["method"] == "POST"
+        assert client.requests[0]["data"]["config_yaml"] == config_yaml
+        assert client.requests[0]["data"]["is_draft"] is False
 
     @pytest.mark.asyncio
-    async def test_update_pipeline_name_error(self) -> None:
-        """Test error handling when updating a pipeline's name."""
-        # Create client that raises an exception
+    async def test_get_version_sends_correct_request(self) -> None:
+        """Test that get_version sends the correct GET request."""
+        pipeline_name = "test-pipeline"
+        version_id = "00000000-0000-0000-0000-000000000003"
+        version_response = {
+            "version_id": version_id,
+            "version_number": 1,
+            "config_yaml": "foo: 1",
+            "created_at": "2024-01-01T00:00:00Z",
+            "created_by": {"user_id": "u1", "given_name": "A", "family_name": "B"},
+            "supports_prompt": False,
+        }
         client = DummyClient(
-            responses={"test-workspace/pipelines/old-pipeline": ValueError("Pipeline name already exists")}
+            responses={f"test-workspace/pipelines/{pipeline_name}/versions/{version_id}": version_response}
+        )
+        resource = PipelineResource(client=client, workspace="test-workspace")
+
+        result = await resource.get_version(pipeline_name=pipeline_name, version_id=version_id)
+
+        assert str(result.version_id) == version_id
+        assert result.version_number == 1
+        assert client.requests[0]["endpoint"] == (
+            f"v1/workspaces/test-workspace/pipelines/{pipeline_name}/versions/{version_id}"
         )
 
-        # Create resource
-        resource = PipelineResource(client=client, workspace="test-workspace")
-
-        # Verify exception is raised
-        with pytest.raises(ValueError, match="Pipeline name already exists"):
-            await resource.update(pipeline_name="old-pipeline", updated_pipeline_name="duplicate")
-
     @pytest.mark.asyncio
-    async def test_update_pipeline_yaml_error(self) -> None:
-        """Test error handling when updating a pipeline's YAML config."""
-        # Create client that raises an exception
-        client = DummyClient(responses={"test-workspace/pipelines/test-pipeline/yaml": ValueError("Invalid YAML")})
-
-        # Create resource
-        resource = PipelineResource(client=client, workspace="test-workspace")
-
-        # Verify exception is raised
-        with pytest.raises(ValueError, match="Invalid YAML"):
-            await resource.update(pipeline_name="test-pipeline", yaml_config="invalid: ")
-
-    @pytest.mark.asyncio
-    async def test_update_pipeline_name_then_yaml_error(self) -> None:
-        """Test error handling when name update succeeds but YAML update fails."""
-        # Create client with successful name update but error for YAML
+    async def test_restore_version_sends_correct_request(self) -> None:
+        """Test that restore_version sends the correct POST request."""
+        pipeline_name = "test-pipeline"
+        version_id = "00000000-0000-0000-0000-000000000001"
+        version_response = {
+            "version_id": version_id,
+            "version_number": 1,
+            "config_yaml": "foo: 1",
+            "created_at": "2024-01-01T00:00:00Z",
+            "created_by": {"user_id": "u1", "given_name": "A", "family_name": "B"},
+            "supports_prompt": False,
+        }
         client = DummyClient(
-            responses={
-                "test-workspace/pipelines/old-pipeline": {"status": "success"},
-                "test-workspace/pipelines/new-pipeline/yaml": ValueError("Invalid YAML"),
-            }
+            responses={f"test-workspace/pipelines/{pipeline_name}/versions/{version_id}/restore": version_response}
+        )
+        resource = PipelineResource(client=client, workspace="test-workspace")
+
+        result = await resource.restore_version(pipeline_name=pipeline_name, version_id=version_id)
+
+        assert str(result.version_id) == version_id
+        assert client.requests[0]["method"] == "POST"
+        assert client.requests[0]["endpoint"] == (
+            f"v1/workspaces/test-workspace/pipelines/{pipeline_name}/versions/{version_id}/restore"
         )
 
-        # Create resource
+    @pytest.mark.asyncio
+    async def test_patch_version_sends_correct_request(self) -> None:
+        """Test that patch_version sends the correct PATCH request."""
+        pipeline_name = "test-pipeline"
+        version_id = "00000000-0000-0000-0000-000000000004"
+        version_response = {
+            "version_id": version_id,
+            "version_number": 2,
+            "config_yaml": "foo: patched",
+            "created_at": "2024-01-01T00:00:00Z",
+            "created_by": {"user_id": "u1", "given_name": "A", "family_name": "B"},
+            "supports_prompt": False,
+        }
+        client = DummyClient(
+            responses={f"test-workspace/pipelines/{pipeline_name}/versions/{version_id}": version_response}
+        )
         resource = PipelineResource(client=client, workspace="test-workspace")
 
-        # Verify exception is raised
-        with pytest.raises(ValueError, match="Invalid YAML"):
-            await resource.update(
-                pipeline_name="old-pipeline", updated_pipeline_name="new-pipeline", yaml_config="invalid: "
-            )
+        result = await resource.patch_version(
+            pipeline_name=pipeline_name,
+            version_id=version_id,
+            config_yaml="foo: patched",
+            description="new desc",
+        )
 
-        # Verify both requests were attempted
-        assert len(client.requests) == 2
-        assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines/old-pipeline"
-        assert client.requests[1]["endpoint"] == "v1/workspaces/test-workspace/pipelines/new-pipeline/yaml"
+        assert result.config_yaml == "foo: patched"
+        assert client.requests[0]["method"] == "PATCH"
+        assert client.requests[0]["endpoint"] == (
+            f"v1/workspaces/test-workspace/pipelines/{pipeline_name}/versions/{version_id}"
+        )
+        assert client.requests[0]["data"] == {"config_yaml": "foo: patched", "description": "new desc"}
 
     @pytest.mark.asyncio
     async def test_validation_success(self) -> None:

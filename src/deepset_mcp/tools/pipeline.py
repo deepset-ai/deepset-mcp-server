@@ -15,6 +15,7 @@ from deepset_mcp.api.pipeline.models import (
     LogLevel,
     PipelineLog,
     PipelineValidationResult,
+    PipelineVersion,
 )
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.shared_models import PaginatedResponse
@@ -149,85 +150,170 @@ async def create_pipeline(
         return f"Failed to create pipeline '{pipeline_name}': {e}"
 
 
-async def update_pipeline(
+async def list_pipeline_versions(
     *,
     client: AsyncClientProtocol,
     workspace: str,
     pipeline_name: str,
-    original_config_snippet: str,
-    replacement_config_snippet: str,
-    skip_validation_errors: bool = True,
-) -> DeepsetPipeline | PipelineOperationWithErrors | str:
-    """
-    Updates a pipeline configuration in the specified workspace with a replacement configuration snippet.
-
-    This function validates the replacement configuration snippet before applying it to the pipeline.
-    If the validation fails and skip_validation_errors is False, it returns error messages.
-    Otherwise, the replacement snippet is used to update the pipeline's configuration.
+    after: str | None = None,
+) -> PaginatedResponse[PipelineVersion] | str:
+    """Lists all versions of a pipeline, ordered by version number descending (newest first).
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
-    :param pipeline_name: Name of the pipeline to update.
-    :param original_config_snippet: The configuration snippet to replace.
-    :param replacement_config_snippet: The new configuration snippet.
-    :param skip_validation_errors: If True (default), updates the pipeline even if validation fails.
-                                  If False, stops update when validation fails.
-    :returns: Updated pipeline or error message.
+    :param pipeline_name: Name of the pipeline to list versions for.
+    :param after: Cursor (version_id UUID) to fetch the next page of results.
+    :returns: Paginated list of pipeline versions or error message.
     """
     try:
-        original_pipeline = await client.pipelines(workspace=workspace).get(pipeline_name=pipeline_name)
-    except ResourceNotFoundError:
-        return f"There is no pipeline named '{pipeline_name}'. Did you mean to create it?"
-    except (BadRequestError, UnexpectedAPIError) as e:
-        return f"Failed to fetch pipeline '{pipeline_name}': {e}"
-
-    if original_pipeline.yaml_config is None:
-        return f"The pipeline '{pipeline_name}' does not have a YAML configuration."
-
-    occurrences = original_pipeline.yaml_config.count(original_config_snippet)
-
-    if occurrences == 0:
-        return f"No occurrences of the provided configuration snippet were found in the pipeline '{pipeline_name}'."
-
-    if occurrences > 1:
-        return (
-            f"Multiple occurrences ({occurrences}) of the provided configuration snippet were found in the pipeline "
-            f"'{pipeline_name}'. Specify a more precise snippet to proceed with the update."
+        return await client.pipelines(workspace=workspace).list_versions(
+            pipeline_name=pipeline_name, after=after
         )
+    except ResourceNotFoundError:
+        return f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}'."
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to list versions for pipeline '{pipeline_name}': {e}"
 
-    updated_yaml_configuration = original_pipeline.yaml_config.replace(
-        original_config_snippet, replacement_config_snippet, 1
-    )
+
+async def create_pipeline_version(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    yaml_configuration: str,
+    description: str | None = None,
+    is_draft: bool = False,
+) -> PipelineVersion | str:
+    """Creates a new version of an existing pipeline with the provided YAML configuration.
+
+    Use this to update a pipeline's configuration. Each call creates a new immutable version,
+    preserving the full history of changes.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline to create a version for.
+    :param yaml_configuration: The new YAML configuration for this version.
+    :param description: Optional description of what changed in this version.
+    :param is_draft: If True, the version is created as a draft (default: False).
+    :returns: The newly created pipeline version or error message.
+    """
+    if not yaml_configuration or not yaml_configuration.strip():
+        return "You need to provide a YAML configuration to create a version."
 
     try:
-        validation_response = await client.pipelines(workspace=workspace).validate(updated_yaml_configuration)
+        yaml.safe_load(yaml_configuration)
+    except yaml.YAMLError as e:
+        return f"Invalid YAML provided: {e}"
 
-        if not validation_response.valid and not skip_validation_errors:
-            error_messages = [f"{error.code}: {error.message}" for error in validation_response.errors]
-            return "Pipeline validation failed:\n" + "\n".join(error_messages)
-
-        await client.pipelines(workspace=workspace).update(
-            pipeline_name=pipeline_name, yaml_config=updated_yaml_configuration
+    try:
+        return await client.pipelines(workspace=workspace).create_version(
+            pipeline_name=pipeline_name,
+            config_yaml=yaml_configuration,
+            description=description,
+            is_draft=is_draft,
         )
-
-        # Get the full pipeline after update
-        pipeline = await client.pipelines(workspace=workspace).get(pipeline_name)
-
-        # If validation failed but we proceeded anyway, return the special model
-        if not validation_response.valid:
-            return PipelineOperationWithErrors(
-                message="The operation completed with errors", validation_result=validation_response, pipeline=pipeline
-            )
-
-        # Otherwise return just the pipeline
-        return pipeline
-
     except ResourceNotFoundError:
-        return f"There is no pipeline named '{pipeline_name}'. Did you mean to create it?"
-    except BadRequestError as e:
-        return f"Failed to update the pipeline '{pipeline_name}': {e}"
-    except UnexpectedAPIError as e:
-        return f"Failed to update the pipeline '{pipeline_name}': {e}"
+        return f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}'."
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to create version for pipeline '{pipeline_name}': {e}"
+
+
+async def get_pipeline_version(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    version_id: str,
+) -> PipelineVersion | str:
+    """Fetches a specific version of a pipeline by its version ID.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline.
+    :param version_id: UUID of the version to fetch.
+    :returns: Pipeline version details or error message.
+    """
+    try:
+        return await client.pipelines(workspace=workspace).get_version(
+            pipeline_name=pipeline_name, version_id=version_id
+        )
+    except ResourceNotFoundError:
+        return f"There is no version '{version_id}' for pipeline '{pipeline_name}' in workspace '{workspace}'."
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to fetch version '{version_id}' for pipeline '{pipeline_name}': {e}"
+
+
+async def restore_pipeline_version(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    version_id: str,
+) -> PipelineVersion | str:
+    """Restores a pipeline to a previous version, making that version the active configuration.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline to restore.
+    :param version_id: UUID of the version to restore.
+    :returns: The restored pipeline version or error message.
+    """
+    try:
+        return await client.pipelines(workspace=workspace).restore_version(
+            pipeline_name=pipeline_name, version_id=version_id
+        )
+    except ResourceNotFoundError:
+        return f"There is no version '{version_id}' for pipeline '{pipeline_name}' in workspace '{workspace}'."
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to restore version '{version_id}' for pipeline '{pipeline_name}': {e}"
+
+
+async def patch_pipeline_version(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    version_id: str,
+    yaml_configuration: str | None = None,
+    description: str | None = None,
+    is_draft: bool | None = None,
+) -> PipelineVersion | str:
+    """Updates fields of an existing pipeline version in place.
+
+    At least one of yaml_configuration, description, or is_draft must be provided.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline.
+    :param version_id: UUID of the version to update.
+    :param yaml_configuration: New YAML configuration for the version (optional).
+    :param description: New description for the version (optional).
+    :param is_draft: New draft status for the version (optional).
+    :returns: The updated pipeline version or error message.
+    """
+    if yaml_configuration is None and description is None and is_draft is None:
+        return "At least one of yaml_configuration, description, or is_draft must be provided."
+
+    if yaml_configuration is not None:
+        if not yaml_configuration.strip():
+            return "yaml_configuration cannot be empty."
+        try:
+            yaml.safe_load(yaml_configuration)
+        except yaml.YAMLError as e:
+            return f"Invalid YAML provided: {e}"
+
+    try:
+        return await client.pipelines(workspace=workspace).patch_version(
+            pipeline_name=pipeline_name,
+            version_id=version_id,
+            config_yaml=yaml_configuration,
+            description=description,
+            is_draft=is_draft,
+        )
+    except ResourceNotFoundError:
+        return f"There is no version '{version_id}' for pipeline '{pipeline_name}' in workspace '{workspace}'."
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to update version '{version_id}' for pipeline '{pipeline_name}': {e}"
 
 
 async def get_pipeline_logs(

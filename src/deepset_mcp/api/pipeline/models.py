@@ -275,3 +275,31 @@ class LogLevel(StrEnum):
     INFO = "info"
     WARNING = "warning"
     ERROR = "error"
+
+
+class PipelineVersion(BaseModel):
+    """Model representing a version of a pipeline."""
+
+    version_id: UUID
+    "Unique identifier for the pipeline version"
+    version_number: int | None = None
+    "Sequential version number"
+    config_yaml: str
+    "YAML configuration for this version"
+    description: str | None = None
+    "Optional description of the version"
+    is_draft: bool = False
+    "Whether this version is a draft"
+    created_at: datetime
+    "Timestamp when the version was created"
+    created_by: DeepsetUser | None = None
+    "User who created the version"
+    updated_at: datetime | None = None
+    "Timestamp when the version was last updated"
+    updated_by: DeepsetUser | None = None
+    "User who last updated the version"
+
+    class Config:
+        """Configuration for serialization and deserialization."""
+
+        populate_by_name = True

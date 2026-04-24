@@ -12,6 +12,7 @@ from deepset_mcp.api.pipeline.models import (
     LogLevel,
     PipelineLog,
     PipelineValidationResult,
+    PipelineVersion,
 )
 from deepset_mcp.api.shared_models import NoContentResponse, PaginatedResponse
 
@@ -35,13 +36,42 @@ class PipelineResourceProtocol(Protocol):
         """Create a new pipeline with a name and YAML config."""
         ...
 
-    async def update(
+    async def list_versions(
         self,
         pipeline_name: str,
-        updated_pipeline_name: str | None = None,
-        yaml_config: str | None = None,
-    ) -> NoContentResponse:
-        """Update name and/or YAML config of an existing pipeline."""
+        limit: int = 10,
+        after: str | None = None,
+    ) -> PaginatedResponse[PipelineVersion]:
+        """List versions of a pipeline."""
+        ...
+
+    async def create_version(
+        self,
+        pipeline_name: str,
+        config_yaml: str,
+        description: str | None = None,
+        is_draft: bool = False,
+    ) -> PipelineVersion:
+        """Create a new version of a pipeline."""
+        ...
+
+    async def get_version(self, pipeline_name: str, version_id: str) -> PipelineVersion:
+        """Fetch a specific version of a pipeline."""
+        ...
+
+    async def restore_version(self, pipeline_name: str, version_id: str) -> PipelineVersion:
+        """Restore a pipeline to a previous version."""
+        ...
+
+    async def patch_version(
+        self,
+        pipeline_name: str,
+        version_id: str,
+        config_yaml: str | None = None,
+        description: str | None = None,
+        is_draft: bool | None = None,
+    ) -> PipelineVersion:
+        """Patch fields of an existing pipeline version."""
         ...
 
     async def get_logs(

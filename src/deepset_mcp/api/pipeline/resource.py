@@ -16,6 +16,7 @@ from deepset_mcp.api.pipeline.models import (
     LogLevel,
     PipelineLog,
     PipelineValidationResult,
+    PipelineVersion,
     ValidationError,
 )
 from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
@@ -161,54 +162,153 @@ class PipelineResource(PipelineResourceProtocol):
 
         return NoContentResponse(message="Pipeline created successfully.")
 
-    async def update(
+    async def list_versions(
         self,
         pipeline_name: str,
-        updated_pipeline_name: str | None = None,
-        yaml_config: str | None = None,
-    ) -> NoContentResponse:
-        """Update name and/or YAML config of an existing pipeline.
+        limit: int = 10,
+        after: str | None = None,
+    ) -> PaginatedResponse[PipelineVersion]:
+        """List versions of a pipeline, most recent first.
 
-        :param pipeline_name: Current name of the pipeline.
-        :param updated_pipeline_name: New name for the pipeline (optional).
-        :param yaml_config: New YAML configuration (optional).
-        :returns: NoContentResponse indicating successful update.
-        :raises ValueError: If neither updated_pipeline_name nor yaml_config is provided.
+        :param pipeline_name: Name of the pipeline.
+        :param limit: Maximum number of versions to return per page.
+        :param after: Cursor (version_id UUID) for the next page.
+        :returns: A `PaginatedResponse` containing pipeline versions.
         """
-        # Handle name update first if any
-        if updated_pipeline_name is not None:
-            name_resp = await self._client.request(
-                endpoint=f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/{quote(pipeline_name, safe='')}",
-                method="PATCH",
-                data={"name": updated_pipeline_name},
-            )
+        request_params: dict[str, Any] = {"limit": limit, "order": "DESC", "field": "version_number"}
+        if after is not None:
+            request_params["after"] = after
 
-            raise_for_status(name_resp)
+        page = await self._list_versions_api_call(pipeline_name, **request_params)
+        page._inject_paginator(
+            fetch_func=lambda **kwargs: self._list_versions_api_call(pipeline_name, **kwargs),
+            base_args={"limit": limit, "order": "DESC", "field": "version_number"},
+            cursor_param="after",
+        )
+        return page
 
-            pipeline_name = updated_pipeline_name
+    async def _list_versions_api_call(
+        self, pipeline_name: str, **kwargs: Any
+    ) -> PaginatedResponse[PipelineVersion]:
+        resp = await self._client.request(
+            endpoint=(
+                f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/"
+                f"{quote(pipeline_name, safe='')}/versions"
+            ),
+            method="GET",
+            params=kwargs,
+        )
+        raise_for_status(resp)
+        if resp.json is None:
+            raise UnexpectedAPIError(status_code=resp.status_code, message="Empty response", detail=None)
+        return PaginatedResponse[PipelineVersion].create_with_cursor_field(resp.json, "version_id")
 
-            if yaml_config is None:
-                return NoContentResponse(message="Pipeline name updated successfully.")
+    async def create_version(
+        self,
+        pipeline_name: str,
+        config_yaml: str,
+        description: str | None = None,
+        is_draft: bool = False,
+    ) -> PipelineVersion:
+        """Create a new version of a pipeline.
 
-        if yaml_config is not None:
-            yaml_resp = await self._client.request(
-                endpoint=(
-                    f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/{quote(pipeline_name, safe='')}/yaml"
-                ),
-                method="PUT",
-                data={"query_yaml": yaml_config},
-            )
+        :param pipeline_name: Name of the pipeline.
+        :param config_yaml: YAML configuration for the new version.
+        :param description: Optional description of the version.
+        :param is_draft: Whether to create the version as a draft.
+        :returns: The newly created PipelineVersion.
+        """
+        data: dict[str, Any] = {"config_yaml": config_yaml, "is_draft": is_draft}
+        if description is not None:
+            data["description"] = description
 
-            raise_for_status(yaml_resp)
+        resp = await self._client.request(
+            endpoint=(
+                f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/"
+                f"{quote(pipeline_name, safe='')}/versions"
+            ),
+            method="POST",
+            data=data,
+        )
+        raise_for_status(resp)
+        if resp.json is None:
+            raise UnexpectedAPIError(status_code=resp.status_code, message="Empty response", detail=None)
+        return PipelineVersion.model_validate(resp.json)
 
-            if updated_pipeline_name is not None:
-                response = NoContentResponse(message="Pipeline name and YAML updated successfully.")
-            else:
-                response = NoContentResponse(message="Pipeline YAML updated successfully.")
+    async def get_version(self, pipeline_name: str, version_id: str) -> PipelineVersion:
+        """Fetch a specific version of a pipeline.
 
-            return response
+        :param pipeline_name: Name of the pipeline.
+        :param version_id: UUID of the version to fetch.
+        :returns: The requested PipelineVersion.
+        """
+        resp = await self._client.request(
+            endpoint=(
+                f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/"
+                f"{quote(pipeline_name, safe='')}/versions/{quote(version_id, safe='')}"
+            ),
+        )
+        raise_for_status(resp)
+        if resp.json is None:
+            raise UnexpectedAPIError(status_code=resp.status_code, message="Empty response", detail=None)
+        return PipelineVersion.model_validate(resp.json)
 
-        raise ValueError("Either `updated_pipeline_name` or `yaml_config` must be provided.")
+    async def restore_version(self, pipeline_name: str, version_id: str) -> PipelineVersion:
+        """Restore a pipeline to a previous version.
+
+        :param pipeline_name: Name of the pipeline.
+        :param version_id: UUID of the version to restore.
+        :returns: The restored PipelineVersion.
+        """
+        resp = await self._client.request(
+            endpoint=(
+                f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/"
+                f"{quote(pipeline_name, safe='')}/versions/{quote(version_id, safe='')}/restore"
+            ),
+            method="POST",
+        )
+        raise_for_status(resp)
+        if resp.json is None:
+            raise UnexpectedAPIError(status_code=resp.status_code, message="Empty response", detail=None)
+        return PipelineVersion.model_validate(resp.json)
+
+    async def patch_version(
+        self,
+        pipeline_name: str,
+        version_id: str,
+        config_yaml: str | None = None,
+        description: str | None = None,
+        is_draft: bool | None = None,
+    ) -> PipelineVersion:
+        """Patch fields of an existing pipeline version.
+
+        :param pipeline_name: Name of the pipeline.
+        :param version_id: UUID of the version to patch.
+        :param config_yaml: New YAML configuration (optional).
+        :param description: New description (optional).
+        :param is_draft: New draft status (optional).
+        :returns: The updated PipelineVersion.
+        """
+        data: dict[str, Any] = {}
+        if config_yaml is not None:
+            data["config_yaml"] = config_yaml
+        if description is not None:
+            data["description"] = description
+        if is_draft is not None:
+            data["is_draft"] = is_draft
+
+        resp = await self._client.request(
+            endpoint=(
+                f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/"
+                f"{quote(pipeline_name, safe='')}/versions/{quote(version_id, safe='')}"
+            ),
+            method="PATCH",
+            data=data,
+        )
+        raise_for_status(resp)
+        if resp.json is None:
+            raise UnexpectedAPIError(status_code=resp.status_code, message="Empty response", detail=None)
+        return PipelineVersion.model_validate(resp.json)
 
     async def get_logs(
         self,

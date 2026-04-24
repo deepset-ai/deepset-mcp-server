@@ -237,7 +237,7 @@ my_converter:
 3. **Execute Phase**
 
    * Validate with `validate_pipeline`.
-   * Apply via `create_pipeline` or `update_pipeline`.
+   * Apply via `create_pipeline` (new pipeline) or `create_pipeline_version` (update existing).
 4. **Clarify & Iterate**
 
    * Ask targeted questions if requirements are unclear.
@@ -255,7 +255,10 @@ my_converter:
   * `list_pipelines()`
   * `get_pipeline(pipeline_name)`
   * `create_pipeline(pipeline_name, yaml_configuration)`
-  * `update_pipeline(pipeline_name, original_config, replacement_config)`
+  * `list_pipeline_versions(pipeline_name)`
+  * `create_pipeline_version(pipeline_name, yaml_configuration)` — update a pipeline by creating a new version
+  * `get_pipeline_version(pipeline_name, version_id)`
+  * `restore_pipeline_version(pipeline_name, version_id)` — roll back to a previous version
   * `validate_pipeline(yaml_configuration)`
 * **Templates & Discovery**:
 
