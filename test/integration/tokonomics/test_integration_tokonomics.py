@@ -87,7 +87,7 @@ def redis_backend(redis_container: Any) -> RedisBackend:
 
     # Clear all keys before each test for isolation
     try:
-        import redis  # type: ignore[import-not-found]
+        import redis
 
         r = redis.from_url("redis://localhost:16379/0")
         r.flushall()

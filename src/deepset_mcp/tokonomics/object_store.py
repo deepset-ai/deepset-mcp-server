@@ -77,7 +77,7 @@ class RedisBackend:
     def __init__(self, redis_url: str) -> None:
         """Initialize the redis backend."""
         try:
-            import redis  # type: ignore[import-not-found]
+            import redis
         except ImportError as e:
             logger.error(
                 "Redis package not installed. Install with: pip install deepset-mcp[redis] to use the RedisBackend."
@@ -104,7 +104,7 @@ class RedisBackend:
 
     def get(self, key: str) -> bytes | None:
         """Get a value at key."""
-        return self._client.get(key)  # type: ignore[no-any-return]
+        return self._client.get(key)
 
     def delete(self, key: str) -> bool:
         """Delete a value at key."""
