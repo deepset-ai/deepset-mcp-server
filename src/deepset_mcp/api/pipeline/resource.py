@@ -187,13 +187,10 @@ class PipelineResource(PipelineResourceProtocol):
         )
         return page
 
-    async def _list_versions_api_call(
-        self, pipeline_name: str, **kwargs: Any
-    ) -> PaginatedResponse[PipelineVersion]:
+    async def _list_versions_api_call(self, pipeline_name: str, **kwargs: Any) -> PaginatedResponse[PipelineVersion]:
         resp = await self._client.request(
             endpoint=(
-                f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/"
-                f"{quote(pipeline_name, safe='')}/versions"
+                f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/{quote(pipeline_name, safe='')}/versions"
             ),
             method="GET",
             params=kwargs,
@@ -224,8 +221,7 @@ class PipelineResource(PipelineResourceProtocol):
 
         resp = await self._client.request(
             endpoint=(
-                f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/"
-                f"{quote(pipeline_name, safe='')}/versions"
+                f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/{quote(pipeline_name, safe='')}/versions"
             ),
             method="POST",
             data=data,

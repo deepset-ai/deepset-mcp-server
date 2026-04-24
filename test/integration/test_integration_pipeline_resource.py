@@ -166,37 +166,29 @@ async def test_get_pipeline(
 
 
 @pytest.mark.asyncio
-async def test_update_pipeline(
+async def test_create_pipeline_version(
     pipeline_resource: PipelineResource,
     sample_yaml_config: str,
 ) -> None:
-    """Test updating an existing pipeline's name and config."""
-    original_name = "test-update-pipeline-original"
-    updated_name = "test-update-pipeline-updated"
+    """Test creating a new version of an existing pipeline."""
+    pipeline_name = "test-create-pipeline-version"
 
-    # Create a pipeline to update
-    await pipeline_resource.create(pipeline_name=original_name, yaml_config=sample_yaml_config)
+    # Create the pipeline first
+    await pipeline_resource.create(pipeline_name=pipeline_name, yaml_config=sample_yaml_config)
 
-    # Update the pipeline name
-    await pipeline_resource.update(
-        pipeline_name=original_name,
-        updated_pipeline_name=updated_name,
-    )
-
-    # Verify the name was updated
-    updated_pipeline: DeepsetPipeline = await pipeline_resource.get(pipeline_name=updated_name)
-    assert updated_pipeline.name == updated_name
-
-    # Update the pipeline config
+    # Create a new version with modified config
     modified_yaml = sample_yaml_config.replace("temperature: 0.1", "temperature: 0.2")
-    await pipeline_resource.update(
-        pipeline_name=updated_name,
-        yaml_config=modified_yaml,
+    version = await pipeline_resource.create_version(
+        pipeline_name=pipeline_name,
+        config_yaml=modified_yaml,
+        description="Updated temperature",
     )
 
-    # Verify the config was updated
-    updated_pipeline = await pipeline_resource.get(pipeline_name=updated_name)
-    assert updated_pipeline.yaml_config == modified_yaml
+    assert version.config_yaml == modified_yaml
+
+    # Verify the version appears in the list
+    versions = await pipeline_resource.list_versions(pipeline_name=pipeline_name)
+    assert any(str(v.version_id) == str(version.version_id) for v in versions.data)
 
 
 @pytest.mark.asyncio

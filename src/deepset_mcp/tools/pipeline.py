@@ -166,9 +166,7 @@ async def list_pipeline_versions(
     :returns: Paginated list of pipeline versions or error message.
     """
     try:
-        return await client.pipelines(workspace=workspace).list_versions(
-            pipeline_name=pipeline_name, after=after
-        )
+        return await client.pipelines(workspace=workspace).list_versions(pipeline_name=pipeline_name, after=after)
     except ResourceNotFoundError:
         return f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}'."
     except (BadRequestError, UnexpectedAPIError) as e:

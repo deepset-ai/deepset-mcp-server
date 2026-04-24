@@ -77,7 +77,7 @@ class RedisBackend:
     def __init__(self, redis_url: str) -> None:
         """Initialize the redis backend."""
         try:
-            import redis
+            import redis  # type: ignore[import-not-found]
         except ImportError as e:
             logger.error(
                 "Redis package not installed. Install with: pip install deepset-mcp[redis] to use the RedisBackend."
@@ -86,7 +86,7 @@ class RedisBackend:
                 "Redis package not installed. Install with: pip install deepset-mcp[redis] to use the RedisBackend."
             ) from e
 
-        self._client = redis.from_url(redis_url, decode_responses=False)  # type: ignore[no-untyped-call]
+        self._client = redis.from_url(redis_url, decode_responses=False)
         # Test connection immediately
         self._client.ping()
 

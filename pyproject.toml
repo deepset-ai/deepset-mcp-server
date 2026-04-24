@@ -64,13 +64,8 @@ dev = [
     "pytest",
     "pytest-asyncio",
     "python-dotenv",
-    "docker"
-]
-lint = [
+    "docker",
     "ruff",
-]
-
-types = [
     "mypy",
     "types-PyYAML",
     "pandas-stubs",

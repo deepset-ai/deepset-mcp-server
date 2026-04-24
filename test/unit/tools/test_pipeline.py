@@ -5,6 +5,7 @@
 from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 import pytest
 
@@ -466,7 +467,7 @@ def make_pipeline_version(
 ) -> PipelineVersion:
     user = DeepsetUser(user_id="u1", given_name="A", family_name="B")
     return PipelineVersion(
-        version_id=version_id,
+        version_id=UUID(version_id),
         version_number=version_number,
         config_yaml=config_yaml,
         created_at=datetime.now(),

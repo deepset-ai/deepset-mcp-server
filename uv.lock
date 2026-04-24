@@ -270,22 +270,18 @@ redis = [
 [package.dev-dependencies]
 dev = [
     { name = "docker" },
+    { name = "mypy" },
+    { name = "pandas-stubs" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "python-dotenv" },
+    { name = "ruff" },
+    { name = "types-pyyaml" },
 ]
 docs = [
     { name = "mkdocs" },
     { name = "mkdocs-material" },
     { name = "mkdocstrings", extra = ["python"] },
-]
-lint = [
-    { name = "ruff" },
-]
-types = [
-    { name = "mypy" },
-    { name = "pandas-stubs" },
-    { name = "types-pyyaml" },
 ]
 
 [package.metadata]
@@ -309,20 +305,18 @@ provides-extras = ["redis"]
 [package.metadata.requires-dev]
 dev = [
     { name = "docker" },
+    { name = "mypy" },
+    { name = "pandas-stubs" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "python-dotenv" },
+    { name = "ruff" },
+    { name = "types-pyyaml" },
 ]
 docs = [
     { name = "mkdocs" },
     { name = "mkdocs-material" },
     { name = "mkdocstrings", extras = ["python"] },
-]
-lint = [{ name = "ruff" }]
-types = [
-    { name = "mypy" },
-    { name = "pandas-stubs" },
-    { name = "types-pyyaml" },
 ]
 
 [[package]]

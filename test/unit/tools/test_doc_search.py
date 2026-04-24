@@ -16,6 +16,7 @@ from deepset_mcp.api.pipeline.models import (
     LogLevel,
     PipelineLog,
     PipelineValidationResult,
+    PipelineVersion,
 )
 from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
 from deepset_mcp.api.shared_models import NoContentResponse, PaginatedResponse
@@ -79,12 +80,34 @@ class FakeDocsPipelineResource(PipelineResourceProtocol):
     async def create(self, name: str, yaml_config: str) -> NoContentResponse:
         raise NotImplementedError
 
-    async def update(
+    async def list_versions(
+        self, pipeline_name: str, limit: int = 10, after: str | None = None
+    ) -> PaginatedResponse[PipelineVersion]:
+        raise NotImplementedError
+
+    async def create_version(
         self,
         pipeline_name: str,
-        updated_pipeline_name: str | None = None,
-        yaml_config: str | None = None,
-    ) -> NoContentResponse:
+        config_yaml: str,
+        description: str | None = None,
+        is_draft: bool = False,
+    ) -> PipelineVersion:
+        raise NotImplementedError
+
+    async def get_version(self, pipeline_name: str, version_id: str) -> PipelineVersion:
+        raise NotImplementedError
+
+    async def patch_version(
+        self,
+        pipeline_name: str,
+        version_id: str,
+        config_yaml: str | None = None,
+        description: str | None = None,
+        is_draft: bool | None = None,
+    ) -> PipelineVersion:
+        raise NotImplementedError
+
+    async def restore_version(self, pipeline_name: str, version_id: str) -> PipelineVersion:
         raise NotImplementedError
 
     async def get_logs(
