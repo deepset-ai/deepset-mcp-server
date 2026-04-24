@@ -21,11 +21,8 @@ jobs:
         with:
           python-version-file: ".python-version"
 
-      - name: Install project
-        run: uv sync --locked --all-extras --dev
-
       - name: Run tests
-        run: uv run --dev pytest -m "not integration"
+        run: make test-unit
 
   lint:
     name: Run Linting
@@ -41,14 +38,11 @@ jobs:
         with:
           python-version-file: ".python-version"
 
-      - name: Install project
-        run: uv sync --locked --all-extras --dev
-
       - name: Run lint
-        run: uv run ruff check
+        run: make lint
 
       - name: Run format
-        run: uv run ruff format --check
+        run: make format-check
 
   types:
     name: Run mypy
@@ -64,11 +58,8 @@ jobs:
         with:
           python-version-file: ".python-version"
 
-      - name: Install project
-        run: uv sync --locked --all-extras --dev
-
       - name: Run types
-        run: uv run mypy src/ test/
+        run: make types
 
   license_headers:
     name: Check License Headers
