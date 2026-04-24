@@ -89,7 +89,7 @@ def redis_backend(redis_container: Any) -> RedisBackend:
     try:
         import redis
 
-        r = redis.from_url("redis://localhost:16379/0")  # type: ignore[no-untyped-call]
+        r = redis.from_url("redis://localhost:16379/0")
         r.flushall()
     except ImportError:
         pass

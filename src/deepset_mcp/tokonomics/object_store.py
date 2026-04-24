@@ -86,7 +86,7 @@ class RedisBackend:
                 "Redis package not installed. Install with: pip install deepset-mcp[redis] to use the RedisBackend."
             ) from e
 
-        self._client = redis.from_url(redis_url, decode_responses=False)  # type: ignore[no-untyped-call]
+        self._client = redis.from_url(redis_url, decode_responses=False)
         # Test connection immediately
         self._client.ping()
 
@@ -104,7 +104,7 @@ class RedisBackend:
 
     def get(self, key: str) -> bytes | None:
         """Get a value at key."""
-        return self._client.get(key)  # type: ignore[no-any-return]
+        return self._client.get(key)
 
     def delete(self, key: str) -> bool:
         """Delete a value at key."""

@@ -32,14 +32,18 @@ from deepset_mcp.tools.indexes import (
 from deepset_mcp.tools.object_store import create_get_from_object_store, create_get_slice_from_object_store
 from deepset_mcp.tools.pipeline import (
     create_pipeline as create_pipeline_tool,
+    create_pipeline_version as create_pipeline_version_tool,
     deploy_pipeline as deploy_pipeline_tool,
     get_pipeline as get_pipeline_tool,
     get_pipeline_logs as get_pipeline_logs_tool,
+    get_pipeline_version as get_pipeline_version_tool,
+    list_pipeline_versions as list_pipeline_versions_tool,
     list_pipelines as list_pipelines_tool,
+    patch_pipeline_version as patch_pipeline_version_tool,
+    restore_pipeline_version as restore_pipeline_version_tool,
     search_pipeline as search_pipeline_tool,
     search_pipeline_with_filters as search_pipeline_with_filters_tool,
     search_pipeline_with_params as search_pipeline_with_params_tool,
-    update_pipeline as update_pipeline_tool,
     validate_pipeline as validate_pipeline_tool,
 )
 from deepset_mcp.tools.pipeline_template import (
@@ -100,14 +104,25 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
             custom_args={"skip_validation_errors": True},
         ),
     ),
-    "update_pipeline": (
-        update_pipeline_tool,
-        ToolConfig(
-            needs_client=True,
-            needs_workspace=True,
-            memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE,
-            custom_args={"skip_validation_errors": True},
-        ),
+    "list_pipeline_versions": (
+        list_pipeline_versions_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "create_pipeline_version": (
+        create_pipeline_version_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
+    ),
+    "get_pipeline_version": (
+        get_pipeline_version_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "patch_pipeline_version": (
+        patch_pipeline_version_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
+    ),
+    "restore_pipeline_version": (
+        restore_pipeline_version_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
     ),
     "get_pipeline": (
         get_pipeline_tool,

@@ -64,16 +64,13 @@ dev = [
     "pytest",
     "pytest-asyncio",
     "python-dotenv",
-    "docker"
-]
-lint = [
+    "docker",
     "ruff",
-]
-
-types = [
     "mypy",
     "types-PyYAML",
+    "types-redis",
     "pandas-stubs",
+    "redis>=4.0.0",
 ]
 
 docs = [

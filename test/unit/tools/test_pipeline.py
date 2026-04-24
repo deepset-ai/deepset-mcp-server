@@ -5,6 +5,7 @@
 from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 import pytest
 
@@ -24,6 +25,7 @@ from deepset_mcp.api.pipeline.models import (
     PipelineLog,
     PipelineServiceLevel,
     PipelineValidationResult,
+    PipelineVersion,
     ValidationError,
 )
 from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
@@ -34,12 +36,16 @@ from deepset_mcp.tools.pipeline import (
     PipelineOperationWithErrors,
     PipelineValidationResultWithYaml,
     create_pipeline,
+    create_pipeline_version,
     deploy_pipeline,
     get_pipeline,
     get_pipeline_logs,
+    get_pipeline_version,
+    list_pipeline_versions,
     list_pipelines,
+    patch_pipeline_version,
+    restore_pipeline_version,
     search_pipeline,
-    update_pipeline,
     validate_pipeline,
 )
 from test.unit.conftest import BaseFakeClient
@@ -53,17 +59,25 @@ class FakePipelineResource:
         get_responses: list[DeepsetPipeline] | None = None,  # For sequential responses during waiting
         validate_response: PipelineValidationResult | None = None,
         create_response: NoContentResponse | None = None,
-        update_response: NoContentResponse | None = None,
         logs_response: PaginatedResponse[PipelineLog] | None = None,
         deploy_response: PipelineValidationResult | None = None,
         search_response: DeepsetSearchResponse | None = None,
+        list_versions_response: PaginatedResponse[PipelineVersion] | None = None,
+        create_version_response: PipelineVersion | None = None,
+        get_version_response: PipelineVersion | None = None,
+        restore_version_response: PipelineVersion | None = None,
         get_exception: Exception | None = None,
-        update_exception: Exception | None = None,
         create_exception: Exception | None = None,
         logs_exception: Exception | None = None,
         deploy_exception: Exception | None = None,
         search_exception: Exception | None = None,
         list_exception: Exception | None = None,
+        list_versions_exception: Exception | None = None,
+        create_version_exception: Exception | None = None,
+        get_version_exception: Exception | None = None,
+        patch_version_response: PipelineVersion | None = None,
+        patch_version_exception: Exception | None = None,
+        restore_version_exception: Exception | None = None,
     ) -> None:
         self._list_response = list_response
         self._get_response = get_response
@@ -72,9 +86,7 @@ class FakePipelineResource:
         self._validate_response = validate_response
         self._create_response = create_response
         self._create_exception = create_exception
-        self._update_response = update_response
         self._get_exception = get_exception
-        self._update_exception = update_exception
         self._logs_response = logs_response
         self._logs_exception = logs_exception
         self._deploy_response = deploy_response
@@ -82,6 +94,16 @@ class FakePipelineResource:
         self._search_response = search_response
         self._search_exception = search_exception
         self._list_exception = list_exception
+        self._list_versions_response = list_versions_response
+        self._list_versions_exception = list_versions_exception
+        self._create_version_response = create_version_response
+        self._create_version_exception = create_version_exception
+        self._get_version_response = get_version_response
+        self._get_version_exception = get_version_exception
+        self._patch_version_response = patch_version_response
+        self._patch_version_exception = patch_version_exception
+        self._restore_version_response = restore_version_response
+        self._restore_version_exception = restore_version_exception
 
     async def list(
         self, limit: int = 10, after: str | None = None, before: str | None = None
@@ -124,16 +146,54 @@ class FakePipelineResource:
             return self._create_response
         raise NotImplementedError
 
-    async def update(
+    async def list_versions(
+        self, pipeline_name: str, limit: int = 10, after: str | None = None
+    ) -> PaginatedResponse[PipelineVersion]:
+        if self._list_versions_exception:
+            raise self._list_versions_exception
+        if self._list_versions_response is not None:
+            return self._list_versions_response
+        raise NotImplementedError
+
+    async def create_version(
         self,
         pipeline_name: str,
-        updated_pipeline_name: str | None = None,
-        yaml_config: str | None = None,
-    ) -> NoContentResponse:
-        if self._update_exception:
-            raise self._update_exception
-        if self._update_response is not None:
-            return self._update_response
+        config_yaml: str,
+        description: str | None = None,
+        is_draft: bool = False,
+    ) -> PipelineVersion:
+        if self._create_version_exception:
+            raise self._create_version_exception
+        if self._create_version_response is not None:
+            return self._create_version_response
+        raise NotImplementedError
+
+    async def get_version(self, pipeline_name: str, version_id: str) -> PipelineVersion:
+        if self._get_version_exception:
+            raise self._get_version_exception
+        if self._get_version_response is not None:
+            return self._get_version_response
+        raise NotImplementedError
+
+    async def patch_version(
+        self,
+        pipeline_name: str,
+        version_id: str,
+        config_yaml: str | None = None,
+        description: str | None = None,
+        is_draft: bool | None = None,
+    ) -> PipelineVersion:
+        if self._patch_version_exception:
+            raise self._patch_version_exception
+        if self._patch_version_response is not None:
+            return self._patch_version_response
+        raise NotImplementedError
+
+    async def restore_version(self, pipeline_name: str, version_id: str) -> PipelineVersion:
+        if self._restore_version_exception:
+            raise self._restore_version_exception
+        if self._restore_version_response is not None:
+            return self._restore_version_response
         raise NotImplementedError
 
     async def get_logs(
@@ -400,278 +460,304 @@ async def test_create_pipeline_skip_validation_errors_true() -> None:
     assert result_default.pipeline.name == "test_pipeline"
 
 
-@pytest.mark.asyncio
-async def test_update_pipeline_not_found_on_get() -> None:
-    resource = FakePipelineResource(get_exception=ResourceNotFoundError())
-    client = FakeClient(resource)
-    res = await update_pipeline(
-        client=client, workspace="ws", pipeline_name="np", original_config_snippet="x", replacement_config_snippet="y"
-    )
-    assert isinstance(res, str)
-    assert "no pipeline named 'np'" in res.lower()
-
-
-@pytest.mark.asyncio
-async def test_update_pipeline_no_occurrences() -> None:
+def make_pipeline_version(
+    version_id: str = "00000000-0000-0000-0000-000000000001",
+    version_number: int = 1,
+    config_yaml: str = "foo: bar",
+) -> PipelineVersion:
     user = DeepsetUser(user_id="u1", given_name="A", family_name="B")
-    original = DeepsetPipeline(
-        pipeline_id="p",
-        name="np",
-        status="S",
-        service_level=PipelineServiceLevel.DRAFT,
+    return PipelineVersion(
+        version_id=UUID(version_id),
+        version_number=version_number,
+        config_yaml=config_yaml,
         created_at=datetime.now(),
-        last_edited_at=None,
         created_by=user,
-        last_edited_by=None,
-        yaml_config="foo: bar",
     )
-    resource = FakePipelineResource(get_response=original)
-    client = FakeClient(resource)
-    res = await update_pipeline(
-        client=client,
-        workspace="ws",
-        pipeline_name="np",
-        original_config_snippet="baz",
-        replacement_config_snippet="qux",
-    )
-    assert "No occurrences" in res
 
 
 @pytest.mark.asyncio
-async def test_update_pipeline_multiple_occurrences() -> None:
-    user = DeepsetUser(user_id="u1", given_name="A", family_name="B")
-    yaml = "dup: x\ndup: x"
-    original = DeepsetPipeline(
-        pipeline_id="p",
-        name="np",
-        status="S",
-        service_level=PipelineServiceLevel.DRAFT,
-        created_at=datetime.now(),
-        last_edited_at=None,
-        created_by=user,
-        last_edited_by=None,
-        yaml_config=yaml,
-    )
-    resource = FakePipelineResource(get_response=original)
-    client = FakeClient(resource)
-    res = await update_pipeline(
-        client=client,
-        workspace="ws",
-        pipeline_name="np",
-        original_config_snippet="dup: x",
-        replacement_config_snippet="z",
-    )
-    assert "Multiple occurrences (2)" in res
-
-
-@pytest.mark.asyncio
-async def test_update_pipeline_validation_failure() -> None:
-    user = DeepsetUser(user_id="u1", given_name="A", family_name="B")
-    orig_yaml = "foo: 1"
-    original = DeepsetPipeline(
-        pipeline_id="p",
-        name="np",
-        status="S",
-        service_level=PipelineServiceLevel.DRAFT,
-        created_at=datetime.now(),
-        last_edited_at=None,
-        created_by=user,
-        last_edited_by=None,
-        yaml_config=orig_yaml,
-    )
-    invalid_val = PipelineValidationResult(valid=False, errors=[ValidationError(code="E", message="err")])
-    resource = FakePipelineResource(get_response=original, validate_response=invalid_val)
-    client = FakeClient(resource)
-    res = await update_pipeline(
-        client=client,
-        workspace="ws",
-        pipeline_name="np",
-        original_config_snippet="foo: 1",
-        replacement_config_snippet="foo: 2",
-        skip_validation_errors=False,
-    )
-    assert isinstance(res, str)
-    assert "Pipeline validation failed" in res
-    assert "E: err" in res
-
-
-@pytest.mark.asyncio
-async def test_update_pipeline_exceptions_on_update() -> None:
-    user = DeepsetUser(user_id="u1", given_name="A", family_name="B")
-    orig_yaml = "foo: 1"
-    original = DeepsetPipeline(
-        pipeline_id="p",
-        name="np",
-        status="S",
-        service_level=PipelineServiceLevel.DRAFT,
-        created_at=datetime.now(),
-        last_edited_at=None,
-        created_by=user,
-        last_edited_by=None,
-        yaml_config=orig_yaml,
-    )
-    val_ok = PipelineValidationResult(valid=True, errors=[])
-    # ResourceNotFoundError
-    res_not_found = FakePipelineResource(
-        get_response=original, validate_response=val_ok, update_exception=ResourceNotFoundError()
-    )
-    client_not_found = FakeClient(res_not_found)
-    r1 = await update_pipeline(
-        client=client_not_found,
-        workspace="ws",
-        pipeline_name="np",
-        original_config_snippet="foo: 1",
-        replacement_config_snippet="foo: 2",
-    )
-    assert isinstance(r1, str)
-    assert "no pipeline named 'np'" in r1.lower()
-    # BadRequestError
-    res_bad = FakePipelineResource(
-        get_response=original, validate_response=val_ok, update_exception=BadRequestError("bad request")
-    )
-    client_bad = FakeClient(res_bad)
-    r2 = await update_pipeline(
-        client=client_bad,
-        workspace="ws",
-        pipeline_name="np",
-        original_config_snippet="foo: 1",
-        replacement_config_snippet="foo: 2",
-    )
-    assert "Failed to update" in r2
-    assert "bad request" in r2
-    # UnexpectedAPIError
-    res_unexp = FakePipelineResource(
-        get_response=original,
-        validate_response=val_ok,
-        update_exception=UnexpectedAPIError(status_code=500, message="oops"),
-    )
-    client_unexp = FakeClient(res_unexp)
-    r3 = await update_pipeline(
-        client=client_unexp,
-        workspace="ws",
-        pipeline_name="np",
-        original_config_snippet="foo: 1",
-        replacement_config_snippet="foo: 2",
-    )
-    assert "Failed to update" in r3
-    assert "oops" in r3
-
-
-@pytest.mark.asyncio
-async def test_update_pipeline_success_response() -> None:
-    user = DeepsetUser(user_id="u1", given_name="A", family_name="B")
-    orig_yaml = "foo: 1"
-    original = DeepsetPipeline(
-        pipeline_id="p",
-        name="np",
-        status="S",
-        service_level=PipelineServiceLevel.DEVELOPMENT,
-        created_at=datetime.now(),
-        last_edited_at=None,
-        created_by=user,
-        last_edited_by=None,
-        yaml_config=orig_yaml,
-    )
-    updated = DeepsetPipeline(
-        pipeline_id="p",
-        name="np",
-        status="S",
-        service_level=PipelineServiceLevel.DEVELOPMENT,
-        created_at=datetime.now(),
-        last_edited_at=None,
-        created_by=user,
-        last_edited_by=None,
-        yaml_config="foo: 2",
-    )
-    val_ok = PipelineValidationResult(valid=True, errors=[])
-
-    # success
-    res_succ = FakePipelineResource(
-        get_responses=[original, updated],  # First get returns original, second returns updated
-        validate_response=val_ok,
-        update_response=NoContentResponse(message="successfully updated"),
-    )
-    client_succ = FakeClient(res_succ)
-    r_success = await update_pipeline(
-        client=client_succ,
-        workspace="ws",
-        pipeline_name="np",
-        original_config_snippet="foo: 1",
-        replacement_config_snippet="foo: 2",
-    )
-    assert isinstance(r_success, DeepsetPipeline)
-    assert r_success.yaml_config == "foo: 2"
-
-
-@pytest.mark.asyncio
-async def test_update_pipeline_skip_validation_errors_true() -> None:
-    """Test that update_pipeline updates the pipeline despite validation errors."""
-    user = DeepsetUser(user_id="u1", given_name="A", family_name="B")
-    orig_yaml = "foo: 1"
-    original = DeepsetPipeline(
-        pipeline_id="p",
-        name="np",
-        status="S",
-        service_level=PipelineServiceLevel.DEVELOPMENT,
-        created_at=datetime.now(),
-        last_edited_at=None,
-        created_by=user,
-        last_edited_by=None,
-        yaml_config=orig_yaml,
-    )
-    updated = DeepsetPipeline(
-        pipeline_id="p",
-        name="np",
-        status="S",
-        service_level=PipelineServiceLevel.DEVELOPMENT,
-        created_at=datetime.now(),
-        last_edited_at=None,
-        created_by=user,
-        last_edited_by=None,
-        yaml_config="foo: 2",
-    )
-    invalid_result = PipelineValidationResult(
-        valid=False, errors=[ValidationError(code="E1", message="Test error message")]
-    )
-
-    resource = FakePipelineResource(
-        get_responses=[original, updated],
-        validate_response=invalid_result,
-        update_response=NoContentResponse(message="successfully updated"),
-    )
+async def test_list_pipeline_versions_success() -> None:
+    v1 = make_pipeline_version(version_number=2, config_yaml="foo: 2")
+    v2 = make_pipeline_version(version_number=1, config_yaml="foo: 1")
+    versions_page = PaginatedResponse[PipelineVersion](data=[v1, v2], has_more=False, total=2)
+    resource = FakePipelineResource(list_versions_response=versions_page)
     client = FakeClient(resource)
 
-    # Test with explicit True
-    result = await update_pipeline(
-        client=client,
-        workspace="ws",
-        pipeline_name="np",
-        original_config_snippet="foo: 1",
-        replacement_config_snippet="foo: 2",
-        skip_validation_errors=True,
+    result = await list_pipeline_versions(client=client, workspace="ws", pipeline_name="my-pipeline")
+
+    assert isinstance(result, PaginatedResponse)
+    assert len(result.data) == 2
+    assert result.data[0].version_number == 2
+
+
+@pytest.mark.asyncio
+async def test_list_pipeline_versions_not_found() -> None:
+    resource = FakePipelineResource(list_versions_exception=ResourceNotFoundError())
+    client = FakeClient(resource)
+
+    result = await list_pipeline_versions(client=client, workspace="ws", pipeline_name="missing")
+
+    assert isinstance(result, str)
+    assert "missing" in result
+
+
+@pytest.mark.asyncio
+async def test_list_pipeline_versions_unexpected_error() -> None:
+    resource = FakePipelineResource(list_versions_exception=UnexpectedAPIError(status_code=500, message="boom"))
+    client = FakeClient(resource)
+
+    result = await list_pipeline_versions(client=client, workspace="ws", pipeline_name="my-pipeline")
+
+    assert isinstance(result, str)
+    assert "Failed to list versions" in result
+
+
+@pytest.mark.asyncio
+async def test_create_pipeline_version_success() -> None:
+    version = make_pipeline_version(version_number=3, config_yaml="foo: 3")
+    resource = FakePipelineResource(create_version_response=version)
+    client = FakeClient(resource)
+
+    result = await create_pipeline_version(
+        client=client, workspace="ws", pipeline_name="my-pipeline", yaml_configuration="foo: 3"
     )
 
-    assert isinstance(result, PipelineOperationWithErrors)
-    assert result.message == "The operation completed with errors"
-    assert result.validation_result == invalid_result
-    assert result.pipeline.yaml_config == "foo: 2"
+    assert isinstance(result, PipelineVersion)
+    assert result.config_yaml == "foo: 3"
+    assert result.version_number == 3
 
-    # Reset call count for second test
-    resource._get_call_count = 0
 
-    # Test with default (should behave the same as True)
-    result_default = await update_pipeline(
-        client=client,
-        workspace="ws",
-        pipeline_name="np",
-        original_config_snippet="foo: 1",
-        replacement_config_snippet="foo: 2",
+@pytest.mark.asyncio
+async def test_create_pipeline_version_empty_yaml() -> None:
+    resource = FakePipelineResource()
+    client = FakeClient(resource)
+
+    result = await create_pipeline_version(
+        client=client, workspace="ws", pipeline_name="my-pipeline", yaml_configuration=""
     )
 
-    assert isinstance(result_default, PipelineOperationWithErrors)
-    assert result_default.message == "The operation completed with errors"
-    assert result_default.validation_result == invalid_result
-    assert result_default.pipeline.yaml_config == "foo: 2"
+    assert isinstance(result, str)
+    assert "YAML" in result
+
+
+@pytest.mark.asyncio
+async def test_create_pipeline_version_invalid_yaml() -> None:
+    resource = FakePipelineResource()
+    client = FakeClient(resource)
+
+    result = await create_pipeline_version(
+        client=client, workspace="ws", pipeline_name="my-pipeline", yaml_configuration=": :"
+    )
+
+    assert isinstance(result, str)
+    assert "Invalid YAML" in result
+
+
+@pytest.mark.asyncio
+async def test_create_pipeline_version_not_found() -> None:
+    resource = FakePipelineResource(create_version_exception=ResourceNotFoundError())
+    client = FakeClient(resource)
+
+    result = await create_pipeline_version(
+        client=client, workspace="ws", pipeline_name="missing", yaml_configuration="foo: bar"
+    )
+
+    assert isinstance(result, str)
+    assert "missing" in result
+
+
+@pytest.mark.asyncio
+async def test_create_pipeline_version_api_error() -> None:
+    resource = FakePipelineResource(create_version_exception=BadRequestError("bad"))
+    client = FakeClient(resource)
+
+    result = await create_pipeline_version(
+        client=client, workspace="ws", pipeline_name="my-pipeline", yaml_configuration="foo: bar"
+    )
+
+    assert isinstance(result, str)
+    assert "Failed to create version" in result
+
+
+@pytest.mark.asyncio
+async def test_get_pipeline_version_success() -> None:
+    version = make_pipeline_version(version_id="00000000-0000-0000-0000-000000000042", version_number=5)
+    resource = FakePipelineResource(get_version_response=version)
+    client = FakeClient(resource)
+
+    result = await get_pipeline_version(
+        client=client, workspace="ws", pipeline_name="my-pipeline", version_id="00000000-0000-0000-0000-000000000042"
+    )
+
+    assert isinstance(result, PipelineVersion)
+    assert result.version_number == 5
+
+
+@pytest.mark.asyncio
+async def test_get_pipeline_version_not_found() -> None:
+    resource = FakePipelineResource(get_version_exception=ResourceNotFoundError())
+    client = FakeClient(resource)
+
+    result = await get_pipeline_version(
+        client=client,
+        workspace="ws",
+        pipeline_name="my-pipeline",
+        version_id="00000000-0000-0000-0000-000000000099",
+    )
+
+    assert isinstance(result, str)
+    assert "00000000-0000-0000-0000-000000000099" in result
+
+
+@pytest.mark.asyncio
+async def test_restore_pipeline_version_success() -> None:
+    version = make_pipeline_version(version_id="00000000-0000-0000-0000-000000000001", version_number=1)
+    resource = FakePipelineResource(restore_version_response=version)
+    client = FakeClient(resource)
+
+    result = await restore_pipeline_version(
+        client=client,
+        workspace="ws",
+        pipeline_name="my-pipeline",
+        version_id="00000000-0000-0000-0000-000000000001",
+    )
+
+    assert isinstance(result, PipelineVersion)
+    assert result.version_number == 1
+
+
+@pytest.mark.asyncio
+async def test_restore_pipeline_version_not_found() -> None:
+    resource = FakePipelineResource(restore_version_exception=ResourceNotFoundError())
+    client = FakeClient(resource)
+
+    result = await restore_pipeline_version(
+        client=client,
+        workspace="ws",
+        pipeline_name="my-pipeline",
+        version_id="00000000-0000-0000-0000-000000000099",
+    )
+
+    assert isinstance(result, str)
+    assert "00000000-0000-0000-0000-000000000099" in result
+
+
+@pytest.mark.asyncio
+async def test_restore_pipeline_version_api_error() -> None:
+    resource = FakePipelineResource(restore_version_exception=UnexpectedAPIError(status_code=500, message="oops"))
+    client = FakeClient(resource)
+
+    result = await restore_pipeline_version(
+        client=client,
+        workspace="ws",
+        pipeline_name="my-pipeline",
+        version_id="00000000-0000-0000-0000-000000000001",
+    )
+
+    assert isinstance(result, str)
+    assert "Failed to restore version" in result
+
+
+@pytest.mark.asyncio
+async def test_patch_pipeline_version_success() -> None:
+    version = make_pipeline_version(version_id="00000000-0000-0000-0000-000000000005", config_yaml="foo: updated")
+    resource = FakePipelineResource(patch_version_response=version)
+    client = FakeClient(resource)
+
+    result = await patch_pipeline_version(
+        client=client,
+        workspace="ws",
+        pipeline_name="my-pipeline",
+        version_id="00000000-0000-0000-0000-000000000005",
+        yaml_configuration="foo: updated",
+    )
+
+    assert isinstance(result, PipelineVersion)
+    assert result.config_yaml == "foo: updated"
+
+
+@pytest.mark.asyncio
+async def test_patch_pipeline_version_description_only() -> None:
+    version = make_pipeline_version()
+    resource = FakePipelineResource(patch_version_response=version)
+    client = FakeClient(resource)
+
+    result = await patch_pipeline_version(
+        client=client,
+        workspace="ws",
+        pipeline_name="my-pipeline",
+        version_id="00000000-0000-0000-0000-000000000001",
+        description="Updated description",
+    )
+
+    assert isinstance(result, PipelineVersion)
+
+
+@pytest.mark.asyncio
+async def test_patch_pipeline_version_no_fields() -> None:
+    resource = FakePipelineResource()
+    client = FakeClient(resource)
+
+    result = await patch_pipeline_version(
+        client=client,
+        workspace="ws",
+        pipeline_name="my-pipeline",
+        version_id="00000000-0000-0000-0000-000000000001",
+    )
+
+    assert isinstance(result, str)
+    assert "At least one" in result
+
+
+@pytest.mark.asyncio
+async def test_patch_pipeline_version_invalid_yaml() -> None:
+    resource = FakePipelineResource()
+    client = FakeClient(resource)
+
+    result = await patch_pipeline_version(
+        client=client,
+        workspace="ws",
+        pipeline_name="my-pipeline",
+        version_id="00000000-0000-0000-0000-000000000001",
+        yaml_configuration=": :",
+    )
+
+    assert isinstance(result, str)
+    assert "Invalid YAML" in result
+
+
+@pytest.mark.asyncio
+async def test_patch_pipeline_version_not_found() -> None:
+    resource = FakePipelineResource(patch_version_exception=ResourceNotFoundError())
+    client = FakeClient(resource)
+
+    result = await patch_pipeline_version(
+        client=client,
+        workspace="ws",
+        pipeline_name="my-pipeline",
+        version_id="00000000-0000-0000-0000-000000000099",
+        description="x",
+    )
+
+    assert isinstance(result, str)
+    assert "00000000-0000-0000-0000-000000000099" in result
+
+
+@pytest.mark.asyncio
+async def test_patch_pipeline_version_api_error() -> None:
+    resource = FakePipelineResource(patch_version_exception=BadRequestError("bad"))
+    client = FakeClient(resource)
+
+    result = await patch_pipeline_version(
+        client=client,
+        workspace="ws",
+        pipeline_name="my-pipeline",
+        version_id="00000000-0000-0000-0000-000000000001",
+        is_draft=False,
+    )
+
+    assert isinstance(result, str)
+    assert "Failed to update version" in result
 
 
 @pytest.mark.asyncio

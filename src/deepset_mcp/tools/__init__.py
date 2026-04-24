@@ -15,14 +15,18 @@ from .indexes import create_index, deploy_index, get_index, list_indexes, update
 from .object_store import create_get_from_object_store, create_get_slice_from_object_store
 from .pipeline import (
     create_pipeline,
+    create_pipeline_version,
     deploy_pipeline,
     get_pipeline,
     get_pipeline_logs,
+    get_pipeline_version,
+    list_pipeline_versions,
     list_pipelines,
+    patch_pipeline_version,
+    restore_pipeline_version,
     search_pipeline,
     search_pipeline_with_filters,
     search_pipeline_with_params,
-    update_pipeline,
     validate_pipeline,
 )
 from .pipeline_template import get_template, list_templates, search_templates
@@ -55,8 +59,12 @@ __all__ = [
     "search_pipeline_with_filters",
     "search_pipeline_with_params",
     "create_pipeline",
-    "update_pipeline",
     "validate_pipeline",
+    "list_pipeline_versions",
+    "create_pipeline_version",
+    "get_pipeline_version",
+    "patch_pipeline_version",
+    "restore_pipeline_version",
     "list_templates",
     "get_template",
     "search_templates",
