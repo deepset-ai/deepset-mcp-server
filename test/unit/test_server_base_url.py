@@ -6,6 +6,8 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from deepset_mcp.mcp.server import configure_mcp_server
 
 
@@ -13,12 +15,13 @@ class TestConfigureMcpServerBaseUrl:
     """Test the configure_mcp_server function with base_url parameter."""
 
     @patch("deepset_mcp.mcp.server.register_tools")
-    def test_configure_mcp_server_passes_base_url(self, mock_register_tools: MagicMock) -> None:
+    @pytest.mark.asyncio
+    async def test_configure_mcp_server_passes_base_url(self, mock_register_tools: MagicMock) -> None:
         """Test that configure_mcp_server passes base_url to register_tools."""
         mock_server = MagicMock()
         custom_url = "https://custom.api.example.com"
 
-        configure_mcp_server(
+        await configure_mcp_server(
             mcp_server_instance=mock_server,
             tools_to_register={"list_pipelines"},
             deepset_api_key="test-key",
@@ -32,11 +35,12 @@ class TestConfigureMcpServerBaseUrl:
         assert call_args[1]["base_url"] == custom_url
 
     @patch("deepset_mcp.mcp.server.register_tools")
-    def test_configure_mcp_server_without_base_url(self, mock_register_tools: MagicMock) -> None:
+    @pytest.mark.asyncio
+    async def test_configure_mcp_server_without_base_url(self, mock_register_tools: MagicMock) -> None:
         """Test that configure_mcp_server works without base_url."""
         mock_server = MagicMock()
 
-        configure_mcp_server(
+        await configure_mcp_server(
             mcp_server_instance=mock_server,
             tools_to_register={"list_pipelines"},
             deepset_api_key="test-key",

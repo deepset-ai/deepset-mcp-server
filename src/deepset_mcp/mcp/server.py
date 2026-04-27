@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-import asyncio
 from urllib.parse import parse_qs, urlparse
 
 import jwt
@@ -16,7 +15,7 @@ from deepset_mcp.mcp.tool_models import DeepsetDocsConfig
 from deepset_mcp.mcp.tool_registry import TOOL_REGISTRY
 
 
-def configure_mcp_server(
+async def configure_mcp_server(
     mcp_server_instance: FastMCP,
     tools_to_register: set[str] | None = None,
     deepset_api_key: str | None = None,
@@ -56,8 +55,8 @@ def configure_mcp_server(
             "Please provide 'deepset_api_key' or enable 'get_api_key_from_authorization_header'."
         )
 
-    workspace_name, pipeline_name, api_key_docs = asyncio.run(
-        fetch_shared_prototype_details(deepset_docs_shareable_prototype_url)
+    workspace_name, pipeline_name, api_key_docs = await fetch_shared_prototype_details(
+        deepset_docs_shareable_prototype_url
     )
     docs_config = DeepsetDocsConfig(api_key=api_key_docs, workspace_name=workspace_name, pipeline_name=pipeline_name)
 
