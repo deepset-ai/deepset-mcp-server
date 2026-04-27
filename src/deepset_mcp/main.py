@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+import asyncio
 import logging
 import os
 from enum import StrEnum
@@ -191,17 +192,19 @@ def main(
         raise typer.Exit(1)
 
     mcp = FastMCP("deepset AI platform MCP server")
-    configure_mcp_server(
-        mcp_server_instance=mcp,
-        deepset_api_key=api_key,
-        deepset_api_url=api_url,
-        deepset_workspace=workspace,
-        tools_to_register=tool_names,
-        deepset_docs_shareable_prototype_url=docs_share_url,
-        get_api_key_from_authorization_header=api_key_from_auth_header,
-        object_store_backend=backend,
-        object_store_redis_url=redis_url,
-        object_store_ttl=ttl,
+    asyncio.run(
+        configure_mcp_server(
+            mcp_server_instance=mcp,
+            deepset_api_key=api_key,
+            deepset_api_url=api_url,
+            deepset_workspace=workspace,
+            tools_to_register=tool_names,
+            deepset_docs_shareable_prototype_url=docs_share_url,
+            get_api_key_from_authorization_header=api_key_from_auth_header,
+            object_store_backend=backend,
+            object_store_redis_url=redis_url,
+            object_store_ttl=ttl,
+        )
     )
     mcp.settings.host = host
     if port is not None:
