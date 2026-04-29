@@ -128,7 +128,7 @@ async def create_pipeline(
             error_messages = [f"{error.code}: {error.message}" for error in validation_response.errors]
             return "Pipeline validation failed:\n" + "\n".join(error_messages)
 
-        await client.pipelines(workspace=workspace).create(name=pipeline_name, yaml_config=yaml_configuration)
+        await client.pipelines(workspace=workspace).create(pipeline_name=pipeline_name, yaml_config=yaml_configuration)
 
         # Get the full pipeline after creation
         pipeline = await client.pipelines(workspace=workspace).get(pipeline_name)

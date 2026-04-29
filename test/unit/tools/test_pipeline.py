@@ -139,7 +139,7 @@ class FakePipelineResource:
             return self._validate_response
         raise NotImplementedError
 
-    async def create(self, name: str, yaml_config: str) -> NoContentResponse:
+    async def create(self, pipeline_name: str, yaml_config: str) -> NoContentResponse:
         if self._create_exception:
             raise self._create_exception
         if self._create_response is not None:

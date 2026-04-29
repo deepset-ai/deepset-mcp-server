@@ -32,7 +32,7 @@ class PipelineResourceProtocol(Protocol):
         """List pipelines in the configured workspace with optional pagination."""
         ...
 
-    async def create(self, name: str, yaml_config: str) -> NoContentResponse:
+    async def create(self, pipeline_name: str, yaml_config: str) -> NoContentResponse:
         """Create a new pipeline with a name and YAML config."""
         ...
 
