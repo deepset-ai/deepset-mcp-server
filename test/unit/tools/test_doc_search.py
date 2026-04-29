@@ -77,7 +77,7 @@ class FakeDocsPipelineResource(PipelineResourceProtocol):
     ) -> PaginatedResponse[DeepsetPipeline]:
         raise NotImplementedError
 
-    async def create(self, name: str, yaml_config: str) -> NoContentResponse:
+    async def create(self, pipeline_name: str, yaml_config: str) -> NoContentResponse:
         raise NotImplementedError
 
     async def list_versions(
