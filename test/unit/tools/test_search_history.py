@@ -27,7 +27,9 @@ class FakeSearchHistoryResource(SearchHistoryResourceProtocol):
         self._list_exception = list_exception
         self._list_pipeline_exception = list_pipeline_exception
 
-    async def list(self, limit: int = 10, after: str | None = None) -> PaginatedResponse[SearchHistoryEntry]:
+    async def list(
+        self, limit: int = 10, after: str | None = None, query_filter: str | None = None
+    ) -> PaginatedResponse[SearchHistoryEntry]:
         if self._list_exception:
             raise self._list_exception
         if self._list_response is not None:
@@ -35,7 +37,7 @@ class FakeSearchHistoryResource(SearchHistoryResourceProtocol):
         return PaginatedResponse(data=[], has_more=False, total=0)
 
     async def list_pipeline(
-        self, pipeline_name: str, limit: int = 10, after: str | None = None
+        self, pipeline_name: str, limit: int = 10, after: str | None = None, query_filter: str | None = None
     ) -> PaginatedResponse[SearchHistoryEntry]:
         if self._list_pipeline_exception:
             raise self._list_pipeline_exception
