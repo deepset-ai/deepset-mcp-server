@@ -36,16 +36,21 @@ class SearchHistoryResource(SearchHistoryResourceProtocol):
             f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/{quote(pipeline_name, safe='')}/search_history"
         )
 
-    async def list(self, limit: int = 10, after: str | None = None) -> PaginatedResponse[SearchHistoryEntry]:
+    async def list(
+        self, limit: int = 10, after: str | None = None, query_filter: str | None = None
+    ) -> PaginatedResponse[SearchHistoryEntry]:
         """List search history entries in the workspace.
 
         :param limit: Maximum number of entries to return per page.
         :param after: Cursor to fetch the next page of results.
+        :param query_filter: OData filter expression to narrow results.
         :returns: Paginated response of search history entries.
         """
         params: dict[str, str | int] = {"limit": limit}
         if after is not None:
             params["after"] = after
+        if query_filter is not None:
+            params["filter"] = query_filter
 
         resp = await self._client.request(
             endpoint=self._base_path(),
@@ -80,7 +85,7 @@ class SearchHistoryResource(SearchHistoryResourceProtocol):
         )
 
     async def list_pipeline(
-        self, pipeline_name: str, limit: int = 10, after: str | None = None
+        self, pipeline_name: str, limit: int = 10, after: str | None = None, query_filter: str | None = None
     ) -> PaginatedResponse[SearchHistoryEntry]:
         """List search history entries for a specific pipeline with pagination.
 
@@ -89,11 +94,14 @@ class SearchHistoryResource(SearchHistoryResourceProtocol):
         :param pipeline_name: Name of the pipeline.
         :param limit: Maximum number of entries to return per page.
         :param after: Cursor to fetch the next page of results.
+        :param query_filter: OData filter expression to narrow results.
         :returns: Paginated response of search history entries.
         """
         params: dict[str, str | int] = {"limit": limit}
         if after is not None:
             params["after"] = after
+        if query_filter is not None:
+            params["filter"] = query_filter
 
         resp = await self._client.request(
             endpoint=f"{self._pipeline_path(pipeline_name)}_archive",
