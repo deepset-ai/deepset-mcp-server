@@ -187,7 +187,6 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
             needs_client=True,
             needs_workspace=True,
             memory_type=MemoryType.EXPLORABLE,
-            custom_args={"field": "created_at", "order": "DESC", "limit": 100},
         ),
     ),
     "get_template": (
