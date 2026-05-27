@@ -11,7 +11,9 @@ tools to store their outputs and accept reference inputs.
 
 from __future__ import annotations
 
+import ast
 import inspect
+import json
 from collections.abc import Callable
 from functools import wraps
 from types import UnionType
@@ -23,6 +25,39 @@ from deepset_mcp.tokonomics.explorer import RichExplorer
 from deepset_mcp.tokonomics.object_store import ObjectStore
 
 F = TypeVar("F", bound=Callable[..., Any])
+
+
+def _try_coerce_from_string(value: str, annotation: Any) -> Any:
+    """Try to convert a string value to the expected type."""
+    origin = get_origin(annotation)
+    if origin in {Union, UnionType}:
+        for arg in get_args(annotation):
+            if arg is str:
+                continue
+            try:
+                return _try_coerce_from_string(value, arg)
+            except (ValueError, TypeError):
+                continue
+        raise ValueError(f"Cannot convert '{value}' to {annotation}")
+    if annotation is bool:
+        if value.lower() in ("true", "1", "yes"):
+            return True
+        if value.lower() in ("false", "0", "no"):
+            return False
+        raise ValueError(f"Cannot convert '{value}' to bool")
+    if annotation is int:
+        return int(value)
+    if annotation is float:
+        return float(value)
+    if annotation in (dict, list):
+        try:
+            result = json.loads(value)
+        except json.JSONDecodeError:
+            result = ast.literal_eval(value)
+        if not isinstance(result, annotation):
+            raise ValueError(f"Expected {annotation.__name__}, got {type(result).__name__}")
+        return result
+    raise TypeError(f"Cannot convert string to {annotation}")
 
 
 def _is_reference(value: Any) -> bool:
@@ -246,10 +281,13 @@ def referenceable(
                     # Check for invalid string values
                     if not info.get("accepts_str", True) and isinstance(value, str):
                         if not _is_reference(value):
-                            raise TypeError(
-                                f"Parameter '{name}' expects {info['original']}, "
-                                f"got string '{value}'. Use '@obj_id' for references."
-                            )
+                            try:
+                                value = _try_coerce_from_string(value, info["original"])
+                            except (ValueError, TypeError):
+                                raise TypeError(
+                                    f"Parameter '{name}' expects {info['original']}, "
+                                    f"got string '{value}'. Use '@obj_id' for references."
+                                )
 
                     # Resolve references
                     if _is_reference(value):
@@ -289,10 +327,13 @@ def referenceable(
                     # Check for invalid string values
                     if not info.get("accepts_str", True) and isinstance(value, str):
                         if not _is_reference(value):
-                            raise TypeError(
-                                f"Parameter '{name}' expects {info['original']}, "
-                                f"got string '{value}'. Use '@obj_id' for references."
-                            )
+                            try:
+                                value = _try_coerce_from_string(value, info["original"])
+                            except (ValueError, TypeError):
+                                raise TypeError(
+                                    f"Parameter '{name}' expects {info['original']}, "
+                                    f"got string '{value}'. Use '@obj_id' for references."
+                                )
 
                     # Resolve references
                     if _is_reference(value):
