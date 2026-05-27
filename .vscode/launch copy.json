@@ -1,0 +1,25 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": ["--workspace", "thomas", "--api-key", "api_eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiZGQzNjg3My1kYWI1LTQ2NzEtOTUwMy1mNzY4MzNkYjcxNjh8NjI3M2ExODMyNGFkMDcwMDY5Mjc5N2VjIiwiYXVkIjpbImh0dHBzOi8vYXBpLmNsb3VkLmRlZXBzZXQuYWkiXX0.qLFC8EaYmO9pY-WT3ONO9XeXwC3dcnETiu-ddZAqujM"]
+        },
+        {
+            "name": "Python Debugger: Module",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "deepset_mcp.main",
+            "console": "integratedTerminal",
+            "args": ["--transport", "streamable-http", "--workspace", "thomas", "--api-key", "api_eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiZGQzNjg3My1kYWI1LTQ2NzEtOTUwMy1mNzY4MzNkYjcxNjh8NjI3M2ExODMyNGFkMDcwMDY5Mjc5N2VjIiwiYXVkIjpbImh0dHBzOi8vYXBpLmNsb3VkLmRlZXBzZXQuYWkiXX0.qLFC8EaYmO9pY-WT3ONO9XeXwC3dcnETiu-ddZAqujM"],
+            "justMyCode": false
+        }
+    ]
+}

@@ -14,6 +14,7 @@ from deepset_mcp.tokonomics.decorators import (
     _enhance_docstring_for_explorable,
     _enhance_docstring_for_references,
     _is_reference,
+    _try_coerce_from_string,
     _type_allows_str,
     explorable,
     explorable_and_referenceable,
@@ -178,6 +179,82 @@ class TestHelperFunctions:
         # Check that enhancement is added
         assert "automatically stored and can be referenced" in result
         assert "object ID (e.g., ``@obj_123``)" in result
+
+
+class TestTryCoerceFromString:
+    """Test _try_coerce_from_string helper."""
+
+    @pytest.mark.parametrize("value,expected", [("42", 42), ("-7", -7), ("0", 0)])
+    def test_int(self, value: str, expected: int) -> None:
+        assert _try_coerce_from_string(value, int) == expected
+
+    @pytest.mark.parametrize("value,expected", [("3.14", 3.14), ("-1.0", -1.0), ("0.0", 0.0)])
+    def test_float(self, value: str, expected: float) -> None:
+        assert _try_coerce_from_string(value, float) == pytest.approx(expected)
+
+    @pytest.mark.parametrize(
+        "value,expected",
+        [
+            ("true", True),
+            ("True", True),
+            ("TRUE", True),
+            ("1", True),
+            ("yes", True),
+            ("false", False),
+            ("False", False),
+            ("FALSE", False),
+            ("0", False),
+            ("no", False),
+        ],
+    )
+    def test_bool(self, value: str, expected: bool) -> None:
+        assert _try_coerce_from_string(value, bool) is expected
+
+    @pytest.mark.parametrize(
+        "value,expected",
+        [
+            ('{"key": "value"}', {"key": "value"}),
+            ('{"a": 1, "b": 2}', {"a": 1, "b": 2}),
+            ("{'key': 'value'}", {"key": "value"}),
+        ],
+    )
+    def test_dict(self, value: str, expected: dict) -> None:
+        assert _try_coerce_from_string(value, dict) == expected
+
+    @pytest.mark.parametrize("value,expected", [("[1, 2, 3]", [1, 2, 3]), ('["a", "b"]', ["a", "b"])])
+    def test_list(self, value: str, expected: list) -> None:
+        assert _try_coerce_from_string(value, list) == expected
+
+    def test_union_picks_first_matching_type(self) -> None:
+        result = _try_coerce_from_string("42", int | float)
+        assert result == 42
+        assert isinstance(result, int)
+
+    def test_union_falls_through_to_next_type(self) -> None:
+        result = _try_coerce_from_string("3.14", int | float)
+        assert result == pytest.approx(3.14)
+        assert isinstance(result, float)
+
+    def test_union_skips_str_entries(self) -> None:
+        result = _try_coerce_from_string("99", str | int)
+        assert result == 99
+        assert isinstance(result, int)
+
+    def test_invalid_int_raises(self) -> None:
+        with pytest.raises((ValueError, TypeError)):
+            _try_coerce_from_string("not_a_number", int)
+
+    def test_invalid_bool_raises(self) -> None:
+        with pytest.raises(ValueError):
+            _try_coerce_from_string("maybe", bool)
+
+    def test_invalid_dict_raises(self) -> None:
+        with pytest.raises((ValueError, TypeError)):
+            _try_coerce_from_string("not json", dict)
+
+    def test_unsupported_type_raises(self) -> None:
+        with pytest.raises(TypeError):
+            _try_coerce_from_string("value", bytes)
 
 
 class TestExplorableDecorator:
@@ -444,6 +521,54 @@ class TestReferenceableDecorator:
         assert "All parameters accept object references" in test_func.__doc__
         # Should not contain the old reference support formatting
         assert "**Reference Support**" not in test_func.__doc__
+
+    @pytest.mark.parametrize(
+        "raw,annotation,expected",
+        [
+            ("42", int, 42),
+            ("-3", int, -3),
+            ("3.14", float, 3.14),
+            ("true", bool, True),
+            ("false", bool, False),
+            ('{"k": 1}', dict, {"k": 1}),
+            ("[1,2]", list, [1, 2]),
+        ],
+    )
+    def test_referenceable_coerces_plain_string_to_expected_type(
+        self, store: ObjectStore, explorer: RichExplorer, raw: str, annotation: Any, expected: Any
+    ) -> None:
+        """Plain strings are coerced to the annotated type when not a reference."""
+
+        @referenceable(object_store=store, explorer=explorer)
+        def test_func(value: annotation) -> Any:
+            return value
+
+        result = test_func(raw)
+        assert result == expected
+        assert isinstance(result, annotation)
+
+    def test_referenceable_coerces_plain_string_async(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Plain string coercion works for async functions too."""
+
+        @referenceable(object_store=store, explorer=explorer)
+        async def test_func(number: int) -> int:
+            return number * 2
+
+        async def run() -> None:
+            result = await test_func("21")
+            assert result == 42
+
+        asyncio.run(run())
+
+    def test_referenceable_unconvertible_string_still_raises(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """A plain string that cannot be coerced to the expected type still raises TypeError."""
+
+        @referenceable(object_store=store, explorer=explorer)
+        def test_func(number: int) -> int:
+            return number
+
+        with pytest.raises(TypeError, match="Parameter 'number' expects"):
+            test_func("not_a_number")
 
 
 class TestExplorableAndReferenceableDecorator:
