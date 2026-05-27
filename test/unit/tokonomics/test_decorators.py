@@ -540,7 +540,7 @@ class TestReferenceableDecorator:
         """Plain strings are coerced to the annotated type when not a reference."""
 
         @referenceable(object_store=store, explorer=explorer)
-        def test_func(value: annotation) -> Any:  # type: ignore[valid-type]
+        def test_func(value: annotation) -> Any:
             return value
 
         result = test_func(raw)
