@@ -283,11 +283,11 @@ def referenceable(
                         if not _is_reference(value):
                             try:
                                 value = _try_coerce_from_string(value, info["original"])
-                            except (ValueError, TypeError):
+                            except (ValueError, TypeError) as exc:
                                 raise TypeError(
                                     f"Parameter '{name}' expects {info['original']}, "
                                     f"got string '{value}'. Use '@obj_id' for references."
-                                )
+                                ) from exc
 
                     # Resolve references
                     if _is_reference(value):
@@ -329,11 +329,11 @@ def referenceable(
                         if not _is_reference(value):
                             try:
                                 value = _try_coerce_from_string(value, info["original"])
-                            except (ValueError, TypeError):
+                            except (ValueError, TypeError) as exc:
                                 raise TypeError(
                                     f"Parameter '{name}' expects {info['original']}, "
                                     f"got string '{value}'. Use '@obj_id' for references."
-                                )
+                                ) from exc
 
                     # Resolve references
                     if _is_reference(value):
