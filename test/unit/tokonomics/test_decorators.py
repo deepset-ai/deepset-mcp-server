@@ -560,9 +560,7 @@ class TestReferenceableDecorator:
 
         asyncio.run(run())
 
-    def test_referenceable_unconvertible_string_still_raises(
-        self, store: ObjectStore, explorer: RichExplorer
-    ) -> None:
+    def test_referenceable_unconvertible_string_still_raises(self, store: ObjectStore, explorer: RichExplorer) -> None:
         """A plain string that cannot be coerced to the expected type still raises TypeError."""
 
         @referenceable(object_store=store, explorer=explorer)
