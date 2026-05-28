@@ -29,7 +29,12 @@ from deepset_mcp.tools.indexes import (
     update_index as update_index_tool,
     validate_index as validate_index_tool,
 )
-from deepset_mcp.tools.object_store import create_get_from_object_store, create_get_slice_from_object_store
+from deepset_mcp.tools.object_store import (
+    create_get_from_object_store,
+    create_get_slice_from_object_store,
+    create_grep_object_store,
+    create_sed_object_store,
+)
 from deepset_mcp.tools.pipeline import (
     create_pipeline as create_pipeline_tool,
     create_pipeline_version as create_pipeline_version_tool,
@@ -248,6 +253,8 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "create_workspace": (create_workspace_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "get_from_object_store": (create_get_from_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
     "get_slice_from_object_store": (create_get_slice_from_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
+    "grep_object_store": (create_grep_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
+    "sed_object_store": (create_sed_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
     DOCS_SEARCH_TOOL_NAME: (get_docs_search_tool, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
 }
 

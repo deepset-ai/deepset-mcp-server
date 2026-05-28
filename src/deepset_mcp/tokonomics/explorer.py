@@ -146,6 +146,51 @@ class RichExplorer:
 
         return f"{header}\n\n" + "\n".join(result)
 
+    def replace(
+        self,
+        obj_id: str,
+        pattern: str,
+        replacement: str,
+        path: str = "",
+        count: int = 0,
+        case_sensitive: bool = False,
+    ) -> str:
+        r"""Replace occurrences of a pattern in a string object, storing the result as a new object.
+
+        :param obj_id: Identifier obtained from the store.
+        :param pattern: Regular expression pattern to find.
+        :param replacement: Replacement string (supports backreferences like \1, \2).
+        :param path: Navigation path to the string to modify (optional).
+        :param count: Maximum number of replacements (0 = replace all).
+        :param case_sensitive: Whether the pattern match should be case sensitive.
+        :return: New object ID and summary of replacements made.
+        """
+        obj = self._get_object_at_path(obj_id, path)
+        header = self._make_header(obj_id, path, obj)
+
+        if not isinstance(obj, str):
+            return f"{header}\n\nReplace is only supported on string objects. Found {type(obj).__name__} at path."
+
+        flags = 0 if case_sensitive else re.IGNORECASE
+
+        try:
+            new_str, num_replacements = re.subn(pattern, replacement, obj, count=count, flags=flags)
+        except re.error as e:
+            return f"{header}\n\nInvalid regex pattern: {e}"
+
+        if num_replacements == 0:
+            return f"{header}\n\nNo matches found for pattern '{pattern}'. Object unchanged."
+
+        new_id = self.store.put(new_str)
+        preview = new_str[: self.max_string_length]
+        truncated = " (truncated)" if len(new_str) > self.max_string_length else ""
+
+        return (
+            f"Replaced {num_replacements} occurrence(s) of '{pattern}' → '{replacement}'.\n"
+            f"Result stored as @{new_id}.\n\n"
+            f"Preview{truncated}:\n{preview}"
+        )
+
     def slice(self, obj_id: str, start: int = 0, end: int | None = None, path: str = "") -> str:
         """Extract a slice from a string or list object.
 

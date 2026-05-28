@@ -448,3 +448,108 @@ class TestRichExplorer:
         lines = result.split("\n\n", 1)
         body = lines[1] if len(lines) > 1 else ""
         assert body == test_string
+
+    def test_replace_basic(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test basic regex replacement creates a new object."""
+        obj_id = store.put("The quick brown fox")
+
+        result = explorer.replace(obj_id, "fox", "cat")
+
+        assert "Replaced 1 occurrence(s)" in result
+        assert "Result stored as @" in result
+        assert "cat" in result
+
+    def test_replace_stores_new_object(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test that replace stores the result and the original is unchanged."""
+        original = "hello world"
+        obj_id = store.put(original)
+
+        result = explorer.replace(obj_id, "world", "there")
+
+        new_id = result.split("@")[1].split(".")[0].strip()
+        assert store.get(new_id) == "hello there"
+        assert store.get(obj_id) == original
+
+    def test_replace_all_occurrences(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test that count=0 replaces all occurrences."""
+        obj_id = store.put("cat cat cat")
+
+        result = explorer.replace(obj_id, "cat", "dog")
+
+        assert "Replaced 3 occurrence(s)" in result
+        new_id = result.split("@")[1].split(".")[0].strip()
+        assert store.get(new_id) == "dog dog dog"
+
+    def test_replace_limited_count(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test that count limits the number of replacements."""
+        obj_id = store.put("cat cat cat")
+
+        result = explorer.replace(obj_id, "cat", "dog", count=2)
+
+        assert "Replaced 2 occurrence(s)" in result
+        new_id = result.split("@")[1].split(".")[0].strip()
+        assert store.get(new_id) == "dog dog cat"
+
+    def test_replace_no_match(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test replace with no matches returns unchanged message."""
+        obj_id = store.put("hello world")
+
+        result = explorer.replace(obj_id, "xyz", "abc")
+
+        assert "No matches found" in result
+        assert "Object unchanged" in result
+
+    def test_replace_case_insensitive(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test case-insensitive replacement."""
+        obj_id = store.put("The Quick Brown FOX")
+
+        result = explorer.replace(obj_id, "fox", "cat", case_sensitive=False)
+
+        assert "Replaced 1 occurrence(s)" in result
+        new_id = result.split("@")[1].split(".")[0].strip()
+        assert store.get(new_id) == "The Quick Brown cat"
+
+    def test_replace_case_sensitive_no_match(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test that case-sensitive replacement respects case."""
+        obj_id = store.put("The Quick Brown FOX")
+
+        result = explorer.replace(obj_id, "fox", "cat", case_sensitive=True)
+
+        assert "No matches found" in result
+
+    def test_replace_with_backreference(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test replacement with regex backreferences."""
+        obj_id = store.put("2024-01-15")
+
+        result = explorer.replace(obj_id, r"(\d{4})-(\d{2})-(\d{2})", r"\3/\2/\1", case_sensitive=True)
+
+        assert "Replaced 1 occurrence(s)" in result
+        new_id = result.split("@")[1].split(".")[0].strip()
+        assert store.get(new_id) == "15/01/2024"
+
+    def test_replace_with_path(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test replacement navigates to nested string via path."""
+        obj_id = store.put({"content": "hello world"})
+
+        result = explorer.replace(obj_id, "world", "there", path="content")
+
+        assert "Replaced 1 occurrence(s)" in result
+        new_id = result.split("@")[1].split(".")[0].strip()
+        assert store.get(new_id) == "hello there"
+
+    def test_replace_on_non_string(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test replace on non-string object returns error."""
+        obj_id = store.put({"key": "value"})
+
+        result = explorer.replace(obj_id, "key", "new")
+
+        assert "Replace is only supported on string objects" in result
+        assert "Found dict" in result
+
+    def test_replace_invalid_regex(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test replace with invalid regex pattern."""
+        obj_id = store.put("test string")
+
+        result = explorer.replace(obj_id, "[invalid", "x")
+
+        assert "Invalid regex pattern" in result
