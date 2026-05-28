@@ -155,11 +155,11 @@ class RichExplorer:
         count: int = 0,
         case_sensitive: bool = False,
     ) -> str:
-        """Replace occurrences of a pattern in a string object, storing the result as a new object.
+        r"""Replace occurrences of a pattern in a string object, storing the result as a new object.
 
         :param obj_id: Identifier obtained from the store.
         :param pattern: Regular expression pattern to find.
-        :param replacement: Replacement string (supports backreferences like \\1, \\2).
+        :param replacement: Replacement string (supports backreferences like \1, \2).
         :param path: Navigation path to the string to modify (optional).
         :param count: Maximum number of replacements (0 = replace all).
         :param case_sensitive: Whether the pattern match should be case sensitive.

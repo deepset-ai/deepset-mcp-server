@@ -84,14 +84,14 @@ def create_sed_object_store(explorer: RichExplorer) -> Callable[..., Any]:
         count: int = 0,
         case_sensitive: bool = False,
     ) -> str:
-        """Find and replace text in a string stored in the object store using regex.
+        r"""Find and replace text in a string stored in the object store using regex.
 
         Applies substitution (like `sed s/pattern/replacement/`) and stores the result
         as a new object, returning its ID. The original object is not modified.
 
         :param object_id: The id of the object to modify in the format `@obj_001`.
         :param pattern: Regular expression pattern to find.
-        :param replacement: Replacement string. Supports backreferences like `\\1`, `\\2`.
+        :param replacement: Replacement string. Supports backreferences like `\1`, `\2`.
         :param path: Navigation path to a nested string attribute (optional).
         :param count: Maximum number of replacements (0 = replace all, default: 0).
         :param case_sensitive: Whether the pattern match should be case sensitive (default: False).
