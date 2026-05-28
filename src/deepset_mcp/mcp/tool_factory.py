@@ -344,7 +344,7 @@ def register_tools(
             # base_func is a factory function.
             # We configure with the docs_config to get the actual tool function.
             enhanced_tool = base_func(config=docs_config)
-        elif tool_name in ("get_from_object_store", "get_slice_from_object_store"):
+        elif tool_name in ("get_from_object_store", "get_slice_from_object_store", "grep_object_store", "sed_object_store"):
             # ObjectStore tools are factory functions that need an explorer created from the store
             if object_store is None:
                 raise ValueError(f"ObjectStore instance is required for {tool_name}")
