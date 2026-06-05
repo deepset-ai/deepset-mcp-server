@@ -448,8 +448,8 @@ class TestIndexResource:
         """Test deployment with validation errors (422)."""
         validation_errors = {
             "details": [
-                {"code": "invalid_config", "message": "Index configuration is invalid"},
-                {"code": "missing_dependency", "message": "Required dependency not found"},
+                {"code": "invalid_config", "message": "Index configuration is invalid", "category": "ERROR"},
+                {"code": "missing_dependency", "message": "Required dependency not found", "category": "ERROR"},
             ]
         }
 
@@ -465,6 +465,8 @@ class TestIndexResource:
         assert len(result.errors) == 2
         assert result.errors[0].code == "invalid_config"
         assert result.errors[0].message == "Index configuration is invalid"
+        assert result.errors[0].category == "ERROR"
+        assert result.errors[1].category == "ERROR"
         assert result.errors[1].code == "missing_dependency"
         assert result.errors[1].message == "Required dependency not found"
 
