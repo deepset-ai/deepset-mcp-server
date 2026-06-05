@@ -72,7 +72,7 @@ class StreamingResponse:
             # For success, stream line by line
             async for line in self._reader.aiter_lines():
                 if line.startswith("data: "):  # optionally handle SSE 'data: ' prefix
-                    yield line[6:]
+                    line = line[6:]
                 yield line
 
     async def read_body(self) -> str:
