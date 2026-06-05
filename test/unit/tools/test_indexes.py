@@ -446,7 +446,9 @@ async def test_update_index_validation_failure() -> None:
         name="np",
         yaml_config=orig_yaml,
     )
-    invalid_val = PipelineValidationResult(valid=False, errors=[ValidationError(code="E", message="err")])
+    invalid_val = PipelineValidationResult(
+        valid=False, errors=[ValidationError(code="E", message="err", category="ERROR")]
+    )
     resource = FakeIndexResource(get_response=original, validate_response=invalid_val)
     client = FakeClient(resource)
     result = await update_index(
@@ -477,7 +479,8 @@ async def test_update_index_skip_validation_errors_true() -> None:
         yaml_config="foo: 2",
     )
     invalid_result = PipelineValidationResult(
-        valid=False, errors=[ValidationError(code="E1", message="Test error message")]
+        valid=False,
+        errors=[ValidationError(code="E1", message="Test error message", category="ERROR", json_pointer=None)],
     )
 
     resource = FakeIndexResource(
@@ -579,8 +582,12 @@ async def test_deploy_index_returns_success_message() -> None:
 async def test_deploy_index_returns_validation_errors() -> None:
     """Test deployment with validation errors."""
     validation_errors = [
-        ValidationError(code="invalid_config", message="Index configuration is invalid"),
-        ValidationError(code="missing_dependency", message="Required dependency not found"),
+        ValidationError(
+            code="invalid_config", message="Index configuration is invalid", category="ERROR", json_pointer=None
+        ),
+        ValidationError(
+            code="missing_dependency", message="Required dependency not found", category="ERROR", json_pointer=None
+        ),
     ]
     validation_result = PipelineValidationResult(valid=False, errors=validation_errors)
     resource = FakeIndexResource(deploy_response=validation_result)
@@ -664,7 +671,10 @@ async def test_validate_index_validates_via_client_and_returns_model() -> None:
     valid_result = PipelineValidationResult(valid=True, errors=[])
     invalid_result = PipelineValidationResult(
         valid=False,
-        errors=[ValidationError(code="E1", message="Oops"), ValidationError(code="E2", message="Bad")],
+        errors=[
+            ValidationError(code="E1", message="Oops", category="ERROR", json_pointer=None),
+            ValidationError(code="E2", message="Bad", category="ERROR", json_pointer=None),
+        ],
     )
 
     # Test valid

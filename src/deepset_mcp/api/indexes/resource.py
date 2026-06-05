@@ -162,14 +162,22 @@ class IndexResource(IndexResourceProtocol):
 
         # Handle validation errors (422)
         if resp.status_code == 422 and resp.json is not None and isinstance(resp.json, dict) and "details" in resp.json:
-            errors = [ValidationError(code=error["code"], message=error["message"]) for error in resp.json["details"]]
+            errors = [
+                ValidationError(
+                    code=error["code"],
+                    message=error["message"],
+                    category=error["category"],
+                    json_pointer=error.get("json_pointer"),
+                )
+                for error in resp.json["details"]
+            ]
             return PipelineValidationResult(valid=False, errors=errors)
 
         # Handle other 4xx errors (400, 404, 424)
         if 400 <= resp.status_code < 500:
             # For non-validation errors, create a generic error
             error_message = resp.text if resp.text else f"HTTP {resp.status_code} error"
-            errors = [ValidationError(code="DEPLOYMENT_ERROR", message=error_message)]
+            errors = [ValidationError(code="DEPLOYMENT_ERROR", message=error_message, category="ERROR")]
             return PipelineValidationResult(valid=False, errors=errors)
 
         raise UnexpectedAPIError(status_code=resp.status_code, message=resp.text, detail=resp.json)
@@ -194,12 +202,20 @@ class IndexResource(IndexResourceProtocol):
             return PipelineValidationResult(valid=True)
 
         if resp.status_code == 400 and resp.json is not None and isinstance(resp.json, dict) and "details" in resp.json:
-            errors = [ValidationError(code=error["code"], message=error["message"]) for error in resp.json["details"]]
+            errors = [
+                ValidationError(
+                    code=error["code"],
+                    message=error["message"],
+                    category=error["category"],
+                    json_pointer=error.get("json_pointer"),
+                )
+                for error in resp.json["details"]
+            ]
 
             return PipelineValidationResult(valid=False, errors=errors)
 
         if resp.status_code == 422:
-            errors = [ValidationError(code="YAML_ERROR", message="Syntax error in YAML")]
+            errors = [ValidationError(code="YAML_ERROR", message="Syntax error in YAML", category="ERROR")]
 
             return PipelineValidationResult(valid=False, errors=errors)
 

@@ -683,7 +683,12 @@ class TestPipelineResource:
         # Create a response with validation errors
         validation_errors = {
             "details": [
-                {"code": "required_field_missing", "message": "Field 'type' is required for node 'missing_type'"}
+                {
+                    "code": "required_field_missing",
+                    "message": "Field 'type' is required for node 'missing_type'",
+                    "category": "ERROR",
+                    "json_pointer": "/pipeline/nodes/0/type",
+                }
             ]
         }
 
@@ -706,6 +711,8 @@ class TestPipelineResource:
         assert len(result.errors) == 1
         assert result.errors[0].code == "required_field_missing"
         assert result.errors[0].message == "Field 'type' is required for node 'missing_type'"
+        assert result.errors[0].category == "ERROR"
+        assert result.errors[0].json_pointer == "/pipeline/nodes/0/type"
 
     @pytest.mark.asyncio
     async def test_validation_with_invalid_yaml(self) -> None:
@@ -1107,8 +1114,12 @@ class TestPipelineResource:
         # Create a response with validation errors
         validation_errors = {
             "details": [
-                {"code": "invalid_component", "message": "Component 'invalid_reader' is not available"},
-                {"code": "missing_field", "message": "Required field 'index' is missing"},
+                {
+                    "code": "invalid_component",
+                    "message": "Component 'invalid_reader' is not available",
+                    "category": "ERROR",
+                },
+                {"code": "missing_field", "message": "Required field 'index' is missing", "category": "ERROR"},
             ]
         }
 
@@ -1127,8 +1138,10 @@ class TestPipelineResource:
         assert len(result.errors) == 2
         assert result.errors[0].code == "invalid_component"
         assert result.errors[0].message == "Component 'invalid_reader' is not available"
+        assert result.errors[0].category == "ERROR"
         assert result.errors[1].code == "missing_field"
         assert result.errors[1].message == "Required field 'index' is missing"
+        assert result.errors[1].category == "ERROR"
 
     @pytest.mark.asyncio
     async def test_deploy_pipeline_with_400_error(self) -> None:

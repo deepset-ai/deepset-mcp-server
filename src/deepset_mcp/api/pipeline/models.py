@@ -79,6 +79,10 @@ class ValidationError(BaseModel):
     "Error code identifying the type of validation error"
     message: str
     "Human-readable description of the validation error"
+    category: str
+    "Category of the validation error (e.g., 'ERROR', 'WARNING')"
+    json_pointer: str | None = None
+    "JSON Pointer indicating the location in the pipeline config related to the error"
 
 
 class PipelineValidationResult(BaseModel):
