@@ -68,7 +68,15 @@ class PipelineResource(PipelineResourceProtocol):
             return PipelineValidationResult(valid=True)
 
         if resp.status_code == 400 and resp.json is not None and isinstance(resp.json, dict) and "details" in resp.json:
-            errors = [ValidationError(code=error["code"], message=error["message"], category=error["category"], json_pointer=error.get("json_pointer")) for error in resp.json["details"]]
+            errors = [
+                ValidationError(
+                    code=error["code"],
+                    message=error["message"],
+                    category=error["category"],
+                    json_pointer=error.get("json_pointer"),
+                )
+                for error in resp.json["details"]
+            ]
 
             return PipelineValidationResult(valid=False, errors=errors)
 
@@ -391,7 +399,15 @@ class PipelineResource(PipelineResourceProtocol):
 
         # Handle validation errors (422)
         if resp.status_code == 422 and resp.json is not None and isinstance(resp.json, dict) and "details" in resp.json:
-            errors = [ValidationError(code=error["code"], message=error["message"], category=error["category"], json_pointer=error.get("json_pointer")) for error in resp.json["details"]]
+            errors = [
+                ValidationError(
+                    code=error["code"],
+                    message=error["message"],
+                    category=error["category"],
+                    json_pointer=error.get("json_pointer"),
+                )
+                for error in resp.json["details"]
+            ]
             return PipelineValidationResult(valid=False, errors=errors)
 
         # Handle other 4xx errors (400, 404)
