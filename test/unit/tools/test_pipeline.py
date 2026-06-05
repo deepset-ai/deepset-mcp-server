@@ -335,7 +335,10 @@ async def test_validate_pipeline_validates_via_client_and_returns_model() -> Non
     valid_result = PipelineValidationResult(valid=True, errors=[])
     invalid_result = PipelineValidationResult(
         valid=False,
-        errors=[ValidationError(code="E1", message="Oops"), ValidationError(code="E2", message="Bad")],
+        errors=[
+            ValidationError(code="E1", message="Oops", category="ERROR"),
+            ValidationError(code="E2", message="Bad", category="ERROR"),
+        ],
     )
     # Test valid
     resource_valid = FakePipelineResource(validate_response=valid_result)
@@ -356,7 +359,9 @@ async def test_validate_pipeline_validates_via_client_and_returns_model() -> Non
 
 @pytest.mark.asyncio
 async def test_create_pipeline_handles_validation_failure() -> None:
-    invalid_result = PipelineValidationResult(valid=False, errors=[ValidationError(code="E", message="Err")])
+    invalid_result = PipelineValidationResult(
+        valid=False, errors=[ValidationError(code="E", message="Err", category="ERROR")]
+    )
     resource = FakePipelineResource(validate_response=invalid_result)
     client = FakeClient(resource)
     result = await create_pipeline(
@@ -411,7 +416,7 @@ async def test_create_pipeline_skip_validation_errors_true() -> None:
     """Test that create_pipeline creates the pipeline despite validation errors."""
     user = DeepsetUser(user_id="u1", given_name="Alice", family_name="Smith")
     invalid_result = PipelineValidationResult(
-        valid=False, errors=[ValidationError(code="E1", message="Test error message")]
+        valid=False, errors=[ValidationError(code="E1", message="Test error message", category="ERROR")]
     )
     created_pipeline = DeepsetPipeline(
         pipeline_id="p1",
@@ -910,8 +915,15 @@ async def test_deploy_pipeline_with_validation_errors() -> None:
     error_result = PipelineValidationResult(
         valid=False,
         errors=[
-            ValidationError(code="INVALID_COMPONENT", message="Component 'invalid_reader' is not available"),
-            ValidationError(code="MISSING_FIELD", message="Required field 'index' is missing"),
+            ValidationError(
+                code="INVALID_COMPONENT",
+                message="Component 'invalid_reader' is not available",
+                category="ERROR",
+                json_pointer=None,
+            ),
+            ValidationError(
+                code="MISSING_FIELD", message="Required field 'index' is missing", category="ERROR", json_pointer=None
+            ),
         ],
     )
     resource = FakePipelineResource(deploy_response=error_result)
