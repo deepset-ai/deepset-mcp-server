@@ -4,17 +4,16 @@
 
 """Unit tests for SearchHistoryResource."""
 
-from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
 import pytest
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.pipeline.models import DeepsetPipeline, PipelineServiceLevel
-from deepset_mcp.api.search_history.models import PipelineTraceEntry, SearchHistoryEntry
+from deepset_mcp.api.pipeline.models import DeepsetPipeline
+from deepset_mcp.api.search_history.models import PipelineTraceEntry
 from deepset_mcp.api.search_history.resource import SearchHistoryResource
-from deepset_mcp.api.shared_models import DeepsetUser, PaginatedResponse
+from deepset_mcp.api.shared_models import PaginatedResponse
 from deepset_mcp.api.transport import TransportResponse
 from deepset_mcp.api.workspace.models import Workspace
 from test.unit.conftest import BaseFakeClient

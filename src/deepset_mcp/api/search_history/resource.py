@@ -205,8 +205,12 @@ class SearchHistoryResource(SearchHistoryResourceProtocol):
         if query_filter is not None:
             params["filter"] = query_filter
 
+        traces_endpoint = (
+            f"v2/workspaces/{quote(workspace_id, safe='')}"
+            f"/pipelines/{quote(pipeline_id, safe='')}/search_history/traces"
+        )
         resp = await self._client.request(
-            endpoint=f"v2/workspaces/{quote(workspace_id, safe='')}/pipelines/{quote(pipeline_id, safe='')}/search_history/traces",
+            endpoint=traces_endpoint,
             method="GET",
             params=params,
             timeout=70.0,

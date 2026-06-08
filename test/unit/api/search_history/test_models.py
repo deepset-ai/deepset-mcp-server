@@ -4,8 +4,6 @@
 
 """Unit tests for search history models."""
 
-import pytest
-
 from deepset_mcp.api.search_history.models import (
     HaystackTraceFailure,
     HaystackTraceLog,
@@ -14,7 +12,6 @@ from deepset_mcp.api.search_history.models import (
     PipelineTraceEntry,
     SearchHistoryEntry,
 )
-
 
 # ---------------------------------------------------------------------------
 # SearchHistoryEntry

@@ -15,7 +15,7 @@ import os
 import pytest
 
 from deepset_mcp.api.client import AsyncDeepsetClient
-from deepset_mcp.api.exceptions import ResourceNotFoundError
+from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.pipeline.resource import PipelineResource
 from deepset_mcp.api.search_history.models import PipelineTraceEntry, SearchHistoryEntry
 from deepset_mcp.api.search_history.resource import SearchHistoryResource
@@ -362,7 +362,7 @@ class TestIntegrationSearchHistoryGetPipelineTrace:
     ) -> None:
         """A query_id that doesn't exist raises an API error (typically 404)."""
         non_existent_id = "00000000-0000-0000-0000-000000000000"
-        with pytest.raises(Exception):
+        with pytest.raises((ResourceNotFoundError, UnexpectedAPIError)):
             await search_history_resource.get_pipeline_trace(
                 pipeline_name=test_pipeline,
                 query_id=non_existent_id,
