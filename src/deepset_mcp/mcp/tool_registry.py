@@ -57,7 +57,9 @@ from deepset_mcp.tools.pipeline_template import (
     search_templates as search_pipeline_templates_tool,
 )
 from deepset_mcp.tools.search_history import (
+    get_pipeline_trace as get_pipeline_trace_tool,
     list_pipeline_search_history as list_pipeline_search_history_tool,
+    list_pipeline_traces as list_pipeline_traces_tool,
     list_search_history as list_search_history_tool,
 )
 from deepset_mcp.tools.secrets import get_secret as get_secret_tool, list_secrets as list_secrets_tool
@@ -213,6 +215,14 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     ),
     "list_pipeline_search_history": (
         list_pipeline_search_history_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "list_pipeline_traces": (
+        list_pipeline_traces_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_pipeline_trace": (
+        get_pipeline_trace_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
     "list_custom_component_installations": (

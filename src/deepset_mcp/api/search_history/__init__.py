@@ -4,7 +4,7 @@
 
 """Search history API module."""
 
-from .models import SearchHistoryEntry
+from .models import HaystackTraceV1, PipelineTraceEntry, SearchHistoryEntry
 from .resource import SearchHistoryResource
 
-__all__ = ["SearchHistoryEntry", "SearchHistoryResource"]
+__all__ = ["HaystackTraceV1", "PipelineTraceEntry", "SearchHistoryEntry", "SearchHistoryResource"]
