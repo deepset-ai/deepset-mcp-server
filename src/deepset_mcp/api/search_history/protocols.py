@@ -14,19 +14,32 @@ class SearchHistoryResourceProtocol(Protocol):
     """Protocol defining the interface for search history resources."""
 
     async def list(
-        self, limit: int = 10, after: str | None = None, query_filter: str | None = None
+        self,
+        limit: int = 10,
+        after: str | None = None,
+        query_filter: str | None = None,
+        sort_field: Literal["created_at", "query", "duration", "feedbacks/score"] = "created_at",
+        sort_order: Literal["ASC", "DESC"] = "DESC",
     ) -> PaginatedResponse[SearchHistoryEntry]:
         """List search history entries in the workspace.
 
         :param limit: Maximum number of entries to return per page.
         :param after: Cursor to fetch the next page of results.
         :param query_filter: OData filter expression to narrow results.
+        :param sort_field: Field to sort by.
+        :param sort_order: Sort direction (ASC or DESC).
         :returns: Paginated response of search history entries.
         """
         ...
 
     async def list_pipeline(
-        self, pipeline_name: str, limit: int = 10, after: str | None = None, query_filter: str | None = None
+        self,
+        pipeline_name: str,
+        limit: int = 10,
+        after: str | None = None,
+        query_filter: str | None = None,
+        sort_field: Literal["created_at", "query", "duration", "feedbacks/score"] = "created_at",
+        sort_order: Literal["ASC", "DESC"] = "DESC",
     ) -> PaginatedResponse[SearchHistoryEntry]:
         """List search history entries for a specific pipeline with pagination.
 
@@ -34,6 +47,8 @@ class SearchHistoryResourceProtocol(Protocol):
         :param limit: Maximum number of entries to return per page.
         :param after: Cursor to fetch the next page of results.
         :param query_filter: OData filter expression to narrow results.
+        :param sort_field: Field to sort by.
+        :param sort_order: Sort direction (ASC or DESC).
         :returns: Paginated response of search history entries (most recent first).
         """
         ...
@@ -54,7 +69,7 @@ class SearchHistoryResourceProtocol(Protocol):
         :param after: Cursor to fetch the next page of results.
         :param query_filter: OData filter expression to narrow results.
         :param sort_field: Field to sort by.
-        :param sort_order: Sort direction.
+        :param sort_order: Sort direction (ASC or DESC).
         :returns: Paginated response of pipeline trace entries.
         """
         ...
