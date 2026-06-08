@@ -184,10 +184,7 @@ async def list_pipeline_traces(
             sort_order=sort_order,
         )
     except ResourceNotFoundError:
-        return (
-            f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}', "
-            "or it has no traces yet."
-        )
+        return f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}', or it has no traces yet."
     except (BadRequestError, UnexpectedAPIError) as e:
         return f"Failed to list traces for pipeline '{pipeline_name}': {e}"
 
