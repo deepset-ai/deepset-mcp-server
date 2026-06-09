@@ -11,13 +11,13 @@ from deepset_mcp.api.shared_models import PaginatedResponse
 class PipelineTemplateResourceProtocol(Protocol):
     """Protocol defining the implementation for PipelineTemplateResource."""
 
-    async def get_template(self, template_name: str) -> PipelineTemplate:
+    async def get_template(self, template_name: str, include_yaml: bool = True) -> PipelineTemplate:
         """Fetch a single pipeline template by its name."""
         ...
 
     async def list(
         self,
-        limit: int = 10,
+        limit: int = 100,
         after: str | None = None,
         field: str = "created_at",
         order: str = "DESC",
