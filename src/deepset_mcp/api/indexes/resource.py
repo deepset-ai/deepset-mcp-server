@@ -26,7 +26,7 @@ class IndexResource(IndexResourceProtocol):
         self._client = client
         self._workspace = workspace
 
-    async def list(self, limit: int = 10, after: str | None = None) -> PaginatedResponse[Index]:
+    async def list(self, limit: int = 100, after: str | None = None) -> PaginatedResponse[Index]:
         """Lists indexes and returns the first page of results.
 
         The returned object can be iterated over to fetch subsequent pages.

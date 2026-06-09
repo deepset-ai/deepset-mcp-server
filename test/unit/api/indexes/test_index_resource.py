@@ -581,7 +581,7 @@ class TestIndexResource:
         assert len(client.requests) == 1
         assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/indexes"
         assert client.requests[0]["method"] == "GET"
-        assert client.requests[0]["params"] == {"limit": 10}
+        assert client.requests[0]["params"] == {"limit": 100}
 
     async def test_list_indexes_with_pagination(self) -> None:
         """Test listing indexes with custom pagination parameters."""
