@@ -7,6 +7,7 @@ from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
+from rich.repr import Result
 
 
 class PipelineType(StrEnum):
@@ -74,3 +75,16 @@ class PipelineTemplate(BaseModel):
             values["yaml_config"] = yaml_config
 
         return values
+
+    def __rich_repr__(self) -> Result:
+        """Used to display the model in an LLM friendly way."""
+        yield "template_name", self.template_name
+        yield "display_name", self.display_name
+        yield "pipeline_template_id", str(self.pipeline_template_id)
+        yield "description", self.description
+        yield "best_for", self.best_for
+        yield "potential_applications", self.potential_applications
+        yield "pipeline_type", self.pipeline_type
+        yield "tags", [tag.name for tag in self.tags]
+        yield "author", self.author
+        yield "yaml_config", self.yaml_config if self.yaml_config is not None else "Get full template to see config."

@@ -212,7 +212,7 @@ class TestPipelineResource:
         assert len(client.requests) == 1
         assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines"
         assert client.requests[0]["method"] == "GET"
-        assert client.requests[0]["params"] == {"limit": 10}
+        assert client.requests[0]["params"] == {"limit": 100}
 
     @pytest.mark.asyncio
     async def test_list_pipelines_with_pagination(self) -> None:
@@ -247,7 +247,7 @@ class TestPipelineResource:
         # Verify request
         assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines"
         # TODO: change to after when problem with deepset API pagination is fixed
-        assert client.requests[0]["params"] == {"limit": 5, "before": "some_cursor"}
+        assert client.requests[0]["params"] == {"limit": 5, "after": "some_cursor"}
 
     @pytest.mark.asyncio
     async def test_list_pipelines_empty_result(self) -> None:
@@ -553,7 +553,7 @@ class TestPipelineResource:
         result = await resource.create_version(pipeline_name=pipeline_name, config_yaml=config_yaml, description="v3")
 
         assert result.version_number == 3
-        assert result.config_yaml == config_yaml
+        assert result.config_yaml is None  # create_version should not return YAML
         assert client.requests[0]["method"] == "POST"
         assert client.requests[0]["data"]["config_yaml"] == config_yaml
         assert client.requests[0]["data"]["is_draft"] is False
@@ -635,7 +635,8 @@ class TestPipelineResource:
             description="new desc",
         )
 
-        assert result.config_yaml == "foo: patched"
+        assert str(result.version_id) == version_id
+        assert result.config_yaml is None  # patch_version should not return YAML
         assert client.requests[0]["method"] == "PATCH"
         assert client.requests[0]["endpoint"] == (
             f"v1/workspaces/test-workspace/pipelines/{pipeline_name}/versions/{version_id}"

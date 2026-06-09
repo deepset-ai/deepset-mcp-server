@@ -28,7 +28,7 @@ class PipelineResourceProtocol(Protocol):
         """Fetch a single pipeline by its name."""
         ...
 
-    async def list(self, limit: int = 10, after: str | None = None) -> PaginatedResponse[DeepsetPipeline]:
+    async def list(self, limit: int = 100, after: str | None = None) -> PaginatedResponse[DeepsetPipeline]:
         """List pipelines in the configured workspace with optional pagination."""
         ...
 
@@ -39,7 +39,7 @@ class PipelineResourceProtocol(Protocol):
     async def list_versions(
         self,
         pipeline_name: str,
-        limit: int = 10,
+        limit: int = 100,
         after: str | None = None,
     ) -> PaginatedResponse[PipelineVersion]:
         """List versions of a pipeline."""
@@ -55,7 +55,7 @@ class PipelineResourceProtocol(Protocol):
         """Create a new version of a pipeline."""
         ...
 
-    async def get_version(self, pipeline_name: str, version_id: str) -> PipelineVersion:
+    async def get_version(self, pipeline_name: str, version_id: str, include_yaml: bool = True) -> PipelineVersion:
         """Fetch a specific version of a pipeline."""
         ...
 

@@ -309,7 +309,7 @@ class TestIndexResource:
 
         # Check the last request's parameters
         last_request = fake_client.requests[-1]
-        assert last_request["params"] == {"limit": 20, "before": "cursor123"}
+        assert last_request["params"] == {"limit": 20, "after": "cursor123"}
 
     async def test_create_index_successful(
         self, fake_client: BaseFakeClient, workspace: str, index_response: dict[str, Any]
@@ -615,7 +615,7 @@ class TestIndexResource:
         # Verify request
         assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/indexes"
         # TODO: change to after when problem with deepset API pagination is fixed
-        assert client.requests[0]["params"] == {"limit": 5, "before": "some_cursor"}
+        assert client.requests[0]["params"] == {"limit": 5, "after": "some_cursor"}
 
     async def test_list_indexes_empty_result(self) -> None:
         """Test listing indexes when there are no indexes."""

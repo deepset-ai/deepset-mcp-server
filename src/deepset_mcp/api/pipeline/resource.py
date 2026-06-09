@@ -87,7 +87,7 @@ class PipelineResource(PipelineResourceProtocol):
 
         raise UnexpectedAPIError(status_code=resp.status_code, message=resp.text, detail=resp.json)
 
-    async def list(self, limit: int = 10, after: str | None = None) -> PaginatedResponse[DeepsetPipeline]:
+    async def list(self, limit: int = 100, after: str | None = None) -> PaginatedResponse[DeepsetPipeline]:
         """Lists pipelines and returns the first page of results.
 
         The returned object can be iterated over to fetch subsequent pages.
@@ -97,12 +97,7 @@ class PipelineResource(PipelineResourceProtocol):
         :returns: A `PaginatedResponse` object containing the first page of pipelines.
         """
         # 1. Prepare arguments for the initial API call
-        # TODO: Pagination in the deepset API is currently implemented in an unintuitive way.
-        # TODO: The cursor is always time based (created_at) and after signifies pipelines older than the current cursor
-        # TODO: while 'before' signals pipelines younger than the current cursor.
-        # TODO: This is applied irrespective of any sort (e.g. name) that would conflict with this approach.
-        # TODO: Change this to 'after' once the behaviour is fixed on the deepset API
-        request_params = {"limit": limit, "before": after}
+        request_params = {"limit": limit, "after": after}
         request_params = {k: v for k, v in request_params.items() if v is not None}
 
         # 2. Make the first API call using a private, stateless method
@@ -176,7 +171,7 @@ class PipelineResource(PipelineResourceProtocol):
     async def list_versions(
         self,
         pipeline_name: str,
-        limit: int = 10,
+        limit: int = 100,
         after: str | None = None,
     ) -> PaginatedResponse[PipelineVersion]:
         """List versions of a pipeline, most recent first.
@@ -191,6 +186,8 @@ class PipelineResource(PipelineResourceProtocol):
             request_params["after"] = after
 
         page = await self._list_versions_api_call(pipeline_name, **request_params)
+        for version in page.data:
+            version.config_yaml = None  # Hide YAML config in list responses for brevity
         page._inject_paginator(
             fetch_func=lambda **kwargs: self._list_versions_api_call(pipeline_name, **kwargs),
             base_args={"limit": limit, "order": "DESC", "field": "version_number"},
@@ -240,13 +237,16 @@ class PipelineResource(PipelineResourceProtocol):
         raise_for_status(resp)
         if resp.json is None:
             raise UnexpectedAPIError(status_code=resp.status_code, message="Empty response", detail=None)
-        return PipelineVersion.model_validate(resp.json)
+        version = PipelineVersion.model_validate(resp.json)
+        version.config_yaml = None  # Hide YAML config in get responses for brevity
+        return version
 
-    async def get_version(self, pipeline_name: str, version_id: str) -> PipelineVersion:
+    async def get_version(self, pipeline_name: str, version_id: str, include_yaml: bool = True) -> PipelineVersion:
         """Fetch a specific version of a pipeline.
 
         :param pipeline_name: Name of the pipeline.
         :param version_id: UUID of the version to fetch.
+        :param include_yaml: Whether to include the YAML configuration in the response.
         :returns: The requested PipelineVersion.
         """
         resp = await self._client.request(
@@ -258,7 +258,10 @@ class PipelineResource(PipelineResourceProtocol):
         raise_for_status(resp)
         if resp.json is None:
             raise UnexpectedAPIError(status_code=resp.status_code, message="Empty response", detail=None)
-        return PipelineVersion.model_validate(resp.json)
+        version = PipelineVersion.model_validate(resp.json)
+        if not include_yaml:
+            version.config_yaml = None  # Hide YAML config in get responses for brevity
+        return version
 
     async def restore_version(self, pipeline_name: str, version_id: str) -> PipelineVersion:
         """Restore a pipeline to a previous version.
@@ -277,7 +280,9 @@ class PipelineResource(PipelineResourceProtocol):
         raise_for_status(resp)
         if resp.json is None:
             raise UnexpectedAPIError(status_code=resp.status_code, message="Empty response", detail=None)
-        return PipelineVersion.model_validate(resp.json)
+        version = PipelineVersion.model_validate(resp.json)
+        version.config_yaml = None  # Hide YAML config in get responses for brevity
+        return version
 
     async def patch_version(
         self,
@@ -315,7 +320,9 @@ class PipelineResource(PipelineResourceProtocol):
         raise_for_status(resp)
         if resp.json is None:
             raise UnexpectedAPIError(status_code=resp.status_code, message="Empty response", detail=None)
-        return PipelineVersion.model_validate(resp.json)
+        version = PipelineVersion.model_validate(resp.json)
+        version.config_yaml = None  # Hide YAML config in patch responses for brevity
+        return version
 
     async def get_logs(
         self,

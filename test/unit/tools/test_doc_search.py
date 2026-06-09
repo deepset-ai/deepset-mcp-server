@@ -94,7 +94,7 @@ class FakeDocsPipelineResource(PipelineResourceProtocol):
     ) -> PipelineVersion:
         raise NotImplementedError
 
-    async def get_version(self, pipeline_name: str, version_id: str) -> PipelineVersion:
+    async def get_version(self, pipeline_name: str, version_id: str, include_yaml: bool = True) -> PipelineVersion:
         raise NotImplementedError
 
     async def patch_version(

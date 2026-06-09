@@ -61,7 +61,7 @@ class FakeIndexResource(IndexResourceProtocol):
             return self._list_response
         return PaginatedResponse(data=[], has_more=False, total=0)
 
-    async def get(self, index_name: str) -> Index:
+    async def get(self, index_name: str, include_yaml: bool = True) -> Index:
         if self._get_exception:
             raise self._get_exception
 
@@ -338,7 +338,7 @@ async def test_update_index_no_yaml_config() -> None:
         yaml_config="",
     )
     # Manually set yaml_config to None to test this case
-    original.yaml_config = None  # type: ignore[assignment]
+    original.yaml_config = None
     resource = FakeIndexResource(get_response=original)
     client = FakeClient(resource)
     result = await update_index(

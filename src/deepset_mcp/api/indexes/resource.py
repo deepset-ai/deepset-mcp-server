@@ -36,16 +36,13 @@ class IndexResource(IndexResourceProtocol):
         :returns: A `PaginatedResponse` object containing the first page of indexes.
         """
         # 1. Prepare arguments for the initial API call
-        # TODO: Pagination in the deepset API is currently implemented in an unintuitive way.
-        # TODO: The cursor is always time based (created_at) and after signifies indexes older than the current cursor
-        # TODO: while 'before' signals indexes younger than the current cursor.
-        # TODO: This is applied irrespective of any sort (e.g. name) that would conflict with this approach.
-        # TODO: Change this to 'after' once the behaviour is fixed on the deepset API
-        request_params = {"limit": limit, "before": after}
+        request_params = {"limit": limit, "after": after}
         request_params = {k: v for k, v in request_params.items() if v is not None}
 
         # 2. Make the first API call using a private, stateless method
         page = await self._list_api_call(**request_params)
+        for index in page.data:
+            index.yaml_config = None  # Hide YAML config in list responses for brevity
 
         # 3. Inject the logic needed for subsequent fetches into the response object
         page._inject_paginator(
@@ -66,11 +63,11 @@ class IndexResource(IndexResourceProtocol):
 
         return PaginatedResponse[Index].create_with_cursor_field(resp.json, "pipeline_index_id")
 
-    async def get(self, index_name: str) -> Index:
+    async def get(self, index_name: str, include_yaml: bool = True) -> Index:
         """Get a specific index.
 
         :param index_name: Name of the index.
-
+        :param include_yaml: Whether to include YAML configuration in the response.
         :returns: Index details.
         """
         response = await self._client.request(
@@ -79,7 +76,10 @@ class IndexResource(IndexResourceProtocol):
 
         raise_for_status(response)
 
-        return Index.model_validate(response.json)
+        index = Index.model_validate(response.json)
+        if not include_yaml:
+            index.yaml_config = None  # Hide YAML config in get responses for brevity
+        return index
 
     async def create(self, index_name: str, yaml_config: str, description: str | None = None) -> Index:
         """Create a new index with the given name and configuration.
@@ -102,7 +102,9 @@ class IndexResource(IndexResourceProtocol):
 
         raise_for_status(response)
 
-        return Index.model_validate(response.json)
+        index = Index.model_validate(response.json)
+        index.yaml_config = None  # Hide YAML config in create responses for brevity
+        return index
 
     async def update(
         self, index_name: str, updated_index_name: str | None = None, yaml_config: str | None = None
@@ -131,7 +133,9 @@ class IndexResource(IndexResourceProtocol):
 
         raise_for_status(response)
 
-        return Index.model_validate(response.json)
+        index = Index.model_validate(response.json)
+        index.yaml_config = None  # Hide YAML config in update responses for brevity
+        return index
 
     async def delete(self, index_name: str) -> None:
         """Delete an index.

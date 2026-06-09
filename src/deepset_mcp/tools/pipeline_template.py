@@ -21,7 +21,7 @@ async def list_templates(
     workspace: str,
     limit: int = 100,
     pipeline_type: PipelineType | str | None = None,
-    # after: str | None = None TODO
+    after: str | None = None,
 ) -> PaginatedResponse[PipelineTemplate] | str:
     """Retrieves a list of all available pipeline and indexing templates.
 
@@ -29,13 +29,16 @@ async def list_templates(
     :param workspace: The workspace to list templates from.
     :param limit: Maximum number of templates to return (default: 100).
     :param pipeline_type: The type of pipeline to return.
+    :param after: The cursor to fetch the next page of results.
+        If there are more results to fetch, the cursor will appear as `next_cursor` on the response.
 
     :returns: List of pipeline templates or error message.
     """
     try:
         return await client.pipeline_templates(workspace=workspace).list(
             limit=limit,
-            filter=f"pipeline_type eq '{pipeline_type}'" if pipeline_type else None,  # TODO: after=after
+            after=after,
+            filter=f"pipeline_type eq '{pipeline_type}'" if pipeline_type else None,
         )
     except ResourceNotFoundError:
         return f"There is no workspace named '{workspace}'. Did you mean to configure it?"
@@ -101,12 +104,11 @@ async def search_templates(
     :returns: Search results with similarity scores or error message.
     """
     try:
-        response = await client.pipeline_templates(workspace=workspace).list()
+        response = await client.pipeline_templates(workspace=workspace).list(
+            limit=100,
+            filter=f"pipeline_type eq '{pipeline_type}'" if pipeline_type else None,  # TODO: after=after
+        )
         templates = response.data
-
-        # Filter by pipeline_type if specified
-        if pipeline_type:
-            templates = [t for t in templates if t.pipeline_type == pipeline_type]
     except UnexpectedAPIError as e:
         return f"Failed to retrieve pipeline templates: {e}"
 

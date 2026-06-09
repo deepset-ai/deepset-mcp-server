@@ -28,7 +28,7 @@ class PipelineTemplateResource(PipelineTemplateResourceProtocol):
         self._client = client
         self._workspace = workspace
 
-    async def get_template(self, template_name: str) -> PipelineTemplate:
+    async def get_template(self, template_name: str, include_yaml: bool = True) -> PipelineTemplate:
         """Fetch a single pipeline template by its name.
 
         Parameters
@@ -45,11 +45,14 @@ class PipelineTemplateResource(PipelineTemplateResourceProtocol):
         raise_for_status(response)
         data = response.json
 
-        return PipelineTemplate.model_validate(data)
+        template = PipelineTemplate.model_validate(data)
+        if not include_yaml:
+            template.yaml_config = None  # Hide YAML config if not requested
+        return template
 
     async def list(
         self,
-        limit: int = 10,
+        limit: int = 100,
         after: str | None = None,
         field: str = "created_at",
         order: str = "DESC",
@@ -71,18 +74,15 @@ class PipelineTemplateResource(PipelineTemplateResourceProtocol):
             raise ValueError("Pagination using 'after' parameter is currently not supported by the deepset platform.")
 
         # 1. Prepare arguments for the initial API call
-        # TODO: Pagination in the deepset API is currently implemented in an unintuitive way.
-        # TODO: The cursor is always time based (created_at) and after signifies templates older than the current cursor
-        # TODO: while 'before' signals templates younger than the current cursor.
-        # TODO: This is applied irrespective of any sort (e.g. name) that would conflict with this approach.
-        # TODO: Change this to 'after' once the behaviour is fixed on the deepset API
-        request_params = {"limit": limit, "before": after, "field": field, "order": order}
+        request_params = {"limit": limit, "after": after, "field": field, "order": order}
         if filter is not None:
             request_params["filter"] = filter
         request_params = {k: v for k, v in request_params.items() if v is not None}
 
         # 2. Make the first API call using a private, stateless method
         page = await self._list_api_call(**request_params)
+        for template in page.data:
+            template.yaml_config = None  # Hide YAML config in list responses for brevity
 
         # 3. Inject the logic needed for subsequent fetches into the response object
         page._inject_paginator(

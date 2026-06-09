@@ -12,11 +12,11 @@ from deepset_mcp.api.shared_models import PaginatedResponse
 class IndexResourceProtocol(Protocol):
     """Protocol defining the implementation for IndexResource."""
 
-    async def list(self, limit: int = 10, after: str | None = None) -> PaginatedResponse[Index]:
+    async def list(self, limit: int = 100, after: str | None = None) -> PaginatedResponse[Index]:
         """List indexes in the configured workspace."""
         ...
 
-    async def get(self, index_name: str) -> Index:
+    async def get(self, index_name: str, include_yaml: bool = True) -> Index:
         """Fetch a single index by its name."""
         ...
 

@@ -59,7 +59,7 @@ class FakePipelineTemplateResource:
 
     async def list(
         self,
-        limit: int = 10,
+        limit: int = 100,
         after: str | None = None,
         field: str = "created_at",
         order: str = "DESC",
@@ -77,7 +77,7 @@ class FakePipelineTemplateResource:
             return PaginatedResponse[PipelineTemplate].create_with_cursor_field(response_data, "pipeline_template_id")
         raise NotImplementedError
 
-    async def get_template(self, template_name: str) -> PipelineTemplate:
+    async def get_template(self, template_name: str, include_yaml: bool = True) -> PipelineTemplate:
         if self._get_exception:
             raise self._get_exception
         if self._get_response is not None:

@@ -420,7 +420,7 @@ class TestPipelineTemplateResource:
         assert isinstance(result.data[0], PipelineTemplate)
         assert result.data[0].template_name == "Indexing Template"
         assert result.data[0].pipeline_type == "indexing"
-        assert result.data[0].yaml_config == sample_templates[0]["indexing_yaml"]
+        assert result.data[0].yaml_config is None  # Indexing templates should not return YAML in list
 
         # Verify request includes filter
         assert len(client.requests) == 1
@@ -466,14 +466,14 @@ class TestPipelineTemplateResource:
         assert isinstance(query_template, PipelineTemplate)
         assert query_template.template_name == "Query Template"
         assert query_template.pipeline_type == "query"
-        assert query_template.yaml_config == sample_templates[0]["query_yaml"]
+        assert query_template.yaml_config is None  # Query templates should not return YAML in list
 
         # Verify indexing template
         indexing_template = result.data[1]
         assert isinstance(indexing_template, PipelineTemplate)
         assert indexing_template.template_name == "Indexing Template"
         assert indexing_template.pipeline_type == "indexing"
-        assert indexing_template.yaml_config == sample_templates[1]["indexing_yaml"]
+        assert indexing_template.yaml_config is None  # Indexing templates should not return YAML in list
 
     @pytest.mark.skip("Cursor-based pagination for pipeline templates needs to be fixed on deepset platform.")
     @pytest.mark.asyncio

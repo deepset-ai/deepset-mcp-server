@@ -35,7 +35,7 @@ class Index(BaseModel):
     "Human-readable name of the index"
     description: str | None = None
     "Optional description of the index purpose and contents"
-    yaml_config: str = Field(alias="config_yaml")
+    yaml_config: str | None = Field(alias="config_yaml", default=None)
     "YAML configuration defining the index structure and settings"
     workspace_id: str
     "ID of the workspace containing this index"

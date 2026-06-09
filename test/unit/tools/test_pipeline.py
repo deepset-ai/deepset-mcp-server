@@ -106,7 +106,7 @@ class FakePipelineResource:
         self._restore_version_exception = restore_version_exception
 
     async def list(
-        self, limit: int = 10, after: str | None = None, before: str | None = None
+        self, limit: int = 100, after: str | None = None, before: str | None = None
     ) -> PaginatedResponse[DeepsetPipeline]:
         if self._list_exception:
             raise self._list_exception
@@ -147,7 +147,7 @@ class FakePipelineResource:
         raise NotImplementedError
 
     async def list_versions(
-        self, pipeline_name: str, limit: int = 10, after: str | None = None
+        self, pipeline_name: str, limit: int = 100, after: str | None = None, include_yaml: bool = True
     ) -> PaginatedResponse[PipelineVersion]:
         if self._list_versions_exception:
             raise self._list_versions_exception
@@ -168,7 +168,7 @@ class FakePipelineResource:
             return self._create_version_response
         raise NotImplementedError
 
-    async def get_version(self, pipeline_name: str, version_id: str) -> PipelineVersion:
+    async def get_version(self, pipeline_name: str, version_id: str, include_yaml: bool = True) -> PipelineVersion:
         if self._get_version_exception:
             raise self._get_version_exception
         if self._get_version_response is not None:
