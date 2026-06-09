@@ -288,7 +288,7 @@ class PipelineVersion(BaseModel):
     "Unique identifier for the pipeline version"
     version_number: int | None = None
     "Sequential version number"
-    config_yaml: str
+    config_yaml: str | None = None
     "YAML configuration for this version"
     description: str | None = None
     "Optional description of the version"

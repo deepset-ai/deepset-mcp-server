@@ -28,7 +28,7 @@ class PipelineResourceProtocol(Protocol):
         """Fetch a single pipeline by its name."""
         ...
 
-    async def list(self, limit: int = 100, after: str | None = None) -> PaginatedResponse[DeepsetPipelineMeta]:
+    async def list(self, limit: int = 100, after: str | None = None) -> PaginatedResponse[DeepsetPipeline]:
         """List pipelines in the configured workspace with optional pagination."""
         ...
 
