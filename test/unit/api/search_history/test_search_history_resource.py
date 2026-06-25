@@ -467,6 +467,19 @@ class TestSearchHistoryResourceListPipelineTraces:
         assert client._workspace_resource.calls == [WORKSPACE_NAME]
 
     @pytest.mark.asyncio
+    async def test_resolve_ids_memoized_across_calls_on_same_instance(self) -> None:
+        """A second trace call on the same resource reuses the resolved IDs (no re-lookup)."""
+        client = FakeTracesClient(http_responses={TRACES_ENDPOINT: {"data": [], "has_more": False, "total": 0}})
+        resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
+
+        await resource.list_pipeline_traces(PIPELINE_NAME)
+        await resource.list_pipeline_traces(PIPELINE_NAME)
+
+        # Workspace and pipeline lookups each happen only once despite two calls.
+        assert client._workspace_resource.calls == [WORKSPACE_NAME]
+        assert client._pipeline_resource.calls == [(PIPELINE_NAME, False)]
+
+    @pytest.mark.asyncio
     async def test_list_pipeline_traces_resolves_pipeline_uuid_with_include_yaml_false(self) -> None:
         client = FakeTracesClient(http_responses={TRACES_ENDPOINT: {"data": [], "has_more": False, "total": 0}})
         resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)

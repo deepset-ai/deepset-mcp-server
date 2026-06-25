@@ -4,6 +4,7 @@
 
 """Resource implementation for search history API."""
 
+import asyncio
 import builtins
 from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import quote
@@ -33,6 +34,11 @@ class SearchHistoryResource(SearchHistoryResourceProtocol):
         """
         self._client = client
         self._workspace = workspace
+        # Memoized ID lookups. The workspace is fixed for this resource instance,
+        # and pipeline IDs are cached per name, so repeated trace calls on the same
+        # instance avoid redundant lookups.
+        self._workspace_id: str | None = None
+        self._pipeline_ids: dict[str, str] = {}
 
     def _base_path(self) -> str:
         return f"v1/workspaces/{quote(self._workspace, safe='')}/search_history"
@@ -45,15 +51,32 @@ class SearchHistoryResource(SearchHistoryResourceProtocol):
     async def _resolve_ids(self, pipeline_name: str) -> tuple[str, str]:
         """Resolve workspace UUID and pipeline UUID needed for v2 endpoints.
 
+        The workspace and pipeline lookups are fetched concurrently, and both are
+        memoized on the instance to avoid redundant network calls on repeated use.
+
         :param pipeline_name: Name of the pipeline to look up.
         :returns: Tuple of (workspace_id, pipeline_id) as strings.
         """
-        workspace_obj = await self._client.workspaces().get(self._workspace)
-        workspace_id = str(workspace_obj.workspace_id)
+        cached_pipeline_id = self._pipeline_ids.get(pipeline_name)
+        if self._workspace_id is not None and cached_pipeline_id is not None:
+            return self._workspace_id, cached_pipeline_id
 
-        pipeline_obj = await self._client.pipelines(self._workspace).get(pipeline_name, include_yaml=False)
-        pipeline_id = pipeline_obj.id
+        async def _fetch_workspace_id() -> str:
+            if self._workspace_id is not None:
+                return self._workspace_id
+            workspace_obj = await self._client.workspaces().get(self._workspace)
+            return str(workspace_obj.workspace_id)
 
+        async def _fetch_pipeline_id() -> str:
+            if cached_pipeline_id is not None:
+                return cached_pipeline_id
+            pipeline_obj = await self._client.pipelines(self._workspace).get(pipeline_name, include_yaml=False)
+            return pipeline_obj.id
+
+        workspace_id, pipeline_id = await asyncio.gather(_fetch_workspace_id(), _fetch_pipeline_id())
+
+        self._workspace_id = workspace_id
+        self._pipeline_ids[pipeline_name] = pipeline_id
         return workspace_id, pipeline_id
 
     async def list(
