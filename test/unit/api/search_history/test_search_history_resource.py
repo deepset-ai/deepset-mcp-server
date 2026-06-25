@@ -11,7 +11,7 @@ import pytest
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.pipeline.models import DeepsetPipeline
-from deepset_mcp.api.search_history.models import PipelineTraceEntry
+from deepset_mcp.api.search_history.models import PipelineTraceEntry, PipelineTraceSummary
 from deepset_mcp.api.search_history.resource import SearchHistoryResource
 from deepset_mcp.api.shared_models import PaginatedResponse
 from deepset_mcp.api.transport import TransportResponse
@@ -24,9 +24,14 @@ WORKSPACE_UUID = "76d361b5-a551-40e3-a5c9-fdbc20028021"
 PIPELINE_NAME = "my-pipeline"
 PIPELINE_UUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 QUERY_UUID = "11111111-2222-3333-4444-555555555555"
+SPAN_UUID = "99999999-8888-7777-6666-555555555555"
 
-TRACES_ENDPOINT = f"v2/workspaces/{WORKSPACE_UUID}/pipelines/{PIPELINE_UUID}/search_history/traces"
-SINGLE_TRACE_ENDPOINT = f"v2/workspaces/{WORKSPACE_UUID}/pipelines/{PIPELINE_UUID}/search_history/{QUERY_UUID}/trace"
+_TRACE_BASE = f"v2/workspaces/{WORKSPACE_UUID}/pipelines/{PIPELINE_UUID}/search_history"
+TRACES_ENDPOINT = f"{_TRACE_BASE}/traces"
+# get_pipeline_trace reads the full trace via the export endpoint.
+EXPORT_TRACE_ENDPOINT = f"{_TRACE_BASE}/{QUERY_UUID}/trace/export"
+SPAN_TAGS_ENDPOINT = f"{_TRACE_BASE}/{QUERY_UUID}/trace/tags/{SPAN_UUID}"
+LOGS_ENDPOINT = f"{_TRACE_BASE}/{QUERY_UUID}/trace/logs"
 
 
 def make_workspace() -> Workspace:
@@ -51,6 +56,29 @@ def make_pipeline(pipeline_id: str = PIPELINE_UUID, name: str = PIPELINE_NAME) -
     )
 
 
+def make_trace_summary_dict(
+    query_id: str = "qid-001",
+    query: str = "What is Haystack?",
+    status: str = "success",
+    created_at: str = "2024-03-01T12:00:00Z",
+    duration_s: float = 1.0,
+) -> dict[str, Any]:
+    """A trace as returned by the *list* endpoint — summary only, no spans/logs."""
+    return {
+        "query_id": query_id,
+        "query": query,
+        "status": status,
+        "duration_s": duration_s,
+        "created_at": created_at,
+        "haystack_trace": {
+            "schema_version": "haystack-trace/v1",
+            "run_id": f"run-{query_id}",
+            "started_at": created_at,
+            "status": status,
+        },
+    }
+
+
 def make_trace_entry_dict(
     query_id: str = "qid-001",
     query: str = "What is Haystack?",
@@ -58,6 +86,7 @@ def make_trace_entry_dict(
     created_at: str = "2024-03-01T12:00:00Z",
     duration_s: float = 1.0,
 ) -> dict[str, Any]:
+    """A full trace as returned by the export endpoint — spans (with tags) and logs."""
     return {
         "query_id": query_id,
         "query": query,
@@ -71,13 +100,23 @@ def make_trace_entry_dict(
             "status": status,
             "traces": [
                 {
-                    "span_id": f"span-{query_id}",
+                    "span_id": SPAN_UUID,
                     "operation_name": "Pipeline.run",
                     "start_time": created_at,
-                    "tags": {},
+                    "tags": {
+                        "haystack.component.input": {"query": query},
+                        "haystack.component.output": {"replies": ["an answer"]},
+                    },
                 }
             ],
-            "logs": [],
+            "logs": [
+                {
+                    "logger": "haystack.core.pipeline",
+                    "level": "INFO",
+                    "message": "Running component",
+                    "timestamp": created_at,
+                }
+            ],
         },
     }
 
@@ -388,8 +427,8 @@ class TestSearchHistoryResourceListPipelineTraces:
     @pytest.mark.asyncio
     async def test_list_pipeline_traces_success(self) -> None:
         entries = [
-            make_trace_entry_dict("qid-001", "first query"),
-            make_trace_entry_dict("qid-002", "second query"),
+            make_trace_summary_dict("qid-001", "first query"),
+            make_trace_summary_dict("qid-002", "second query"),
         ]
         client = FakeTracesClient(http_responses={TRACES_ENDPOINT: {"data": entries, "has_more": False, "total": 2}})
         resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
@@ -402,19 +441,21 @@ class TestSearchHistoryResourceListPipelineTraces:
 
     @pytest.mark.asyncio
     async def test_list_pipeline_traces_entry_fields(self) -> None:
-        entry = make_trace_entry_dict("qid-abc", "precise query", status="success", duration_s=0.75)
+        entry = make_trace_summary_dict("qid-abc", "precise query", status="success", duration_s=0.75)
         client = FakeTracesClient(http_responses={TRACES_ENDPOINT: {"data": [entry], "has_more": False, "total": 1}})
         resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
 
         result = await resource.list_pipeline_traces(PIPELINE_NAME)
 
         trace = result.data[0]
-        assert isinstance(trace, PipelineTraceEntry)
+        assert isinstance(trace, PipelineTraceSummary)
         assert trace.query_id == "qid-abc"
         assert trace.query == "precise query"
         assert trace.status == "success"
         assert trace.duration_s == 0.75
+        # Summaries carry run-level metadata but no spans/logs.
         assert trace.haystack_trace is not None
+        assert not hasattr(trace.haystack_trace, "traces")
 
     @pytest.mark.asyncio
     async def test_list_pipeline_traces_resolves_workspace_uuid(self) -> None:
@@ -503,8 +544,8 @@ class TestSearchHistoryResourceListPipelineTraces:
     async def test_list_pipeline_traces_cursor_from_created_at(self) -> None:
         """next_cursor for traces is extracted from `created_at` (the v2 field name)."""
         entries = [
-            make_trace_entry_dict("qid-1", created_at="2024-03-01T12:00:00Z"),
-            make_trace_entry_dict("qid-2", created_at="2024-03-01T10:00:00Z"),
+            make_trace_summary_dict("qid-1", created_at="2024-03-01T12:00:00Z"),
+            make_trace_summary_dict("qid-2", created_at="2024-03-01T10:00:00Z"),
         ]
         client = FakeTracesClient(http_responses={TRACES_ENDPOINT: {"data": entries, "has_more": True, "total": 20}})
         resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
@@ -516,7 +557,7 @@ class TestSearchHistoryResourceListPipelineTraces:
 
     @pytest.mark.asyncio
     async def test_list_pipeline_traces_no_cursor_when_not_has_more(self) -> None:
-        entries = [make_trace_entry_dict("qid-1", created_at="2024-03-01T12:00:00Z")]
+        entries = [make_trace_summary_dict("qid-1", created_at="2024-03-01T12:00:00Z")]
         client = FakeTracesClient(http_responses={TRACES_ENDPOINT: {"data": entries, "has_more": False, "total": 1}})
         resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
 
@@ -623,7 +664,7 @@ class TestSearchHistoryResourceGetPipelineTrace:
     @pytest.mark.asyncio
     async def test_get_pipeline_trace_success(self) -> None:
         trace_dict = make_trace_entry_dict(QUERY_UUID, "Get single trace")
-        client = FakeTracesClient(http_responses={SINGLE_TRACE_ENDPOINT: trace_dict})
+        client = FakeTracesClient(http_responses={EXPORT_TRACE_ENDPOINT: trace_dict})
         resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
 
         result = await resource.get_pipeline_trace(PIPELINE_NAME, QUERY_UUID)
@@ -632,22 +673,29 @@ class TestSearchHistoryResourceGetPipelineTrace:
         assert result.query_id == QUERY_UUID
         assert result.query == "Get single trace"
         assert result.haystack_trace is not None
+        # The export endpoint returns the FULL trace: spans (with input/output tags) and logs.
+        assert len(result.haystack_trace.traces) == 1
+        span = result.haystack_trace.traces[0]
+        assert span.tags["haystack.component.input"] == {"query": "Get single trace"}
+        assert span.tags["haystack.component.output"] == {"replies": ["an answer"]}
+        assert len(result.haystack_trace.logs) == 1
 
     @pytest.mark.asyncio
-    async def test_get_pipeline_trace_calls_correct_v2_endpoint(self) -> None:
+    async def test_get_pipeline_trace_uses_export_endpoint(self) -> None:
         trace_dict = make_trace_entry_dict(QUERY_UUID)
-        client = FakeTracesClient(http_responses={SINGLE_TRACE_ENDPOINT: trace_dict})
+        client = FakeTracesClient(http_responses={EXPORT_TRACE_ENDPOINT: trace_dict})
         resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
 
         await resource.get_pipeline_trace(PIPELINE_NAME, QUERY_UUID)
 
         endpoints = [r["endpoint"] for r in client.requests]
-        assert SINGLE_TRACE_ENDPOINT in endpoints
+        assert EXPORT_TRACE_ENDPOINT in endpoints
+        assert any(e.endswith("/trace/export") for e in endpoints)
 
     @pytest.mark.asyncio
     async def test_get_pipeline_trace_endpoint_contains_uuids_not_names(self) -> None:
         trace_dict = make_trace_entry_dict(QUERY_UUID)
-        client = FakeTracesClient(http_responses={SINGLE_TRACE_ENDPOINT: trace_dict})
+        client = FakeTracesClient(http_responses={EXPORT_TRACE_ENDPOINT: trace_dict})
         resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
 
         await resource.get_pipeline_trace(PIPELINE_NAME, QUERY_UUID)
@@ -664,7 +712,7 @@ class TestSearchHistoryResourceGetPipelineTrace:
     @pytest.mark.asyncio
     async def test_get_pipeline_trace_uses_v2_prefix(self) -> None:
         trace_dict = make_trace_entry_dict(QUERY_UUID)
-        client = FakeTracesClient(http_responses={SINGLE_TRACE_ENDPOINT: trace_dict})
+        client = FakeTracesClient(http_responses={EXPORT_TRACE_ENDPOINT: trace_dict})
         resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
 
         await resource.get_pipeline_trace(PIPELINE_NAME, QUERY_UUID)
@@ -675,7 +723,7 @@ class TestSearchHistoryResourceGetPipelineTrace:
     @pytest.mark.asyncio
     async def test_get_pipeline_trace_null_response_returns_none(self) -> None:
         client = FakeTracesClient(
-            http_responses={SINGLE_TRACE_ENDPOINT: TransportResponse(text="", status_code=200, json=None)}
+            http_responses={EXPORT_TRACE_ENDPOINT: TransportResponse(text="", status_code=200, json=None)}
         )
         resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
 
@@ -686,7 +734,7 @@ class TestSearchHistoryResourceGetPipelineTrace:
     @pytest.mark.asyncio
     async def test_get_pipeline_trace_resolves_workspace_uuid(self) -> None:
         trace_dict = make_trace_entry_dict(QUERY_UUID)
-        client = FakeTracesClient(http_responses={SINGLE_TRACE_ENDPOINT: trace_dict})
+        client = FakeTracesClient(http_responses={EXPORT_TRACE_ENDPOINT: trace_dict})
         resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
 
         await resource.get_pipeline_trace(PIPELINE_NAME, QUERY_UUID)
@@ -696,7 +744,7 @@ class TestSearchHistoryResourceGetPipelineTrace:
     @pytest.mark.asyncio
     async def test_get_pipeline_trace_resolves_pipeline_uuid_with_include_yaml_false(self) -> None:
         trace_dict = make_trace_entry_dict(QUERY_UUID)
-        client = FakeTracesClient(http_responses={SINGLE_TRACE_ENDPOINT: trace_dict})
+        client = FakeTracesClient(http_responses={EXPORT_TRACE_ENDPOINT: trace_dict})
         resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
 
         await resource.get_pipeline_trace(PIPELINE_NAME, QUERY_UUID)
@@ -728,7 +776,7 @@ class TestSearchHistoryResourceGetPipelineTrace:
     @pytest.mark.asyncio
     async def test_get_pipeline_trace_404_raises_resource_not_found(self) -> None:
         client = FakeTracesClient(
-            http_responses={SINGLE_TRACE_ENDPOINT: TransportResponse(text="Not Found", status_code=404)}
+            http_responses={EXPORT_TRACE_ENDPOINT: TransportResponse(text="Not Found", status_code=404)}
         )
         resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
 
@@ -738,7 +786,7 @@ class TestSearchHistoryResourceGetPipelineTrace:
     @pytest.mark.asyncio
     async def test_get_pipeline_trace_500_raises_unexpected_api_error(self) -> None:
         client = FakeTracesClient(
-            http_responses={SINGLE_TRACE_ENDPOINT: TransportResponse(text="Server Error", status_code=500)}
+            http_responses={EXPORT_TRACE_ENDPOINT: TransportResponse(text="Server Error", status_code=500)}
         )
         resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
 
@@ -748,9 +796,153 @@ class TestSearchHistoryResourceGetPipelineTrace:
     @pytest.mark.asyncio
     async def test_get_pipeline_trace_bad_request_raises_error(self) -> None:
         client = FakeTracesClient(
-            http_responses={SINGLE_TRACE_ENDPOINT: TransportResponse(text="Bad Request", status_code=400)}
+            http_responses={EXPORT_TRACE_ENDPOINT: TransportResponse(text="Bad Request", status_code=400)}
         )
         resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
 
         with pytest.raises(BadRequestError):
             await resource.get_pipeline_trace(PIPELINE_NAME, QUERY_UUID)
+
+
+# ---------------------------------------------------------------------------
+# SearchHistoryResource.get_pipeline_trace_span_tags
+# ---------------------------------------------------------------------------
+
+
+class TestSearchHistoryResourceGetPipelineTraceSpanTags:
+    @pytest.mark.asyncio
+    async def test_span_tags_success_returns_dict(self) -> None:
+        tags = {
+            "haystack.component.type": "PromptBuilder",
+            "haystack.component.input": {"query": "hello"},
+            "haystack.component.output": {"prompt": "built"},
+        }
+        client = FakeTracesClient(http_responses={SPAN_TAGS_ENDPOINT: tags})
+        resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
+
+        result = await resource.get_pipeline_trace_span_tags(PIPELINE_NAME, QUERY_UUID, SPAN_UUID)
+
+        assert result == tags
+
+    @pytest.mark.asyncio
+    async def test_span_tags_uses_correct_endpoint_with_uuids(self) -> None:
+        client = FakeTracesClient(http_responses={SPAN_TAGS_ENDPOINT: {}})
+        resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
+
+        await resource.get_pipeline_trace_span_tags(PIPELINE_NAME, QUERY_UUID, SPAN_UUID)
+
+        endpoint = next(r["endpoint"] for r in client.requests if "/trace/tags/" in r["endpoint"])
+        assert endpoint == SPAN_TAGS_ENDPOINT
+        assert endpoint.startswith("v2/")
+        assert WORKSPACE_UUID in endpoint
+        assert PIPELINE_UUID in endpoint
+        assert SPAN_UUID in endpoint
+        assert PIPELINE_NAME not in endpoint
+
+    @pytest.mark.asyncio
+    async def test_span_tags_non_dict_response_returns_none(self) -> None:
+        client = FakeTracesClient(
+            http_responses={SPAN_TAGS_ENDPOINT: TransportResponse(text="", status_code=200, json=None)}
+        )
+        resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
+
+        result = await resource.get_pipeline_trace_span_tags(PIPELINE_NAME, QUERY_UUID, SPAN_UUID)
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_span_tags_404_raises_resource_not_found(self) -> None:
+        client = FakeTracesClient(
+            http_responses={SPAN_TAGS_ENDPOINT: TransportResponse(text="Not Found", status_code=404)}
+        )
+        resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
+
+        with pytest.raises(ResourceNotFoundError):
+            await resource.get_pipeline_trace_span_tags(PIPELINE_NAME, QUERY_UUID, SPAN_UUID)
+
+    @pytest.mark.asyncio
+    async def test_span_tags_500_raises_unexpected_api_error(self) -> None:
+        client = FakeTracesClient(
+            http_responses={SPAN_TAGS_ENDPOINT: TransportResponse(text="Server Error", status_code=500)}
+        )
+        resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
+
+        with pytest.raises(UnexpectedAPIError):
+            await resource.get_pipeline_trace_span_tags(PIPELINE_NAME, QUERY_UUID, SPAN_UUID)
+
+
+# ---------------------------------------------------------------------------
+# SearchHistoryResource.get_pipeline_trace_logs
+# ---------------------------------------------------------------------------
+
+
+class TestSearchHistoryResourceGetPipelineTraceLogs:
+    @pytest.mark.asyncio
+    async def test_logs_success_returns_log_entries(self) -> None:
+        logs = [
+            {
+                "logger": "haystack.core.pipeline",
+                "level": "INFO",
+                "message": "Running component",
+                "timestamp": "2024-03-01T12:00:00Z",
+            },
+            {
+                "logger": "haystack.core.pipeline",
+                "level": "WARNING",
+                "message": "Slow component",
+                "timestamp": "2024-03-01T12:00:01Z",
+                "extra_fields": {"component": "Retriever"},
+            },
+        ]
+        client = FakeTracesClient(http_responses={LOGS_ENDPOINT: logs})
+        resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
+
+        result = await resource.get_pipeline_trace_logs(PIPELINE_NAME, QUERY_UUID)
+
+        assert len(result) == 2
+        assert result[0].level == "INFO"
+        assert result[1].message == "Slow component"
+        assert result[1].extra_fields == {"component": "Retriever"}
+
+    @pytest.mark.asyncio
+    async def test_logs_uses_correct_endpoint_with_uuids(self) -> None:
+        client = FakeTracesClient(http_responses={LOGS_ENDPOINT: []})
+        resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
+
+        await resource.get_pipeline_trace_logs(PIPELINE_NAME, QUERY_UUID)
+
+        endpoint = next(r["endpoint"] for r in client.requests if r["endpoint"].endswith("/trace/logs"))
+        assert endpoint == LOGS_ENDPOINT
+        assert endpoint.startswith("v2/")
+        assert WORKSPACE_UUID in endpoint
+        assert PIPELINE_UUID in endpoint
+        assert PIPELINE_NAME not in endpoint
+
+    @pytest.mark.asyncio
+    async def test_logs_non_list_response_returns_empty(self) -> None:
+        client = FakeTracesClient(
+            http_responses={LOGS_ENDPOINT: TransportResponse(text="", status_code=200, json=None)}
+        )
+        resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
+
+        result = await resource.get_pipeline_trace_logs(PIPELINE_NAME, QUERY_UUID)
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_logs_404_raises_resource_not_found(self) -> None:
+        client = FakeTracesClient(http_responses={LOGS_ENDPOINT: TransportResponse(text="Not Found", status_code=404)})
+        resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
+
+        with pytest.raises(ResourceNotFoundError):
+            await resource.get_pipeline_trace_logs(PIPELINE_NAME, QUERY_UUID)
+
+    @pytest.mark.asyncio
+    async def test_logs_500_raises_unexpected_api_error(self) -> None:
+        client = FakeTracesClient(
+            http_responses={LOGS_ENDPOINT: TransportResponse(text="Server Error", status_code=500)}
+        )
+        resource = SearchHistoryResource(client=client, workspace=WORKSPACE_NAME)
+
+        with pytest.raises(UnexpectedAPIError):
+            await resource.get_pipeline_trace_logs(PIPELINE_NAME, QUERY_UUID)

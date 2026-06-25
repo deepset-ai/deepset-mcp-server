@@ -126,7 +126,12 @@ class HaystackTraceFailure(BaseModel):
 
 
 class HaystackTraceV1(BaseModel):
-    """Full Haystack pipeline run trace (schema version haystack-trace/v1)."""
+    """Full Haystack pipeline run trace (schema version haystack-trace/v1).
+
+    Returned by the single-trace endpoint (``get_pipeline_trace``), which reads the
+    full trace export. Includes every span with its complete tags (component input and
+    output among them) as well as the run's log entries.
+    """
 
     model_config = {"extra": "allow"}
 
@@ -141,8 +146,31 @@ class HaystackTraceV1(BaseModel):
     failure: HaystackTraceFailure | None = Field(default=None, description="Failure details if the run failed")
 
 
-class PipelineTraceEntry(BaseModel):
-    """A single pipeline trace response from the deepset platform (v2 API format)."""
+class HaystackTraceV1Summary(BaseModel):
+    """Trace summary returned by the traces *list* endpoint — no spans and no logs.
+
+    The list endpoint deliberately omits span details and logs to keep the payload
+    small. Use ``get_pipeline_trace`` to fetch the full trace (including spans with
+    input/output and logs) for a single ``query_id``.
+    """
+
+    model_config = {"extra": "allow"}
+
+    schema_version: str = Field(description="Trace schema version identifier")
+    run_id: str = Field(description="Unique run identifier")
+    started_at: str = Field(description="ISO-8601 timestamp when the run started")
+    finished_at: str | None = Field(default=None, description="ISO-8601 timestamp when the run finished")
+    duration_ms: float | None = Field(default=None, description="Total run duration in milliseconds")
+    status: str | None = Field(default=None, description="Run status: 'success' or 'failed'")
+    failure: HaystackTraceFailure | None = Field(default=None, description="Failure details if the run failed")
+
+
+class _PipelineTraceBase(BaseModel):
+    """Shared scalar fields of a pipeline trace record (v2 API format).
+
+    Subclasses differ only in the shape of ``haystack_trace``: the list endpoint
+    returns a summary, the single-trace endpoint returns the full trace.
+    """
 
     model_config = {"extra": "allow"}
 
@@ -158,4 +186,25 @@ class PipelineTraceEntry(BaseModel):
     api_key: dict[str, Any] | None = Field(default=None, description="API key metadata (id, name)")
     feedback: dict[str, Any] | None = Field(default=None, description="Aggregated user feedback for this query")
     user_id: str | None = Field(default=None, description="UUID of the user who ran the query")
+
+
+class PipelineTraceSummary(_PipelineTraceBase):
+    """A pipeline trace as returned by the traces *list* endpoint.
+
+    Carries run-level metadata (status, timing, failure) but no spans or logs. Use the
+    ``query_id`` to fetch the full trace via ``get_pipeline_trace``.
+    """
+
+    haystack_trace: HaystackTraceV1Summary | None = Field(
+        default=None, description="Run-level trace summary (no spans, no logs)"
+    )
+
+
+class PipelineTraceEntry(_PipelineTraceBase):
+    """A single pipeline trace response from the deepset platform (v2 API format).
+
+    Returned by ``get_pipeline_trace``. ``haystack_trace`` holds the full run trace:
+    every span with complete tags (including component input/output) plus the logs.
+    """
+
     haystack_trace: HaystackTraceV1 | None = Field(default=None, description="Full Haystack pipeline run trace")
