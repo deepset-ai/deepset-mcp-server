@@ -386,10 +386,11 @@ class PipelineResource(PipelineResourceProtocol):
             # Return empty paginated response if no JSON data
             return PaginatedResponse[PipelineLog](data=[], has_more=False, total=0)
 
-    async def deploy(self, pipeline_name: str) -> PipelineValidationResult:
+    async def deploy(self, pipeline_name: str, version_id: str | None = None) -> PipelineValidationResult:
         """Deploy a pipeline to production.
 
         :param pipeline_name: Name of the pipeline to deploy.
+        :param version_id: ID of the pipeline version to deploy. If None, deploys the latest non-draft version.
         :returns: PipelineValidationResult containing deployment status and any errors.
         :raises UnexpectedAPIError: If the API returns an unexpected status code.
         """
@@ -398,6 +399,7 @@ class PipelineResource(PipelineResourceProtocol):
                 f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/{quote(pipeline_name, safe='')}/deploy"
             ),
             method="POST",
+            data={"pipeline_version_id": version_id} if version_id is not None else None,
         )
 
         # If successful (status 200), the deployment was successful
