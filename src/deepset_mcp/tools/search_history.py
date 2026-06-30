@@ -4,11 +4,16 @@
 
 """Tools for interacting with search history in a deepset workspace."""
 
-from typing import Literal
+from typing import Any, Literal
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.protocols import AsyncClientProtocol
-from deepset_mcp.api.search_history.models import PipelineTraceEntry, SearchHistoryEntry
+from deepset_mcp.api.search_history.models import (
+    HaystackTraceLog,
+    PipelineTraceEntry,
+    PipelineTraceSummary,
+    SearchHistoryEntry,
+)
 from deepset_mcp.api.shared_models import PaginatedResponse
 
 
@@ -142,13 +147,15 @@ async def list_pipeline_traces(
     query_filter: str | None = None,
     sort_field: Literal["created_at", "query", "duration", "feedbacks/score"] = "created_at",
     sort_order: Literal["ASC", "DESC"] = "DESC",
-) -> PaginatedResponse[PipelineTraceEntry] | str:
-    """Retrieves Haystack pipeline run traces for a specific pipeline.
+) -> PaginatedResponse[PipelineTraceSummary] | str:
+    """Lists Haystack pipeline run trace summaries for a specific pipeline.
 
-    Each trace contains the full execution breakdown of a search query: spans per
-    component, timing, logs, and failure details if the run failed. Use this to
-    debug slow or failing pipeline runs, inspect component-level behaviour, or
-    audit query execution history.
+    Returns one lightweight summary per query run — ``query_id``, query text, status,
+    timing (``duration_s``, ``created_at``), and failure details if the run failed.
+    Summaries do **not** include spans or logs. Use this to browse runs, find slow or
+    failed queries, then pass a ``query_id`` to ``get_pipeline_trace`` for the full
+    execution trace (spans with component input/output and logs), or to
+    ``get_pipeline_trace_logs`` for just the logs.
 
     This tool resolves the pipeline and workspace IDs automatically and calls
     the v2 traces endpoint under the hood.
@@ -172,7 +179,7 @@ async def list_pipeline_traces(
         duration, feedbacks/score. Defaults to created_at.
     :param sort_order: Sort direction — ASC (oldest first) or DESC (newest first).
         Defaults to DESC.
-    :returns: Paginated list of pipeline trace entries or an error message.
+    :returns: Paginated list of pipeline trace summaries or an error message.
     """
     try:
         return await client.search_history(workspace=workspace).list_pipeline_traces(
@@ -196,15 +203,19 @@ async def get_pipeline_trace(
     pipeline_name: str,
     query_id: str,
 ) -> PipelineTraceEntry | str:
-    """Retrieves the Haystack pipeline run trace for a single search history record.
+    """Retrieves the full Haystack pipeline run trace for a single search history record.
 
-    Returns the full execution trace for one query: all component spans with
-    timing, log entries, and failure details. Use this to deep-dive into a
+    Returns the complete execution trace for one query in a single call: every
+    component span with full tags (including the component's **input and output**),
+    all log entries, timing, and failure details. Use this to deep-dive into a
     specific query run identified by its ``query_id`` (obtainable from
     ``list_pipeline_traces`` or ``list_pipeline_search_history``).
 
-    This tool resolves the pipeline and workspace IDs automatically and calls
-    the v2 single-trace endpoint under the hood.
+    For a targeted look at one component without downloading the whole trace, use
+    ``get_pipeline_trace_span_tags``; for only the logs, use ``get_pipeline_trace_logs``.
+
+    This tool resolves the pipeline and workspace IDs automatically and reads the
+    full trace via the v2 trace export endpoint under the hood.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
@@ -212,7 +223,7 @@ async def get_pipeline_trace(
     :param query_id: UUID of the search history query whose trace to retrieve.
         Obtain this from the ``query_id`` / ``search_history_id`` field of a
         ``list_pipeline_traces`` or ``list_pipeline_search_history`` response.
-    :returns: The pipeline trace entry or an error message.
+    :returns: The full pipeline trace entry or an error message.
     """
     try:
         result = await client.search_history(workspace=workspace).get_pipeline_trace(
@@ -229,3 +240,81 @@ async def get_pipeline_trace(
         )
     except (BadRequestError, UnexpectedAPIError) as e:
         return f"Failed to get trace for query_id '{query_id}': {e}"
+
+
+async def get_pipeline_trace_span_tags(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    query_id: str,
+    span_id: str,
+) -> dict[str, Any] | str:
+    """Retrieves all tags for a single span within a Haystack pipeline run trace.
+
+    A span's tags carry the component-level detail, including its **input and output**
+    (e.g. ``haystack.component.input`` / ``haystack.component.output``) plus type and
+    error information. Use this to inspect one component cheaply, without fetching the
+    full trace via ``get_pipeline_trace``.
+
+    Obtain ``span_id`` from a span in a ``get_pipeline_trace`` response, and ``query_id``
+    from ``list_pipeline_traces`` or ``list_pipeline_search_history``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline.
+    :param query_id: UUID of the search history query.
+    :param span_id: UUID of the span whose tags to retrieve.
+    :returns: The span's tag dictionary or an error message.
+    """
+    try:
+        result = await client.search_history(workspace=workspace).get_pipeline_trace_span_tags(
+            pipeline_name=pipeline_name,
+            query_id=query_id,
+            span_id=span_id,
+        )
+        if result is None:
+            return f"No span '{span_id}' found in the trace for query_id '{query_id}' in pipeline '{pipeline_name}'."
+        return result
+    except ResourceNotFoundError:
+        return (
+            f"No span '{span_id}' found for query_id '{query_id}' in pipeline '{pipeline_name}' "
+            f"(workspace '{workspace}'). The query, trace, or span may not exist."
+        )
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to get span tags for span '{span_id}' (query_id '{query_id}'): {e}"
+
+
+async def get_pipeline_trace_logs(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    query_id: str,
+) -> list[HaystackTraceLog] | str:
+    """Retrieves the log entries for a single Haystack pipeline run trace.
+
+    Returns just the run's logs — a cheaper, targeted alternative to ``get_pipeline_trace``
+    when only the logs are needed (e.g. to diagnose warnings or errors emitted during the
+    run). Each entry includes the logger, level, message, timestamp, and extra fields.
+
+    Obtain ``query_id`` from ``list_pipeline_traces`` or ``list_pipeline_search_history``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline.
+    :param query_id: UUID of the search history query.
+    :returns: List of log entries or an error message.
+    """
+    try:
+        return await client.search_history(workspace=workspace).get_pipeline_trace_logs(
+            pipeline_name=pipeline_name,
+            query_id=query_id,
+        )
+    except ResourceNotFoundError:
+        return (
+            f"No trace found for query_id '{query_id}' in pipeline '{pipeline_name}' "
+            f"(workspace '{workspace}'). The query may not exist or may not have a stored trace."
+        )
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to get trace logs for query_id '{query_id}': {e}"

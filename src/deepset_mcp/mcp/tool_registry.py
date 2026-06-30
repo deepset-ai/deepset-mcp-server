@@ -58,6 +58,8 @@ from deepset_mcp.tools.pipeline_template import (
 )
 from deepset_mcp.tools.search_history import (
     get_pipeline_trace as get_pipeline_trace_tool,
+    get_pipeline_trace_logs as get_pipeline_trace_logs_tool,
+    get_pipeline_trace_span_tags as get_pipeline_trace_span_tags_tool,
     list_pipeline_search_history as list_pipeline_search_history_tool,
     list_pipeline_traces as list_pipeline_traces_tool,
     list_search_history as list_search_history_tool,
@@ -223,6 +225,14 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     ),
     "get_pipeline_trace": (
         get_pipeline_trace_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_pipeline_trace_span_tags": (
+        get_pipeline_trace_span_tags_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_pipeline_trace_logs": (
+        get_pipeline_trace_logs_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
     "list_custom_component_installations": (

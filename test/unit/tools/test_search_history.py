@@ -2,21 +2,54 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+import builtins
 from typing import Any, Literal
 
 import pytest
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.search_history.models import PipelineTraceEntry, SearchHistoryEntry
+from deepset_mcp.api.search_history.models import (
+    HaystackTraceLog,
+    PipelineTraceEntry,
+    PipelineTraceSummary,
+    SearchHistoryEntry,
+)
 from deepset_mcp.api.search_history.protocols import SearchHistoryResourceProtocol
 from deepset_mcp.api.shared_models import PaginatedResponse
 from deepset_mcp.tools.search_history import (
     get_pipeline_trace,
+    get_pipeline_trace_logs,
+    get_pipeline_trace_span_tags,
     list_pipeline_search_history,
     list_pipeline_traces,
     list_search_history,
 )
 from test.unit.conftest import BaseFakeClient
+
+
+def make_pipeline_trace_summary(
+    query_id: str = "qid-001",
+    query: str = "test trace query",
+    status: str = "success",
+    duration_s: float = 1.0,
+    created_at: str = "2024-03-01T12:00:00Z",
+) -> PipelineTraceSummary:
+    """A list-endpoint trace summary — no spans, no logs."""
+    from deepset_mcp.api.search_history.models import HaystackTraceV1Summary
+
+    return PipelineTraceSummary(
+        query_id=query_id,
+        query=query,
+        status=status,
+        duration_s=duration_s,
+        created_at=created_at,
+        haystack_trace=HaystackTraceV1Summary(
+            schema_version="haystack-trace/v1",
+            run_id=f"run-{query_id}",
+            started_at=created_at,
+            status=status,
+        ),
+    )
 
 
 def make_pipeline_trace_entry(
@@ -26,7 +59,8 @@ def make_pipeline_trace_entry(
     duration_s: float = 1.0,
     created_at: str = "2024-03-01T12:00:00Z",
 ) -> PipelineTraceEntry:
-    from deepset_mcp.api.search_history.models import HaystackTraceV1
+    """A full single-trace entry — spans (with input/output tags) and logs."""
+    from deepset_mcp.api.search_history.models import HaystackTraceLog, HaystackTraceSpan, HaystackTraceV1
 
     return PipelineTraceEntry(
         query_id=query_id,
@@ -39,8 +73,25 @@ def make_pipeline_trace_entry(
             run_id=f"run-{query_id}",
             started_at=created_at,
             status=status,
-            traces=[],
-            logs=[],
+            traces=[
+                HaystackTraceSpan(
+                    span_id=f"span-{query_id}",
+                    operation_name="Pipeline.run",
+                    start_time=created_at,
+                    tags={
+                        "haystack.component.input": {"query": query},
+                        "haystack.component.output": {"replies": ["an answer"]},
+                    },
+                )
+            ],
+            logs=[
+                HaystackTraceLog(
+                    logger="haystack.core.pipeline",
+                    level="INFO",
+                    message="Running component",
+                    timestamp=created_at,
+                )
+            ],
         ),
     )
 
@@ -52,11 +103,16 @@ class FakeSearchHistoryResource(SearchHistoryResourceProtocol):
         list_pipeline_response: PaginatedResponse[SearchHistoryEntry] | None = None,
         list_exception: Exception | None = None,
         list_pipeline_exception: Exception | None = None,
-        list_traces_response: PaginatedResponse[PipelineTraceEntry] | None = None,
+        list_traces_response: PaginatedResponse[PipelineTraceSummary] | None = None,
         list_traces_exception: Exception | None = None,
         get_trace_response: PipelineTraceEntry | None = None,
         get_trace_exception: Exception | None = None,
         get_trace_returns_none: bool = False,
+        span_tags_response: dict[str, Any] | None = None,
+        span_tags_exception: Exception | None = None,
+        span_tags_returns_none: bool = False,
+        logs_response: list[HaystackTraceLog] | None = None,
+        logs_exception: Exception | None = None,
     ) -> None:
         self._list_response = list_response
         self._list_pipeline_response = list_pipeline_response
@@ -67,6 +123,11 @@ class FakeSearchHistoryResource(SearchHistoryResourceProtocol):
         self._get_trace_response = get_trace_response
         self._get_trace_exception = get_trace_exception
         self._get_trace_returns_none = get_trace_returns_none
+        self._span_tags_response = span_tags_response
+        self._span_tags_exception = span_tags_exception
+        self._span_tags_returns_none = span_tags_returns_none
+        self._logs_response = logs_response
+        self._logs_exception = logs_exception
 
     async def list(
         self,
@@ -105,7 +166,7 @@ class FakeSearchHistoryResource(SearchHistoryResourceProtocol):
         query_filter: str | None = None,
         sort_field: Literal["created_at", "query", "duration", "feedbacks/score"] = "created_at",
         sort_order: Literal["ASC", "DESC"] = "DESC",
-    ) -> PaginatedResponse[PipelineTraceEntry]:
+    ) -> PaginatedResponse[PipelineTraceSummary]:
         if self._list_traces_exception:
             raise self._list_traces_exception
         if self._list_traces_response is not None:
@@ -122,6 +183,27 @@ class FakeSearchHistoryResource(SearchHistoryResourceProtocol):
         if self._get_trace_returns_none:
             return None
         return self._get_trace_response
+
+    async def get_pipeline_trace_span_tags(
+        self,
+        pipeline_name: str,
+        query_id: str,
+        span_id: str,
+    ) -> dict[str, Any] | None:
+        if self._span_tags_exception:
+            raise self._span_tags_exception
+        if self._span_tags_returns_none:
+            return None
+        return self._span_tags_response
+
+    async def get_pipeline_trace_logs(
+        self,
+        pipeline_name: str,
+        query_id: str,
+    ) -> builtins.list[HaystackTraceLog]:
+        if self._logs_exception:
+            raise self._logs_exception
+        return self._logs_response if self._logs_response is not None else []
 
 
 class FakeClient(BaseFakeClient):
@@ -354,7 +436,7 @@ async def test_list_pipeline_search_history_unexpected_error() -> None:
 
 @pytest.mark.asyncio
 async def test_list_pipeline_traces_returns_paginated_response() -> None:
-    entry = make_pipeline_trace_entry(query_id="qid-1", query="trace query")
+    entry = make_pipeline_trace_summary(query_id="qid-1", query="trace query")
     response = PaginatedResponse(data=[entry], has_more=False, total=1)
 
     resource = FakeSearchHistoryResource(list_traces_response=response)
@@ -371,9 +453,9 @@ async def test_list_pipeline_traces_returns_paginated_response() -> None:
 @pytest.mark.asyncio
 async def test_list_pipeline_traces_returns_multiple_entries() -> None:
     entries = [
-        make_pipeline_trace_entry("qid-1", "first"),
-        make_pipeline_trace_entry("qid-2", "second"),
-        make_pipeline_trace_entry("qid-3", "third"),
+        make_pipeline_trace_summary("qid-1", "first"),
+        make_pipeline_trace_summary("qid-2", "second"),
+        make_pipeline_trace_summary("qid-3", "third"),
     ]
     response = PaginatedResponse(data=entries, has_more=False, total=3)
 
@@ -402,7 +484,7 @@ async def test_list_pipeline_traces_empty_result() -> None:
 
 @pytest.mark.asyncio
 async def test_list_pipeline_traces_pagination_cursor() -> None:
-    entry = make_pipeline_trace_entry("qid-1")
+    entry = make_pipeline_trace_summary("qid-1")
     response = PaginatedResponse(data=[entry], has_more=True, total=50, next_cursor="2024-03-01T09:00:00Z")
 
     resource = FakeSearchHistoryResource(list_traces_response=response)
@@ -417,7 +499,7 @@ async def test_list_pipeline_traces_pagination_cursor() -> None:
 
 @pytest.mark.asyncio
 async def test_list_pipeline_traces_with_sort_params() -> None:
-    response: PaginatedResponse[PipelineTraceEntry] = PaginatedResponse(data=[], has_more=False, total=0)
+    response: PaginatedResponse[PipelineTraceSummary] = PaginatedResponse(data=[], has_more=False, total=0)
     resource = FakeSearchHistoryResource(list_traces_response=response)
     client = FakeClient(resource)
 
@@ -435,7 +517,7 @@ async def test_list_pipeline_traces_with_sort_params() -> None:
 
 @pytest.mark.asyncio
 async def test_list_pipeline_traces_with_query_filter() -> None:
-    response: PaginatedResponse[PipelineTraceEntry] = PaginatedResponse(data=[], has_more=False, total=0)
+    response: PaginatedResponse[PipelineTraceSummary] = PaginatedResponse(data=[], has_more=False, total=0)
     resource = FakeSearchHistoryResource(list_traces_response=response)
     client = FakeClient(resource)
 
@@ -485,8 +567,8 @@ async def test_list_pipeline_traces_unexpected_api_error() -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_pipeline_traces_entry_has_haystack_trace() -> None:
-    entry = make_pipeline_trace_entry("qid-x", "trace check", status="failed")
+async def test_list_pipeline_traces_entry_is_summary() -> None:
+    entry = make_pipeline_trace_summary("qid-x", "trace check", status="failed")
     response = PaginatedResponse(data=[entry], has_more=False, total=1)
 
     resource = FakeSearchHistoryResource(list_traces_response=response)
@@ -496,9 +578,12 @@ async def test_list_pipeline_traces_entry_has_haystack_trace() -> None:
 
     assert isinstance(result, PaginatedResponse)
     trace = result.data[0]
+    assert isinstance(trace, PipelineTraceSummary)
     assert trace.status == "failed"
     assert trace.haystack_trace is not None
     assert trace.haystack_trace.run_id == "run-qid-x"
+    # Summaries do not carry spans/logs.
+    assert not hasattr(trace.haystack_trace, "traces")
 
 
 # ---------------------------------------------------------------------------
@@ -531,6 +616,11 @@ async def test_get_pipeline_trace_entry_has_nested_trace() -> None:
     assert isinstance(result, PipelineTraceEntry)
     assert result.haystack_trace is not None
     assert result.haystack_trace.schema_version == "haystack-trace/v1"
+    # The full trace carries spans (with input/output tags) and logs.
+    assert len(result.haystack_trace.traces) == 1
+    assert "haystack.component.input" in result.haystack_trace.traces[0].tags
+    assert "haystack.component.output" in result.haystack_trace.traces[0].tags
+    assert len(result.haystack_trace.logs) == 1
 
 
 @pytest.mark.asyncio
@@ -578,6 +668,162 @@ async def test_get_pipeline_trace_unexpected_api_error() -> None:
     client = FakeClient(resource)
 
     result = await get_pipeline_trace(client=client, workspace="ws1", pipeline_name="p", query_id="qid-err")
+
+    assert isinstance(result, str)
+    assert "qid-err" in result
+    assert "service down" in result
+
+
+# ---------------------------------------------------------------------------
+# get_pipeline_trace_span_tags tool tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_pipeline_trace_span_tags_returns_tags() -> None:
+    tags = {
+        "haystack.component.type": "PromptBuilder",
+        "haystack.component.input": {"query": "hello"},
+        "haystack.component.output": {"prompt": "built"},
+    }
+    resource = FakeSearchHistoryResource(span_tags_response=tags)
+    client = FakeClient(resource)
+
+    result = await get_pipeline_trace_span_tags(
+        client=client, workspace="ws1", pipeline_name="p", query_id="qid-1", span_id="span-1"
+    )
+
+    assert result == tags
+
+
+@pytest.mark.asyncio
+async def test_get_pipeline_trace_span_tags_none_returns_error_string() -> None:
+    resource = FakeSearchHistoryResource(span_tags_returns_none=True)
+    client = FakeClient(resource)
+
+    result = await get_pipeline_trace_span_tags(
+        client=client, workspace="ws1", pipeline_name="p", query_id="qid-1", span_id="span-missing"
+    )
+
+    assert isinstance(result, str)
+    assert "span-missing" in result
+    assert "qid-1" in result
+
+
+@pytest.mark.asyncio
+async def test_get_pipeline_trace_span_tags_resource_not_found_error() -> None:
+    resource = FakeSearchHistoryResource(span_tags_exception=ResourceNotFoundError())
+    client = FakeClient(resource)
+
+    result = await get_pipeline_trace_span_tags(
+        client=client, workspace="ws1", pipeline_name="p", query_id="qid-404", span_id="span-404"
+    )
+
+    assert isinstance(result, str)
+    assert "span-404" in result
+    assert "qid-404" in result
+    assert "ws1" in result
+
+
+@pytest.mark.asyncio
+async def test_get_pipeline_trace_span_tags_bad_request_error() -> None:
+    resource = FakeSearchHistoryResource(span_tags_exception=BadRequestError(message="bad span id"))
+    client = FakeClient(resource)
+
+    result = await get_pipeline_trace_span_tags(
+        client=client, workspace="ws1", pipeline_name="p", query_id="qid-1", span_id="bad"
+    )
+
+    assert isinstance(result, str)
+    assert "bad" in result
+    assert "bad span id" in result
+
+
+@pytest.mark.asyncio
+async def test_get_pipeline_trace_span_tags_unexpected_api_error() -> None:
+    resource = FakeSearchHistoryResource(span_tags_exception=UnexpectedAPIError(status_code=500, message="boom"))
+    client = FakeClient(resource)
+
+    result = await get_pipeline_trace_span_tags(
+        client=client, workspace="ws1", pipeline_name="p", query_id="qid-1", span_id="span-1"
+    )
+
+    assert isinstance(result, str)
+    assert "span-1" in result
+    assert "boom" in result
+
+
+# ---------------------------------------------------------------------------
+# get_pipeline_trace_logs tool tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_pipeline_trace_logs_returns_logs() -> None:
+    logs = [
+        HaystackTraceLog(
+            logger="haystack.core.pipeline",
+            level="INFO",
+            message="Running component",
+            timestamp="2024-03-01T12:00:00Z",
+        ),
+        HaystackTraceLog(
+            logger="haystack.core.pipeline",
+            level="ERROR",
+            message="Component failed",
+            timestamp="2024-03-01T12:00:01Z",
+        ),
+    ]
+    resource = FakeSearchHistoryResource(logs_response=logs)
+    client = FakeClient(resource)
+
+    result = await get_pipeline_trace_logs(client=client, workspace="ws1", pipeline_name="p", query_id="qid-1")
+
+    assert isinstance(result, list)
+    assert len(result) == 2
+    assert result[1].level == "ERROR"
+
+
+@pytest.mark.asyncio
+async def test_get_pipeline_trace_logs_empty_list() -> None:
+    resource = FakeSearchHistoryResource(logs_response=[])
+    client = FakeClient(resource)
+
+    result = await get_pipeline_trace_logs(client=client, workspace="ws1", pipeline_name="p", query_id="qid-1")
+
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_get_pipeline_trace_logs_resource_not_found_error() -> None:
+    resource = FakeSearchHistoryResource(logs_exception=ResourceNotFoundError())
+    client = FakeClient(resource)
+
+    result = await get_pipeline_trace_logs(client=client, workspace="ws1", pipeline_name="p", query_id="qid-404")
+
+    assert isinstance(result, str)
+    assert "qid-404" in result
+    assert "ws1" in result
+
+
+@pytest.mark.asyncio
+async def test_get_pipeline_trace_logs_bad_request_error() -> None:
+    resource = FakeSearchHistoryResource(logs_exception=BadRequestError(message="bad query id"))
+    client = FakeClient(resource)
+
+    result = await get_pipeline_trace_logs(client=client, workspace="ws1", pipeline_name="p", query_id="bad-id")
+
+    assert isinstance(result, str)
+    assert "bad-id" in result
+    assert "bad query id" in result
+
+
+@pytest.mark.asyncio
+async def test_get_pipeline_trace_logs_unexpected_api_error() -> None:
+    resource = FakeSearchHistoryResource(logs_exception=UnexpectedAPIError(status_code=503, message="service down"))
+    client = FakeClient(resource)
+
+    result = await get_pipeline_trace_logs(client=client, workspace="ws1", pipeline_name="p", query_id="qid-err")
 
     assert isinstance(result, str)
     assert "qid-err" in result
