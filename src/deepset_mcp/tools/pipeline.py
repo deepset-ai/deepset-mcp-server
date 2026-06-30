@@ -187,7 +187,8 @@ async def create_pipeline_version(
     Use this to update a pipeline's configuration. Each call creates a new immutable version,
     preserving the full history of changes.
 
-    If is_draft is True, and there is already a draft version, the existing draft will be finalized and incremented to a new version number.
+    If is_draft is True, and there is already a draft version, the existing draft will be finalized and incremented to
+    a new version number.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
@@ -250,7 +251,9 @@ async def restore_pipeline_version(
     pipeline_name: str,
     version_id: str,
 ) -> PipelineVersion | str:
-    """Restores a non-draft pipeline version to be editable as a new draft. The previous draft (if any) is finalized, getting an incremented version number.
+    """Restores a non-draft pipeline version to be editable as a new draft.
+
+    The previous draft (if any) is finalized, getting an incremented version number.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
@@ -377,7 +380,9 @@ async def deploy_pipeline(
     :returns: Deployment validation result or error message.
     """
     try:
-        deployment_result = await client.pipelines(workspace=workspace).deploy(pipeline_name=pipeline_name, version_id=version_id)
+        deployment_result = await client.pipelines(workspace=workspace).deploy(
+            pipeline_name=pipeline_name, version_id=version_id
+        )
     except ResourceNotFoundError:
         return f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}'."
     except BadRequestError as e:
