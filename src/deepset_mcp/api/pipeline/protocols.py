@@ -84,7 +84,7 @@ class PipelineResourceProtocol(Protocol):
         """Fetch logs for a specific pipeline."""
         ...
 
-    async def deploy(self, pipeline_name: str) -> PipelineValidationResult:
+    async def deploy(self, pipeline_name: str, version_id: str | None = None) -> PipelineValidationResult:
         """Deploy a pipeline."""
         ...
 
