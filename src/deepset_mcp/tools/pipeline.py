@@ -187,6 +187,9 @@ async def create_pipeline_version(
     Use this to update a pipeline's configuration. Each call creates a new immutable version,
     preserving the full history of changes.
 
+    If is_draft is True, and there is already a draft version, the existing draft will be finalized and incremented to
+    a new version number.
+
     :param client: The async client for API communication.
     :param workspace: The workspace name.
     :param pipeline_name: Name of the pipeline to create a version for.
@@ -248,7 +251,9 @@ async def restore_pipeline_version(
     pipeline_name: str,
     version_id: str,
 ) -> PipelineVersion | str:
-    """Restores a pipeline to a previous version, making that version the active configuration.
+    """Restores a non-draft pipeline version to be editable as a new draft.
+
+    The previous draft (if any) is finalized, getting an incremented version number.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
@@ -354,6 +359,7 @@ async def deploy_pipeline(
     client: AsyncClientProtocol,
     workspace: str,
     pipeline_name: str,
+    version_id: str | None = None,
     wait_for_deployment: bool = False,
     timeout_seconds: float = 600,
     poll_interval: float = 10,
@@ -366,6 +372,7 @@ async def deploy_pipeline(
     :param client: The async client for API communication.
     :param workspace: The workspace name.
     :param pipeline_name: Name of the pipeline to deploy.
+    :param version_id: Optional ID of the pipeline version to deploy. If None, deploys the latest non-draft version.
     :param wait_for_deployment: If True, waits for the pipeline to reach DEPLOYED status.
     :param timeout_seconds: Maximum time to wait for deployment when wait_for_deployment is True (default: 600.0).
     :param poll_interval: Time between status checks in seconds when wait_for_deployment is True (default: 10.0).
@@ -373,7 +380,9 @@ async def deploy_pipeline(
     :returns: Deployment validation result or error message.
     """
     try:
-        deployment_result = await client.pipelines(workspace=workspace).deploy(pipeline_name=pipeline_name)
+        deployment_result = await client.pipelines(workspace=workspace).deploy(
+            pipeline_name=pipeline_name, version_id=version_id
+        )
     except ResourceNotFoundError:
         return f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}'."
     except BadRequestError as e:
