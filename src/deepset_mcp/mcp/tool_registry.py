@@ -29,6 +29,7 @@ from deepset_mcp.tools.indexes import (
     update_index as update_index_tool,
     validate_index as validate_index_tool,
 )
+from deepset_mcp.tools.model import get_models as get_models_tool
 from deepset_mcp.tools.object_store import (
     create_get_from_object_store,
     create_get_slice_from_object_store,
@@ -189,6 +190,10 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "validate_index": (
         validate_index_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
+    ),
+    "get_models": (
+        get_models_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
     "list_templates": (
         list_pipeline_templates_tool,
