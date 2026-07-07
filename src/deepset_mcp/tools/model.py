@@ -21,7 +21,7 @@ async def get_models(
 
     This includes predefined models offered by deepset as well as custom models configured
     at the workspace or organization level. Use this tool to discover which model names and
-    providers can be used, which configuration options are available, and which default 
+    providers can be used, which configuration options are available, and which default
     configuration is offered when configuring chat generators.
 
     :param client: The async client for API communication.
