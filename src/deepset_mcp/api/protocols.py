@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from deepset_mcp.api.haystack_service.protocols import HaystackServiceProtocol
     from deepset_mcp.api.indexes.protocols import IndexResourceProtocol
     from deepset_mcp.api.integrations.protocols import IntegrationResourceProtocol
+    from deepset_mcp.api.model.protocols import ModelResourceProtocol
     from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
     from deepset_mcp.api.pipeline_template.protocols import PipelineTemplateResourceProtocol
     from deepset_mcp.api.search_history.protocols import SearchHistoryResourceProtocol
@@ -126,6 +127,10 @@ class AsyncClientProtocol(Protocol):
 
     def integrations(self) -> "IntegrationResourceProtocol":
         """Access integrations."""
+        ...
+
+    def models(self, workspace: str) -> "ModelResourceProtocol":
+        """Access models in the specified workspace."""
         ...
 
     def search_history(self, workspace: str) -> "SearchHistoryResourceProtocol":

@@ -17,7 +17,11 @@ import pytest
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.pipeline.resource import PipelineResource
-from deepset_mcp.api.search_history.models import PipelineTraceEntry, SearchHistoryEntry
+from deepset_mcp.api.search_history.models import (
+    PipelineTraceEntry,
+    PipelineTraceSummary,
+    SearchHistoryEntry,
+)
 from deepset_mcp.api.search_history.resource import SearchHistoryResource
 from deepset_mcp.api.shared_models import PaginatedResponse
 
@@ -297,15 +301,15 @@ class TestIntegrationSearchHistoryListPipelineTraces:
         assert result.data == []
 
     @pytest.mark.asyncio
-    async def test_list_pipeline_traces_entries_are_pipeline_trace_entries(
+    async def test_list_pipeline_traces_entries_are_pipeline_trace_summaries(
         self,
         search_history_resource: SearchHistoryResource,
         test_pipeline: str,
     ) -> None:
-        """Each returned item deserialises into PipelineTraceEntry."""
+        """Each returned item deserialises into PipelineTraceSummary (no spans/logs)."""
         result = await search_history_resource.list_pipeline_traces(pipeline_name=test_pipeline, limit=5)
         for entry in result.data:
-            assert isinstance(entry, PipelineTraceEntry)
+            assert isinstance(entry, PipelineTraceSummary)
 
     @pytest.mark.asyncio
     async def test_list_pipeline_traces_nonexistent_pipeline_raises(
@@ -443,3 +447,43 @@ class TestIntegrationSearchHistoryGetPipelineTrace:
         assert isinstance(ht.started_at, str)
         assert isinstance(ht.traces, list)
         assert isinstance(ht.logs, list)
+        # get_pipeline_trace reads the full export: spans carry their complete tags.
+        for span in ht.traces:
+            assert isinstance(span.tags, dict)
+
+    @pytest.mark.asyncio
+    async def test_get_pipeline_trace_span_tags_and_logs(self) -> None:
+        """The span-tags and logs endpoints are reachable for a real trace.
+
+        Requires DEEPSET_TEST_PIPELINE pointing to a pipeline with traces.
+        """
+        pipeline_name = os.environ.get("DEEPSET_TEST_PIPELINE")
+        workspace = os.environ.get("DEEPSET_TEST_WORKSPACE")
+        api_key = os.environ.get("DEEPSET_API_KEY")
+
+        if not pipeline_name or not workspace or not api_key:
+            pytest.skip("DEEPSET_TEST_PIPELINE, DEEPSET_TEST_WORKSPACE, and DEEPSET_API_KEY must all be set")
+
+        async with AsyncDeepsetClient(api_key=api_key) as client:
+            resource = SearchHistoryResource(client=client, workspace=workspace)
+
+            traces = await resource.list_pipeline_traces(pipeline_name=pipeline_name, limit=5)
+            if not traces.data:
+                pytest.skip(f"No traces found for pipeline '{pipeline_name}'")
+
+            entry = traces.data[0]
+
+            # Logs endpoint always returns a list.
+            logs = await resource.get_pipeline_trace_logs(pipeline_name=pipeline_name, query_id=entry.query_id)
+            assert isinstance(logs, list)
+
+            # Span tags: pull a span_id from the full trace, then fetch its tags.
+            full = await resource.get_pipeline_trace(pipeline_name=pipeline_name, query_id=entry.query_id)
+            if full is None or full.haystack_trace is None or not full.haystack_trace.traces:
+                pytest.skip("Trace has no spans to inspect")
+
+            span_id = full.haystack_trace.traces[0].span_id
+            tags = await resource.get_pipeline_trace_span_tags(
+                pipeline_name=pipeline_name, query_id=entry.query_id, span_id=span_id
+            )
+            assert tags is None or isinstance(tags, dict)

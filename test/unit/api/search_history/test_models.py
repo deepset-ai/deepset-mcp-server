@@ -9,7 +9,9 @@ from deepset_mcp.api.search_history.models import (
     HaystackTraceLog,
     HaystackTraceSpan,
     HaystackTraceV1,
+    HaystackTraceV1Summary,
     PipelineTraceEntry,
+    PipelineTraceSummary,
     SearchHistoryEntry,
 )
 
@@ -496,3 +498,79 @@ class TestPipelineTraceEntry:
         assert entry.haystack_trace is not None
         assert len(entry.haystack_trace.traces) == 1
         assert entry.haystack_trace.traces[0].component == "PromptBuilder"
+
+
+# ---------------------------------------------------------------------------
+# HaystackTraceV1Summary
+# ---------------------------------------------------------------------------
+
+
+class TestHaystackTraceV1Summary:
+    def test_summary_has_no_spans_or_logs_fields(self) -> None:
+        summary = HaystackTraceV1Summary(
+            schema_version="haystack-trace/v1",
+            run_id="run-1",
+            started_at="2024-03-01T12:00:00Z",
+            status="success",
+        )
+
+        assert summary.run_id == "run-1"
+        assert summary.status == "success"
+        assert "traces" not in HaystackTraceV1Summary.model_fields
+        assert "logs" not in HaystackTraceV1Summary.model_fields
+
+    def test_summary_validates_from_list_payload(self) -> None:
+        raw = {
+            "schema_version": "haystack-trace/v1",
+            "run_id": "run-2",
+            "started_at": "2024-03-01T12:00:00Z",
+            "finished_at": "2024-03-01T12:00:02Z",
+            "duration_ms": 2000.0,
+            "status": "failed",
+            "failure": {"type": "ValueError", "message": "bad", "stacktrace": ["line 1"]},
+        }
+        summary = HaystackTraceV1Summary.model_validate(raw)
+
+        assert summary.status == "failed"
+        assert summary.failure is not None
+        assert summary.failure.type == "ValueError"
+
+
+# ---------------------------------------------------------------------------
+# PipelineTraceSummary
+# ---------------------------------------------------------------------------
+
+
+class TestPipelineTraceSummary:
+    def test_summary_minimal_fields(self) -> None:
+        summary = PipelineTraceSummary(
+            query_id="qid-sum",
+            query="summary query",
+            status="success",
+            duration_s=0.5,
+            created_at="2024-03-01T12:00:00Z",
+        )
+
+        assert summary.query_id == "qid-sum"
+        assert summary.haystack_trace is None
+
+    def test_summary_from_list_payload(self) -> None:
+        raw = {
+            "query_id": "qid-list",
+            "query": "list query",
+            "status": "success",
+            "duration_s": 1.25,
+            "created_at": "2024-03-01T12:00:00Z",
+            "pipeline_version_number": 3,
+            "haystack_trace": {
+                "schema_version": "haystack-trace/v1",
+                "run_id": "run-list",
+                "started_at": "2024-03-01T12:00:00Z",
+                "status": "success",
+            },
+        }
+        summary = PipelineTraceSummary.model_validate(raw)
+
+        assert summary.pipeline_version_number == 3
+        assert isinstance(summary.haystack_trace, HaystackTraceV1Summary)
+        assert summary.haystack_trace.run_id == "run-list"
