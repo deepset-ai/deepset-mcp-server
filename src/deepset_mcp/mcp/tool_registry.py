@@ -8,7 +8,7 @@ from typing import Any
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.config import DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME
 from deepset_mcp.initialize_embedding_model import get_initialized_model
-from deepset_mcp.mcp.tool_models import DeepsetDocsConfig, MemoryType, ToolConfig
+from deepset_mcp.mcp.tool_models import DeepsetDocsConfig, ExplorerConfig, MemoryType, ToolConfig
 from deepset_mcp.tools.custom_components import (
     get_latest_custom_component_installation_logs as get_latest_custom_component_installation_logs_tool,
     list_custom_component_installations as list_custom_component_installations_tool,
@@ -193,7 +193,13 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     ),
     "get_models": (
         get_models_tool,
-        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+        ToolConfig(
+            needs_client=True,
+            needs_workspace=True,
+            memory_type=MemoryType.EXPLORABLE,
+            # increase max_depth so generation_kwargs are fully captured
+            explorer_config=ExplorerConfig(max_depth=1000),
+        ),
     ),
     "list_templates": (
         list_pipeline_templates_tool,

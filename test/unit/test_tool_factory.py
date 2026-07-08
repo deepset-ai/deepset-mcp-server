@@ -19,7 +19,7 @@ from deepset_mcp.mcp.tool_factory import (
     apply_workspace,
     build_tool,
 )
-from deepset_mcp.mcp.tool_models import MemoryType, ToolConfig
+from deepset_mcp.mcp.tool_models import ExplorerConfig, MemoryType, ToolConfig
 from deepset_mcp.tokonomics import InMemoryBackend, ObjectStore
 from test.unit.conftest import BaseFakeClient
 
@@ -225,6 +225,36 @@ class TestApplyMemory:
 
         mock_both.assert_called_once()
         mock_decorator.assert_called_once_with(sample_func)
+
+    @patch("deepset_mcp.mcp.tool_factory.RichExplorer")
+    @patch("deepset_mcp.mcp.tool_factory.explorable")
+    def test_explorer_overrides_passed_through(
+        self, mock_explorable: Any, mock_rich_explorer: Any, store: ObjectStore
+    ) -> None:
+        """Test that ToolConfig explorer overrides are forwarded to RichExplorer."""
+
+        async def sample_func(a: int) -> str:
+            return str(a)
+
+        config = ToolConfig(memory_type=MemoryType.EXPLORABLE, explorer_config=ExplorerConfig(max_items=5, max_depth=2))
+        apply_memory(sample_func, config, store)
+
+        mock_rich_explorer.assert_called_once_with(store, max_items=5, max_depth=2)
+
+    @patch("deepset_mcp.mcp.tool_factory.RichExplorer")
+    @patch("deepset_mcp.mcp.tool_factory.explorable")
+    def test_no_explorer_overrides_uses_defaults(
+        self, mock_explorable: Any, mock_rich_explorer: Any, store: ObjectStore
+    ) -> None:
+        """Test that RichExplorer defaults are used when no overrides are configured."""
+
+        async def sample_func(a: int) -> str:
+            return str(a)
+
+        config = ToolConfig(memory_type=MemoryType.EXPLORABLE)
+        apply_memory(sample_func, config, store)
+
+        mock_rich_explorer.assert_called_once_with(store)
 
 
 class TestApplyClient:

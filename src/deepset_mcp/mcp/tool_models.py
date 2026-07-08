@@ -26,6 +26,40 @@ class MemoryType(StrEnum):
 
 
 @dataclass
+class ExplorerConfig:
+    """Overrides for 'RichExplorer' defaults. Fields left as 'None' fall back to the 'RichExplorer' default."""
+
+    max_items: int | None = None
+    """Overrides 'RichExplorer.max_items' for this tool."""
+
+    max_string_length: int | None = None
+    """Overrides 'RichExplorer.max_string_length' for this tool."""
+
+    max_depth: int | None = None
+    """Overrides 'RichExplorer.max_depth' for this tool."""
+
+    max_search_matches: int | None = None
+    """Overrides 'RichExplorer.max_search_matches' for this tool."""
+
+    search_context_length: int | None = None
+    """Overrides 'RichExplorer.search_context_length' for this tool."""
+
+    def to_kwargs(self) -> dict[str, int]:
+        """Builds the keyword arguments to override 'RichExplorer' defaults with.
+
+        :returns: A dict of the non-'None' explorer override fields on this config.
+        """
+        overrides = {
+            "max_items": self.max_items,
+            "max_string_length": self.max_string_length,
+            "max_depth": self.max_depth,
+            "max_search_matches": self.max_search_matches,
+            "search_context_length": self.search_context_length,
+        }
+        return {name: value for name, value in overrides.items() if value is not None}
+
+
+@dataclass
 class ToolConfig:
     """Configuration for tool registration.
 
@@ -46,6 +80,9 @@ class ToolConfig:
 
     custom_args: dict[str, Any] = field(default_factory=dict)
     """Any other arguments that should be passed to the tool at registration time instead of being passed by the LLM."""
+
+    explorer_config: ExplorerConfig = field(default_factory=ExplorerConfig)
+    """Overrides for the 'RichExplorer' defaults used by this tool's memory decorator."""
 
 
 @dataclass
