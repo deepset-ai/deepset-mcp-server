@@ -209,7 +209,7 @@ class FakePipelineResource:
             return self._logs_response
         raise NotImplementedError
 
-    async def deploy(self, pipeline_name: str) -> PipelineValidationResult:
+    async def deploy(self, pipeline_name: str, version_id: str | None = None) -> PipelineValidationResult:
         if self._deploy_exception:
             raise self._deploy_exception
         if self._deploy_response is not None:

@@ -29,6 +29,7 @@ from deepset_mcp.tools.indexes import (
     update_index as update_index_tool,
     validate_index as validate_index_tool,
 )
+from deepset_mcp.tools.model import get_models as get_models_tool
 from deepset_mcp.tools.object_store import (
     create_get_from_object_store,
     create_get_slice_from_object_store,
@@ -58,6 +59,8 @@ from deepset_mcp.tools.pipeline_template import (
 )
 from deepset_mcp.tools.search_history import (
     get_pipeline_trace as get_pipeline_trace_tool,
+    get_pipeline_trace_logs as get_pipeline_trace_logs_tool,
+    get_pipeline_trace_span_tags as get_pipeline_trace_span_tags_tool,
     list_pipeline_search_history as list_pipeline_search_history_tool,
     list_pipeline_traces as list_pipeline_traces_tool,
     list_search_history as list_search_history_tool,
@@ -188,6 +191,10 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
         validate_index_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
     ),
+    "get_models": (
+        get_models_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
     "list_templates": (
         list_pipeline_templates_tool,
         ToolConfig(
@@ -223,6 +230,14 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     ),
     "get_pipeline_trace": (
         get_pipeline_trace_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_pipeline_trace_span_tags": (
+        get_pipeline_trace_span_tags_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_pipeline_trace_logs": (
+        get_pipeline_trace_logs_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
     "list_custom_component_installations": (

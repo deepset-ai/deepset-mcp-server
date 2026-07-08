@@ -119,7 +119,7 @@ class FakeDocsPipelineResource(PipelineResourceProtocol):
     ) -> PaginatedResponse[PipelineLog]:
         raise NotImplementedError
 
-    async def deploy(self, pipeline_name: str) -> PipelineValidationResult:
+    async def deploy(self, pipeline_name: str, version_id: str | None = None) -> PipelineValidationResult:
         raise NotImplementedError
 
     def search_stream(
