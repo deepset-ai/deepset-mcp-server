@@ -127,7 +127,7 @@ def apply_memory(
     if store is None:
         raise ValueError("ObjectStore instance is required for memory decorators")
 
-    explorer = RichExplorer(store)
+    explorer = RichExplorer(store, **config.explorer_config.to_kwargs())
 
     if config.memory_type == MemoryType.EXPLORABLE:
         return explorable(object_store=store, explorer=explorer)(base_func)
@@ -354,7 +354,7 @@ def register_tools(
             if object_store is None:
                 raise ValueError(f"ObjectStore instance is required for {tool_name}")
 
-            explorer = RichExplorer(store=object_store)
+            explorer = RichExplorer(store=object_store, **config.explorer_config.to_kwargs())
             enhanced_tool = base_func(explorer=explorer)
         else:
             enhanced_tool = build_tool(
