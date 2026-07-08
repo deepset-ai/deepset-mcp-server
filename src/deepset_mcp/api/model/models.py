@@ -9,7 +9,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from deepset_mcp.api.shared_models import DeepsetUser
 
@@ -22,6 +22,19 @@ class ModelOrigin(StrEnum):
     PLATFORM = "PLATFORM"
 
 
+class ModelProvider(StrEnum):
+    """Well-known providers of models.
+
+    This is not an exhaustive list of all providers a model may report. Other provider values
+    (e.g. from custom or newly added integrations) are still valid and accepted as plain strings.
+    """
+
+    AWS_BEDROCK = "aws-bedrock"
+    OPENAI = "openai"
+    GEMINI = "gemini"
+    ANTHROPIC = "anthropic"
+
+
 class Model(BaseModel):
     """A model that can be used to configure generator components in a pipeline."""
 
@@ -31,6 +44,9 @@ class Model(BaseModel):
     "Name of the model, e.g. 'gpt-4o'"
     provider: str
     "Provider of the model, e.g. 'openai'"
+    model: str | None = None
+    "The underlying model identifier used by the chat generator, e.g. 'gpt-4o'. Extracted from "
+    "`chat_generator_config.init_parameters.model`."
     connected: bool | None = None
     "Whether the workspace has a valid integration to use this model. None if not evaluated."
     origin: ModelOrigin = ModelOrigin.PLATFORM
@@ -47,6 +63,23 @@ class Model(BaseModel):
     "Timestamp when the model was created, if it is a custom model"
     updated_at: datetime | None = None
     "Timestamp when the model was last updated, if it is a custom model"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _infer_model(cls, data: Any) -> Any:
+        """Populate `model` from chat_generator_config.init_parameters.model if not set explicitly."""
+        if not isinstance(data, dict) or data.get("model") is not None:
+            return data
+
+        chat_generator_config = data.get("chat_generator_config")
+        if not isinstance(chat_generator_config, dict):
+            return data
+
+        init_parameters = chat_generator_config.get("init_parameters")
+        if isinstance(init_parameters, dict) and isinstance(init_parameters.get("model"), str):
+            data["model"] = init_parameters["model"]
+
+        return data
 
 
 class ModelList(BaseModel):

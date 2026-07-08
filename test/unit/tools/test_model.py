@@ -7,7 +7,7 @@ import uuid
 import pytest
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.model.models import Model, ModelList, ModelOrigin
+from deepset_mcp.api.model.models import Model, ModelList, ModelOrigin, ModelProvider
 from deepset_mcp.api.model.protocols import ModelResourceProtocol
 from deepset_mcp.tools.model import get_models
 from test.unit.conftest import BaseFakeClient
@@ -28,8 +28,16 @@ class FakeModelResource(ModelResourceProtocol):
         limit: int = 100,
         page_number: int = 1,
         connected: bool | None = None,
+        provider: ModelProvider | str | None = None,
+        model: str | None = None,
     ) -> ModelList:
-        self.last_call_kwargs = {"limit": limit, "page_number": page_number, "connected": connected}
+        self.last_call_kwargs = {
+            "limit": limit,
+            "page_number": page_number,
+            "connected": connected,
+            "provider": provider,
+            "model": model,
+        }
         if self.list_exception:
             raise self.list_exception
         if self.list_response is None:
@@ -73,13 +81,38 @@ async def test_get_models_success() -> None:
 
 @pytest.mark.asyncio
 async def test_get_models_forwards_params() -> None:
-    """Test that limit, page_number, and connected are forwarded to the resource."""
+    """Test that limit, page_number, connected, provider, and model are forwarded to the resource."""
     fake_resource = FakeModelResource(list_response=ModelList(data=[], has_more=False, total=0))
     client = FakeClient(model_resource=fake_resource)
 
-    await get_models(client=client, workspace="my-workspace", limit=5, page_number=2, connected=False)
+    await get_models(
+        client=client,
+        workspace="my-workspace",
+        limit=5,
+        page_number=2,
+        connected=False,
+        provider="openai",
+        model="gpt-4o",
+    )
 
-    assert fake_resource.last_call_kwargs == {"limit": 5, "page_number": 2, "connected": False}
+    assert fake_resource.last_call_kwargs == {
+        "limit": 5,
+        "page_number": 2,
+        "connected": False,
+        "provider": "openai",
+        "model": "gpt-4o",
+    }
+
+
+@pytest.mark.asyncio
+async def test_get_models_forwards_provider_enum() -> None:
+    """Test that a ModelProvider enum value is forwarded to the resource as-is."""
+    fake_resource = FakeModelResource(list_response=ModelList(data=[], has_more=False, total=0))
+    client = FakeClient(model_resource=fake_resource)
+
+    await get_models(client=client, workspace="my-workspace", provider=ModelProvider.ANTHROPIC)
+
+    assert fake_resource.last_call_kwargs["provider"] == ModelProvider.ANTHROPIC
 
 
 @pytest.mark.asyncio
