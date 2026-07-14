@@ -33,6 +33,7 @@ from .pipeline import (
 from .pipeline_template import get_template, list_templates, search_templates
 from .search_history import list_pipeline_search_history, list_search_history
 from .secrets import get_secret, list_secrets
+from .skills import load_skill
 from .workspace import get_workspace, list_workspaces
 
 __all__ = [
@@ -74,6 +75,7 @@ __all__ = [
     "list_pipeline_search_history",
     "get_secret",
     "list_secrets",
+    "load_skill",
     "list_workspaces",
     "get_workspace",
 ]
