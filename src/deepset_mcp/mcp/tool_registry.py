@@ -66,6 +66,7 @@ from deepset_mcp.tools.search_history import (
     list_search_history as list_search_history_tool,
 )
 from deepset_mcp.tools.secrets import get_secret as get_secret_tool, list_secrets as list_secrets_tool
+from deepset_mcp.tools.skills import load_skill as load_skill_tool
 from deepset_mcp.tools.workspace import (
     create_workspace as create_workspace_tool,
     get_workspace as get_workspace_tool,
@@ -279,6 +280,7 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     ),
     "list_secrets": (list_secrets_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "get_secret": (get_secret_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
+    "load_skill": (load_skill_tool, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
     "list_workspaces": (list_workspaces_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "get_workspace": (get_workspace_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "create_workspace": (create_workspace_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
