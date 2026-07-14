@@ -50,9 +50,7 @@ def _build_docstring() -> str:
     """
     skills = _discover_skills()
     if skills:
-        skills_list = "\n".join(
-            f"    - {name}: {description}" for name, (description, _) in sorted(skills.items())
-        )
+        skills_list = "\n".join(f"    - {name}: {description}" for name, (description, _) in sorted(skills.items()))
     else:
         skills_list = "    (no skills are currently available)"
 
