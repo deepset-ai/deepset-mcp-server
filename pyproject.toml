@@ -51,7 +51,12 @@ dependencies = [
     "pyjwt[crypto]",
     "typer",
     "orjson",
+    "jq>=1.12.0",
 ]
+
+[[tool.uv.index]]
+url = "https://pypi.org/simple"
+default = true
 
 [project.urls]
 Homepage = "https://deepset.ai"
@@ -133,7 +138,7 @@ convention = "pep257"
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["glom"]
+module = ["glom", "jq"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
