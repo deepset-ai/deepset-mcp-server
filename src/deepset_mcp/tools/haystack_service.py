@@ -77,8 +77,7 @@ async def _build_component_definition(
         error_message = None
 
         try:
-            component_name = component_type.split(".")[-1]
-            io_info = await haystack_service.get_component_input_output(component_name)
+            io_info = await haystack_service.get_component_input_output(component_type)
 
             # Build input schema
             if "input" in io_info:

@@ -140,10 +140,10 @@ class FakePipelineResource:
 
     def __init__(self, result: DeepsetPipeline | Exception) -> None:
         self._result = result
-        self.calls: list[tuple[str, bool]] = []
+        self.calls: list[str] = []
 
-    async def get(self, pipeline_name: str, include_yaml: bool = True) -> DeepsetPipeline:
-        self.calls.append((pipeline_name, include_yaml))
+    async def get(self, pipeline_name: str) -> DeepsetPipeline:
+        self.calls.append(pipeline_name)
         if isinstance(self._result, Exception):
             raise self._result
         return self._result
@@ -477,7 +477,7 @@ class TestSearchHistoryResourceListPipelineTraces:
 
         # Workspace and pipeline lookups each happen only once despite two calls.
         assert client._workspace_resource.calls == [WORKSPACE_NAME]
-        assert client._pipeline_resource.calls == [(PIPELINE_NAME, False)]
+        assert client._pipeline_resource.calls == [PIPELINE_NAME]
 
     @pytest.mark.asyncio
     async def test_list_pipeline_traces_resolves_pipeline_uuid_with_include_yaml_false(self) -> None:
@@ -486,7 +486,7 @@ class TestSearchHistoryResourceListPipelineTraces:
 
         await resource.list_pipeline_traces(PIPELINE_NAME)
 
-        assert client._pipeline_resource.calls == [(PIPELINE_NAME, False)]
+        assert client._pipeline_resource.calls == [PIPELINE_NAME]
 
     @pytest.mark.asyncio
     async def test_list_pipeline_traces_calls_v2_endpoint(self) -> None:
@@ -762,7 +762,7 @@ class TestSearchHistoryResourceGetPipelineTrace:
 
         await resource.get_pipeline_trace(PIPELINE_NAME, QUERY_UUID)
 
-        assert client._pipeline_resource.calls == [(PIPELINE_NAME, False)]
+        assert client._pipeline_resource.calls == [PIPELINE_NAME]
 
     @pytest.mark.asyncio
     async def test_get_pipeline_trace_pipeline_not_found_propagates(self) -> None:

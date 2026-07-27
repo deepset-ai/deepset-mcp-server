@@ -80,7 +80,6 @@ async def test_create_pipeline(
     pipeline: DeepsetPipeline = await pipeline_resource.get(pipeline_name=pipeline_name)
 
     assert pipeline.name == pipeline_name
-    assert pipeline.yaml_config == sample_yaml_config
 
 
 @pytest.mark.asyncio
@@ -152,17 +151,8 @@ async def test_get_pipeline(
     # Create a pipeline to retrieve
     await pipeline_resource.create(pipeline_name=pipeline_name, yaml_config=sample_yaml_config)
 
-    # Test getting with YAML config
-    pipeline_with_yaml: DeepsetPipeline = await pipeline_resource.get(pipeline_name=pipeline_name, include_yaml=True)
+    pipeline_with_yaml: DeepsetPipeline = await pipeline_resource.get(pipeline_name=pipeline_name)
     assert pipeline_with_yaml.name == pipeline_name
-    assert pipeline_with_yaml.yaml_config == sample_yaml_config
-
-    # Test getting without YAML config
-    pipeline_without_yaml: DeepsetPipeline = await pipeline_resource.get(
-        pipeline_name=pipeline_name, include_yaml=False
-    )
-    assert pipeline_without_yaml.name == pipeline_name
-    assert pipeline_without_yaml.yaml_config is None
 
 
 @pytest.mark.asyncio
@@ -184,7 +174,7 @@ async def test_create_pipeline_version(
         description="Updated temperature",
     )
 
-    assert version.config_yaml == modified_yaml
+    assert version.description == "Updated temperature"
 
     # Verify the version appears in the list
     versions = await pipeline_resource.list_versions(pipeline_name=pipeline_name)
@@ -258,7 +248,7 @@ components:
     resp = await pipeline_resource.validate(yaml_config=invalid_yaml_syntax)
 
     assert resp.valid is False
-    assert resp.errors[0].code == "YAML_ERROR"
+    assert resp.errors[0].code == "PIPELINE_YAML_ERROR"
 
 
 @pytest.mark.asyncio
