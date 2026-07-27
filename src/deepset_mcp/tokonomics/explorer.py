@@ -141,7 +141,7 @@ class RichExplorer:
             )
             result.append(f"Match {i + 1}: ...{highlighted}...")
 
-        return f"\n".join(result)
+        return "\n".join(result)
 
     def replace(
         self,
