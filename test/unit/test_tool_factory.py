@@ -9,7 +9,7 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from mcp.server.fastmcp import Context
+from mcp.server.fastmcp import Context, FastMCP
 
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.mcp.tool_factory import (
@@ -18,8 +18,10 @@ from deepset_mcp.mcp.tool_factory import (
     apply_memory,
     apply_workspace,
     build_tool,
+    register_tools,
 )
-from deepset_mcp.mcp.tool_models import ExplorerConfig, MemoryType, ToolConfig
+from deepset_mcp.mcp.tool_models import DeepsetDocsConfig, ExplorerConfig, MemoryType, ToolConfig
+from deepset_mcp.mcp.tool_registry import TOOL_REGISTRY
 from deepset_mcp.tokonomics import InMemoryBackend, ObjectStore
 from test.unit.conftest import BaseFakeClient
 
@@ -732,3 +734,32 @@ class TestBuildTool:
             call_args = mock_client_class.call_args
             assert call_args[1]["base_url"] == custom_url
             assert call_args[1]["api_key"] == "test-token"
+
+
+class TestRegisterAllTools:
+    """Regression tests ensuring every tool in TOOL_REGISTRY produces a schema-generatable MCP tool.
+
+    Object-store tools are plain factory functions (``explorer: RichExplorer -> Callable``), not regular
+    tool functions. `register_tools` must special-case them (and any future tool of that shape) so a
+    factory's own signature (which contains a non-serializable parameter like `RichExplorer`) is never
+    handed to FastMCP for JSON schema generation.
+    """
+
+    @pytest.mark.parametrize("tool_name", sorted(TOOL_REGISTRY.keys()))
+    def test_tool_schema_generation(self, tool_name: str) -> None:
+        """Registering any tool from TOOL_REGISTRY must produce a schema-generatable MCP tool."""
+        mcp_server = FastMCP()
+        object_store = ObjectStore(backend=InMemoryBackend(), ttl=0)
+        docs_config = DeepsetDocsConfig(pipeline_name="pipeline", api_key="key", workspace_name="workspace")
+
+        register_tools(
+            mcp_server,
+            tool_names={tool_name},
+            object_store=object_store,
+            docs_config=docs_config,
+        )
+
+        registered = mcp_server._tool_manager._tools[tool_name]
+        properties = registered.parameters.get("properties", {})
+        assert "explorer" not in properties
+        assert "client" not in properties
