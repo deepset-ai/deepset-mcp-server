@@ -2,10 +2,12 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+import json
+
 import pytest
 
 from deepset_mcp.tokonomics import InMemoryBackend, ObjectStore, RichExplorer
-from deepset_mcp.tools.object_store import create_grep_object_store, create_sed_object_store
+from deepset_mcp.tools.object_store import create_grep_object_store, create_sed_object_store, create_yq_object_store
 
 
 @pytest.fixture
@@ -142,3 +144,80 @@ class TestSedObjectStore:
 
         new_id = result.split("@")[1].split(".")[0].strip()
         assert store.get(new_id) == "15/01/2024"
+
+
+class TestYqObjectStore:
+    def test_returns_single_result(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        obj_id = store.put({"name": "Alice", "age": 30})
+        yq = create_yq_object_store(explorer)
+
+        result = yq(f"@{obj_id}", ".name")
+
+        assert "matched 1 value(s)" in result
+        assert "Result stored as @" in result
+        assert "Alice" in result
+
+    def test_returns_multiple_results(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        obj_id = store.put({"items": [{"name": "a"}, {"name": "b"}]})
+        yq = create_yq_object_store(explorer)
+
+        result = yq(f"@{obj_id}", ".items[].name")
+
+        assert "matched 2 value(s)" in result
+        new_id = result.split("@")[1].split(".")[0].strip()
+        assert store.get(new_id) == ["a", "b"]
+
+    def test_no_results(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        obj_id = store.put({"items": []})
+        yq = create_yq_object_store(explorer)
+
+        result = yq(f"@{obj_id}", ".items[]")
+
+        assert "No results for filter" in result
+
+    def test_invalid_filter(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        obj_id = store.put({"a": 1})
+        yq = create_yq_object_store(explorer)
+
+        result = yq(f"@{obj_id}", ".[invalid")
+
+        assert "Invalid jq filter" in result
+
+    def test_with_path(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        obj_id = store.put({"data": {"name": "Alice"}})
+        yq = create_yq_object_store(explorer)
+
+        result = yq(f"@{obj_id}", ".name", path="data")
+
+        assert "Alice" in result
+
+    def test_transforms_yaml_string(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        obj_id = store.put("config:\n  timeout: 10\n")
+        yq = create_yq_object_store(explorer)
+
+        result = yq(f"@{obj_id}", ".config.timeout = 30")
+
+        new_id = result.split("@")[1].split(".")[0].strip()
+        new_value = store.get(new_id)
+        assert isinstance(new_value, str)
+        assert "timeout: 30" in new_value
+
+    def test_transforms_json_string(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        obj_id = store.put('{"config": {"timeout": 10}}')
+        yq = create_yq_object_store(explorer)
+
+        result = yq(f"@{obj_id}", ".config.timeout = 30")
+
+        new_id = result.split("@")[1].split(".")[0].strip()
+        new_value = store.get(new_id)
+        assert isinstance(new_value, str)
+        assert json.loads(new_value) == {"config": {"timeout": 30}}
+
+    def test_store_false_does_not_write_to_store(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        obj_id = store.put({"name": "Alice"})
+        yq = create_yq_object_store(explorer)
+
+        result = yq(f"@{obj_id}", ".name", store=False)
+
+        assert "Alice" in result
+        assert "Result stored as @" not in result

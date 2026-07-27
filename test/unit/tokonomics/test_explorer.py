@@ -2,7 +2,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+import json
+
 import pytest
+import yaml
 from glom import Path
 
 from deepset_mcp.tokonomics import InMemoryBackend, ObjectStore, RichExplorer
@@ -553,3 +556,180 @@ class TestRichExplorer:
         result = explorer.replace(obj_id, "[invalid", "x")
 
         assert "Invalid regex pattern" in result
+
+    def test_query_single_result(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test a jq filter that produces a single scalar result."""
+        obj_id = store.put({"name": "Alice", "age": 30})
+
+        result = explorer.query(obj_id, ".name")
+
+        assert "matched 1 value(s)" in result
+        assert "Result stored as @" in result
+        assert "Alice" in result
+
+    def test_query_stores_scalar_result(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test that a scalar query result is stored as a new object."""
+        obj_id = store.put({"name": "Alice", "age": 30})
+
+        result = explorer.query(obj_id, ".name")
+
+        new_id = result.split("@")[1].split(".")[0].strip()
+        assert store.get(new_id) == "Alice"
+        # Original object is unchanged
+        assert store.get(obj_id) == {"name": "Alice", "age": 30}
+
+    def test_query_multiple_results(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test a jq filter that produces a stream of results."""
+        obj_id = store.put({"items": [{"name": "a", "active": True}, {"name": "b", "active": False}]})
+
+        result = explorer.query(obj_id, ".items[] | select(.active) | .name")
+
+        assert "matched 1 value(s)" in result
+        new_id = result.split("@")[1].split(".")[0].strip()
+        assert store.get(new_id) == "a"
+
+    def test_query_returns_multiple_matches(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test a jq filter that matches multiple items, stored as a list."""
+        obj_id = store.put({"items": [{"name": "a"}, {"name": "b"}]})
+
+        result = explorer.query(obj_id, ".items[].name")
+
+        assert "matched 2 value(s)" in result
+        new_id = result.split("@")[1].split(".")[0].strip()
+        assert store.get(new_id) == ["a", "b"]
+
+    def test_query_no_results(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test a jq filter that produces no results."""
+        obj_id = store.put({"items": []})
+
+        result = explorer.query(obj_id, ".items[]")
+
+        assert "No results for filter" in result
+
+    def test_query_invalid_filter(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test an invalid jq filter returns an error message."""
+        obj_id = store.put({"a": 1})
+
+        result = explorer.query(obj_id, ".[invalid")
+
+        assert "Invalid jq filter" in result
+
+    def test_query_runtime_error(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test a jq filter that fails at evaluation time returns an error message."""
+        obj_id = store.put([1, 2, 3])
+
+        result = explorer.query(obj_id, ".foo")
+
+        assert "Error evaluating filter" in result
+
+    def test_query_with_path(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test that query navigates to a nested object via path before applying the filter."""
+        obj_id = store.put({"data": {"items": [{"name": "a"}, {"name": "b"}]}})
+
+        result = explorer.query(obj_id, ".items[].name", path="data")
+
+        assert "matched 2 value(s)" in result
+        new_id = result.split("@")[1].split(".")[0].strip()
+        assert store.get(new_id) == ["a", "b"]
+
+    def test_query_transforms_structured_object(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test that a jq write-filter transforms the whole document, not just a leaf value."""
+        obj_id = store.put({"config": {"timeout": 10}})
+
+        result = explorer.query(obj_id, ".config.timeout = 30")
+
+        new_id = result.split("@")[1].split(".")[0].strip()
+        assert store.get(new_id) == {"config": {"timeout": 30}}
+        # Original object is unchanged
+        assert store.get(obj_id) == {"config": {"timeout": 10}}
+
+    def test_query_parses_yaml_string(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test that a YAML-string object is parsed before the filter is applied."""
+        obj_id = store.put("config:\n  timeout: 10\n  retries: 3\n")
+
+        result = explorer.query(obj_id, ".config.timeout")
+
+        new_id = result.split("@")[1].split(".")[0].strip()
+        assert store.get(new_id) == 10
+
+    def test_query_transform_reserializes_to_yaml(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test that a transform on a YAML-string object is stored back as a YAML string."""
+        obj_id = store.put("config:\n  timeout: 10\n")
+
+        result = explorer.query(obj_id, ".config.timeout = 30")
+
+        new_id = result.split("@")[1].split(".")[0].strip()
+        new_value = store.get(new_id)
+        assert isinstance(new_value, str)
+        assert yaml.safe_load(new_value) == {"config": {"timeout": 30}}
+
+    def test_query_plain_string_not_treated_as_yaml(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test that a plain (non-structured) string is queried as an opaque string, not parsed."""
+        obj_id = store.put("The quick brown fox")
+
+        result = explorer.query(obj_id, ".")
+
+        new_id = result.split("@")[1].split(".")[0].strip()
+        assert store.get(new_id) == "The quick brown fox"
+
+    def test_query_invalid_yaml_string_used_as_is(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test that a string which fails to parse as YAML is queried as an opaque string."""
+        obj_id = store.put("not: valid: yaml: at: all:")
+
+        result = explorer.query(obj_id, ".")
+
+        new_id = result.split("@")[1].split(".")[0].strip()
+        assert store.get(new_id) == "not: valid: yaml: at: all:"
+
+    def test_query_parses_json_string(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test that a JSON-string object is parsed before the filter is applied."""
+        obj_id = store.put('{"config": {"timeout": 10, "retries": 3}}')
+
+        result = explorer.query(obj_id, ".config.timeout")
+
+        new_id = result.split("@")[1].split(".")[0].strip()
+        assert store.get(new_id) == 10
+
+    def test_query_transform_reserializes_to_json(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test that a transform on a JSON-string object is stored back as a JSON string, not YAML."""
+        obj_id = store.put('{"config": {"timeout": 10}}')
+
+        result = explorer.query(obj_id, ".config.timeout = 30")
+
+        new_id = result.split("@")[1].split(".")[0].strip()
+        new_value = store.get(new_id)
+        assert isinstance(new_value, str)
+        assert json.loads(new_value) == {"config": {"timeout": 30}}
+        # Round-trips as JSON syntax, not YAML block style
+        assert new_value.strip().startswith("{")
+
+    def test_query_no_store_does_not_write_to_store(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test that store=False does not create a new object."""
+        obj_id = store.put({"name": "Alice"})
+
+        result = explorer.query(obj_id, ".name", store=False)
+
+        assert "matched 1 value(s)" in result
+        assert "Result stored as @" not in result
+        assert "@" not in result
+
+    def test_query_no_store_returns_full_string(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test that store=False returns the full string result, not a truncated preview."""
+        long_string = "x" * (explorer.max_string_length + 50)
+        obj_id = store.put({"text": long_string})
+
+        result = explorer.query(obj_id, ".text", store=False)
+
+        assert long_string in result
+        assert "truncated" not in result
+        assert "Preview" not in result
+
+    def test_query_no_store_returns_structured_result(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test that store=False still renders structured (non-string) results."""
+        obj_id = store.put({"items": [{"name": "a"}, {"name": "b"}]})
+
+        result = explorer.query(obj_id, ".items[].name", store=False)
+
+        assert "matched 2 value(s)" in result
+        assert "'a'" in result
+        assert "'b'" in result

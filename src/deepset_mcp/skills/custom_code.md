@@ -11,7 +11,18 @@ Guide for producing Haystack custom components and custom tools that run on the 
 
 ## Quick Start
 
+Custom components and custom tools are embedded differently in a pipeline's YAML:
+
+- A **custom component** is declared as a standalone pipeline component with a fixed `type` and an `init_parameters.code` field holding the Python source as a block scalar.
+- A **custom tool** is not a standalone pipeline component. It is listed under the `tools` init parameter of a tool-using component (e.g. `haystack.components.agents.agent.Agent`), with a fixed `type` and a `data.code` field (alongside `data.name`/`data.description` and a sibling `_meta` block) holding the Python source.
+
+In both cases the `type` never changes — only the `code` changes based on what is being built.
+
 ### Custom Component
+
+`type`: `deepset_cloud_custom_nodes.code.code_component.Code`
+
+Python source:
 
 ```python
 from haystack import component
@@ -30,7 +41,35 @@ class WelcomeTextGenerator:
         }
 ```
 
+Pipeline YAML:
+
+```yaml
+components:
+  welcome_text_generator:
+    type: deepset_cloud_custom_nodes.code.code_component.Code
+    init_parameters:
+      code: |
+        from haystack import component
+
+        @component
+        class WelcomeTextGenerator:
+            """
+            A component generating personal welcome message and making it upper case
+            """
+
+            @component.output_types(welcome_text=str, note=str)
+            def run(self, name: str):
+                return {
+                    "welcome_text": f'Hello {name}, welcome to Haystack!'.upper(),
+                    "note": "welcome message is ready"
+                }
+```
+
 ### Custom Tool
+
+`type`: `deepset_cloud_custom_nodes.tools.code_tool.CodeTool`
+
+Python source:
 
 ```python
 from haystack.tools import tool
@@ -46,6 +85,40 @@ def get_weather(
         "temperature": "20 degrees " + ("Celsius" if unit == "Celsius" else "Fahrenheit")
     }
 ```
+
+Pipeline YAML (nested inside an `Agent`'s `tools` list):
+
+```yaml
+components:
+  agent:
+    type: haystack.components.agents.agent.Agent
+    init_parameters:
+      # ... other Agent init_parameters (chat_generator, system_prompt, etc.)
+      tools:
+      - type: deepset_cloud_custom_nodes.tools.code_tool.CodeTool
+        data:
+          name: get_weather
+          description:
+          code: |
+            from haystack.tools import tool
+            from typing import Annotated, Literal
+
+            @tool
+            def get_weather(
+                city: Annotated[str, "the city for which to get the weather"],
+                unit: Annotated[Literal["Celsius", "Fahrenheit"], "the unit for the temperature"]
+            ):
+                return {
+                    "city": city,
+                    "temperature": "20 degrees " + ("Celsius" if unit == "Celsius" else "Fahrenheit")
+                }
+        _meta:
+          name: get_weather
+          description:
+          tool_id:
+```
+
+> Platform-exported YAML often uses a folded block scalar (`code: >`) instead of `|`. Folded style joins single line breaks into spaces but preserves breaks around more-indented lines — so a blank line must separate every top-level statement (imports, decorators, `def`) to keep it on its own line, while nested/indented code inside a function body needs no extra blank lines. Using `|` (literal style), as above, avoids this pitfall entirely and is safe when authoring this YAML by hand.
 
 ## Rules — Custom Components
 
