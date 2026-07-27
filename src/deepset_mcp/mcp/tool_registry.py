@@ -35,6 +35,7 @@ from deepset_mcp.tools.object_store import (
     create_get_slice_from_object_store,
     create_grep_object_store,
     create_sed_object_store,
+    create_yq_object_store,
 )
 from deepset_mcp.tools.pipeline import (
     create_pipeline as create_pipeline_tool,
@@ -288,6 +289,7 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "get_slice_from_object_store": (create_get_slice_from_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
     "grep_object_store": (create_grep_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
     "sed_object_store": (create_sed_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
+    "yq_object_store": (create_yq_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
     DOCS_SEARCH_TOOL_NAME: (get_docs_search_tool, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
 }
 

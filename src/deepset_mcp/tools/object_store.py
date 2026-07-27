@@ -107,3 +107,36 @@ def create_sed_object_store(explorer: RichExplorer) -> Callable[..., Any]:
         )
 
     return sed_object_store
+
+
+def create_yq_object_store(explorer: RichExplorer) -> Callable[..., Any]:
+    """Creates the `yq_object_store` tool."""
+
+    def yq_object_store(object_id: str, filter: str, path: str = "", store: bool = True) -> str:
+        """Query or transform structured data stored in the object store using a jq filter expression.
+
+        Use this to filter, map, select, or rewrite nested data without pulling the whole object into
+        context, e.g. `{"object_id": "@obj_001", "filter": ".items[] | select(.active) | .name"}`.
+        Transforming filters work the same way, e.g. `.config.timeout = 30`.
+
+        If the targeted value is a JSON or YAML string (e.g. a pipeline's YAML config), it is parsed before
+        the filter runs so you can navigate into its fields; a transformed result is re-serialized back to
+        that same format.
+
+        By default, the result is stored as a new object and returned with a preview, so you can reference
+        it further (e.g. `get_from_object_store`) or feed it back into another `yq_object_store` call. Set
+        `store=False` if you just want the full result inline and don't need it stored, e.g. for a small
+        lookup you'll act on immediately.
+
+        :param object_id: The id of the object to query in the format `@obj_001`.
+        :param filter: jq filter expression to apply, e.g. `.field`, `.items[]`, `.[] | select(.status=="done")`,
+            or a transformation like `.field = "value"`.
+        :param path: Navigation path to a nested attribute to query instead of the whole object (optional).
+        :param store: Whether to store the result as a new object (default: True). Set to False to get the
+            full result inline instead of a preview, without writing anything to the object store.
+        :return: New object ID and a preview of the result, the full result if `store` is False, or a message
+            if the filter is invalid or produced no results.
+        """
+        return explorer.query(obj_id=object_id, filter=filter, path=path, store=store)
+
+    return yq_object_store
