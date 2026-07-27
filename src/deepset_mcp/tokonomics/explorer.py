@@ -11,9 +11,12 @@ navigation, searching, and slicing.
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
+import jq
+import yaml
 from glom import GlomError, Path, T, glom
 from rich.console import Console
 from rich.pretty import Pretty
@@ -104,12 +107,9 @@ class RichExplorer:
         """
         obj = self._get_object_at_path(obj_id, path)
 
-        # Generate header
-        header = self._make_header(obj_id, path, obj)
-
         # Only allow search on strings
         if not isinstance(obj, str):
-            return f"{header}\n\nSearch is only supported on string objects. Found {type(obj).__name__} at path."
+            return f"Search is only supported on string objects. Found {type(obj).__name__} at path '{path}'."
 
         # Search the string
         flags = 0 if case_sensitive else re.IGNORECASE
@@ -117,16 +117,16 @@ class RichExplorer:
         try:
             matches = list(re.finditer(pattern, obj, flags))
         except re.error as e:
-            return f"{header}\n\nInvalid regex pattern: {e}"
+            return f"Invalid regex pattern: {e}"
 
         if not matches:
-            return f"{header}\n\nNo matches found for pattern '{pattern}'"
+            return f"No matches found for pattern '{pattern}'"
 
         # Format results
         result = [f"Found {len(matches)} matches for pattern '{pattern}':", ""]
 
         # Show limited number of matches
-        for i, match in enumerate(matches[: self.max_search_matches]):
+        for i, match in enumerate(matches):
             start, end = match.span()
             context_start = max(0, start - self.search_context_length)
             context_end = min(len(obj), end + self.search_context_length)
@@ -141,10 +141,7 @@ class RichExplorer:
             )
             result.append(f"Match {i + 1}: ...{highlighted}...")
 
-        if len(matches) > self.max_search_matches:
-            result.append(f"\n... and {len(matches) - self.max_search_matches} more matches")
-
-        return f"{header}\n\n" + "\n".join(result)
+        return "\n".join(result)
 
     def replace(
         self,
@@ -166,20 +163,19 @@ class RichExplorer:
         :return: New object ID and summary of replacements made.
         """
         obj = self._get_object_at_path(obj_id, path)
-        header = self._make_header(obj_id, path, obj)
 
         if not isinstance(obj, str):
-            return f"{header}\n\nReplace is only supported on string objects. Found {type(obj).__name__} at path."
+            return f"Replace is only supported on string objects. Found {type(obj).__name__} at path '{path}'."
 
         flags = 0 if case_sensitive else re.IGNORECASE
 
         try:
             new_str, num_replacements = re.subn(pattern, replacement, obj, count=count, flags=flags)
         except re.error as e:
-            return f"{header}\n\nInvalid regex pattern: {e}"
+            return f"Invalid regex pattern: {e}"
 
         if num_replacements == 0:
-            return f"{header}\n\nNo matches found for pattern '{pattern}'. Object unchanged."
+            return f"No matches found for pattern '{pattern}'. Object unchanged."
 
         new_id = self.store.put(new_str)
         preview = new_str[: self.max_string_length]
@@ -202,15 +198,12 @@ class RichExplorer:
         """
         obj = self._get_object_at_path(obj_id, path)
 
-        # Generate header
-        header = self._make_header(obj_id, path, obj)
-
         # Handle string slicing
         if isinstance(obj, str):
             sliced_str: str = obj[start:end]
             actual_end = end if end is not None else len(obj)
             body = f"String slice [{start}:{actual_end}] of length {len(sliced_str)}:\n\n{sliced_str}"
-            return f"{header}\n\n" + body
+            return body
 
         # Handle list/tuple slicing
         elif isinstance(obj, list | tuple):
@@ -235,10 +228,82 @@ class RichExplorer:
                 f"(showing {len(sliced_list)} of {len(obj)} items):\n\n"
                 f"{cap.get().rstrip()}"
             )
-            return f"{header}\n\n" + body
+            return body
 
         else:
-            return f"{header}\n\nObject of type {type(obj).__name__} does not support slicing"
+            return f"Object of type {type(obj).__name__} does not support slicing"
+
+    def query(self, obj_id: str, filter: str, path: str = "", store: bool = True) -> str:
+        """Query (or transform) structured data using a jq filter expression.
+
+        If the targeted object is a string containing JSON or YAML, it is parsed before the filter is
+        applied, so filters can navigate into its fields (e.g. a pipeline's YAML config). Filters that
+        transform the document (e.g. ``.field = "value"``) work the same way as ones that only extract data
+        (e.g. ``.field``), since both are plain jq filters. If the input was parsed from JSON or YAML, a
+        non-string result is re-serialized back to that same format before being stored.
+
+        :param obj_id: Identifier obtained from the store.
+        :param filter: jq filter expression (e.g. ``.items[] | select(.active) | .name`` or ``.field = "value"``).
+        :param path: Navigation path to the object to query (optional).
+        :param store: Whether to store the result as a new object (default: True). When False, nothing is
+            written to the object store and the full result is returned inline instead of a preview.
+        :return: New object ID and a preview of the result, the full result if ``store`` is False, or an
+            error message.
+        """
+        obj = self._get_object_at_path(obj_id, path)
+
+        query_input = obj
+        source_format: str | None = None
+        if isinstance(obj, str):
+            try:
+                parsed = json.loads(obj)
+            except ValueError:
+                parsed = None
+            if parsed is not None and not isinstance(parsed, str):
+                query_input = parsed
+                source_format = "json"
+            else:
+                try:
+                    parsed = yaml.safe_load(obj)
+                except yaml.YAMLError:
+                    parsed = None
+                if parsed is not None and not isinstance(parsed, str):
+                    query_input = parsed
+                    source_format = "yaml"
+
+        try:
+            program = jq.compile(filter)
+        except ValueError as e:
+            return f"Invalid jq filter '{filter}': {e}"
+
+        try:
+            results = program.input_value(query_input).all()
+        except ValueError as e:
+            return f"Error evaluating filter '{filter}': {e}"
+
+        if not results:
+            return f"No results for filter '{filter}'."
+
+        result: Any = results[0] if len(results) == 1 else results
+
+        if source_format == "json" and isinstance(result, dict | list):
+            result = json.dumps(result, indent=2)
+        elif source_format == "yaml" and isinstance(result, dict | list):
+            result = yaml.safe_dump(result, sort_keys=False)
+
+        if not store:
+            body = result if isinstance(result, str) else self._get_pretty_repr(result)
+            return f"Filter '{filter}' matched {len(results)} value(s):\n\n{body}"
+
+        new_id = self.store.put(result)
+
+        if isinstance(result, str):
+            truncated = " (truncated)" if len(result) > self.max_string_length else ""
+            preview = f"Preview{truncated}:\n{result[: self.max_string_length]}"
+        else:
+            preview = self._get_pretty_repr(result)
+
+        return f"Filter '{filter}' matched {len(results)} value(s). Result stored as @{new_id}.\n\n{preview}"
 
     def _get_object_at_path(self, obj_id: str, path: str) -> Any:
         """Get object from store and navigate to path if provided.
