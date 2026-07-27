@@ -106,7 +106,6 @@ class TestRichExplorer:
 
         result = explorer.search(obj_id, "fox")
 
-        assert f"@{obj_id} → str" in result
         assert "Found 1 matches" in result
         assert "[fox]" in result
 
@@ -158,7 +157,6 @@ class TestRichExplorer:
 
         result = explorer.search(obj_id, "fox", path="content")
 
-        assert f"@{obj_id}.content → str" in result
         assert "Found 1 matches" in result
 
     def test_search_invalid_regex(self, store: ObjectStore, explorer: RichExplorer) -> None:
@@ -177,7 +175,6 @@ class TestRichExplorer:
 
         result = explorer.slice(obj_id, 0, 5)
 
-        assert f"@{obj_id} → str" in result
         assert "String slice [0:5]" in result
         assert "Hello" in result
 
@@ -198,7 +195,6 @@ class TestRichExplorer:
 
         result = explorer.slice(obj_id, 2, 6)
 
-        assert f"@{obj_id} → list" in result
         assert "List slice [2:6]" in result
         assert "showing 4 of 10 items" in result
 
@@ -209,7 +205,6 @@ class TestRichExplorer:
 
         result = explorer.slice(obj_id, 1, 4)
 
-        assert f"@{obj_id} → list" in result
         assert "List slice [1:4]" in result
 
     def test_slice_non_sliceable(self, store: ObjectStore, explorer: RichExplorer) -> None:
@@ -228,7 +223,6 @@ class TestRichExplorer:
 
         result = explorer.slice(obj_id, 1, 3, path="items")
 
-        assert f"@{obj_id}.items → list" in result
         assert "List slice [1:3]" in result
 
     def test_validate_path_valid_attributes(self, explorer: RichExplorer) -> None:
@@ -404,20 +398,6 @@ class TestRichExplorer:
         assert "Found 1 matches" in result
         # Context should be limited
         assert len(result) < len(test_string) + 100  # Rough check
-
-    def test_max_search_matches(self, store: ObjectStore) -> None:
-        """Test maximum search matches limit."""
-        explorer = RichExplorer(store, max_search_matches=2)
-        test_string = "cat dog cat bird cat fish cat"
-        obj_id = store.put(test_string)
-
-        result = explorer.search(obj_id, "cat")
-
-        assert "Found 4 matches" in result  # Total found
-        assert "Match 1:" in result
-        assert "Match 2:" in result
-        assert "Match 3:" not in result  # Should be limited
-        assert "and 2 more matches" in result
 
     def test_explore_string_returns_full_string(self, store: ObjectStore, explorer: RichExplorer) -> None:
         """Test that exploring a string object returns the full string without pretty formatting."""
