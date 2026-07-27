@@ -349,6 +349,7 @@ def register_tools(
             "get_slice_from_object_store",
             "grep_object_store",
             "sed_object_store",
+            "yq_object_store",
         ):
             # ObjectStore tools are factory functions that need an explorer created from the store
             if object_store is None:
