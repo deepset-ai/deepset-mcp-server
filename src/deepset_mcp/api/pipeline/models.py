@@ -22,7 +22,7 @@ class PipelineServiceLevel(StrEnum):
 
 
 class DeepsetPipeline(BaseModel):
-    """Model representing a pipeline on the deepset platform."""
+    """Model representing a pipeline on the Haystack Enterprise Platform."""
 
     id: str = Field(alias="pipeline_id")
     "Unique identifier for the pipeline"

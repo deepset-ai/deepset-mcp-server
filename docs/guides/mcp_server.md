@@ -1,13 +1,13 @@
 # MCP Server Guides
 
-## How to configure an MCP server to connect to the deepset platform
+## Configuring an MCP server to connect to the Haystack Enterprise Platform
 
-This guide shows how to set up an MCP server that connects to the deepset platform using the deepset-mcp library.
+Set up an MCP server that connects to the Haystack platform using the deepset-mcp library.
 
 ### Prerequisites
 
-- deepset API key
-- Python environment with deepset-mcp-server installed
+- Haystack Platform API key. You can scope the API key to a workspace. For details, see [Generate an API key](https://docs.cloud.deepset.ai/docs/generate-api-key).
+- Python environment with deepset-mcp-server installed.
 
 ### Basic server setup
 
@@ -18,7 +18,7 @@ from mcp.server.fastmcp import FastMCP
 from deepset_mcp.mcp.server import configure_mcp_server
 
 # Create server instance
-mcp = FastMCP("deepset AI platform MCP server")
+mcp = FastMCP("Haystack Enterprise Platform MCP server")
 
 # Configure with API key and workspace
 # This will take care of registering all deepset mcp tools on the instance
@@ -99,7 +99,7 @@ See the [tool reference](../reference/tool_reference.md) for the complete list o
 
 ## How to add custom tools
 
-This guide shows how to create and register custom tools that integrate with the deepset platform.
+This guide shows how to create and register custom tools that integrate with the Haystack Enterprise Platform.
 
 ### Create a custom tool function
 
@@ -528,7 +528,7 @@ Configure MCP clients to connect to your remote server:
 
 ## How to use deepset-mcp with a custom Haystack Agent
 
-This guide shows how to integrate deepset-mcp tools with custom Haystack Agents using the MCPToolset. This enables agents to access your deepset platform resources, manage pipelines, search indexes, and work with Haystack components programmatically.
+This guide shows how to integrate deepset-mcp tools with custom Haystack Agents using the MCPToolset. This enables agents to access your Haystack Enterprise Platform resources, manage pipelines, search indexes, and work with Haystack components programmatically.
 
 ### Prerequisites
 
@@ -544,7 +544,7 @@ pip install haystack-ai deepset-mcp
 
 ### Agent setup with deepset-mcp tools
 
-Create an agent that can access your deepset platform through MCP tools:
+Create an agent that can access your Haystack Enterprise Platform through MCP tools:
 
 ```python
 import os
@@ -577,7 +577,7 @@ generator = OpenAIChatGenerator(
 agent = Agent(
     chat_generator=generator,
     tools=toolset,
-    system_prompt="You are an AI assistant with access to the deepset AI platform. Use the available tools to help users create, manage, and debug AI pipelines on the platform."
+    system_prompt="You are an AI assistant with access to the Haystack Enterprise Platform. Use the available tools to help users create, manage, and debug AI pipelines on the platform."
 )
 
 # Use the agent with proper message formatting
@@ -638,7 +638,7 @@ result = pipeline_agent.run([ChatMessage.from_user(query)])
 
 ### Combining deepset tools with other capabilities
 
-Create agents that bridge deepset platform with external systems:
+Create agents that bridge Haystack Enterprise Platform with external systems:
 
 ```python
 from haystack.components.websearch import SerperDevWebSearch
@@ -683,7 +683,7 @@ remote_toolset = MCPToolset(server_info=remote_server_info)
 remote_agent = Agent(
     chat_generator=generator,
     tools=remote_toolset,
-    system_prompt="You have access to the deepset AI platform through remote tools. Help users manage their pipelines and debug issues."
+    system_prompt="You have access to the Haystack Enterprise Platform through remote tools. Help users manage their pipelines and debug issues."
 )
 ```
 

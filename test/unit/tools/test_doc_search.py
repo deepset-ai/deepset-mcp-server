@@ -141,7 +141,7 @@ class FakeDocsPipelineResource(PipelineResourceProtocol):
 async def test_search_docs_success() -> None:
     """Test successful docs search."""
     doc_1 = DeepsetDocument(
-        content="The deepset platform provides powerful search capabilities.",
+        content="The Haystack Enterprise Platform provides powerful search capabilities.",
         meta={"original_file_path": "/path/to/file.md", "source_id": "123"},
     )
 
@@ -151,7 +151,7 @@ async def test_search_docs_success() -> None:
     )
 
     doc_2 = DeepsetDocument(
-        content="The deepset platform is great.",
+        content="The Haystack Enterprise Platform is great.",
         meta={"original_file_path": "/path/to/file_2.md", "source_id": "456"},
     )
 
@@ -169,8 +169,8 @@ async def test_search_docs_success() -> None:
         query="How to use deepset search?",
     )
 
-    assert "The deepset platform provides powerful search capabilities. It is developed by deepset." in result
-    assert "The deepset platform is great." in result
+    assert "The Haystack Enterprise Platform provides powerful search capabilities. It is developed by deepset." in result
+    assert "The Haystack Enterprise Platform is great." in result
     assert "path/to/file_2.md" in result
     assert "path/to/file.md" in result
 

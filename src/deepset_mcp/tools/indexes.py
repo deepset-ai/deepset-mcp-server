@@ -102,7 +102,7 @@ async def create_index(
     yaml_configuration: str,
     description: str | None = None,
 ) -> dict[str, str | Index] | str:
-    """Creates a new index within your deepset platform workspace.
+    """Creates a new index within your Haystack Enterprise Platform workspace.
 
     :param client: Deepset API client to use.
     :param workspace: Workspace in which to create the index.

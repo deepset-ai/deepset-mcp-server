@@ -71,7 +71,7 @@ class PipelineTemplateResource(PipelineTemplateResourceProtocol):
         """
         # TODO: Remove when fixed
         if after is not None:
-            raise ValueError("Pagination using 'after' parameter is currently not supported by the deepset platform.")
+            raise ValueError("Pagination using 'after' parameter is currently not supported by the Haystack Enterprise Platform.")
 
         # 1. Prepare arguments for the initial API call
         request_params = {"limit": limit, "after": after, "field": field, "order": order}

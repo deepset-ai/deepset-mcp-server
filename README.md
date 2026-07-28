@@ -1,8 +1,8 @@
 # deepset-mcp
 
-**The official MCP server and Python SDK for the deepset AI platform**
+**The official MCP server and Python SDK for the Haystack Enterprise Platform**
 
-deepset-mcp enables AI agents to build and debug pipelines on the [Haystack Enterprise AI platform](https://www.deepset.ai/products-and-services/deepset-ai-platform) through 45+ specialized tools. It also provides a Python SDK for programmatic access to many platform resources.
+deepset-mcp enables AI agents to build and debug pipelines on the [Haystack Enterprise Platform](https://www.deepset.ai/products-and-services/deepset-ai-platform) through 45+ specialized tools. It also provides a Python SDK for programmatic access to many platform resources.
 
 ## Documentation
 
@@ -10,7 +10,7 @@ deepset-mcp enables AI agents to build and debug pipelines on the [Haystack Ente
 
 ## Quick Links
 
-- 🔗 **[Haystack Enterprise AI platform](https://www.deepset.ai/products-and-services/deepset-ai-platform)**
+- 🔗 **[Haystack Enterprise Platform](https://www.deepset.ai/products-and-services/deepset-ai-platform)**
 - 📚 **[Installation Guide](https://deepset-ai.github.io/deepset-mcp-server/installation/)**
 - 🛠️ **[MCP Server Guide](https://deepset-ai.github.io/deepset-mcp-server/guides/mcp_server/)**
 - 🐍 **[Python SDK Guide](https://deepset-ai.github.io/deepset-mcp-server/guides/api_sdk/)**

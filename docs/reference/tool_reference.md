@@ -2,7 +2,7 @@
 
 ## MCP tool names
 
-The tables below list every tool the MCP server can expose, by its **MCP tool name** — the name an
+The tables below list every tool the MCP server can expose, by its MCP tool name. MCP tool name is the name an
 agent calls and the name you pass to `tools_to_register`:
 
 ```python
@@ -16,9 +16,9 @@ configure_mcp_server(
 
     A few MCP tool names differ from the Python function that implements them (the function is what
     appears under [Tool base functions](#tool-base-functions) below). Always register the **MCP tool
-    name** from these tables:
+    name** listed in this table:
 
-    | MCP tool name | Implemented by |
+    | MCP tool name | Implemented by Python function |
     | --- | --- |
     | `search_component_definitions` | `search_component_definition` |
     | `get_from_object_store` | `create_get_from_object_store` |
@@ -28,14 +28,15 @@ configure_mcp_server(
     | `yq_object_store` | `create_yq_object_store` |
     | `search_docs` | `get_docs_search_tool` |
 
-The **Memory** column describes how a tool interacts with the object store (see
-[MCP server concepts](../concepts/mcp_server_concepts.md)):
-
-- **explorable** — the tool's output is stored and returned as an `@obj_id` reference
-- **referenceable** — the tool accepts `@obj_id` references as parameters
-- **none** — the tool returns its output directly
 
 ### Pipelines
+
+The *Memory* column describes how a tool interacts with the object store (see
+[MCP server concepts](../concepts/mcp_server_concepts.md)):
+
+- *explorable*: The tool's output is stored and returned as an `@obj_id` reference.
+- *referenceable*: The tool accepts `@obj_id` references as parameters.
+- *none*: The tool returns its output directly.
 
 | MCP tool name | Workspace | Memory | Description |
 | --- | --- | --- | --- |
@@ -134,7 +135,7 @@ See [Tool output truncation and exploration](../concepts/mcp_server_concepts.md#
 
 | MCP tool name | Workspace | Memory | Description |
 | --- | --- | --- | --- |
-| `search_docs` | not needed | none | Search the deepset platform documentation. Requires docs search to be configured on the server. |
+| `search_docs` | not needed | none | Search the Haystack Enterprise Platform documentation. Requires docs search to be configured on the server. |
 | `load_skill` | not needed | none | Load a bundled skill containing detailed guidance for a specific task. |
 
 ## Tool base functions

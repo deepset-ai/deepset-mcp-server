@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class SearchHistoryEntry(BaseModel):
-    """A single search history entry from the deepset platform (v1 API format).
+    """A single search history entry from the Haystack Enterprise Platform (v1 API format).
 
     The v1 search history API returns entries with the following top-level fields.
     Key nested data:
@@ -201,7 +201,7 @@ class PipelineTraceSummary(_PipelineTraceBase):
 
 
 class PipelineTraceEntry(_PipelineTraceBase):
-    """A single pipeline trace response from the deepset platform (v2 API format).
+    """A single pipeline trace response from the Haystack Enterprise Platform (v2 API format).
 
     Returned by ``get_pipeline_trace``. ``haystack_trace`` holds the full run trace:
     every span with complete tags (including component input/output) plus the logs.
