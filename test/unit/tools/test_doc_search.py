@@ -169,7 +169,9 @@ async def test_search_docs_success() -> None:
         query="How to use deepset search?",
     )
 
-    assert "The Haystack Enterprise Platform provides powerful search capabilities. It is developed by deepset." in result
+    assert (
+        "The Haystack Enterprise Platform provides powerful search capabilities. It is developed by deepset." in result
+    )
     assert "The Haystack Enterprise Platform is great." in result
     assert "path/to/file_2.md" in result
     assert "path/to/file.md" in result
