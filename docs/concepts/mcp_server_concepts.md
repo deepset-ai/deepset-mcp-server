@@ -121,15 +121,24 @@ The `RichExplorer` class generates human-readable, truncated representations of 
 
 ### Exploration Tools
 
-Two specialized tools enable LLMs to navigate stored objects:
+Five specialized tools enable LLMs to navigate stored objects:
 
 **`get_from_object_store`**: Retrieves objects or specific nested properties using dot-notation paths (e.g., `@obj_123.config.timeout`). This tool provides the primary interface for accessing stored data.
 
 **`get_slice_from_object_store`**: Extracts specific ranges from strings and lists (e.g., characters 100-200 of a document, items 10-20 of a list). This enables efficient inspection of large sequences without loading entire contents.
 
+**`grep_object_store`**: Searches a stored string for a regular expression and returns the matches with surrounding context, like `grep`. Use it to locate relevant sections in large logs or YAML configurations without reading them in full.
+
+**`sed_object_store`**: Applies a regex substitution to a stored string and stores the result as a new object, like `sed`. Use it for targeted edits to large strings (for example, patching a value in a pipeline YAML) without re-transmitting the whole content.
+
+**`yq_object_store`**: Queries or transforms structured data with a `jq` filter expression (e.g. `.items[] | select(.active) | .name`, or `.config.timeout = 30`). YAML and JSON strings — such as a pipeline's YAML configuration — are parsed before the filter runs and re-serialized to the same format afterwards. Results are stored as a new object by default, so they can be chained into further calls.
+
 The distinction between these tools reflects different access patterns:
 - Use `get_from_object_store` for structural navigation (accessing object properties)
 - Use `get_slice_from_object_store` for range-based access (viewing portions of sequences)
+- Use `grep_object_store` for content-based search when the location is unknown
+- Use `sed_object_store` for in-place modification of stored strings
+- Use `yq_object_store` for structured queries and transformations of YAML/JSON configurations
 
 ## Tool Invocation by Reference
 

@@ -10,7 +10,7 @@ Haystack is an Open Source Python framework for AI application building.
 All source code is in `src/deepset_mcp`.
 Code for the API SDK is in `src/deepset_mcp/api`.
 Code for tools is in `src/deepset_mcp/tools`.
-The tools are added to an MCP server which is defined in `src/deepset_mcp/main.py` and configured in `src/deepset_mcp/tool_factory.py`.
+The tools are added to an MCP server which is defined in `src/deepset_mcp/main.py`, registered in `src/deepset_mcp/mcp/tool_registry.py`, and wired up (dependency injection, memory) in `src/deepset_mcp/mcp/tool_factory.py`.
 
 Tests are in the `test` directory.
 All unit tests go into `test/unit`, integration tests go into `test/integration`.
@@ -40,7 +40,7 @@ Tools are meant to be used by large language models.
 Known exceptions should usually be caught and converted to strings.
 Typically, we have one tool file per resource.
 A tool can make multiple calls to different resources or different methods on the same resource to produce the desired output.
-Most tools are imported into `src/deepset_mcp/tool_factory.py` where they are added to the MCP server.
+Most tools are imported into `src/deepset_mcp/mcp/tool_registry.py` where they are added to `TOOL_REGISTRY` and exposed on the MCP server.
 
 
 ## Instructions for common tasks
@@ -85,8 +85,9 @@ You would need to perform the following steps:
 3. the tool should call the methods on the resource through the client
 4. refer to `src/deepset_mcp/tools/pipeline.py` as a good example for tool implementations
 5. extract model or response serialization into reusable helper functions
-6. once you added a tool, import it in `src/deepset_mcp/tool_factory.py` and add it to the tool registry with the appropriate config
-7. the docstring of the tool will serve as the prompt for the large language model calling the tool, make sure it has good instructions on when to use the tool, how to best use it, and what kind of answer to expect.
+6. once you added a tool, import it in `src/deepset_mcp/mcp/tool_registry.py` and add it to `TOOL_REGISTRY` with the appropriate config
+7. also export it from `src/deepset_mcp/tools/__init__.py` (import and add to `__all__`) — the Tool Reference docs page renders the `deepset_mcp.tools` package with mkdocstrings, so an unexported tool is missing from the published documentation. `test/unit/test_tool_documentation.py` enforces this.
+8. the docstring of the tool will serve as the prompt for the large language model calling the tool, make sure it has good instructions on when to use the tool, how to best use it, and what kind of answer to expect. It must document every caller-supplied parameter with `:param:` and its return value with `:returns:`.
 
 #### Testing the tool
 

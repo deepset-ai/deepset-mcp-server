@@ -613,7 +613,7 @@ pipeline_toolset = MCPToolset(
         "list_pipelines",
         "get_pipeline", 
         "create_pipeline",
-        "update_pipeline",
+        "create_pipeline_version",
         "deploy_pipeline",
     ]
 )

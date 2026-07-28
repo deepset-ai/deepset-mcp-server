@@ -4,7 +4,7 @@
 
 deepset-mcp provides two powerful layers for interacting with the [deepset AI platform](https://www.deepset.ai/products-and-services/deepset-ai-platform):
 
-- **MCP Server**: Enables AI agents to build and debug pipelines on the deepset platform through 30+ specialized tools
+- **MCP Server**: Enables AI agents to build and debug pipelines on the deepset platform through 45+ specialized tools
 - **Python SDK**: Provides programmatic access to many deepset platform resources for developers
 
 ## Quick Start
@@ -72,7 +72,7 @@ Set up deepset-mcp with Cursor, Claude Desktop, or other MCP clients.
 
 ### Reference
 - **[MCP Server Reference](reference/mcp_reference.md)**: Complete server configuration options
-- **[Tool Reference](reference/tool_reference.md)**: All 30+ available MCP tools
+- **[Tool Reference](reference/tool_reference.md)**: All 45+ available MCP tools
 - **[API SDK Reference](reference/api_sdk_reference.md)**: Full SDK documentation
 
 ## Benefits

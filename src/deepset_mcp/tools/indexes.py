@@ -57,6 +57,7 @@ async def get_index(*, client: AsyncClientProtocol, workspace: str, index_name: 
     :param client: Deepset API client to use for requesting the index.
     :param workspace: Workspace of which to get the index from.
     :param index_name: Unique name of the index to fetch.
+    :returns: The index configuration or an error message.
     """
     try:
         response = await client.indexes(workspace=workspace).get(index_name)
@@ -108,6 +109,7 @@ async def create_index(
     :param index_name: Unique name of the index to create.
     :param yaml_configuration: YAML configuration to use for the index.
     :param description: Description of the index to create.
+    :returns: A message and the created index, or an error message.
     """
     try:
         result = await client.indexes(workspace=workspace).create(
