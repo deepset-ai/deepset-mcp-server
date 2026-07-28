@@ -97,7 +97,7 @@ async def wait_for_pipeline_deployment(
             )
 
         # Get the current pipeline status
-        pipeline = await pipeline_resource.get(pipeline_name=pipeline_name, include_yaml=False)
+        pipeline = await pipeline_resource.get(pipeline_name=pipeline_name)
 
         if pipeline.status == "DEPLOYED":
             return pipeline

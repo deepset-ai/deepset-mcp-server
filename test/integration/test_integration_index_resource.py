@@ -463,4 +463,4 @@ components:
     resp = await index_resource.validate(yaml_config=invalid_yaml_syntax)
 
     assert resp.valid is False
-    assert resp.errors[0].code == "YAML_ERROR"
+    assert resp.errors[0].code == "PIPELINE_YAML_ERROR"

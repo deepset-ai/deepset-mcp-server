@@ -43,8 +43,13 @@ class DeepsetPipeline(BaseModel):
     last_updated_by: DeepsetUser | None = Field(None, alias="last_edited_by")  # Map API's last_edited_by
     "User who last modified the pipeline"
 
-    yaml_config: str | None = None
-    "YAML configuration defining the pipeline structure"
+    deployed_version_id: UUID | None = None
+    "Identifier of the currently deployed version of the pipeline"
+    running_version_id: UUID | None = None
+    """Identifier of the currently running version of the pipeline.
+    If this is different from the deployed version, it indicates that a new version is being deployed."""
+    draft_version_id: UUID | None = None
+    "Identifier of the draft version of the pipeline"
 
     class Config:
         """Configuration for serialization and deserialization."""
@@ -69,7 +74,9 @@ class DeepsetPipeline(BaseModel):
             else None,
         )
         yield "last_updated_at", self.last_updated_at.strftime("%m/%d/%Y %I:%M:%S %p") if self.last_updated_at else None
-        yield "yaml_config", self.yaml_config if self.yaml_config is not None else "Get full pipeline to see config."
+        yield "deployed_version_id", self.deployed_version_id
+        yield "running_version_id", self.running_version_id
+        yield "draft_version_id", self.draft_version_id
 
 
 class ValidationError(BaseModel):

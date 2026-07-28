@@ -34,11 +34,11 @@ async def test_get_component_input_output(
     haystack_service_resource: HaystackServiceResource,
 ) -> None:
     """Test for getting component input/output schema."""
-    response = await haystack_service_resource.get_component_input_output("Agent")
+    response = await haystack_service_resource.get_component_input_output("haystack.components.agents.agent.Agent")
 
     assert isinstance(response, dict)
     assert "name" in response
-    assert response["name"] == "Agent"
+    assert response["name"] == "haystack.components.agents.agent.Agent"
     assert "input" in response
     assert "output" in response
 

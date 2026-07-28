@@ -24,7 +24,7 @@ class PipelineResourceProtocol(Protocol):
         """Validate a pipeline's YAML configuration against the API."""
         ...
 
-    async def get(self, pipeline_name: str, include_yaml: bool = True) -> DeepsetPipeline:
+    async def get(self, pipeline_name: str) -> DeepsetPipeline:
         """Fetch a single pipeline by its name."""
         ...
 

@@ -122,11 +122,10 @@ class PipelineResource(PipelineResourceProtocol):
 
         return PaginatedResponse[DeepsetPipeline].create_with_cursor_field(resp.json, "pipeline_id")
 
-    async def get(self, pipeline_name: str, include_yaml: bool = True) -> DeepsetPipeline:
+    async def get(self, pipeline_name: str) -> DeepsetPipeline:
         """Fetch a single pipeline by its name.
 
         :param pipeline_name: Name of the pipeline to fetch.
-        :param include_yaml: Whether to include YAML configuration in the response.
         :returns: DeepsetPipeline instance.
         """
         resp = await self._client.request(
@@ -135,18 +134,6 @@ class PipelineResource(PipelineResourceProtocol):
         raise_for_status(resp)
 
         pipeline = DeepsetPipeline.model_validate(resp.json)
-
-        if include_yaml:
-            yaml_response = await self._client.request(
-                endpoint=(
-                    f"v1/workspaces/{quote(self._workspace, safe='')}/pipelines/{quote(pipeline_name, safe='')}/yaml"
-                )
-            )
-
-            raise_for_status(yaml_response)
-
-            if yaml_response.json is not None:
-                pipeline.yaml_config = yaml_response.json["query_yaml"]
 
         return pipeline
 
