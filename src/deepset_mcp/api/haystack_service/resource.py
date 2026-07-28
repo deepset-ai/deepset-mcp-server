@@ -47,7 +47,7 @@ class HaystackServiceResource(HaystackServiceProtocol):
             endpoint="v1/haystack/components/input-output",
             method="GET",
             headers={"accept": "application/json"},
-            params={"domain": "deepset-cloud", "names": component_name},
+            params={"domain": "deepset-cloud", "names": [component_name]},
             response_type=list[dict[str, Any]],
         )
 
@@ -56,7 +56,7 @@ class HaystackServiceResource(HaystackServiceProtocol):
         if resp.json is None or len(resp.json) == 0:
             raise ResourceNotFoundError(f"Component '{component_name}' not found.")
 
-        return resp.json[0] if resp.json is not None else {}
+        return next(iter(s for s in resp.json if s.get("name") == component_name), {})
 
     async def run_component(
         self,

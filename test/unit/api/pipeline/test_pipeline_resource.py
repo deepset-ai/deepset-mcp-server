@@ -4,6 +4,7 @@
 
 from typing import Any
 from urllib.parse import quote
+from uuid import UUID
 
 import pytest
 
@@ -127,6 +128,8 @@ def create_sample_pipeline(
             "family_name": "User",
             "email": "editor@example.com",
         },
+        "deployed_version_id": UUID(int=1).hex,
+        "running_version_id": UUID(int=1).hex,
     }
 
 
@@ -344,18 +347,16 @@ class TestPipelineResource:
         assert single_page.has_more is False
 
     @pytest.mark.asyncio
-    async def test_get_pipeline_with_yaml(self) -> None:
+    async def test_get_pipeline(self) -> None:
         """Test getting a pipeline with YAML config."""
         # Create sample pipeline data
         pipeline_name = "test-pipeline"
         sample_pipeline = create_sample_pipeline(name=pipeline_name)
-        yaml_config = "version: '1.0'\npipeline:\n  name: test"
 
         # Create client with predefined responses
         client = DummyClient(
             responses={
                 f"test-workspace/pipelines/{pipeline_name}": sample_pipeline,
-                f"test-workspace/pipelines/{pipeline_name}/yaml": {"query_yaml": yaml_config},
             }
         )
 
@@ -367,34 +368,10 @@ class TestPipelineResource:
         assert isinstance(result, DeepsetPipeline)
         assert result.id == "test-pipeline-id"
         assert result.name == pipeline_name
-        assert result.yaml_config == yaml_config
+        assert result.deployed_version_id == UUID(int=1)
+        assert result.running_version_id == UUID(int=1)
 
         # Verify requests
-        assert len(client.requests) == 2
-        assert client.requests[0]["endpoint"] == f"v1/workspaces/test-workspace/pipelines/{pipeline_name}"
-        assert client.requests[1]["endpoint"] == f"v1/workspaces/test-workspace/pipelines/{pipeline_name}/yaml"
-
-    @pytest.mark.asyncio
-    async def test_get_pipeline_without_yaml(self) -> None:
-        """Test getting a pipeline without YAML config."""
-        # Create sample pipeline data
-        pipeline_name = "test-pipeline"
-        sample_pipeline = create_sample_pipeline(name=pipeline_name)
-
-        # Create client with predefined response
-        client = DummyClient(responses={f"test-workspace/pipelines/{pipeline_name}": sample_pipeline})
-
-        # Create resource and call get method with include_yaml=False
-        resource = PipelineResource(client=client, workspace="test-workspace")
-        result = await resource.get(pipeline_name=pipeline_name, include_yaml=False)
-
-        # Verify results
-        assert isinstance(result, DeepsetPipeline)
-        assert result.id == "test-pipeline-id"
-        assert result.name == pipeline_name
-        assert result.yaml_config is None
-
-        # Verify only one request was made (no YAML request)
         assert len(client.requests) == 1
         assert client.requests[0]["endpoint"] == f"v1/workspaces/test-workspace/pipelines/{pipeline_name}"
 
@@ -412,28 +389,6 @@ class TestPipelineResource:
             await resource.get(pipeline_name="nonexistent")
 
     @pytest.mark.asyncio
-    async def test_get_pipeline_yaml_error(self) -> None:
-        """Test error handling when getting YAML config."""
-        # Create sample pipeline data
-        pipeline_name = "test-pipeline"
-        sample_pipeline = create_sample_pipeline(name=pipeline_name)
-
-        # Create client with successful pipeline response but error for YAML
-        client = DummyClient(
-            responses={
-                f"test-workspace/pipelines/{pipeline_name}": sample_pipeline,
-                f"test-workspace/pipelines/{pipeline_name}/yaml": ValueError("YAML not available"),
-            }
-        )
-
-        # Create resource
-        resource = PipelineResource(client=client, workspace="test-workspace")
-
-        # Verify exception is raised
-        with pytest.raises(ValueError, match="YAML not available"):
-            await resource.get(pipeline_name=pipeline_name)
-
-    @pytest.mark.asyncio
     async def test_get_pipeline_with_special_characters(self) -> None:
         """Test getting a pipeline with a name containing special characters."""
         # Create sample pipeline data with special characters in name
@@ -445,7 +400,7 @@ class TestPipelineResource:
 
         # Create resource and call get method
         resource = PipelineResource(client=client, workspace="test-workspace")
-        result = await resource.get(pipeline_name=pipeline_name, include_yaml=False)
+        result = await resource.get(pipeline_name=pipeline_name)
 
         # Verify results
         assert isinstance(result, DeepsetPipeline)

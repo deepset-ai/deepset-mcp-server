@@ -70,7 +70,7 @@ class SearchHistoryResource(SearchHistoryResourceProtocol):
         async def _fetch_pipeline_id() -> str:
             if cached_pipeline_id is not None:
                 return cached_pipeline_id
-            pipeline_obj = await self._client.pipelines(self._workspace).get(pipeline_name, include_yaml=False)
+            pipeline_obj = await self._client.pipelines(self._workspace).get(pipeline_name)
             return pipeline_obj.id
 
         workspace_id, pipeline_id = await asyncio.gather(_fetch_workspace_id(), _fetch_pipeline_id())

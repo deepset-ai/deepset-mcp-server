@@ -41,7 +41,7 @@ async def list_pipelines(
 
 
 async def get_pipeline(*, client: AsyncClientProtocol, workspace: str, pipeline_name: str) -> DeepsetPipeline | str:
-    """Fetches detailed configuration information for a specific pipeline, identified by its unique `pipeline_name`.
+    """Fetches information for a specific pipeline, identified by its unique `pipeline_name`.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
@@ -409,7 +409,7 @@ async def deploy_pipeline(
 
         try:
             # Get the current pipeline status
-            pipeline = await client.pipelines(workspace=workspace).get(pipeline_name=pipeline_name, include_yaml=False)
+            pipeline = await client.pipelines(workspace=workspace).get(pipeline_name=pipeline_name)
 
             if pipeline.status == "DEPLOYED":
                 return deployment_result  # Return the successful validation result

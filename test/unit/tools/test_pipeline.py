@@ -270,7 +270,6 @@ async def test_list_pipelines_returns_pipeline_list() -> None:
         last_edited_at=None,
         created_by=user,
         last_edited_by=None,
-        yaml_config=None,
     )
     pipeline2 = DeepsetPipeline(
         pipeline_id="p2",
@@ -281,7 +280,6 @@ async def test_list_pipelines_returns_pipeline_list() -> None:
         last_edited_at=datetime(2022, 3, 3, 15, 45),
         created_by=user,
         last_edited_by=user,
-        yaml_config="config: value",
     )
     resource = FakePipelineResource(list_response=[pipeline1, pipeline2])
     client = FakeClient(resource)
@@ -304,14 +302,16 @@ async def test_get_pipeline_returns_pipeline_object() -> None:
         last_edited_at=None,
         created_by=user,
         last_edited_by=None,
-        yaml_config="foo: bar",
+        deployed_version_id=UUID(int=1),
+        running_version_id=UUID(int=1),
     )
     resource = FakePipelineResource(get_response=pipeline)
     client = FakeClient(resource)
     result = await get_pipeline(client=client, workspace="ws2", pipeline_name="mypipe")
     assert isinstance(result, DeepsetPipeline)
     assert result.name == "mypipe"
-    assert result.yaml_config == "foo: bar"
+    assert result.deployed_version_id == UUID(int=1)
+    assert result.running_version_id == UUID(int=1)
 
 
 @pytest.mark.asyncio
@@ -385,7 +385,6 @@ async def test_create_pipeline_handles_success_and_failure_response() -> None:
         last_edited_at=None,
         created_by=user,
         last_edited_by=None,
-        yaml_config="a: b",
     )
 
     # success
@@ -427,7 +426,6 @@ async def test_create_pipeline_skip_validation_errors_true() -> None:
         last_edited_at=None,
         created_by=user,
         last_edited_by=None,
-        yaml_config="config: test",
     )
     resource = FakePipelineResource(
         validate_response=invalid_result,
@@ -988,7 +986,6 @@ async def test_deploy_pipeline_wait_for_deployment_success() -> None:
         last_edited_at=None,
         created_by=user,
         last_edited_by=None,
-        yaml_config="config: test",
     )
 
     pipeline_deployed = DeepsetPipeline(
@@ -1000,7 +997,6 @@ async def test_deploy_pipeline_wait_for_deployment_success() -> None:
         last_edited_at=None,
         created_by=user,
         last_edited_by=None,
-        yaml_config="config: test",
     )
 
     success_result = PipelineValidationResult(valid=True, errors=[])
@@ -1038,7 +1034,6 @@ async def test_deploy_pipeline_wait_for_deployment_failed() -> None:
         last_edited_at=None,
         created_by=user,
         last_edited_by=None,
-        yaml_config="config: test",
     )
 
     pipeline_failed = DeepsetPipeline(
@@ -1050,7 +1045,6 @@ async def test_deploy_pipeline_wait_for_deployment_failed() -> None:
         last_edited_at=None,
         created_by=user,
         last_edited_by=None,
-        yaml_config="config: test",
     )
 
     success_result = PipelineValidationResult(valid=True, errors=[])
@@ -1087,7 +1081,6 @@ async def test_deploy_pipeline_wait_for_deployment_timeout() -> None:
         last_edited_at=None,
         created_by=user,
         last_edited_by=None,
-        yaml_config="config: test",
     )
 
     success_result = PipelineValidationResult(valid=True, errors=[])
@@ -1181,7 +1174,6 @@ async def test_search_pipeline_success() -> None:
         last_edited_at=None,
         created_by=user,
         last_edited_by=None,
-        yaml_config="config: test",
     )
 
     answer = DeepsetAnswer(
@@ -1225,7 +1217,6 @@ async def test_search_pipeline_not_deployed() -> None:
         last_edited_at=None,
         created_by=user,
         last_edited_by=None,
-        yaml_config="config: test",
     )
 
     resource = FakePipelineResource(get_response=pipeline)
@@ -1261,7 +1252,6 @@ async def test_search_pipeline_search_error() -> None:
         last_edited_at=None,
         created_by=user,
         last_edited_by=None,
-        yaml_config="config: test",
     )
 
     resource = FakePipelineResource(
@@ -1288,7 +1278,6 @@ async def test_search_pipeline_no_results() -> None:
         last_edited_at=None,
         created_by=user,
         last_edited_by=None,
-        yaml_config="config: test",
     )
 
     search_response = DeepsetSearchResponse(
@@ -1326,7 +1315,6 @@ async def test_search_pipeline_with_documents() -> None:
         last_edited_at=None,
         created_by=user,
         last_edited_by=None,
-        yaml_config="config: test",
     )
 
     document = DeepsetDocument(
