@@ -48,6 +48,8 @@ class DeepsetPipeline(BaseModel):
     running_version_id: UUID | None = None
     """Identifier of the currently running version of the pipeline.
     If this is different from the deployed version, it indicates that a new version is being deployed."""
+    draft_version_id: UUID | None = None
+    "Identifier of the draft version of the pipeline"
 
     class Config:
         """Configuration for serialization and deserialization."""
@@ -74,6 +76,7 @@ class DeepsetPipeline(BaseModel):
         yield "last_updated_at", self.last_updated_at.strftime("%m/%d/%Y %I:%M:%S %p") if self.last_updated_at else None
         yield "deployed_version_id", self.deployed_version_id
         yield "running_version_id", self.running_version_id
+        yield "draft_version_id", self.draft_version_id
 
 
 class ValidationError(BaseModel):
