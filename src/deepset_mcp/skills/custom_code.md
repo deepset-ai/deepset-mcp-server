@@ -141,7 +141,7 @@ components:
 
 ## Rules — Shared
 
-- Only packages available via the `get_available_python_dependencies` tool may be used. Other packages will not work.
+- If the `get_available_python_dependencies` tool is available, only packages available via the `get_available_python_dependencies` tool may be used. Other packages will not work.
 - `httpx` is preferred over the `requests` library.
 - Only a single file may be written. Helper classes and functions may be implemented in the same file as the component or tool.
 - The component class / tool function must be defined directly in the submitted code, not merely imported — a class or function pulled in via `import` is ignored when the platform looks for the `@component`/`@tool` target, even if it's correctly decorated. Imported classes or functions can be used by wrapping or inheritance.
