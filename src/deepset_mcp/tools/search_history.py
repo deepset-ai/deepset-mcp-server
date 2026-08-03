@@ -154,11 +154,9 @@ async def list_pipeline_traces(
     timing (``duration_s``, ``created_at``), and failure details if the run failed.
     Summaries do **not** include spans or logs. Use this to browse runs, find slow or
     failed queries, then pass a ``query_id`` to ``get_pipeline_trace`` for the full
-    execution trace (spans with component input/output and logs), or to
-    ``get_pipeline_trace_logs`` for just the logs.
-
-    This tool resolves the pipeline and workspace IDs automatically and calls
-    the v2 traces endpoint under the hood.
+    execution trace (spans with essential tags such as component type),
+    ``get_pipeline_trace_span_tags`` for a single span with full tags (including input/output),
+    or ``get_pipeline_trace_logs`` for the logs of the trace.
 
     Use the ``after`` parameter with ``next_cursor`` from the response to fetch
     the next page.
@@ -203,19 +201,16 @@ async def get_pipeline_trace(
     pipeline_name: str,
     query_id: str,
 ) -> PipelineTraceEntry | str:
-    """Retrieves the full Haystack pipeline run trace for a single search history record.
+    """Retrieves the Haystack pipeline run trace including all spans for a single search history record.
 
-    Returns the complete execution trace for one query in a single call: every
-    component span with full tags (including the component's **input and output**),
-    all log entries, timing, and failure details. Use this to deep-dive into a
+    Returns the execution trace for one query: every
+    component span with essential tags (excluding the component's input and output),
+    timing, and failure details. Use this to deep-dive into a
     specific query run identified by its ``query_id`` (obtainable from
     ``list_pipeline_traces`` or ``list_pipeline_search_history``).
 
-    For a targeted look at one component without downloading the whole trace, use
-    ``get_pipeline_trace_span_tags``; for only the logs, use ``get_pipeline_trace_logs``.
-
-    This tool resolves the pipeline and workspace IDs automatically and reads the
-    full trace via the v2 trace export endpoint under the hood.
+    For a targeted look at one span including the input and output at one component, use
+    ``get_pipeline_trace_span_tags``; for the logs, use ``get_pipeline_trace_logs``.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
@@ -223,7 +218,7 @@ async def get_pipeline_trace(
     :param query_id: UUID of the search history query whose trace to retrieve.
         Obtain this from the ``query_id`` / ``search_history_id`` field of a
         ``list_pipeline_traces`` or ``list_pipeline_search_history`` response.
-    :returns: The full pipeline trace entry or an error message.
+    :returns: The pipeline trace entry including all spans or an error message.
     """
     try:
         result = await client.search_history(workspace=workspace).get_pipeline_trace(
@@ -254,8 +249,7 @@ async def get_pipeline_trace_span_tags(
 
     A span's tags carry the component-level detail, including its **input and output**
     (e.g. ``haystack.component.input`` / ``haystack.component.output``) plus type and
-    error information. Use this to inspect one component cheaply, without fetching the
-    full trace via ``get_pipeline_trace``.
+    error information. Use this to inspect one component run in detail.
 
     Obtain ``span_id`` from a span in a ``get_pipeline_trace`` response, and ``query_id``
     from ``list_pipeline_traces`` or ``list_pipeline_search_history``.
@@ -294,8 +288,7 @@ async def get_pipeline_trace_logs(
 ) -> list[HaystackTraceLog] | str:
     """Retrieves the log entries for a single Haystack pipeline run trace.
 
-    Returns just the run's logs — a cheaper, targeted alternative to ``get_pipeline_trace``
-    when only the logs are needed (e.g. to diagnose warnings or errors emitted during the
+    Returns the run's logs (e.g. to diagnose warnings or errors emitted during the
     run). Each entry includes the logger, level, message, timestamp, and extra fields.
 
     Obtain ``query_id`` from ``list_pipeline_traces`` or ``list_pipeline_search_history``.
