@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
 
 class PipelineResource(PipelineResourceProtocol):
-    """Interact with pipelines on the deepset AI platform."""
+    """Interact with pipelines on the Haystack Enterprise Platform."""
 
     def __init__(
         self,

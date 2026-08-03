@@ -8,7 +8,7 @@ packages = ["src/deepset_mcp"]
 [project]
 name = "deepset-mcp"
 dynamic = ["version"]
-description = "Collection of MCP tools and Agents to work with the deepset AI platform. Create, debug or learn about pipelines on the platform. Useable from the CLI, Cursor, Claude Code, or other MCP clients."
+description = "Collection of MCP tools and Agents to work with the Haystack Enterprise Platform. Create, debug or learn about pipelines on the platform. Useable from the CLI, Cursor, Claude Code, or other MCP clients."
 license = "Apache-2.0"
 readme = "README.md"
 authors = [

@@ -21,6 +21,7 @@ def create_get_from_object_store(explorer: RichExplorer) -> Callable[..., Any]:
 
         :param object_id: The id of the object to fetch in the format `@obj_001`.
         :param path: The path of the object to fetch in the format of `access.to.attr` or `["access"]["to"]["attr"]`.
+        :return: String representation of the object or of the value at `path`.
         """
         return explorer.explore(obj_id=object_id, path=path)
 

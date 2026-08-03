@@ -2,7 +2,7 @@
 
 ## About the Client-Resource Architecture
 
-The Deepset API SDK is designed around a client-resource pattern that reflects how the deepset platform organizes its services.
+The Deepset API SDK is designed around a client-resource pattern that reflects how the Haystack Enterprise Platform organizes its services.
 
 At the core is the `AsyncDeepsetClient`, which serves as your gateway to the platform. The client exposes resource classes
 for each platform component.

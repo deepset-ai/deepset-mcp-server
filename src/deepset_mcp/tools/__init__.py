@@ -13,7 +13,13 @@ from .haystack_service import (
 )
 from .indexes import create_index, deploy_index, get_index, list_indexes, update_index, validate_index
 from .model import get_models
-from .object_store import create_get_from_object_store, create_get_slice_from_object_store
+from .object_store import (
+    create_get_from_object_store,
+    create_get_slice_from_object_store,
+    create_grep_object_store,
+    create_sed_object_store,
+    create_yq_object_store,
+)
 from .pipeline import (
     create_pipeline,
     create_pipeline_version,
@@ -31,10 +37,17 @@ from .pipeline import (
     validate_pipeline,
 )
 from .pipeline_template import get_template, list_templates, search_templates
-from .search_history import list_pipeline_search_history, list_search_history
+from .search_history import (
+    get_pipeline_trace,
+    get_pipeline_trace_logs,
+    get_pipeline_trace_span_tags,
+    list_pipeline_search_history,
+    list_pipeline_traces,
+    list_search_history,
+)
 from .secrets import get_secret, list_secrets
 from .skills import load_skill
-from .workspace import get_workspace, list_workspaces
+from .workspace import create_workspace, get_workspace, list_workspaces
 
 __all__ = [
     "list_custom_component_installations",
@@ -54,6 +67,9 @@ __all__ = [
     "get_models",
     "create_get_from_object_store",
     "create_get_slice_from_object_store",
+    "create_grep_object_store",
+    "create_sed_object_store",
+    "create_yq_object_store",
     "list_pipelines",
     "get_pipeline",
     "get_pipeline_logs",
@@ -73,9 +89,14 @@ __all__ = [
     "search_templates",
     "list_search_history",
     "list_pipeline_search_history",
+    "list_pipeline_traces",
+    "get_pipeline_trace",
+    "get_pipeline_trace_span_tags",
+    "get_pipeline_trace_logs",
     "get_secret",
     "list_secrets",
     "load_skill",
     "list_workspaces",
     "get_workspace",
+    "create_workspace",
 ]

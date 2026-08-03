@@ -80,7 +80,7 @@ async def configure_mcp_server(
 async def fetch_shared_prototype_details(share_url: str) -> tuple[str, str, str]:
     """Extract pipeline name, workspace name and API token from a shared prototype URL.
 
-    :param share_url: The URL of a shared prototype on the Deepset platform
+    :param share_url: The URL of a shared prototype on the Haystack Enterprise Platform
     :returns: A tuple containing (workspace_name, pipeline_name, api_key)
     :raises ValueError: If the URL is invalid or missing required parameters
     """

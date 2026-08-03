@@ -79,7 +79,7 @@ def get_docs_search_tool(config: DeepsetDocsConfig) -> Callable[..., Any]:
     """Get a docs search tool configured with the provided config."""
 
     async def search_docs(query: str) -> str:
-        """Search the deepset platform documentation.
+        """Search the Haystack Enterprise Platform documentation.
 
         This tool allows you to search through deepset's official documentation to find
         information about features, API usage, best practices, and troubleshooting guides.

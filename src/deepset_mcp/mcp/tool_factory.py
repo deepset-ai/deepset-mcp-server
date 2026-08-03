@@ -299,7 +299,8 @@ def register_tools(
 
     Args:
         mcp_server_instance: FastMCP server instance
-        api_key: An api key for the deepset AI platform; only needs to be provided when not read from request context.
+        api_key: An api key for the Haystack Enterprise Platform; only needs to be provided when not
+            read from request context.
         workspace: Pass a deepset workspace name if you only want to run the tools on a specific workspace.
         tool_names: Set of tool names to register (if None, registers all tools)
         get_api_key_from_authorization_header: Whether to use request context to retrieve an API key for tool execution.

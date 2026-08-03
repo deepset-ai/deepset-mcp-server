@@ -1,10 +1,10 @@
 # MCP Server Concepts
 
-This section explains key concepts that enable efficient AI tool orchestration between the deepset AI platform and various clients. Understanding these concepts helps you grasp why certain design decisions were made and how different components work together to create effective AI workflows.
+Learn about key concepts to help you efficiently orchestrate between the Haystack Enterprise Platform and various clients. Understan how different components work together to create effective AI workflows.
 
-## deepset AI Platform
+## Haystack Enterprise Platform
 
-The [deepset AI platform](https://www.deepset.ai/products-and-services/deepset-ai-platform) is a Software-as-a-Service solution for building and managing Large Language Model applications throughout their entire lifecycle. It serves as the foundation for creating AI-powered search and question-answering systems.
+The [Haystack Enterprise Platform](https://www.deepset.ai/products-and-services/deepset-ai-platform) is a Software-as-a-Service solution for building and managing AI-powered applications.
 
 **Pipeline-Based Architecture**: The platform organizes AI functionality into pipelines—modular building blocks that can be mixed, matched, and replaced to form various configurations. Components like retrievers, generators, and processors connect together to create complete AI workflows. This flexibility allows you to customize behavior for different use cases while maintaining a consistent development experience.
 
@@ -42,9 +42,9 @@ The [Model Context Protocol](https://modelcontextprotocol.io/docs/getting-starte
 
 The protocol emphasizes human oversight and control, requiring user approval for tool executions while enabling sophisticated AI workflows across multiple specialized servers.
 
-## Integrating deepset Platform with MCP Clients
+## Integrating Haystack Enterprise Platform with MCP Clients
 
-MCP clients like Cursor, Claude Desktop, and Claude Code can connect to deepset platform capabilities through the deepset MCP server. This integration transforms how AI assistants interact with your search and AI pipeline infrastructure.
+MCP clients like Cursor, Claude Desktop, and Claude Code can connect to Haystack Enterprise Platform capabilities through the deepset MCP server. This integration transforms how AI assistants interact with your search and AI pipeline infrastructure.
 
 **Client-Side Configuration**: MCP clients require configuration files that specify how to connect to the deepset MCP server. These configurations include the execution command (typically `uvx deepset-mcp`), environment variables for authentication, and workspace settings. The client handles launching the server process and managing the connection lifecycle.
 
@@ -56,19 +56,19 @@ MCP clients like Cursor, Claude Desktop, and Claude Code can connect to deepset 
 
 **Workspace Flexibility**: Clients can be configured with a default workspace for all operations, or they can operate in dynamic mode where the AI assistant specifies the workspace for each tool invocation. This flexibility supports both focused single-project work and multi-environment management.
 
-The integration creates a seamless experience where AI assistants can naturally work with your deepset platform resources, turning conversational requests like "search our documentation for deployment guides" into actual pipeline executions.
+The integration creates a seamless experience where AI assistants can naturally work with your Haystack Enterprise Platform resources, turning conversational requests like "search our documentation for deployment guides" into actual pipeline executions.
 
 View our [installation guides](../installation.md) to set up the deepset MCP server with various MCP clients.
 
 ## Use with Custom Agents
 
-Beyond MCP clients, the deepset MCP server tools can be used directly by custom AI agents that implement MCP client functionality. This approach enables building specialized AI applications that deeply integrate with deepset platform capabilities.
+Beyond MCP clients, the deepset MCP server tools can be used directly by custom AI agents that implement MCP client functionality. This approach enables building specialized AI applications that deeply integrate with Haystack Enterprise Platform capabilities.
 
 **Agent-Tool Interface**: AI agents can consume deepset MCP tools through the same protocol used by desktop clients. The tools are exposed as callable functions with typed parameters and structured return values, making them natural building blocks for agent workflows.
 
-**Haystack Agent Integration**: Haystack provides a built-in MCPToolset that dynamically discovers and loads MCP server tools. This integration enables Haystack agents to use deepset platform capabilities alongside other tools in their workflows. The agent can reason about which tools to use, execute searches, analyze results, and take follow-up actions all within a single conversation.
+**Haystack Agent Integration**: Haystack provides a built-in MCPToolset that dynamically discovers and loads MCP server tools. This integration enables Haystack agents to use Haystack Enterprise Platform capabilities alongside other tools in their workflows. The agent can reason about which tools to use, execute searches, analyze results, and take follow-up actions all within a single conversation.
 
-**Custom Tool Orchestration**: When building custom agents, you can combine deepset MCP tools with other capabilities—web search, document processing, code execution, or domain-specific APIs. This combination creates powerful AI assistants that can bridge multiple systems while maintaining access to your deepset platform resources.
+**Custom Tool Orchestration**: When building custom agents, you can combine deepset MCP tools with other capabilities—web search, document processing, code execution, or domain-specific APIs. This combination creates powerful AI assistants that can bridge multiple systems while maintaining access to your Haystack Enterprise Platform resources.
 
 **Reference-Based Workflows**: The object store concept becomes particularly powerful in agent scenarios. Agents can chain operations together efficiently—search for documents, analyze the results, extract insights, and create new pipelines—all without re-transmitting large data structures between tool calls.
 
@@ -121,15 +121,24 @@ The `RichExplorer` class generates human-readable, truncated representations of 
 
 ### Exploration Tools
 
-Two specialized tools enable LLMs to navigate stored objects:
+Five specialized tools enable LLMs to navigate stored objects:
 
-**`get_from_object_store`**: Retrieves objects or specific nested properties using dot-notation paths (e.g., `@obj_123.config.timeout`). This tool provides the primary interface for accessing stored data.
+**`get_from_object_store`**: Retrieves objects or specific nested properties using dot-notation paths (for example, `@obj_123.config.timeout`). This tool provides the primary interface for accessing stored data.
 
-**`get_slice_from_object_store`**: Extracts specific ranges from strings and lists (e.g., characters 100-200 of a document, items 10-20 of a list). This enables efficient inspection of large sequences without loading entire contents.
+**`get_slice_from_object_store`**: Extracts specific ranges from strings and lists (for example, characters 100-200 of a document, items 10-20 of a list). Use this tool to inspect large sequences without loading entire contents.
+
+**`grep_object_store`**: Searches a stored string for a regular expression and returns the matches with surrounding context, like `grep`. Use it to locate relevant sections in large logs or YAML configurations without reading them in full.
+
+**`sed_object_store`**: Applies a regex substitution to a stored string and stores the result as a new object, like `sed`. Use it for targeted edits to large strings (for example, patching a value in a pipeline YAML) without re-transmitting the whole content.
+
+**`yq_object_store`**: Queries or transforms structured data with a `jq` filter expression (for example, `.items[] | select(.active) | .name`, or `.config.timeout = 30`). YAML and JSON strings — such as a pipeline's YAML configuration — are parsed before the filter runs and re-serialized to the same format afterwards. Results are stored as a new object by default, so they can be chained into further calls.
 
 The distinction between these tools reflects different access patterns:
 - Use `get_from_object_store` for structural navigation (accessing object properties)
 - Use `get_slice_from_object_store` for range-based access (viewing portions of sequences)
+- Use `grep_object_store` for content-based search when the location is unknown
+- Use `sed_object_store` for in-place modification of stored strings
+- Use `yq_object_store` for structured queries and transformations of YAML/JSON configurations
 
 ## Tool Invocation by Reference
 
