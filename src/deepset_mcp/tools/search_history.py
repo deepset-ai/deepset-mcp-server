@@ -154,8 +154,8 @@ async def list_pipeline_traces(
     timing (``duration_s``, ``created_at``), and failure details if the run failed.
     Summaries do **not** include spans or logs. Use this to browse runs, find slow or
     failed queries, then pass a ``query_id`` to ``get_pipeline_trace`` for the full
-    execution trace (spans with essential tags such as component type), 
-    ``get_pipeline_trace_span_tags`` for a single span with full tags (including input/output), 
+    execution trace (spans with essential tags such as component type),
+    ``get_pipeline_trace_span_tags`` for a single span with full tags (including input/output),
     or ``get_pipeline_trace_logs`` for the logs of the trace.
 
     Use the ``after`` parameter with ``next_cursor`` from the response to fetch

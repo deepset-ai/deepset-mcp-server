@@ -90,7 +90,8 @@ class SearchHistoryResourceProtocol(Protocol):
         """Get the full Haystack pipeline run trace for a single search history record including all spans.
 
         Includes every span with essential tags.
-        For full details including component input/output and the run logs, use ``get_pipeline_trace_span_tags`` and ``get_pipeline_trace_logs``.
+        For full details including component input/output and the run logs, use ``get_pipeline_trace_span_tags`` and
+        ``get_pipeline_trace_logs``.
 
         :param pipeline_name: Name of the pipeline.
         :param query_id: UUID of the search history query.
