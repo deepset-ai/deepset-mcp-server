@@ -329,14 +329,13 @@ class PipelineResource(PipelineResourceProtocol):
         :returns: A `PaginatedResponse` object containing the first page of logs.
         """
         # 1. Prepare arguments for the initial API call
-        request_params = {
+        request_params: dict[str, Any] = {
             "limit": limit,
-            "filter": "origin eq 'querypipeline'",
         }
 
         # Add level filter if specified
         if level is not None:
-            request_params["filter"] = f"level eq '{level}' and origin eq 'querypipeline'"
+            request_params["filter"] = f"level eq '{level}'"
 
         # Add cursor if provided
         if after is not None:
@@ -352,7 +351,7 @@ class PipelineResource(PipelineResourceProtocol):
         page._inject_paginator(
             fetch_func=lambda **kwargs: self._get_logs_api_call(pipeline_name, **kwargs),
             # Base args for the *next* fetch don't include initial cursors
-            base_args={"limit": limit, "filter": request_params["filter"]},
+            base_args={"limit": limit, "filter": request_params.get("filter")},
             cursor_param="after",  # Logs use 'after' cursor, not 'before' like pipelines
         )
         return page
