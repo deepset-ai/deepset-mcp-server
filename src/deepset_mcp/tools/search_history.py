@@ -293,6 +293,10 @@ async def get_pipeline_trace_logs(
 
     Obtain ``query_id`` from ``list_pipeline_traces`` or ``list_pipeline_search_history``.
 
+    If errors occur outside of the pipeline (e.g. in the API or search history service), they will not appear in the
+    trace logs. Use the ``get_pipeline_logs`` tool to retrieve logs for the pipeline itself (e.g. startup errors,
+    configuration issues, orother runtime problems).
+
     :param client: The async client for API communication.
     :param workspace: The workspace name.
     :param pipeline_name: Name of the pipeline.
