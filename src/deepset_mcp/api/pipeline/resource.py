@@ -4,7 +4,7 @@
 
 import json
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
@@ -14,6 +14,8 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetSearchResponse,
     DeepsetStreamEvent,
     LogLevel,
+    PipelineDebugBreakpoint,
+    PipelineDebugResult,
     PipelineLog,
     PipelineValidationResult,
     PipelineVersion,
@@ -329,14 +331,13 @@ class PipelineResource(PipelineResourceProtocol):
         :returns: A `PaginatedResponse` object containing the first page of logs.
         """
         # 1. Prepare arguments for the initial API call
-        request_params = {
+        request_params: dict[str, Any] = {
             "limit": limit,
-            "filter": "origin eq 'querypipeline'",
         }
 
         # Add level filter if specified
         if level is not None:
-            request_params["filter"] = f"level eq '{level}' and origin eq 'querypipeline'"
+            request_params["filter"] = f"level eq '{level}'"
 
         # Add cursor if provided
         if after is not None:
@@ -352,7 +353,7 @@ class PipelineResource(PipelineResourceProtocol):
         page._inject_paginator(
             fetch_func=lambda **kwargs: self._get_logs_api_call(pipeline_name, **kwargs),
             # Base args for the *next* fetch don't include initial cursors
-            base_args={"limit": limit, "filter": request_params["filter"]},
+            base_args={"limit": limit, "filter": request_params.get("filter")},
             cursor_param="after",  # Logs use 'after' cursor, not 'before' like pipelines
         )
         return page
@@ -430,6 +431,63 @@ class PipelineResource(PipelineResourceProtocol):
         raise_for_status(resp)
 
         return NoContentResponse(message="Pipeline deleted successfully.")
+
+    async def debug(
+        self,
+        *,
+        pipeline_config: dict[str, Any],
+        inputs: dict[str, Any] | None = None,
+        break_at: PipelineDebugBreakpoint | None = None,
+        resume_from: dict[str, Any] | None = None,
+        files: Sequence[str] | None = None,
+        pipeline_id: str | None = None,
+        pipeline_version_id: str | None = None,
+        dry_run: bool = False,
+    ) -> PipelineDebugResult:
+        """Run a pipeline configuration in debug mode: pin a breakpoint, resume a snapshot, or trace a full run.
+
+        :param pipeline_config: Pipeline configuration as a dictionary (components, connections, inputs mapping).
+        :param inputs: Named pipeline inputs keyed by the input name declared under the pipeline config's
+            'inputs' mapping. Ignored on resume, where inputs come from the snapshot.
+        :param break_at: Where to stop the run. Mutually exclusive with resume_from.
+        :param resume_from: A snapshot from a previous debug run, replayed to completion. Mutually exclusive
+            with break_at.
+        :param files: File IDs to download and inject into the inputs declared under the pipeline config's
+            'inputs.files' mapping.
+        :param pipeline_id: Optional ID of the pipeline this debug run is associated with.
+        :param pipeline_version_id: Optional ID of the pipeline version (requires pipeline_id).
+        :param dry_run: Best-effort stateless run that skips state-modifying components (e.g. DocumentWriter).
+        :returns: PipelineDebugResult with status, result/snapshot, and the run trace.
+        """
+        data: dict[str, Any] = {
+            "pipeline_config": pipeline_config,
+            "inputs": inputs or {},
+            "dry_run": dry_run,
+        }
+        if break_at is not None:
+            data["break_at"] = break_at.model_dump()
+        if resume_from is not None:
+            data["resume_from"] = resume_from
+        if files is not None:
+            data["files"] = list(files)
+        if pipeline_id is not None:
+            data["pipeline_id"] = pipeline_id
+        if pipeline_version_id is not None:
+            data["pipeline_version_id"] = pipeline_version_id
+
+        resp = await self._client.request(
+            endpoint=f"v1/workspaces/{quote(self._workspace, safe='')}/haystack/pipelines/debug",
+            method="POST",
+            data=data,
+            response_type=dict[str, Any],
+        )
+
+        raise_for_status(resp)
+
+        if resp.json is None:
+            raise UnexpectedAPIError(status_code=resp.status_code, message="Empty response", detail=None)
+
+        return PipelineDebugResult.model_validate(resp.json)
 
     async def search(
         self,
