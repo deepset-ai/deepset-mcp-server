@@ -40,6 +40,7 @@ from deepset_mcp.tools.object_store import (
 from deepset_mcp.tools.pipeline import (
     create_pipeline as create_pipeline_tool,
     create_pipeline_version as create_pipeline_version_tool,
+    debug_pipeline as debug_pipeline_tool,
     deploy_pipeline as deploy_pipeline_tool,
     get_pipeline as get_pipeline_tool,
     get_pipeline_logs as get_pipeline_logs_tool,
@@ -156,6 +157,10 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "get_pipeline_logs": (
         get_pipeline_logs_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "debug_pipeline": (
+        debug_pipeline_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
     ),
     "search_pipeline": (
         search_pipeline_tool,
