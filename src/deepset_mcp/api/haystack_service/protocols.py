@@ -8,11 +8,13 @@ from typing import Any, Protocol
 class HaystackServiceProtocol(Protocol):
     """Protocol defining the implementation for HaystackService."""
 
-    async def get_component_schemas(self) -> dict[str, Any]:
+    async def get_component_schemas(self, haystack_version: str | None = None) -> dict[str, Any]:
         """Fetch the component schema from the API."""
         ...
 
-    async def get_component_input_output(self, component_name: str) -> dict[str, Any]:
+    async def get_component_input_output(
+        self, component_name: str, haystack_version: str | None = None
+    ) -> dict[str, Any]:
         """Fetch input and output schema for a component from the API."""
         ...
 
@@ -23,6 +25,7 @@ class HaystackServiceProtocol(Protocol):
         input_data: dict[str, Any] | None = None,
         input_types: dict[str, str] | None = None,
         workspace: str | None = None,
+        haystack_version: str | None = None,
     ) -> dict[str, Any]:
         """Run a Haystack component with the given parameters.
 
@@ -32,6 +35,7 @@ class HaystackServiceProtocol(Protocol):
         :param input_data: Input data for the component
         :param input_types: Optional type information for inputs (inferred if not provided)
         :param workspace: Optional workspace name to run the component in
+        :param haystack_version: Optional version of Haystack to use for the component
 
         :returns: Dictionary containing the component's output sockets
         """

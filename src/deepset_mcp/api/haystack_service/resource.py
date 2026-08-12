@@ -17,16 +17,20 @@ class HaystackServiceResource(HaystackServiceProtocol):
         """Initializes a HaystackServiceResource instance."""
         self._client = client
 
-    async def get_component_schemas(self) -> dict[str, Any]:
+    async def get_component_schemas(self, haystack_version: str | None = None) -> dict[str, Any]:
         """Fetch the component schema from the API.
 
-        Returns:
-            The component schema as a dictionary
+        :param haystack_version: Optional version of Haystack to use for the component
+
+        :returns: The component schema as a dictionary
         """
+        headers = {"accept": "application/json"}
+        if haystack_version is not None:
+            headers["X-Haystack-Version"] = haystack_version
         resp = await self._client.request(
             endpoint="v1/haystack/components",
             method="GET",
-            headers={"accept": "application/json"},
+            headers=headers,
             data={"domain": "deepset-cloud"},
         )
 
@@ -34,19 +38,23 @@ class HaystackServiceResource(HaystackServiceProtocol):
 
         return resp.json if resp.json is not None else {}
 
-    async def get_component_input_output(self, component_name: str) -> dict[str, Any]:
+    async def get_component_input_output(
+        self, component_name: str, haystack_version: str | None = None
+    ) -> dict[str, Any]:
         """Fetch the component input and output schema from the API.
 
-        Args:
-            component_name: The name of the component to fetch the input/output schema for
+        :param component_name: The name of the component to fetch the input/output schema for
+        :param haystack_version: Optional version of Haystack to use for the component
 
-        Returns:
-            The component input/output schema as a dictionary
+        :returns: The component input/output schema as a dictionary
         """
+        headers = {"accept": "application/json"}
+        if haystack_version is not None:
+            headers["X-Haystack-Version"] = haystack_version
         resp = await self._client.request(
             endpoint="v1/haystack/components/input-output",
             method="GET",
-            headers={"accept": "application/json"},
+            headers=headers,
             params={"domain": "deepset-cloud", "names": [component_name]},
             response_type=list[dict[str, Any]],
         )
@@ -65,6 +73,7 @@ class HaystackServiceResource(HaystackServiceProtocol):
         input_data: dict[str, Any] | None = None,
         input_types: dict[str, str] | None = None,
         workspace: str | None = None,
+        haystack_version: str | None = None,
     ) -> dict[str, Any]:
         """Run a Haystack component with the given parameters.
 
@@ -73,9 +82,16 @@ class HaystackServiceResource(HaystackServiceProtocol):
         :param input_data: Input data for the component
         :param input_types: Optional type information for inputs (inferred if not provided)
         :param workspace: Optional workspace name to run the component in
+        :param haystack_version: Optional version of Haystack to use for the component
 
         :returns: Dictionary containing the component's output sockets
         """
+        headers = {
+            "accept": "application/json",
+            "content-type": "application/json",
+        }
+        if haystack_version is not None:
+            headers["X-Haystack-Version"] = haystack_version
         payload: dict[str, Any] = {
             "component_type": component_type,
             "init_params": init_params or {},
@@ -92,10 +108,7 @@ class HaystackServiceResource(HaystackServiceProtocol):
         resp = await self._client.request(
             endpoint=endpoint,
             method="POST",
-            headers={
-                "accept": "application/json",
-                "content-type": "application/json",
-            },
+            headers=headers,
             data=payload,
             response_type=dict[str, Any],
         )
