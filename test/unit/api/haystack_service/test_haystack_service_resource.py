@@ -119,6 +119,24 @@ async def test_get_component_schema_success(
 
 
 @pytest.mark.asyncio
+async def test_get_component_schema_with_haystack_version(
+    mock_client: BaseFakeClient,
+    mock_successful_schema_response: None,
+) -> None:
+    """Test component schema retrieval with a haystack_version."""
+    resource = HaystackServiceResource(client=mock_client)
+    result = await resource.get_component_schemas(haystack_version="2.1.0")
+
+    assert result == make_component_schema_response()
+    assert mock_client.requests[-1] == {
+        "method": "GET",
+        "endpoint": "v1/haystack/components",
+        "headers": {"accept": "application/json", "X-Haystack-Version": "2.1.0"},
+        "data": {"domain": "deepset-cloud"},
+    }
+
+
+@pytest.mark.asyncio
 async def test_get_component_schema_error(
     mock_client: BaseFakeClient,
     mock_schema_error_response: None,
@@ -139,6 +157,19 @@ async def test_get_component_input_output_success(
     result = await resource.get_component_input_output("Agent")
 
     assert result == {"name": "Agent", "input": "Mock input", "output": "Mock output"}
+
+
+@pytest.mark.asyncio
+async def test_get_component_input_output_with_haystack_version(
+    mock_client: BaseFakeClient,
+    mock_successful_io_response: None,
+) -> None:
+    resource = HaystackServiceResource(client=mock_client)
+    result = await resource.get_component_input_output("Agent", haystack_version="2.1.0")
+
+    assert result == {"name": "Agent", "input": "Mock input", "output": "Mock output"}
+    request = mock_client.requests[-1]
+    assert request["headers"] == {"accept": "application/json", "X-Haystack-Version": "2.1.0"}
 
 
 @pytest.mark.asyncio
@@ -221,6 +252,27 @@ async def test_run_component_without_input_types(
     assert result == make_component_run_response()
     request = mock_client.requests[-1]
     assert "input_types" not in request["data"]
+
+
+@pytest.mark.asyncio
+async def test_run_component_with_haystack_version(
+    mock_client: BaseFakeClient,
+    mock_successful_run_response: None,
+) -> None:
+    """Test component run with a haystack_version."""
+    resource = HaystackServiceResource(client=mock_client)
+    result = await resource.run_component(
+        component_type="haystack.components.builders.PromptBuilder",
+        haystack_version="2.1.0",
+    )
+
+    assert result == make_component_run_response()
+    request = mock_client.requests[-1]
+    assert request["headers"] == {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "X-Haystack-Version": "2.1.0",
+    }
 
 
 @pytest.mark.asyncio
