@@ -137,7 +137,6 @@ def create_sample_log(
     log_id: str = "UHG0_JYBbpf1V-YKI8YQ",
     message: str = "Will use search history type: SNS",
     level: str = "info",
-    origin: str = "querypipeline",
 ) -> dict[str, Any]:
     """Create a sample log entry for testing."""
     return {
@@ -145,7 +144,7 @@ def create_sample_log(
         "message": message,
         "logged_at": "2025-05-23T10:33:04.157182Z",
         "level": level,
-        "origin": origin,
+        "origin": "haystack",
         "exceptions": None,
         "extra_fields": {
             "_logger": "<_FixedFindCallerLogger dc_query_api.search_history_publisher (INFO)>",
@@ -758,7 +757,7 @@ class TestPipelineResource:
         assert result.data[0].log_id == "log1"
         assert result.data[0].message == "First log entry"
         assert result.data[0].level == "info"
-        assert result.data[0].origin == "querypipeline"
+        assert result.data[0].origin == "haystack"
         assert result.has_more is False
         assert result.total == 2
 
@@ -766,7 +765,7 @@ class TestPipelineResource:
         assert len(client.requests) == 1
         assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipelines/test-pipeline/logs"
         assert client.requests[0]["method"] == "GET"
-        assert client.requests[0]["params"] == {"limit": 30, "filter": "origin eq 'querypipeline'"}
+        assert client.requests[0]["params"] == {"limit": 30}
 
     @pytest.mark.asyncio
     async def test_get_logs_with_limit(self) -> None:
@@ -795,7 +794,7 @@ class TestPipelineResource:
         assert result.total == 100
 
         # Verify request
-        assert client.requests[0]["params"] == {"limit": 10, "filter": "origin eq 'querypipeline'"}
+        assert client.requests[0]["params"] == {"limit": 10}
 
     @pytest.mark.asyncio
     async def test_get_logs_with_level_filter(self) -> None:
@@ -826,7 +825,7 @@ class TestPipelineResource:
         assert all(log.level == "error" for log in result.data)
 
         # Verify request with level filter
-        assert client.requests[0]["params"] == {"limit": 30, "filter": "level eq 'error' and origin eq 'querypipeline'"}
+        assert client.requests[0]["params"] == {"limit": 30, "filter": "level eq 'error'"}
 
     @pytest.mark.asyncio
     async def test_get_logs_with_warning_level(self) -> None:
@@ -858,7 +857,7 @@ class TestPipelineResource:
         # Verify request with warning level filter
         assert client.requests[0]["params"] == {
             "limit": 30,
-            "filter": "level eq 'warning' and origin eq 'querypipeline'",
+            "filter": "level eq 'warning'",
         }
 
     @pytest.mark.asyncio
@@ -937,7 +936,7 @@ class TestPipelineResource:
         assert len(result.data) == 0
 
         # Verify request
-        assert client.requests[0]["params"] == {"limit": 0, "filter": "origin eq 'querypipeline'"}
+        assert client.requests[0]["params"] == {"limit": 0}
 
     @pytest.mark.asyncio
     async def test_get_logs_preserves_extra_fields(self) -> None:
@@ -1002,7 +1001,6 @@ class TestPipelineResource:
         # Logs should use 'after' parameter (not 'before' like pipelines)
         assert client.requests[0]["params"] == {
             "limit": 5,
-            "filter": "origin eq 'querypipeline'",
             "after": "some_cursor",
         }
 
@@ -1039,7 +1037,7 @@ class TestPipelineResource:
         # Verify request with both level filter and cursor
         expected_params = {
             "limit": 10,
-            "filter": "level eq 'error' and origin eq 'querypipeline'",
+            "filter": "level eq 'error'",
             "after": "some_cursor",
         }
         assert client.requests[0]["params"] == expected_params

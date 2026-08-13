@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from typing import Any, Protocol
 
 from deepset_mcp.api.pipeline.models import (
@@ -10,6 +10,8 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetSearchResponse,
     DeepsetStreamEvent,
     LogLevel,
+    PipelineDebugBreakpoint,
+    PipelineDebugResult,
     PipelineLog,
     PipelineValidationResult,
     PipelineVersion,
@@ -114,4 +116,19 @@ class PipelineResourceProtocol(Protocol):
 
     async def delete(self, pipeline_name: str) -> NoContentResponse:
         """Delete a pipeline."""
+        ...
+
+    async def debug(
+        self,
+        *,
+        pipeline_config: dict[str, Any],
+        inputs: dict[str, Any] | None = None,
+        break_at: PipelineDebugBreakpoint | None = None,
+        resume_from: dict[str, Any] | None = None,
+        files: Sequence[str] | None = None,
+        pipeline_id: str | None = None,
+        pipeline_version_id: str | None = None,
+        dry_run: bool = False,
+    ) -> PipelineDebugResult:
+        """Run a pipeline configuration in debug mode: pin a breakpoint, resume a snapshot, or trace a full run."""
         ...

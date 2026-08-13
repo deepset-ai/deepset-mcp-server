@@ -13,7 +13,7 @@ from typing import Any
 from mcp.server.fastmcp import Context, FastMCP
 
 from deepset_mcp.api.client import AsyncDeepsetClient
-from deepset_mcp.config import DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME
+from deepset_mcp.config import DEEPSET_CLIENT_TIMEOUT, DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME
 from deepset_mcp.mcp.tool_models import DeepsetDocsConfig, MemoryType, ToolConfig
 from deepset_mcp.mcp.tool_registry import TOOL_REGISTRY
 from deepset_mcp.tokonomics import (
@@ -181,7 +181,8 @@ def apply_client(
             if not api_key:
                 raise ValueError("API key cannot be empty")
 
-            client_kwargs: dict[str, Any] = {"transport_config": DEFAULT_CLIENT_HEADER, "api_key": api_key}
+            transport_config = {**DEFAULT_CLIENT_HEADER, "timeout": DEEPSET_CLIENT_TIMEOUT}
+            client_kwargs: dict[str, Any] = {"transport_config": transport_config, "api_key": api_key}
             if base_url:
                 client_kwargs["base_url"] = base_url
             async with AsyncDeepsetClient(**client_kwargs) as client:
@@ -207,7 +208,8 @@ def apply_client(
 
         @functools.wraps(base_func)
         async def client_wrapper_without_context(*args: Any, **kwargs: Any) -> Any:
-            client_kwargs: dict[str, Any] = {"transport_config": DEFAULT_CLIENT_HEADER, "api_key": api_key}
+            transport_config = {**DEFAULT_CLIENT_HEADER, "timeout": DEEPSET_CLIENT_TIMEOUT}
+            client_kwargs: dict[str, Any] = {"transport_config": transport_config, "api_key": api_key}
             if base_url:
                 client_kwargs["base_url"] = base_url
             async with AsyncDeepsetClient(**client_kwargs) as client:

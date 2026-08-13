@@ -5,6 +5,7 @@
 """This module contains static configuration for the deepset MCP server."""
 
 import importlib.metadata
+import os
 
 try:
     __version__ = importlib.metadata.version("deepset-mcp")
@@ -39,3 +40,4 @@ DEEPSET_DOCS_DEFAULT_SHARE_URL = "https://cloud.deepset.ai/shared_prototypes?sha
 DOCS_SEARCH_TOOL_NAME = "search_docs"
 
 DEFAULT_CLIENT_HEADER = {"headers": {"User-Agent": f"deepset-mcp/{__version__}"}}
+DEEPSET_CLIENT_TIMEOUT = float(os.environ.get("DEEPSET_CLIENT_TIMEOUT", 5))  # seconds

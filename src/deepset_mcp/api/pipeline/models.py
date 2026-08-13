@@ -4,12 +4,13 @@
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
 from rich.repr import Result
 
+from deepset_mcp.api.search_history.models import HaystackTraceV1
 from deepset_mcp.api.shared_models import DeepsetUser
 
 
@@ -314,3 +315,27 @@ class PipelineVersion(BaseModel):
         """Configuration for serialization and deserialization."""
 
         populate_by_name = True
+
+
+class PipelineDebugBreakpoint(BaseModel):
+    """Where a debugging pipeline run stopped, or where it should stop."""
+
+    component_name: str
+    "Name of the component the breakpoint targets"
+    visit_count: int = 0
+    "Visit count at which to break (0 breaks before the first visit); relevant for loops/cycles"
+
+
+class PipelineDebugResult(BaseModel):
+    """Result of running a pipeline in debug mode (break, resume, or a plain traced run)."""
+
+    status: Literal["completed", "stopped_at_breakpoint", "failed"]
+    "Whether the pipeline ran to completion, stopped at a breakpoint, or failed"
+    result: dict[str, Any] | None = None
+    "Full pipeline output, present when status is 'completed'"
+    snapshot: dict[str, Any] | None = None
+    "Resumable pipeline snapshot, present when status is 'stopped_at_breakpoint'. Pass back as resume_from."
+    stopped_at: PipelineDebugBreakpoint | None = None
+    "Where the run stopped, present when status is 'stopped_at_breakpoint'"
+    trace: HaystackTraceV1
+    "The run trace captured up to this point"
