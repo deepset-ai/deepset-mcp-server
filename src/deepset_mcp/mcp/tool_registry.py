@@ -299,3 +299,11 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
 }
 
 ALL_DEEPSET_TOOLS = set(TOOL_REGISTRY.keys())
+
+OBJECT_STORE_TOOL_NAMES = {
+    "get_from_object_store",
+    "get_slice_from_object_store",
+    "grep_object_store",
+    "sed_object_store",
+    "yq_object_store",
+}
