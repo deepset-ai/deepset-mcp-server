@@ -12,7 +12,6 @@ from deepset_mcp.config import DEEPSET_DOCS_DEFAULT_SHARE_URL
 from deepset_mcp.mcp.store import initialize_or_get_initialized_store
 from deepset_mcp.mcp.tool_factory import register_tools
 from deepset_mcp.mcp.tool_models import DeepsetDocsConfig
-from deepset_mcp.mcp.tool_registry import TOOL_REGISTRY
 
 
 async def configure_mcp_server(
@@ -47,9 +46,6 @@ async def configure_mcp_server(
     :param object_store_ttl: TTL in seconds for stored objects
     :raises ValueError: If required parameters are missing or invalid
     """
-    if tools_to_register is None:
-        tools_to_register = set(TOOL_REGISTRY.keys())
-
     if deepset_docs_shareable_prototype_url is None:
         deepset_docs_shareable_prototype_url = DEEPSET_DOCS_DEFAULT_SHARE_URL
 

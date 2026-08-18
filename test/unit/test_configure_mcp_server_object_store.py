@@ -57,3 +57,26 @@ class TestConfigureMcpServerObjectStore:
         call_args = mock_register_tools.call_args
         assert call_args[1]["object_store"] is None
         assert call_args[1]["enable_object_store"] is False
+
+    @patch("deepset_mcp.mcp.server.initialize_or_get_initialized_store")
+    @patch("deepset_mcp.mcp.server.register_tools")
+    @pytest.mark.asyncio
+    async def test_object_store_disabled_and_no_tools_specified_forwards_none(
+        self, mock_register_tools: MagicMock, mock_initialize_store: MagicMock
+    ) -> None:
+        """'tools_to_register=None' must be forwarded as 'None', not expanded into every tool name.
+
+        Regression test: 'configure_mcp_server' used to eagerly expand 'tools_to_register=None' into the full
+        'TOOL_REGISTRY' key set (including object-store tools) before calling 'register_tools'. That made
+        'register_tools' think the object-store tools had been explicitly requested, so it raised
+        'ValueError: Cannot register object-store tools ...' whenever 'enable_object_store=False' was combined
+        with the default 'tools_to_register=None'.
+        """
+        mock_server = MagicMock()
+
+        await configure_mcp_server(
+            mcp_server_instance=mock_server, deepset_api_key="test-key", enable_object_store=False
+        )
+
+        call_args = mock_register_tools.call_args
+        assert call_args[1]["tool_names"] is None
