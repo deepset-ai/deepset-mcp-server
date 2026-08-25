@@ -21,7 +21,7 @@ from deepset_mcp.mcp.tool_factory import (
     register_tools,
 )
 from deepset_mcp.mcp.tool_models import DeepsetDocsConfig, ExplorerConfig, MemoryType, ToolConfig
-from deepset_mcp.mcp.tool_registry import TOOL_REGISTRY
+from deepset_mcp.mcp.tool_registry import OBJECT_STORE_TOOL_NAMES, TOOL_REGISTRY
 from deepset_mcp.tokonomics import InMemoryBackend, ObjectStore
 from test.unit.conftest import BaseFakeClient
 
@@ -763,3 +763,42 @@ class TestRegisterAllTools:
         properties = registered.parameters.get("properties", {})
         assert "explorer" not in properties
         assert "client" not in properties
+
+
+class TestRegisterToolsWithObjectStoreDisabled:
+    """Test 'register_tools' with 'enable_object_store=False'."""
+
+    def test_object_store_tools_are_skipped(self) -> None:
+        """Registering all tools with the object store disabled must skip the object-store tools."""
+        mcp_server = FastMCP()
+        docs_config = DeepsetDocsConfig(pipeline_name="pipeline", api_key="key", workspace_name="workspace")
+
+        register_tools(mcp_server, docs_config=docs_config, enable_object_store=False)
+
+        registered_names = set(mcp_server._tool_manager._tools.keys())
+        assert registered_names == set(TOOL_REGISTRY.keys()) - OBJECT_STORE_TOOL_NAMES
+
+    def test_no_object_store_instance_required(self) -> None:
+        """Registering tools with the object store disabled must not require an 'ObjectStore' instance."""
+        mcp_server = FastMCP()
+
+        # Would raise if an ObjectStore were required for a normally-'EXPLORABLE' tool.
+        register_tools(mcp_server, tool_names={"list_pipelines"}, object_store=None, enable_object_store=False)
+
+        assert "list_pipelines" in mcp_server._tool_manager._tools
+
+    @patch("deepset_mcp.mcp.tool_factory.explorable")
+    def test_memory_decorators_are_not_applied(self, mock_explorable: Any) -> None:
+        """Tools that are normally wrapped for memory must be registered with 'NO_MEMORY' instead."""
+        mcp_server = FastMCP()
+
+        register_tools(mcp_server, tool_names={"list_pipelines"}, enable_object_store=False)
+
+        mock_explorable.assert_not_called()
+
+    def test_explicitly_requested_object_store_tool_raises(self) -> None:
+        """Explicitly requesting an object-store tool while disabled is a caller error, not a silent skip."""
+        mcp_server = FastMCP()
+
+        with pytest.raises(ValueError, match="get_from_object_store"):
+            register_tools(mcp_server, tool_names={"get_from_object_store"}, enable_object_store=False)
