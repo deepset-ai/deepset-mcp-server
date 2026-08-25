@@ -23,6 +23,7 @@ from .object_store import (
 from .pipeline import (
     create_pipeline,
     create_pipeline_version,
+    debug_pipeline,
     deploy_pipeline,
     get_pipeline,
     get_pipeline_logs,
@@ -73,6 +74,7 @@ __all__ = [
     "list_pipelines",
     "get_pipeline",
     "get_pipeline_logs",
+    "debug_pipeline",
     "deploy_pipeline",
     "search_pipeline",
     "search_pipeline_with_filters",

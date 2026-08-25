@@ -46,6 +46,7 @@ The *Memory* column describes how a tool interacts with the object store (see
 | `validate_pipeline` | required | explorable, referenceable | Validate a YAML configuration without saving it. |
 | `deploy_pipeline` | required | explorable | Deploy a pipeline and wait for it to become available. |
 | `get_pipeline_logs` | required | explorable | Fetch a deployed pipeline's logs. |
+| `debug_pipeline` | required | explorable, referenceable | Run a YAML configuration in debug mode, optionally breaking at a component or resuming from a snapshot. |
 | `search_pipeline` | required | explorable | Run a query against a deployed pipeline. |
 | `search_pipeline_with_filters` | required | explorable | Run a query with metadata filters. |
 | `search_pipeline_with_params` | required | explorable | Run a query with component-level parameter overrides. |
