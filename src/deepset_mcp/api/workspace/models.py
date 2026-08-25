@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 
 class Workspace(BaseModel):
-    """Model representing a workspace on the deepset platform."""
+    """Model representing a workspace on the Haystack Enterprise Platform."""
 
     name: str
     "Human-readable name of the workspace"

@@ -221,7 +221,9 @@ class TestPipelineTemplateResource:
         assert client.requests[0]["endpoint"] == "v1/workspaces/test-workspace/pipeline_templates"
         assert client.requests[0]["method"] == "GET"
 
-    @pytest.mark.skip("Cursor-based pagination for pipeline templates needs to be fixed on deepset platform.")
+    @pytest.mark.skip(
+        "Cursor-based pagination for pipeline templates needs to be fixed on Haystack Enterprise Platform."
+    )
     @pytest.mark.asyncio
     async def test_list_with_pagination(self) -> None:
         """Test listing templates with pagination parameters."""
@@ -475,7 +477,9 @@ class TestPipelineTemplateResource:
         assert indexing_template.pipeline_type == "indexing"
         assert indexing_template.yaml_config is None  # Indexing templates should not return YAML in list
 
-    @pytest.mark.skip("Cursor-based pagination for pipeline templates needs to be fixed on deepset platform.")
+    @pytest.mark.skip(
+        "Cursor-based pagination for pipeline templates needs to be fixed on Haystack Enterprise Platform."
+    )
     @pytest.mark.asyncio
     async def test_list_iteration(self) -> None:
         """Test iterating through paginated template results."""
@@ -509,7 +513,9 @@ class TestPipelineTemplateResource:
         assert next_page.data[0].template_name == "Template 3"
         assert next_page.data[1].template_name == "Template 4"
 
-    @pytest.mark.skip("Cursor-based pagination for pipeline templates needs to be fixed on deepset platform.")
+    @pytest.mark.skip(
+        "Cursor-based pagination for pipeline templates needs to be fixed on Haystack Enterprise Platform."
+    )
     @pytest.mark.asyncio
     async def test_list_cursor_population(self) -> None:
         """Test that cursors are properly populated in paginated responses."""

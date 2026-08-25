@@ -26,7 +26,7 @@ class TransportEnum(StrEnum):
 
 app = typer.Typer(
     name="deepset-mcp",
-    help="Run the Deepset MCP server to interact with the deepset AI platform.",
+    help="Run the Deepset MCP server to interact with the Haystack Enterprise Platform.",
     no_args_is_help=True,
 )
 
@@ -131,7 +131,7 @@ def main(
     """
     Run the Deepset MCP server.
 
-    The Deepset MCP server provides tools to interact with the deepset AI platform,
+    The Deepset MCP server provides tools to interact with the Haystack Enterprise Platform,
     allowing you to create, debug, and learn about pipelines on the platform.
 
     :param workspace: Deepset workspace name. Pass if you only want to run the tools on a specific workspace.
@@ -191,7 +191,7 @@ def main(
         )
         raise typer.Exit(1)
 
-    mcp = FastMCP("deepset AI platform MCP server")
+    mcp = FastMCP("Haystack Enterprise Platform MCP server")
     asyncio.run(
         configure_mcp_server(
             mcp_server_instance=mcp,

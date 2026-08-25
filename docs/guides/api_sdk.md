@@ -1,6 +1,6 @@
 # Deepset API SDK
 
-The Deepset API SDK provides a Python interface for interacting with the [deepset AI Platform](https://docs.cloud.deepset.ai/docs/getting-started). 
+The Deepset API SDK provides a Python interface for interacting with the [Haystack Enterprise Platform](https://docs.cloud.deepset.ai/docs/getting-started). 
 It enables developers to build, manage, and deploy AI-powered applications through a structured, asynchronous API.
 
 
