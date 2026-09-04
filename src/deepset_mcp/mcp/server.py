@@ -5,7 +5,7 @@
 from urllib.parse import parse_qs, urlparse
 
 import jwt
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.config import DEEPSET_DOCS_DEFAULT_SHARE_URL
@@ -16,7 +16,7 @@ from deepset_mcp.mcp.tool_registry import TOOL_REGISTRY
 
 
 async def configure_mcp_server(
-    mcp_server_instance: FastMCP,
+    mcp_server_instance: MCPServer,
     tools_to_register: set[str] | None = None,
     deepset_api_key: str | None = None,
     deepset_api_url: str | None = None,
@@ -29,7 +29,7 @@ async def configure_mcp_server(
 ) -> None:
     """Configure the MCP server with the specified tools and settings.
 
-    :param mcp_server_instance: The FastMCP server instance to configure
+    :param mcp_server_instance: The MCPServer instance to configure
     :param tools_to_register: Set of tool names to register with the server.
         Will register all tools if set to None.
     :param deepset_api_key: Optional Deepset API key for authentication

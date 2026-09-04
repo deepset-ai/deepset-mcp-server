@@ -6,10 +6,10 @@ import asyncio
 import logging
 import os
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
 
 from deepset_mcp.config import DEEPSET_DOCS_DEFAULT_SHARE_URL, DOCS_SEARCH_TOOL_NAME
 from deepset_mcp.mcp.server import configure_mcp_server
@@ -191,7 +191,7 @@ def main(
         )
         raise typer.Exit(1)
 
-    mcp = FastMCP("deepset AI platform MCP server")
+    mcp = MCPServer("deepset AI platform MCP server")
     asyncio.run(
         configure_mcp_server(
             mcp_server_instance=mcp,
@@ -206,11 +206,14 @@ def main(
             object_store_ttl=ttl,
         )
     )
-    mcp.settings.host = host
-    if port is not None:
-        mcp.settings.port = port
 
-    mcp.run(transport=transport.value)
+    run_kwargs: dict[str, Any] = {}
+    if transport is not TransportEnum.STDIO:
+        run_kwargs["host"] = host
+        if port is not None:
+            run_kwargs["port"] = port
+
+    mcp.run(transport=transport.value, **run_kwargs)
 
 
 if __name__ == "__main__":

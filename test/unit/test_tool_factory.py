@@ -9,7 +9,8 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server import MCPServer
+from mcp.server.mcpserver import Context
 
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.mcp.tool_factory import (
@@ -742,13 +743,13 @@ class TestRegisterAllTools:
     Object-store tools are plain factory functions (``explorer: RichExplorer -> Callable``), not regular
     tool functions. `register_tools` must special-case them (and any future tool of that shape) so a
     factory's own signature (which contains a non-serializable parameter like `RichExplorer`) is never
-    handed to FastMCP for JSON schema generation.
+    handed to MCPServer for JSON schema generation.
     """
 
     @pytest.mark.parametrize("tool_name", sorted(TOOL_REGISTRY.keys()))
     def test_tool_schema_generation(self, tool_name: str) -> None:
         """Registering any tool from TOOL_REGISTRY must produce a schema-generatable MCP tool."""
-        mcp_server = FastMCP()
+        mcp_server = MCPServer()
         object_store = ObjectStore(backend=InMemoryBackend(), ttl=0)
         docs_config = DeepsetDocsConfig(pipeline_name="pipeline", api_key="key", workspace_name="workspace")
 
