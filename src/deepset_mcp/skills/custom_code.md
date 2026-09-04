@@ -1,6 +1,6 @@
 ---
 name: custom-code
-description: Use this skill whenever writing, generating, reviewing, or fixing a Haystack custom component or custom tool for the deepset/Haystack enterprise platform. Triggers include requests to create a custom component (decorated with @component), a custom tool (decorated with @tool), or to check custom code against the platform's structural constraints (single class/function per file, required decorators, type annotations, allowed dependencies).
+description: Use this skill whenever writing, generating, reviewing, or fixing a Haystack custom component (deepset_cloud_custom_nodes.code.code_component.Code) or custom tool (deepset_cloud_custom_nodes.tools.code_tool.CodeTool) for the deepset/Haystack enterprise platform. Triggers include requests to create a custom component, a custom tool, to check custom code against the platform's structural constraints (single class/function per file, required decorators, type annotations, allowed dependencies), or to extend the existing pipeline for functionality that is not already covered by existing components.
 ---
 
 # Haystack Custom Code Generator

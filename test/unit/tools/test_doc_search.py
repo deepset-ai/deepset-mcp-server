@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from typing import Any
 
 import pytest
@@ -14,6 +14,8 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetSearchResponse,
     DeepsetStreamEvent,
     LogLevel,
+    PipelineDebugBreakpoint,
+    PipelineDebugResult,
     PipelineLog,
     PipelineValidationResult,
     PipelineVersion,
@@ -136,12 +138,26 @@ class FakeDocsPipelineResource(PipelineResourceProtocol):
     async def delete(self, pipeline_name: str) -> NoContentResponse:
         raise NotImplementedError
 
+    async def debug(
+        self,
+        *,
+        pipeline_config: dict[str, Any],
+        inputs: dict[str, Any] | None = None,
+        break_at: PipelineDebugBreakpoint | None = None,
+        resume_from: dict[str, Any] | None = None,
+        files: Sequence[str] | None = None,
+        pipeline_id: str | None = None,
+        pipeline_version_id: str | None = None,
+        dry_run: bool = False,
+    ) -> PipelineDebugResult:
+        raise NotImplementedError
+
 
 @pytest.mark.asyncio
 async def test_search_docs_success() -> None:
     """Test successful docs search."""
     doc_1 = DeepsetDocument(
-        content="The deepset platform provides powerful search capabilities.",
+        content="The Haystack Enterprise Platform provides powerful search capabilities.",
         meta={"original_file_path": "/path/to/file.md", "source_id": "123"},
     )
 
@@ -151,7 +167,7 @@ async def test_search_docs_success() -> None:
     )
 
     doc_2 = DeepsetDocument(
-        content="The deepset platform is great.",
+        content="The Haystack Enterprise Platform is great.",
         meta={"original_file_path": "/path/to/file_2.md", "source_id": "456"},
     )
 
@@ -169,8 +185,10 @@ async def test_search_docs_success() -> None:
         query="How to use deepset search?",
     )
 
-    assert "The deepset platform provides powerful search capabilities. It is developed by deepset." in result
-    assert "The deepset platform is great." in result
+    assert (
+        "The Haystack Enterprise Platform provides powerful search capabilities. It is developed by deepset." in result
+    )
+    assert "The Haystack Enterprise Platform is great." in result
     assert "path/to/file_2.md" in result
     assert "path/to/file.md" in result
 

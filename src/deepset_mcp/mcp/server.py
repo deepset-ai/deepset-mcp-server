@@ -12,7 +12,6 @@ from deepset_mcp.config import DEEPSET_DOCS_DEFAULT_SHARE_URL
 from deepset_mcp.mcp.store import initialize_or_get_initialized_store
 from deepset_mcp.mcp.tool_factory import register_tools
 from deepset_mcp.mcp.tool_models import DeepsetDocsConfig
-from deepset_mcp.mcp.tool_registry import TOOL_REGISTRY
 
 
 async def configure_mcp_server(
@@ -23,6 +22,7 @@ async def configure_mcp_server(
     deepset_workspace: str | None = None,
     deepset_docs_shareable_prototype_url: str | None = None,
     get_api_key_from_authorization_header: bool = False,
+    enable_object_store: bool = True,
     object_store_backend: str = "memory",
     object_store_redis_url: str | None = None,
     object_store_ttl: int = 600,
@@ -38,14 +38,14 @@ async def configure_mcp_server(
     :param deepset_docs_shareable_prototype_url: Shareable prototype URL that allows access to a docs search pipeline.
         Will fall back to the default shareable prototype URL if set to None.
     :param get_api_key_from_authorization_header: Whether to extract API key from authorization header
+    :param enable_object_store: Whether tool outputs may be stored in and referenced from the object store. When
+        False, tool outputs are always returned as-is, the object-store inspection tools are not registered, and
+        the 'object_store_*' parameters are ignored.
     :param object_store_backend: Object store backend type ('memory' or 'redis')
     :param object_store_redis_url: Redis connection URL (required if backend='redis')
     :param object_store_ttl: TTL in seconds for stored objects
     :raises ValueError: If required parameters are missing or invalid
     """
-    if tools_to_register is None:
-        tools_to_register = set(TOOL_REGISTRY.keys())
-
     if deepset_docs_shareable_prototype_url is None:
         deepset_docs_shareable_prototype_url = DEEPSET_DOCS_DEFAULT_SHARE_URL
 
@@ -60,9 +60,13 @@ async def configure_mcp_server(
     )
     docs_config = DeepsetDocsConfig(api_key=api_key_docs, workspace_name=workspace_name, pipeline_name=pipeline_name)
 
-    # Initialize the store before registering tools
-    store = initialize_or_get_initialized_store(
-        backend=object_store_backend, redis_url=object_store_redis_url, ttl=object_store_ttl
+    # Initialize the store before registering tools, unless the object store is disabled entirely
+    store = (
+        initialize_or_get_initialized_store(
+            backend=object_store_backend, redis_url=object_store_redis_url, ttl=object_store_ttl
+        )
+        if enable_object_store
+        else None
     )
 
     register_tools(
@@ -74,13 +78,14 @@ async def configure_mcp_server(
         api_key=deepset_api_key,
         base_url=deepset_api_url,
         object_store=store,
+        enable_object_store=enable_object_store,
     )
 
 
 async def fetch_shared_prototype_details(share_url: str) -> tuple[str, str, str]:
     """Extract pipeline name, workspace name and API token from a shared prototype URL.
 
-    :param share_url: The URL of a shared prototype on the Deepset platform
+    :param share_url: The URL of a shared prototype on the Haystack Enterprise Platform
     :returns: A tuple containing (workspace_name, pipeline_name, api_key)
     :raises ValueError: If the URL is invalid or missing required parameters
     """

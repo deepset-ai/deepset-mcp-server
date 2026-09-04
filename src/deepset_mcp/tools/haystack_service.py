@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
+from deepset_mcp.api.haystack_service.protocols import HaystackServiceProtocol
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.tools.haystack_service_models import (
     ComponentDefinition,
@@ -50,7 +51,12 @@ def _format_type(type_: str | list[str]) -> str:
 
 
 async def _build_component_definition(
-    *, component_def: dict[str, Any], component_type: str, haystack_service: Any, schema: dict[str, Any] | None = None
+    *,
+    component_def: dict[str, Any],
+    component_type: str,
+    haystack_service: HaystackServiceProtocol,
+    schema: dict[str, Any] | None = None,
+    haystack_version: str | None = None,
 ) -> ComponentDefinition | str:
     """Build a ComponentDefinition from component schema data."""
     try:
@@ -77,7 +83,9 @@ async def _build_component_definition(
         error_message = None
 
         try:
-            io_info = await haystack_service.get_component_input_output(component_type)
+            io_info = await haystack_service.get_component_input_output(
+                component_type, haystack_version=haystack_version
+            )
 
             # Build input schema
             if "input" in io_info:
@@ -164,19 +172,23 @@ async def _build_component_definition(
         return f"Failed to build component definition: {str(e)}"
 
 
-async def get_component_definition(*, client: AsyncClientProtocol, component_type: str) -> ComponentDefinition | str:
+async def get_component_definition(
+    *, client: AsyncClientProtocol, component_type: str, haystack_version: str | None = None
+) -> ComponentDefinition | str:
     """Returns the definition of a specific Haystack component.
 
     :param client: The API client to use
     :param component_type: Fully qualified component type
         (e.g. haystack.components.routers.conditional_router.ConditionalRouter)
+    :param haystack_version: Optional version of Haystack to use.
+        Pass the same version as specified in the pipeline yaml's `dependencies` section for the `haystack-ai` package.
 
     :returns: ComponentDefinition model or error message string
     """
     haystack_service = client.haystack_service()
 
     try:
-        response = await haystack_service.get_component_schemas()
+        response = await haystack_service.get_component_schemas(haystack_version=haystack_version)
     except UnexpectedAPIError as e:
         return f"Failed to retrieve component definition: {e}"
 
@@ -193,12 +205,20 @@ async def get_component_definition(*, client: AsyncClientProtocol, component_typ
         return f"Component not found: {component_type}"
 
     return await _build_component_definition(
-        component_def=component_def, component_type=component_type, haystack_service=haystack_service
+        component_def=component_def,
+        component_type=component_type,
+        haystack_service=haystack_service,
+        haystack_version=haystack_version,
     )
 
 
 async def search_component_definition(
-    *, client: AsyncClientProtocol, query: str, model: ModelProtocol, top_k: int = 5
+    *,
+    client: AsyncClientProtocol,
+    query: str,
+    model: ModelProtocol,
+    top_k: int = 5,
+    haystack_version: str | None = None,
 ) -> ComponentSearchResults | str:
     """Searches for components based on name or description using semantic similarity.
 
@@ -206,13 +226,15 @@ async def search_component_definition(
     :param query: The search query
     :param model: The model to use for computing embeddings
     :param top_k: Maximum number of results to return (default: 5)
+    :param haystack_version: Optional version of Haystack to use.
+        Pass the same version as specified in the pipeline yaml's `dependencies` section for the `haystack-ai` package.
 
     :returns: ComponentSearchResults model or error message string
     """
     haystack_service = client.haystack_service()
 
     try:
-        response = await haystack_service.get_component_schemas()
+        response = await haystack_service.get_component_schemas(haystack_version=haystack_version)
     except UnexpectedAPIError as e:
         return f"Failed to retrieve component schemas: {e}"
 
@@ -255,7 +277,10 @@ async def search_component_definition(
 
         if component_def:
             definition = await _build_component_definition(
-                component_def=component_def, component_type=component_type, haystack_service=haystack_service
+                component_def=component_def,
+                component_type=component_type,
+                haystack_service=haystack_service,
+                haystack_version=haystack_version,
             )
             if isinstance(definition, ComponentDefinition):
                 search_results.append(ComponentSearchResult(component=definition, similarity_score=float(sim)))
@@ -263,17 +288,21 @@ async def search_component_definition(
     return ComponentSearchResults(results=search_results, query=query, total_found=len(search_results))
 
 
-async def list_component_families(*, client: AsyncClientProtocol) -> ComponentFamilyList | str:
+async def list_component_families(
+    *, client: AsyncClientProtocol, haystack_version: str | None = None
+) -> ComponentFamilyList | str:
     """Lists all Haystack component families that are available on deepset.
 
     :param client: The API client to use
+    :param haystack_version: Optional version of Haystack to use.
+        Pass the same version as specified in the pipeline yaml's `dependencies` section for the `haystack-ai` package.
 
     :returns: ComponentFamilyList model or error message string
     """
     haystack_service = client.haystack_service()
 
     try:
-        response = await haystack_service.get_component_schemas()
+        response = await haystack_service.get_component_schemas(haystack_version=haystack_version)
     except UnexpectedAPIError as e:
         return f"Failed to retrieve component families: {e}"
 
@@ -297,17 +326,21 @@ async def list_component_families(*, client: AsyncClientProtocol) -> ComponentFa
     return ComponentFamilyList(families=family_objects, total_count=len(family_objects))
 
 
-async def get_custom_components(*, client: AsyncClientProtocol) -> ComponentDefinitionList | str:
+async def get_custom_components(
+    *, client: AsyncClientProtocol, haystack_version: str | None = None
+) -> ComponentDefinitionList | str:
     """Get a list of all installed custom components.
 
     :param client: The API client to use.
+    :param haystack_version: Optional version of Haystack to use.
+        Pass the same version as specified in the pipeline yaml's `dependencies` section for the `haystack-ai` package.
 
     :returns: ComponentDefinitionList model or error message string.
     """
     haystack_service = client.haystack_service()
 
     try:
-        response = await haystack_service.get_component_schemas()
+        response = await haystack_service.get_component_schemas(haystack_version=haystack_version)
     except UnexpectedAPIError as e:
         return f"Error retrieving component schemas: {e}"
 
@@ -347,6 +380,7 @@ async def get_custom_components(*, client: AsyncClientProtocol) -> ComponentDefi
                     component_type=component_type,
                     haystack_service=haystack_service,
                     schema=schema,
+                    haystack_version=haystack_version,
                 )
                 if isinstance(definition, ComponentDefinition):
                     return definition
@@ -372,6 +406,7 @@ async def run_component(
     init_params: dict[str, Any] | None = None,
     input_data: dict[str, Any] | None = None,
     input_types: dict[str, str] | None = None,
+    haystack_version: str | None = None,
 ) -> dict[str, Any] | str:
     """Run a Haystack component with the given parameters.
 
@@ -386,6 +421,8 @@ async def run_component(
     :param input_data: Input data for the component
     :param input_types: Optional type information for inputs (inferred if not provided). For custom types use the full
         import path (e.g. haystack.dataclasses.document.Document for Document)
+    :param haystack_version: Optional version of Haystack to use for the component.
+        Pass the same version as specified in the pipeline yaml's `dependencies` section for the `haystack-ai` package.
 
     :returns: Dictionary containing the component's outputs or error message string
     """
@@ -397,6 +434,7 @@ async def run_component(
             init_params=init_params,
             input_data=input_data,
             input_types=input_types,
+            haystack_version=haystack_version,
         )
         return result
     except Exception as e:

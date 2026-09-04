@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -22,6 +22,8 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetStreamEvent,
     ExceptionInfo,
     LogLevel,
+    PipelineDebugBreakpoint,
+    PipelineDebugResult,
     PipelineLog,
     PipelineServiceLevel,
     PipelineValidationResult,
@@ -37,6 +39,7 @@ from deepset_mcp.tools.pipeline import (
     PipelineValidationResultWithYaml,
     create_pipeline,
     create_pipeline_version,
+    debug_pipeline,
     deploy_pipeline,
     get_pipeline,
     get_pipeline_logs,
@@ -78,6 +81,8 @@ class FakePipelineResource:
         patch_version_response: PipelineVersion | None = None,
         patch_version_exception: Exception | None = None,
         restore_version_exception: Exception | None = None,
+        debug_response: PipelineDebugResult | None = None,
+        debug_exception: Exception | None = None,
     ) -> None:
         self._list_response = list_response
         self._get_response = get_response
@@ -104,6 +109,9 @@ class FakePipelineResource:
         self._patch_version_exception = patch_version_exception
         self._restore_version_response = restore_version_response
         self._restore_version_exception = restore_version_exception
+        self._debug_response = debug_response
+        self._debug_exception = debug_exception
+        self.debug_calls: list[dict[str, Any]] = []
 
     async def list(
         self, limit: int = 100, after: str | None = None, before: str | None = None
@@ -246,6 +254,36 @@ class FakePipelineResource:
 
     async def delete(self, pipeline_name: str) -> NoContentResponse:
         """Delete a pipeline."""
+        raise NotImplementedError
+
+    async def debug(
+        self,
+        *,
+        pipeline_config: dict[str, Any],
+        inputs: dict[str, Any] | None = None,
+        break_at: PipelineDebugBreakpoint | None = None,
+        resume_from: dict[str, Any] | None = None,
+        files: Sequence[str] | None = None,
+        pipeline_id: str | None = None,
+        pipeline_version_id: str | None = None,
+        dry_run: bool = False,
+    ) -> PipelineDebugResult:
+        self.debug_calls.append(
+            {
+                "pipeline_config": pipeline_config,
+                "inputs": inputs,
+                "break_at": break_at,
+                "resume_from": resume_from,
+                "files": files,
+                "pipeline_id": pipeline_id,
+                "pipeline_version_id": pipeline_version_id,
+                "dry_run": dry_run,
+            }
+        )
+        if self._debug_exception:
+            raise self._debug_exception
+        if self._debug_response is not None:
+            return self._debug_response
         raise NotImplementedError
 
 
@@ -1344,3 +1382,227 @@ async def test_search_pipeline_with_documents() -> None:
     assert len(result.documents) == 1
     assert result.documents[0].content == "This is a test document with some content that should be displayed."
     assert result.documents[0].meta["title"] == "Test Document"
+
+
+def _debug_result(status: str = "completed", **overrides: Any) -> PipelineDebugResult:
+    from deepset_mcp.api.search_history.models import HaystackTraceV1
+
+    defaults: dict[str, Any] = {
+        "status": status,
+        "result": {"answer_builder": {"answers": ["hi"]}} if status == "completed" else None,
+        "snapshot": None,
+        "stopped_at": None,
+        "trace": HaystackTraceV1(schema_version="haystack-trace/v1", run_id="run-1", started_at="2026-01-01T00:00:00Z"),
+    }
+    defaults.update(overrides)
+    return PipelineDebugResult(**defaults)
+
+
+@pytest.mark.asyncio
+async def test_debug_pipeline_plain_run() -> None:
+    debug_result = _debug_result()
+    resource = FakePipelineResource(debug_response=debug_result)
+    client = FakeClient(resource)
+
+    result = await debug_pipeline(
+        client=client,
+        workspace="ws",
+        yaml_configuration="components: {}",
+        inputs={"query": "hi"},
+    )
+
+    assert result is debug_result
+    assert resource.debug_calls == [
+        {
+            "pipeline_config": {"components": {}},
+            "inputs": {"query": "hi"},
+            "break_at": None,
+            "resume_from": None,
+            "files": None,
+            "pipeline_id": None,
+            "pipeline_version_id": None,
+            "dry_run": False,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_debug_pipeline_with_break_at() -> None:
+    debug_result = _debug_result(status="stopped_at_breakpoint", snapshot={"a": 1})
+    resource = FakePipelineResource(debug_response=debug_result)
+    client = FakeClient(resource)
+
+    result = await debug_pipeline(
+        client=client,
+        workspace="ws",
+        yaml_configuration="components: {}",
+        break_at_component_name="retriever",
+        break_at_visit_count=2,
+    )
+
+    assert result is debug_result
+    assert resource.debug_calls[0]["break_at"] == PipelineDebugBreakpoint(component_name="retriever", visit_count=2)
+
+
+@pytest.mark.asyncio
+async def test_debug_pipeline_with_resume_from() -> None:
+    debug_result = _debug_result()
+    resource = FakePipelineResource(debug_response=debug_result)
+    client = FakeClient(resource)
+
+    snapshot = {"pipeline_state": "..."}
+    result = await debug_pipeline(
+        client=client,
+        workspace="ws",
+        yaml_configuration="components: {}",
+        resume_from=snapshot,
+    )
+
+    assert result is debug_result
+    assert resource.debug_calls[0]["resume_from"] == snapshot
+    assert resource.debug_calls[0]["break_at"] is None
+
+
+@pytest.mark.asyncio
+async def test_debug_pipeline_passes_through_optional_fields() -> None:
+    debug_result = _debug_result()
+    resource = FakePipelineResource(debug_response=debug_result)
+    client = FakeClient(resource)
+
+    await debug_pipeline(
+        client=client,
+        workspace="ws",
+        yaml_configuration="components: {}",
+        files=["file-1"],
+        pipeline_id="pipe-1",
+        pipeline_version_id="version-1",
+        dry_run=True,
+    )
+
+    call = resource.debug_calls[0]
+    assert call["files"] == ["file-1"]
+    assert call["pipeline_id"] == "pipe-1"
+    assert call["pipeline_version_id"] == "version-1"
+    assert call["dry_run"] is True
+
+
+@pytest.mark.asyncio
+async def test_debug_pipeline_empty_yaml() -> None:
+    resource = FakePipelineResource()
+    client = FakeClient(resource)
+
+    result = await debug_pipeline(client=client, workspace="ws", yaml_configuration="   ")
+
+    assert isinstance(result, str)
+    assert "YAML configuration" in result
+    assert resource.debug_calls == []
+
+
+@pytest.mark.asyncio
+async def test_debug_pipeline_invalid_yaml() -> None:
+    resource = FakePipelineResource()
+    client = FakeClient(resource)
+
+    result = await debug_pipeline(client=client, workspace="ws", yaml_configuration="components: [unterminated")
+
+    assert isinstance(result, str)
+    assert "Invalid YAML" in result
+    assert resource.debug_calls == []
+
+
+@pytest.mark.asyncio
+async def test_debug_pipeline_yaml_not_a_mapping() -> None:
+    resource = FakePipelineResource()
+    client = FakeClient(resource)
+
+    result = await debug_pipeline(client=client, workspace="ws", yaml_configuration="- just\n- a\n- list")
+
+    assert isinstance(result, str)
+    assert "mapping" in result
+    assert resource.debug_calls == []
+
+
+@pytest.mark.asyncio
+async def test_debug_pipeline_break_at_and_resume_from_are_exclusive() -> None:
+    resource = FakePipelineResource()
+    client = FakeClient(resource)
+
+    result = await debug_pipeline(
+        client=client,
+        workspace="ws",
+        yaml_configuration="components: {}",
+        break_at_component_name="retriever",
+        resume_from={"a": 1},
+    )
+
+    assert isinstance(result, str)
+    assert "cannot be combined" in result
+    assert resource.debug_calls == []
+
+
+@pytest.mark.asyncio
+async def test_debug_pipeline_negative_visit_count() -> None:
+    resource = FakePipelineResource()
+    client = FakeClient(resource)
+
+    result = await debug_pipeline(
+        client=client,
+        workspace="ws",
+        yaml_configuration="components: {}",
+        break_at_component_name="retriever",
+        break_at_visit_count=-1,
+    )
+
+    assert isinstance(result, str)
+    assert "visit_count" in result
+    assert resource.debug_calls == []
+
+
+@pytest.mark.asyncio
+async def test_debug_pipeline_version_requires_pipeline_id() -> None:
+    resource = FakePipelineResource()
+    client = FakeClient(resource)
+
+    result = await debug_pipeline(
+        client=client,
+        workspace="ws",
+        yaml_configuration="components: {}",
+        pipeline_version_id="version-1",
+    )
+
+    assert isinstance(result, str)
+    assert "pipeline_id" in result
+    assert resource.debug_calls == []
+
+
+@pytest.mark.asyncio
+async def test_debug_pipeline_workspace_not_found() -> None:
+    resource = FakePipelineResource(debug_exception=ResourceNotFoundError())
+    client = FakeClient(resource)
+
+    result = await debug_pipeline(client=client, workspace="ws", yaml_configuration="components: {}")
+
+    assert isinstance(result, str)
+    assert "no workspace named 'ws'" in result
+
+
+@pytest.mark.asyncio
+async def test_debug_pipeline_bad_request() -> None:
+    resource = FakePipelineResource(debug_exception=BadRequestError("break_at and resume_from cannot be combined"))
+    client = FakeClient(resource)
+
+    result = await debug_pipeline(client=client, workspace="ws", yaml_configuration="components: {}")
+
+    assert isinstance(result, str)
+    assert "Failed to debug pipeline" in result
+
+
+@pytest.mark.asyncio
+async def test_debug_pipeline_unexpected_api_error() -> None:
+    resource = FakePipelineResource(debug_exception=UnexpectedAPIError(status_code=500, message="boom"))
+    client = FakeClient(resource)
+
+    result = await debug_pipeline(client=client, workspace="ws", yaml_configuration="components: {}")
+
+    assert isinstance(result, str)
+    assert "Failed to debug pipeline" in result

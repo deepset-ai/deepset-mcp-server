@@ -13,6 +13,8 @@ from deepset_mcp.api.pipeline.models import (
     DeepsetPipeline,
     DeepsetSearchResponse,
     LogLevel,
+    PipelineDebugBreakpoint,
+    PipelineDebugResult,
     PipelineLog,
     PipelineValidationResult,
     PipelineVersion,
@@ -421,6 +423,101 @@ async def deploy_pipeline(
 
         except Exception as e:
             return f"Pipeline '{pipeline_name}' deployment initiated, but failed to check deployment status: {e}"
+
+
+async def debug_pipeline(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    yaml_configuration: str,
+    inputs: dict[str, Any] | None = None,
+    break_at_component_name: str | None = None,
+    break_at_visit_count: int = 0,
+    resume_from: dict[str, Any] | None = None,
+    files: list[str] | None = None,
+    pipeline_id: str | None = None,
+    pipeline_version_id: str | None = None,
+    dry_run: bool = False,
+) -> PipelineDebugResult | str:
+    """Runs a pipeline configuration in debug mode: pin a breakpoint, resume a snapshot, or trace a full run.
+
+    Debugs a pipeline configuration directly (not a saved pipeline by name) -- pass the YAML you want to
+    test, e.g. from get_pipeline_version, create_pipeline_version, or a local draft. The inline run trace is
+    always returned, so a failure is visible even for a run that never reaches a breakpoint.
+
+    One call carries at most one of:
+
+    - break_at_component_name (with break_at_visit_count) -- run from inputs until the breakpoint is hit,
+      then stop and return a resumable snapshot in the 'snapshot' field. Pass that back as resume_from to
+      continue the run.
+    - resume_from -- replay a snapshot returned by a previous debug run to completion; inputs are ignored,
+      they come from the snapshot.
+    - neither -- run the pipeline from inputs to completion as a plain debug run.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param yaml_configuration: The pipeline YAML configuration to debug.
+    :param inputs: Named pipeline inputs keyed by the input name declared under the pipeline config's
+        'inputs' mapping (e.g. {"query": "What is love?"}). Ignored when resume_from is set.
+    :param break_at_component_name: Name of the component to break at. Mutually exclusive with resume_from;
+        omit both to run to completion as a plain debug run.
+    :param break_at_visit_count: Break when the target has been visited this many times (0 breaks before the
+        first visit; relevant for loops/cycles). Only used if break_at_component_name is set.
+    :param resume_from: A snapshot returned by a previous debug run (its 'snapshot' field), replayed to
+        completion. Mutually exclusive with break_at_component_name.
+    :param files: File IDs to download and inject into the inputs declared under the pipeline config's
+        'inputs.files' mapping.
+    :param pipeline_id: Optional ID of the pipeline this debug run is associated with.
+    :param pipeline_version_id: Optional ID of the pipeline version to associate the run with (requires
+        pipeline_id).
+    :param dry_run: Best-effort stateless run: state-modifying components (e.g. DocumentWriter) are replaced
+        with no-op equivalents so the pipeline can be inspected without side effects. Required for indexing
+        pipelines (their document store carries no index until deploy time); harmless for query pipelines.
+        Set it on resume too if the original run used dry_run, otherwise the run is rejected.
+
+    :returns: PipelineDebugResult with status, result/snapshot, and the run trace, or an error message.
+    """
+    if not yaml_configuration or not yaml_configuration.strip():
+        return "You need to provide a YAML configuration to debug."
+
+    try:
+        pipeline_config = yaml.safe_load(yaml_configuration)
+    except yaml.YAMLError as e:
+        return f"Invalid YAML provided: {e}"
+
+    if not isinstance(pipeline_config, dict):
+        return "Invalid YAML provided: expected a mapping at the top level."
+
+    if break_at_component_name is not None and resume_from is not None:
+        return "break_at_component_name and resume_from cannot be combined. Provide at most one."
+
+    if break_at_visit_count < 0:
+        return "break_at_visit_count must be 0 or greater."
+
+    if pipeline_version_id is not None and pipeline_id is None:
+        return "pipeline_version_id requires pipeline_id to be set."
+
+    break_at = (
+        PipelineDebugBreakpoint(component_name=break_at_component_name, visit_count=break_at_visit_count)
+        if break_at_component_name is not None
+        else None
+    )
+
+    try:
+        return await client.pipelines(workspace=workspace).debug(
+            pipeline_config=pipeline_config,
+            inputs=inputs,
+            break_at=break_at,
+            resume_from=resume_from,
+            files=files,
+            pipeline_id=pipeline_id,
+            pipeline_version_id=pipeline_version_id,
+            dry_run=dry_run,
+        )
+    except ResourceNotFoundError:
+        return f"There is no workspace named '{workspace}'. Did you mean to configure it?"
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to debug pipeline: {e}"
 
 
 async def search_pipeline(

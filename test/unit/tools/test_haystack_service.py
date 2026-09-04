@@ -60,15 +60,20 @@ class FakeHaystackServiceResource:
         self._get_component_io_response = get_component_io_response
         self._run_component_response = run_component_response
         self._exception = exception
+        self.received_haystack_versions: list[str | None] = []
 
-    async def get_component_schemas(self) -> dict[str, Any]:
+    async def get_component_schemas(self, haystack_version: str | None = None) -> dict[str, Any]:
+        self.received_haystack_versions.append(haystack_version)
         if self._exception:
             raise self._exception
         if self._get_component_schemas_response is not None:
             return self._get_component_schemas_response
         raise NotImplementedError
 
-    async def get_component_input_output(self, component_name: str) -> dict[str, Any]:
+    async def get_component_input_output(
+        self, component_name: str, haystack_version: str | None = None
+    ) -> dict[str, Any]:
+        self.received_haystack_versions.append(haystack_version)
         if self._exception:
             raise self._exception
         if self._get_component_io_response is not None:
@@ -82,6 +87,7 @@ class FakeHaystackServiceResource:
         input_data: dict[str, Any] | None = None,
         input_types: dict[str, str] | None = None,
         workspace: str | None = None,
+        haystack_version: str | None = None,
     ) -> dict[str, Any]:
         """Run a Haystack component with the given parameters.
 
@@ -91,9 +97,11 @@ class FakeHaystackServiceResource:
         :param input_data: Input data for the component
         :param input_types: Optional type information for inputs (inferred if not provided)
         :param workspace: Optional workspace name to run the component in
+        :param haystack_version: Optional version of Haystack to use for the component
 
         :returns: Dictionary containing the component's output sockets
         """
+        self.received_haystack_versions.append(haystack_version)
         if self._exception:
             raise self._exception
         if self._run_component_response is not None:
@@ -245,6 +253,38 @@ async def test_get_component_definition_success() -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_component_definition_passes_haystack_version() -> None:
+    component_type = "haystack.components.converters.xlsx.XLSXToDocument"
+    schema_response: dict[str, Any] = {
+        "component_schema": {
+            "definitions": {
+                "Components": {
+                    "XLSXToDocument": {
+                        "title": "XLSXToDocument",
+                        "description": "Converts XLSX files into Documents.",
+                        "properties": {
+                            "type": {"const": component_type},
+                            "init_parameters": {"properties": {}},
+                        },
+                    }
+                }
+            }
+        }
+    }
+    io_response: dict[str, Any] = {"input": {"properties": {}}, "output": {"properties": {}}}
+
+    resource = FakeHaystackServiceResource(
+        get_component_schemas_response=schema_response, get_component_io_response=io_response
+    )
+    client = FakeClient(resource=resource)
+
+    result = await get_component_definition(client=client, component_type=component_type, haystack_version="2.1.0")
+
+    assert isinstance(result, ComponentDefinition)
+    assert resource.received_haystack_versions == ["2.1.0", "2.1.0"]
+
+
+@pytest.mark.asyncio
 async def test_get_component_definition_not_found() -> None:
     response: dict[str, Any] = {"component_schema": {"definitions": {"Components": {}}}}
     resource = FakeHaystackServiceResource(get_component_schemas_response=response)
@@ -321,6 +361,40 @@ async def test_search_component_definition_success() -> None:
     # PDFReader should be first due to higher similarity
     assert result.results[0].component.title == "PDFReader"
     assert result.results[0].component.component_type == "haystack.components.readers.PDFReader"
+
+
+@pytest.mark.asyncio
+async def test_search_component_definition_passes_haystack_version() -> None:
+    schema_response = {
+        "component_schema": {
+            "definitions": {
+                "Components": {
+                    "XLSXConverter": {
+                        "title": "XLSXConverter",
+                        "description": "Converts Excel files",
+                        "properties": {
+                            "type": {"const": "haystack.components.converters.XLSXConverter"},
+                            "init_parameters": {"properties": {}},
+                        },
+                    }
+                }
+            }
+        }
+    }
+    io_response: dict[str, Any] = {"input": {"properties": {}}, "output": {"properties": {}}}
+
+    resource = FakeHaystackServiceResource(
+        get_component_schemas_response=schema_response, get_component_io_response=io_response
+    )
+    client = FakeClient(resource=resource)
+    model = FakeModel()
+
+    result = await search_component_definition(
+        client=client, query="convert excel files", model=model, haystack_version="2.1.0"
+    )
+
+    assert isinstance(result, ComponentSearchResults)
+    assert set(resource.received_haystack_versions) == {"2.1.0"}
 
 
 @pytest.mark.asyncio
@@ -402,6 +476,17 @@ async def test_list_component_families_success() -> None:
     assert families_by_name["converters"].description == "Convert data format"
     assert "readers" in families_by_name
     assert families_by_name["readers"].description == "Read data"
+
+
+@pytest.mark.asyncio
+async def test_list_component_families_passes_haystack_version() -> None:
+    response: dict[str, Any] = {"component_schema": {"definitions": {"Components": {}}}}
+    resource = FakeHaystackServiceResource(get_component_schemas_response=response)
+    client = FakeClient(resource=resource)
+
+    await list_component_families(client=client, haystack_version="2.1.0")
+
+    assert resource.received_haystack_versions == ["2.1.0"]
 
 
 @pytest.mark.asyncio
@@ -509,6 +594,38 @@ async def test_get_custom_components_success() -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_custom_components_passes_haystack_version() -> None:
+    response = {
+        "component_schema": {
+            "definitions": {
+                "Components": {
+                    "CustomComponent1": {
+                        "title": "CustomComponent1",
+                        "description": "A custom component for testing",
+                        "package_version": "1.0.0",
+                        "properties": {
+                            "type": {"const": "custom.components.CustomComponent1"},
+                            "init_parameters": {"properties": {}},
+                        },
+                    }
+                }
+            }
+        }
+    }
+    io_response: dict[str, Any] = {"input": {"properties": {}}, "output": {"properties": {}}}
+
+    resource = FakeHaystackServiceResource(
+        get_component_schemas_response=response, get_component_io_response=io_response
+    )
+    client = FakeClient(resource=resource)
+
+    result = await get_custom_components(client=client, haystack_version="2.1.0")
+
+    assert isinstance(result, ComponentDefinitionList)
+    assert set(resource.received_haystack_versions) == {"2.1.0"}
+
+
+@pytest.mark.asyncio
 async def test_get_custom_components_none_found() -> None:
     response = {
         "component_schema": {
@@ -602,6 +719,22 @@ async def test_run_component_minimal_params() -> None:
 
     assert isinstance(result, dict)
     assert result["output"]["result"] == "success"
+
+
+@pytest.mark.asyncio
+async def test_run_component_passes_haystack_version() -> None:
+    run_response = {"output": {"result": "success"}}
+    resource = FakeHaystackServiceResource(run_component_response=run_response)
+    client = FakeClient(resource=resource)
+
+    result = await run_component(
+        client=client,
+        component_type="haystack.components.readers.HTMLReader",
+        haystack_version="2.1.0",
+    )
+
+    assert isinstance(result, dict)
+    assert resource.received_haystack_versions == ["2.1.0"]
 
 
 @pytest.mark.asyncio

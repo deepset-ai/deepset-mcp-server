@@ -40,6 +40,7 @@ from deepset_mcp.tools.object_store import (
 from deepset_mcp.tools.pipeline import (
     create_pipeline as create_pipeline_tool,
     create_pipeline_version as create_pipeline_version_tool,
+    debug_pipeline as debug_pipeline_tool,
     deploy_pipeline as deploy_pipeline_tool,
     get_pipeline as get_pipeline_tool,
     get_pipeline_logs as get_pipeline_logs_tool,
@@ -79,7 +80,7 @@ def get_docs_search_tool(config: DeepsetDocsConfig) -> Callable[..., Any]:
     """Get a docs search tool configured with the provided config."""
 
     async def search_docs(query: str) -> str:
-        """Search the deepset platform documentation.
+        """Search the Haystack Enterprise Platform documentation.
 
         This tool allows you to search through deepset's official documentation to find
         information about features, API usage, best practices, and troubleshooting guides.
@@ -156,6 +157,10 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "get_pipeline_logs": (
         get_pipeline_logs_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "debug_pipeline": (
+        debug_pipeline_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
     ),
     "search_pipeline": (
         search_pipeline_tool,
@@ -294,3 +299,11 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
 }
 
 ALL_DEEPSET_TOOLS = set(TOOL_REGISTRY.keys())
+
+OBJECT_STORE_TOOL_NAMES = {
+    "get_from_object_store",
+    "get_slice_from_object_store",
+    "grep_object_store",
+    "sed_object_store",
+    "yq_object_store",
+}

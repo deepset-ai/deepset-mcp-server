@@ -8,6 +8,7 @@ import functools
 import inspect
 import re
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from typing import Any
 
 from mcp.server import MCPServer
@@ -16,7 +17,7 @@ from mcp.server.mcpserver import Context
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.config import DEEPSET_CLIENT_TIMEOUT, DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME
 from deepset_mcp.mcp.tool_models import DeepsetDocsConfig, MemoryType, ToolConfig
-from deepset_mcp.mcp.tool_registry import TOOL_REGISTRY
+from deepset_mcp.mcp.tool_registry import OBJECT_STORE_TOOL_NAMES, TOOL_REGISTRY
 from deepset_mcp.tokonomics import (
     ObjectStore,
     RichExplorer,
@@ -295,18 +296,26 @@ def register_tools(
     docs_config: DeepsetDocsConfig | None = None,
     base_url: str | None = None,
     object_store: ObjectStore | None = None,
+    enable_object_store: bool = True,
 ) -> None:
     """Register tools with unified configuration.
 
     Args:
         mcp_server_instance: MCPServer instance
-        api_key: An api key for the deepset AI platform; only needs to be provided when not read from request context.
+        api_key: An api key for the Haystack Enterprise Platform; only needs to be provided when not
+            read from request context.
         workspace: Pass a deepset workspace name if you only want to run the tools on a specific workspace.
         tool_names: Set of tool names to register (if None, registers all tools)
         get_api_key_from_authorization_header: Whether to use request context to retrieve an API key for tool execution.
         docs_config: Configuration for the deepset documentation search tool.
         base_url: Base URL for the deepset API.
         object_store: The ObjectStore instance to use for memory decorators.
+        enable_object_store: Whether tool outputs may be stored in and referenced from the object store. When
+            False, the object-store inspection tools are skipped and every other tool is registered with
+            'MemoryType.NO_MEMORY', so its raw output is always returned as-is.
+
+    Raises:
+        ValueError: If an object-store tool is explicitly requested while 'enable_object_store' is False.
     """
     if api_key is None and not get_api_key_from_authorization_header:
         raise ValueError(
@@ -339,6 +348,15 @@ def register_tools(
     else:
         tools_to_register = set(TOOL_REGISTRY.keys())
 
+    if not enable_object_store:
+        requested_object_store_tools = tools_to_register & OBJECT_STORE_TOOL_NAMES
+        if tool_names is not None and requested_object_store_tools:
+            raise ValueError(
+                f"Cannot register object-store tools ({', '.join(sorted(requested_object_store_tools))}) "
+                f"while 'enable_object_store' is False."
+            )
+        tools_to_register -= OBJECT_STORE_TOOL_NAMES
+
     for tool_name in tools_to_register:
         base_func, config = TOOL_REGISTRY[tool_name]
 
@@ -347,13 +365,7 @@ def register_tools(
             # base_func is a factory function.
             # We configure with the docs_config to get the actual tool function.
             enhanced_tool = base_func(config=docs_config)
-        elif tool_name in (
-            "get_from_object_store",
-            "get_slice_from_object_store",
-            "grep_object_store",
-            "sed_object_store",
-            "yq_object_store",
-        ):
+        elif tool_name in OBJECT_STORE_TOOL_NAMES:
             # ObjectStore tools are factory functions that need an explorer created from the store
             if object_store is None:
                 raise ValueError(f"ObjectStore instance is required for {tool_name}")
@@ -361,6 +373,9 @@ def register_tools(
             explorer = RichExplorer(store=object_store, **config.explorer_config.to_kwargs())
             enhanced_tool = base_func(explorer=explorer)
         else:
+            if not enable_object_store:
+                config = replace(config, memory_type=MemoryType.NO_MEMORY)
+
             enhanced_tool = build_tool(
                 base_func=base_func,
                 config=config,

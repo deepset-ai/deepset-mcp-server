@@ -384,7 +384,7 @@ class RichExplorer:
         if current:
             parts.append(current)
 
-        return Path(*parts) if len(parts) > 1 else parts[0]
+        return Path(*parts)
 
     def _make_header(self, obj_id: str, path: str, obj: Any) -> str:
         """Create a header showing object info.

@@ -6,7 +6,7 @@ import json
 
 import pytest
 import yaml
-from glom import Path
+from glom import Path, glom
 
 from deepset_mcp.tokonomics import InMemoryBackend, ObjectStore, RichExplorer
 
@@ -270,7 +270,8 @@ class TestRichExplorer:
     def test_parse_path_simple(self, explorer: RichExplorer) -> None:
         """Test parsing simple paths."""
         path_spec = explorer._parse_path("attr")
-        assert path_spec == "attr"
+        assert isinstance(path_spec, Path)
+        assert glom({"attr": "value"}, path_spec) == "value"
 
     def test_parse_path_dot_notation(self, explorer: RichExplorer) -> None:
         """Test parsing dot notation paths."""
@@ -285,6 +286,35 @@ class TestRichExplorer:
     def test_parse_path_mixed_notation(self, explorer: RichExplorer) -> None:
         """Test parsing mixed notation paths."""
         path_spec = explorer._parse_path("attr.items[0].name")
+        assert isinstance(path_spec, Path)
+
+    def test_parse_path_lone_bracket_index(self, explorer: RichExplorer) -> None:
+        """A single top-level bracket index (e.g. "[0]") must resolve, not raise.
+
+        Regression test: _parse_path used to special-case a single-part path by
+        returning the raw part instead of wrapping it in glom.Path, which glom
+        cannot navigate with when that part is an int (a bracket index) rather
+        than a string attribute name.
+        """
+        path_spec = explorer._parse_path("[0]")
+        assert isinstance(path_spec, Path)
+        assert glom(["first", "second", "third"], path_spec) == "first"
+
+    def test_explore_lone_bracket_index_on_list(self, explorer: RichExplorer) -> None:
+        """explore() with path='[0]' on a top-level list must not raise ValueError."""
+        obj_id = explorer.store.put(["first", "second", "third"])
+        result = explorer.explore(obj_id=obj_id, path="[0]")
+        assert "first" in result
+
+    def test_parse_path_empty_brackets(self, explorer: RichExplorer) -> None:
+        """An empty bracket pair (e.g. "[]") must not raise IndexError.
+
+        Regression test: the old single-part special case (`parts[0]`) crashed
+        with an uncaught IndexError when `parts` was empty, since _parse_path's
+        own call site only catches glom.GlomError, not exceptions raised while
+        building the path spec itself.
+        """
+        path_spec = explorer._parse_path("[]")
         assert isinstance(path_spec, Path)
 
     def test_make_header_simple_type(self, explorer: RichExplorer) -> None:
