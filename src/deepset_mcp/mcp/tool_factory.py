@@ -11,7 +11,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from typing import Any
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server import MCPServer
+from mcp.server.mcpserver import Context
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.config import DEEPSET_CLIENT_TIMEOUT, DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME
@@ -287,7 +288,7 @@ def build_tool(
 
 
 def register_tools(
-    mcp_server_instance: FastMCP,
+    mcp_server_instance: MCPServer,
     api_key: str | None = None,
     workspace: str | None = None,
     tool_names: set[str] | None = None,
@@ -300,7 +301,7 @@ def register_tools(
     """Register tools with unified configuration.
 
     Args:
-        mcp_server_instance: FastMCP server instance
+        mcp_server_instance: MCPServer instance
         api_key: An api key for the Haystack Enterprise Platform; only needs to be provided when not
             read from request context.
         workspace: Pass a deepset workspace name if you only want to run the tools on a specific workspace.
