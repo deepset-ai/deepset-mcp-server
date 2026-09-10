@@ -13,6 +13,25 @@ from deepset_mcp.tools.custom_components import (
     get_latest_custom_component_installation_logs as get_latest_custom_component_installation_logs_tool,
     list_custom_component_installations as list_custom_component_installations_tool,
 )
+from deepset_mcp.tools.deployment import (
+    activate_deployment as activate_deployment_tool,
+    activate_deployment_revision as activate_deployment_revision_tool,
+    add_deployment_tag as add_deployment_tag_tool,
+    create_deployment as create_deployment_tool,
+    create_deployment_revision as create_deployment_revision_tool,
+    deactivate_deployment as deactivate_deployment_tool,
+    delete_deployment as delete_deployment_tool,
+    delete_deployment_tag as delete_deployment_tag_tool,
+    get_deployment as get_deployment_tool,
+    get_deployment_metrics as get_deployment_metrics_tool,
+    get_deployment_revision as get_deployment_revision_tool,
+    get_deployment_stats as get_deployment_stats_tool,
+    list_deployment_activity as list_deployment_activity_tool,
+    list_deployment_revisions as list_deployment_revisions_tool,
+    list_deployment_tags as list_deployment_tags_tool,
+    list_deployments as list_deployments_tool,
+    update_deployment as update_deployment_tool,
+)
 from deepset_mcp.tools.doc_search import search_docs as search_docs_tool
 from deepset_mcp.tools.haystack_service import (
     get_component_definition as get_component_definition_tool,
@@ -197,6 +216,74 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "validate_index": (
         validate_index_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
+    ),
+    "list_deployments": (
+        list_deployments_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "list_deployment_tags": (
+        list_deployment_tags_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "create_deployment": (
+        create_deployment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
+    ),
+    "get_deployment": (
+        get_deployment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "update_deployment": (
+        update_deployment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
+    ),
+    "delete_deployment": (
+        delete_deployment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "add_deployment_tag": (
+        add_deployment_tag_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "delete_deployment_tag": (
+        delete_deployment_tag_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "list_deployment_revisions": (
+        list_deployment_revisions_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_deployment_revision": (
+        get_deployment_revision_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "create_deployment_revision": (
+        create_deployment_revision_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
+    ),
+    "activate_deployment_revision": (
+        activate_deployment_revision_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "activate_deployment": (
+        activate_deployment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "deactivate_deployment": (
+        deactivate_deployment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "list_deployment_activity": (
+        list_deployment_activity_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_deployment_metrics": (
+        get_deployment_metrics_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_deployment_stats": (
+        get_deployment_stats_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
     "get_models": (
         get_models_tool,
