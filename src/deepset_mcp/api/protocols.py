@@ -10,6 +10,7 @@ from deepset_mcp.api.transport import StreamingResponse, TransportResponse
 
 if TYPE_CHECKING:
     from deepset_mcp.api.custom_components.protocols import CustomComponentsProtocol
+    from deepset_mcp.api.deployment.protocols import DeploymentResourceProtocol
     from deepset_mcp.api.haystack_service.protocols import HaystackServiceProtocol
     from deepset_mcp.api.indexes.protocols import IndexResourceProtocol
     from deepset_mcp.api.integrations.protocols import IntegrationResourceProtocol
@@ -107,6 +108,10 @@ class AsyncClientProtocol(Protocol):
 
     def indexes(self, workspace: str) -> "IndexResourceProtocol":
         """Access indexes in the specified workspace."""
+        ...
+
+    def deployments(self, workspace: str) -> "DeploymentResourceProtocol":
+        """Access deployments (AI Gateways) in the specified workspace."""
         ...
 
     def custom_components(self, workspace: str) -> "CustomComponentsProtocol":

@@ -72,6 +72,32 @@ The *Memory* column describes how a tool interacts with the object store (see
 | `validate_index` | required | explorable, referenceable | Validate an index configuration without saving it. |
 | `deploy_index` | required | explorable | Deploy an index. |
 
+### Deployments (AI Gateways)
+
+A deployment serves a pipeline behind a stable endpoint, independent of the pipeline's own
+draft/version history. Each deployment tracks its own history of served pipeline configurations as
+*revisions*.
+
+| MCP tool name | Workspace | Memory | Description |
+| --- | --- | --- | --- |
+| `list_deployments` | required | explorable | List all deployments in the workspace. |
+| `get_deployment` | required | explorable | Fetch a deployment's details, active revision, and runtime status. |
+| `create_deployment` | required | explorable, referenceable | Create a new deployment, optionally linked to a pipeline. |
+| `update_deployment` | required | explorable, referenceable | Update a deployment's metadata, sizing, or execution mode. |
+| `delete_deployment` | required | explorable | Delete a deployment along with all of its revisions. |
+| `list_deployment_tags` | required | explorable | List distinct tags in use across deployments in the workspace. |
+| `add_deployment_tag` | required | explorable | Add a tag to a deployment. |
+| `delete_deployment_tag` | required | explorable | Remove a tag from a deployment. |
+| `list_deployment_revisions` | required | explorable | List a deployment's revision history. |
+| `get_deployment_revision` | required | explorable | Fetch a specific revision, including its config YAML. |
+| `create_deployment_revision` | required | explorable, referenceable | Push a new revision onto a deployment. |
+| `activate_deployment_revision` | required | explorable | Activate a revision as the deployment's served revision. |
+| `activate_deployment` | required | explorable | Re-activate a deployment's current active revision. |
+| `deactivate_deployment` | required | explorable | Mark a deployment as no longer desired to be served. |
+| `list_deployment_activity` | required | explorable | List activation and revision activity for a deployment. |
+| `get_deployment_metrics` | required | explorable | Fetch per-replica CPU/memory usage and replica counts. |
+| `get_deployment_stats` | required | explorable | Fetch query volume, outcome split, and run durations. |
+
 ### Search history and traces
 
 | MCP tool name | Workspace | Memory | Description |

@@ -9,6 +9,7 @@ from types import TracebackType
 from typing import Any, Literal, Self, TypeVar, overload
 
 from deepset_mcp.api.custom_components.protocols import CustomComponentsProtocol
+from deepset_mcp.api.deployment.protocols import DeploymentResourceProtocol
 from deepset_mcp.api.haystack_service.protocols import HaystackServiceProtocol
 from deepset_mcp.api.indexes.protocols import IndexResourceProtocol
 from deepset_mcp.api.integrations.protocols import IntegrationResourceProtocol
@@ -264,6 +265,10 @@ class BaseFakeClient(AsyncClientProtocol):
 
     def indexes(self, workspace: str) -> IndexResourceProtocol:
         """Overwrite this method when testing IndexResource."""
+        raise NotImplementedError
+
+    def deployments(self, workspace: str) -> DeploymentResourceProtocol:
+        """Overwrite this method when testing DeploymentResource."""
         raise NotImplementedError
 
     def custom_components(self, workspace: str) -> CustomComponentsProtocol:
