@@ -22,7 +22,12 @@ from deepset_mcp.api.pipeline.models import (
 )
 from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
 from deepset_mcp.api.shared_models import NoContentResponse, PaginatedResponse
-from deepset_mcp.tools.doc_search import search_docs
+from deepset_mcp.tools.doc_search import (
+    format_docs_search_response,
+    list_doc_sections,
+    search_docs,
+    search_docs_via_docs_api,
+)
 from test.unit.conftest import BaseFakeClient
 
 
@@ -238,3 +243,116 @@ async def test_search_docs_unexpected_error() -> None:
     )
 
     assert "Failed to search documentation using pipeline 'docs-search-pipeline': Internal server error" in result
+
+
+def test_format_docs_search_response_includes_titles_and_urls() -> None:
+    """The public docs-search formatter should surface titles and URLs like the docs MCP."""
+    formatted = format_docs_search_response(
+        {
+            "results": [
+                {
+                    "query": "deploy a pipeline",
+                    "answers": [
+                        {
+                            "answer": "Deploy the latest saved version.",
+                            "type": "generative",
+                            "score": 0.91,
+                            "meta": {
+                                "title": "Deploy a Pipeline",
+                                "url": "/docs/deploy-a-pipeline",
+                            },
+                        }
+                    ],
+                    "documents": [
+                        {
+                            "content": "After you create and save a pipeline, deploy it.",
+                            "score": 0.88,
+                            "meta": {
+                                "heading": "Deploy a Pipeline",
+                                "url": "https://docs.cloud.deepset.ai/docs/deploy-a-pipeline",
+                            },
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
+    assert "# Search Results for: deploy a pipeline" in formatted
+    assert "Deploy the latest saved version." in formatted
+    assert "**URL:** https://docs.cloud.deepset.ai/docs/deploy-a-pipeline" in formatted
+    assert "### 1. Deploy a Pipeline" in formatted
+
+
+def test_format_docs_search_response_empty() -> None:
+    """An empty result list should return a no-results message."""
+    assert format_docs_search_response({"results": []}) == "No results found for your query."
+
+
+@pytest.mark.asyncio
+async def test_list_doc_sections() -> None:
+    """The section list should include the same navigation groups as the docs MCP."""
+    result = await list_doc_sections()
+
+    assert "Base URL: https://docs.cloud.deepset.ai" in result
+    assert "## Getting Started" in result
+    assert "https://docs.cloud.deepset.ai/docs/how-to-guides" in result
+    assert "REST API reference documentation" in result
+
+
+@pytest.mark.asyncio
+async def test_search_docs_via_docs_api_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Public docs search should format the API payload and not require a share token."""
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self) -> dict[str, object]:
+            return {
+                "results": [
+                    {
+                        "query": "RAG",
+                        "answers": [],
+                        "documents": [
+                            {
+                                "content": "Build a RAG pipeline.",
+                                "score": 0.75,
+                                "meta": {
+                                    "heading": "Create a RAG Pipeline",
+                                    "url": "https://docs.cloud.deepset.ai/docs/rag",
+                                },
+                            }
+                        ],
+                    }
+                ]
+            }
+
+    class FakeAsyncClient:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        async def __aenter__(self) -> "FakeAsyncClient":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def post(self, url: str, json: dict[str, str]) -> FakeResponse:
+            assert url == "https://docs.cloud.deepset.ai/api/search"
+            assert json == {"query": "RAG"}
+            return FakeResponse()
+
+    monkeypatch.setattr("deepset_mcp.tools.doc_search.httpx.AsyncClient", FakeAsyncClient)
+
+    result = await search_docs_via_docs_api(query="RAG")
+
+    assert "Create a RAG Pipeline" in result
+    assert "https://docs.cloud.deepset.ai/docs/rag" in result
+    assert "Build a RAG pipeline." in result
+
+
+@pytest.mark.asyncio
+async def test_search_docs_via_docs_api_empty_query() -> None:
+    """A missing query should fail fast without calling the search API."""
+    result = await search_docs_via_docs_api(query="")
+    assert result == "Error: No query provided."

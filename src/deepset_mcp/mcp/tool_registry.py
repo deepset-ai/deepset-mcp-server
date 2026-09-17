@@ -6,7 +6,7 @@ from collections.abc import Callable
 from typing import Any
 
 from deepset_mcp.api.client import AsyncDeepsetClient
-from deepset_mcp.config import DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME
+from deepset_mcp.config import DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME, LIST_DOC_SECTIONS_TOOL_NAME
 from deepset_mcp.initialize_embedding_model import get_initialized_model
 from deepset_mcp.mcp.tool_models import DeepsetDocsConfig, ExplorerConfig, MemoryType, ToolConfig
 from deepset_mcp.tools.custom_components import (
@@ -32,7 +32,11 @@ from deepset_mcp.tools.deployment import (
     list_deployments as list_deployments_tool,
     update_deployment as update_deployment_tool,
 )
-from deepset_mcp.tools.doc_search import search_docs as search_docs_tool
+from deepset_mcp.tools.doc_search import (
+    list_doc_sections as list_doc_sections_tool,
+    search_docs as search_docs_tool,
+    search_docs_via_docs_api,
+)
 from deepset_mcp.tools.haystack_service import (
     get_component_definition as get_component_definition_tool,
     get_custom_components as get_custom_components_tool,
@@ -95,20 +99,28 @@ from deepset_mcp.tools.workspace import (
 )
 
 
-def get_docs_search_tool(config: DeepsetDocsConfig) -> Callable[..., Any]:
-    """Get a docs search tool configured with the provided config."""
+def get_docs_search_tool(config: DeepsetDocsConfig | None = None) -> Callable[..., Any]:
+    """Get a docs search tool configured with the provided config.
+
+    When ``config`` is omitted, the tool uses the same public documentation search
+    pipeline as the documentation MCP server at https://docs.cloud.deepset.ai/api/mcp.
+    """
 
     async def search_docs(query: str) -> str:
         """Search the Haystack Enterprise Platform documentation.
 
-        This tool allows you to search through deepset's official documentation to find
-        information about features, API usage, best practices, and troubleshooting guides.
-        Use this when you need to look up specific deepset functionality or help users
-        understand how to use deepset features.
+        Use this to find information about Haystack components, pipelines, document
+        stores, embedders, generators, retrievers, and other AI platform features.
+        Returns relevant documentation excerpts with source URLs.
 
-        :param query: The search query to execute against the documentation.
-        :returns: The formatted search results from the documentation.
+        :param query: The search query. Be specific about what you're looking for.
+            Examples: 'How to create a RAG pipeline', 'OpenAI embedder configuration',
+            'document store filters'.
+        :returns: Relevant documentation excerpts with source URLs.
         """
+        if config is None:
+            return await search_docs_via_docs_api(query=query)
+
         async with AsyncDeepsetClient(api_key=config.api_key, transport_config=DEFAULT_CLIENT_HEADER) as client:
             response = await search_docs_tool(
                 client=client,
@@ -383,6 +395,7 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "sed_object_store": (create_sed_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
     "yq_object_store": (create_yq_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
     DOCS_SEARCH_TOOL_NAME: (get_docs_search_tool, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
+    LIST_DOC_SECTIONS_TOOL_NAME: (list_doc_sections_tool, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
 }
 
 ALL_DEEPSET_TOOLS = set(TOOL_REGISTRY.keys())
