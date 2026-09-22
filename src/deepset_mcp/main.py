@@ -106,13 +106,13 @@ def main(
         ),
     ] = None,
     object_store_ttl: Annotated[
-        int,
+        int | None,
         typer.Option(
             "--object-store-ttl",
             help="TTL in seconds for stored objects. Default: 600 (10 minutes). "
             "Can also be set via OBJECT_STORE_TTL environment variable.",
         ),
-    ] = 600,
+    ] = None,
     host: Annotated[
         str,
         typer.Option(
@@ -164,7 +164,7 @@ def main(
     # ObjectStore configuration
     backend = str(object_store_backend or os.getenv("OBJECT_STORE_BACKEND", "memory"))
     redis_url = object_store_redis_url or os.getenv("OBJECT_STORE_REDIS_URL")
-    ttl = int(os.getenv("OBJECT_STORE_TTL", str(object_store_ttl)))
+    ttl = object_store_ttl or int(os.getenv("OBJECT_STORE_TTL", "600"))
 
     if tools:
         tool_names = set(tools)
