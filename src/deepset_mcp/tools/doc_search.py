@@ -21,6 +21,28 @@ DOC_SECTIONS: dict[str, str] = {
 }
 
 
+def _invalid_doc_section_error(section: str) -> str:
+    valid_sections = ", ".join(sorted(DOC_SECTIONS))
+    return (
+        f"Error: Unknown documentation section '{section}'. "
+        f"Valid section IDs: {valid_sections}. "
+        "Call list_doc_sections for descriptions and URLs."
+    )
+
+
+def _normalize_doc_section(section: str | None) -> tuple[str | None, str | None]:
+    """Validate an optional section id from list_doc_sections.
+
+    :returns: A tuple of (normalized_section, error_message). Exactly one entry is non-None.
+    """
+    if section is None or not section.strip():
+        return None, None
+    normalized = section.strip()
+    if normalized not in DOC_SECTIONS:
+        return None, _invalid_doc_section_error(normalized)
+    return normalized, None
+
+
 def _absolute_docs_url(url: str) -> str:
     """Turn a docs-relative path into an absolute documentation URL."""
     if url.startswith("/"):
@@ -133,22 +155,37 @@ def doc_search_results_to_llm_readable_string(*, results: DeepsetSearchResponse)
     return "\n----\n".join(files)
 
 
-async def search_docs_via_docs_api(*, query: str, search_url: str = DOCS_SEARCH_API_URL) -> str:
+async def search_docs_via_docs_api(
+    *,
+    query: str,
+    section: str | None = None,
+    search_url: str = DOCS_SEARCH_API_URL,
+) -> str:
     """Search the Haystack Enterprise Platform documentation via the public docs search API.
 
     This is the same backend used by the documentation MCP server at
     https://docs.cloud.deepset.ai/api/mcp.
 
     :param query: The search query to execute.
+    :param section: Optional documentation section id from list_doc_sections (for example,
+        ``how-to-guides`` or ``api``). Limits results to that section.
     :param search_url: Documentation search endpoint. Defaults to the public docs search API.
     :returns: Formatted search results or an error message.
     """
     if not query:
         return "Error: No query provided."
 
+    normalized_section, section_error = _normalize_doc_section(section)
+    if section_error:
+        return section_error
+
+    request_body: dict[str, str] = {"query": query}
+    if normalized_section:
+        request_body["filter"] = normalized_section
+
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(search_url, json={"query": query})
+            response = await client.post(search_url, json=request_body)
     except Exception as error:
         return f"Error: {error}"
 
@@ -166,7 +203,14 @@ async def search_docs_via_docs_api(*, query: str, search_url: str = DOCS_SEARCH_
     return format_docs_search_response(data)
 
 
-async def search_docs(*, client: AsyncClientProtocol, workspace: str, pipeline_name: str, query: str) -> str:
+async def search_docs(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    query: str,
+    section: str | None = None,
+) -> str:
     """Search deepset documentation using a dedicated docs pipeline.
 
     Uses the specified pipeline to perform a search with the given query against the deepset
@@ -177,10 +221,21 @@ async def search_docs(*, client: AsyncClientProtocol, workspace: str, pipeline_n
     :param workspace: The workspace name for the docs pipeline.
     :param pipeline_name: Name of the pipeline to use for doc search.
     :param query: The search query to execute.
+    :param section: Optional documentation section id from list_doc_sections. Limits results to that section.
     :returns: A string containing the formatted search results or error message.
     """
+    normalized_section, section_error = _normalize_doc_section(section)
+    if section_error:
+        return section_error
+
+    filters = {"category": normalized_section} if normalized_section else None
+
     try:
-        search_response = await client.pipelines(workspace=workspace).search(pipeline_name=pipeline_name, query=query)
+        search_response = await client.pipelines(workspace=workspace).search(
+            pipeline_name=pipeline_name,
+            query=query,
+            filters=filters,
+        )
 
         return doc_search_results_to_llm_readable_string(results=search_response)
 
@@ -198,19 +253,22 @@ async def list_doc_sections() -> str:
     """List the main sections of the deepset AI Platform documentation.
 
     Use this to understand what documentation is available and help users navigate
-    to the right section.
+    to the right section. Pass a section id to ``search_docs`` as ``section`` to limit
+    search results to that part of the docs.
 
     :returns: A list of documentation sections with descriptions and URLs.
     """
     output_parts = [
         "# Haystack Enterprise Platform Documentation Sections\n",
         f"Base URL: {DOCS_BASE_URL}\n",
+        "Use the section id with search_docs(section=...) to filter search results.\n",
     ]
 
     for section, description in DOC_SECTIONS.items():
         url = f"{DOCS_BASE_URL}/docs/{section}"
         title = section.replace("-", " ").title()
         output_parts.append(f"## {title}")
+        output_parts.append(f"Section ID: {section}")
         output_parts.append(f"URL: {url}")
         output_parts.append(f"{description}\n")
 

@@ -106,7 +106,7 @@ def get_docs_search_tool(config: DeepsetDocsConfig | None = None) -> Callable[..
     pipeline as the documentation MCP server at https://docs.cloud.deepset.ai/api/mcp.
     """
 
-    async def search_docs(query: str) -> str:
+    async def search_docs(query: str, section: str | None = None) -> str:
         """Search the Haystack Enterprise Platform documentation.
 
         Use this to find information about Haystack components, pipelines, document
@@ -116,10 +116,12 @@ def get_docs_search_tool(config: DeepsetDocsConfig | None = None) -> Callable[..
         :param query: The search query. Be specific about what you're looking for.
             Examples: 'How to create a RAG pipeline', 'OpenAI embedder configuration',
             'document store filters'.
+        :param section: Optional documentation section id from list_doc_sections (for example,
+            ``how-to-guides`` or ``api``). Limits results to that section.
         :returns: Relevant documentation excerpts with source URLs.
         """
         if config is None:
-            return await search_docs_via_docs_api(query=query)
+            return await search_docs_via_docs_api(query=query, section=section)
 
         async with AsyncDeepsetClient(api_key=config.api_key, transport_config=DEFAULT_CLIENT_HEADER) as client:
             response = await search_docs_tool(
@@ -127,6 +129,7 @@ def get_docs_search_tool(config: DeepsetDocsConfig | None = None) -> Callable[..
                 workspace=config.workspace_name,
                 pipeline_name=config.pipeline_name,
                 query=query,
+                section=section,
             )
         return response
 

@@ -296,6 +296,7 @@ async def test_list_doc_sections() -> None:
 
     assert "Base URL: https://docs.cloud.deepset.ai" in result
     assert "## Getting Started" in result
+    assert "Section ID: getting-started" in result
     assert "https://docs.cloud.deepset.ai/docs/how-to-guides" in result
     assert "REST API reference documentation" in result
 
@@ -356,3 +357,43 @@ async def test_search_docs_via_docs_api_empty_query() -> None:
     """A missing query should fail fast without calling the search API."""
     result = await search_docs_via_docs_api(query="")
     assert result == "Error: No query provided."
+
+
+@pytest.mark.asyncio
+async def test_search_docs_via_docs_api_with_section(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Section ids from list_doc_sections should be sent as a search filter."""
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self) -> dict[str, object]:
+            return {"results": []}
+
+    class FakeAsyncClient:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        async def __aenter__(self) -> "FakeAsyncClient":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def post(self, url: str, json: dict[str, str]) -> FakeResponse:
+            assert json == {"query": "deploy pipeline", "filter": "how-to-guides"}
+            return FakeResponse()
+
+    monkeypatch.setattr("deepset_mcp.tools.doc_search.httpx.AsyncClient", FakeAsyncClient)
+
+    result = await search_docs_via_docs_api(query="deploy pipeline", section="how-to-guides")
+
+    assert result == "No results found for your query."
+
+
+@pytest.mark.asyncio
+async def test_search_docs_via_docs_api_invalid_section() -> None:
+    """Unknown section ids should return a helpful error without calling the search API."""
+    result = await search_docs_via_docs_api(query="RAG", section="not-a-section")
+
+    assert "Error: Unknown documentation section 'not-a-section'" in result
+    assert "list_doc_sections" in result
