@@ -9,8 +9,7 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from mcp.server import MCPServer
-from mcp.server.mcpserver import Context
+from mcp.server.mcpserver import Context, MCPServer
 
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.mcp.tool_factory import (

@@ -11,8 +11,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from typing import Any
 
-from mcp.server import MCPServer
-from mcp.server.mcpserver import Context
+from mcp.server.mcpserver import Context, MCPServer
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.config import DEEPSET_CLIENT_TIMEOUT, DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME
