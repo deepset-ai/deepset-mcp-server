@@ -40,7 +40,7 @@ requires-python = ">=3.11"
 
 dependencies = [
     "fastapi",
-    "mcp>=1.10.1",
+    "mcp>=2.0.0",
     "httpx",
     "pydantic>=2.0.0",
     "pyyaml",
