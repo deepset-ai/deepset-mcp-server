@@ -162,7 +162,8 @@ See [Tool output truncation and exploration](../concepts/mcp_server_concepts.md#
 
 | MCP tool name | Workspace | Memory | Description |
 | --- | --- | --- | --- |
-| `search_docs` | not needed | none | Search the Haystack Enterprise Platform documentation. Requires docs search to be configured on the server. |
+| `search_docs` | not needed | none | Search the Haystack Enterprise Platform documentation using the same pipeline as the documentation MCP server. |
+| `list_doc_sections` | not needed | none | List the main documentation sections with descriptions and URLs. |
 | `load_skill` | not needed | none | Load a bundled skill containing detailed guidance for a specific task. |
 
 ## Tool base functions

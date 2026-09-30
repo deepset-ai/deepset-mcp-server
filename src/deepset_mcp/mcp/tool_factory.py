@@ -306,7 +306,9 @@ def register_tools(
         workspace: Pass a deepset workspace name if you only want to run the tools on a specific workspace.
         tool_names: Set of tool names to register (if None, registers all tools)
         get_api_key_from_authorization_header: Whether to use request context to retrieve an API key for tool execution.
-        docs_config: Configuration for the deepset documentation search tool.
+        docs_config: Optional configuration for a custom docs-search pipeline. When omitted,
+            ``search_docs`` uses the same public documentation search pipeline as
+            https://docs.cloud.deepset.ai/api/mcp.
         base_url: Base URL for the deepset API.
         object_store: The ObjectStore instance to use for memory decorators.
         enable_object_store: Whether tool outputs may be stored in and referenced from the object store. When
@@ -320,18 +322,6 @@ def register_tools(
         raise ValueError(
             "'api_key' cannot be 'None' when 'use_request_context' is False. "
             "Either pass 'api_key' or 'use_request_context'."
-        )
-
-    if docs_config is None and tool_names is None:
-        raise ValueError(
-            f"'docs_config' cannot be None when requesting to register all tools. "
-            f"Either pass 'docs_config' or disable the '{DOCS_SEARCH_TOOL_NAME}' tool."
-        )
-
-    if docs_config is None and tool_names is not None and DOCS_SEARCH_TOOL_NAME in tool_names:
-        raise ValueError(
-            f"Requested to register '{DOCS_SEARCH_TOOL_NAME}' tool but 'docs_config' is 'None'. "
-            f"Provide a valid 'docs_config' to register this tool."
         )
 
     # Validate tool names if provided

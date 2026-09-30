@@ -22,7 +22,7 @@ from .deployment import (
     list_deployments,
     update_deployment,
 )
-from .doc_search import search_docs
+from .doc_search import list_doc_sections, search_docs
 from .haystack_service import (
     get_component_definition,
     get_custom_components,
@@ -73,6 +73,7 @@ __all__ = [
     "list_custom_component_installations",
     "get_latest_custom_component_installation_logs",
     "search_docs",
+    "list_doc_sections",
     "run_component",
     "get_custom_components",
     "get_component_definition",

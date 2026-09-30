@@ -51,3 +51,22 @@ class TestConfigureMcpServerBaseUrl:
         mock_register_tools.assert_called_once()
         call_args = mock_register_tools.call_args
         assert call_args[1]["base_url"] is None
+
+    @patch("deepset_mcp.mcp.server.fetch_shared_prototype_details")
+    @patch("deepset_mcp.mcp.server.register_tools")
+    @pytest.mark.asyncio
+    async def test_configure_mcp_server_uses_public_docs_search_by_default(
+        self, mock_register_tools: MagicMock, mock_fetch: MagicMock
+    ) -> None:
+        """Docs search should use the public docs pipeline unless a custom share URL is passed."""
+        mock_server = MagicMock()
+
+        await configure_mcp_server(
+            mcp_server_instance=mock_server,
+            tools_to_register={"search_docs", "list_doc_sections"},
+            deepset_api_key="test-key",
+        )
+
+        mock_fetch.assert_not_called()
+        mock_register_tools.assert_called_once()
+        assert mock_register_tools.call_args[1]["docs_config"] is None

@@ -8,7 +8,6 @@ import jwt
 from mcp.server.fastmcp import FastMCP
 
 from deepset_mcp.api.client import AsyncDeepsetClient
-from deepset_mcp.config import DEEPSET_DOCS_DEFAULT_SHARE_URL
 from deepset_mcp.mcp.store import initialize_or_get_initialized_store
 from deepset_mcp.mcp.tool_factory import register_tools
 from deepset_mcp.mcp.tool_models import DeepsetDocsConfig
@@ -35,8 +34,9 @@ async def configure_mcp_server(
     :param deepset_api_key: Optional Deepset API key for authentication
     :param deepset_api_url: Optional Deepset API base URL
     :param deepset_workspace: Pass a deepset workspace name if you only want to run the tools on a specific workspace.
-    :param deepset_docs_shareable_prototype_url: Shareable prototype URL that allows access to a docs search pipeline.
-        Will fall back to the default shareable prototype URL if set to None.
+    :param deepset_docs_shareable_prototype_url: Optional shareable prototype URL for a custom docs search pipeline.
+        When omitted, ``search_docs`` uses the same public documentation search pipeline as
+        https://docs.cloud.deepset.ai/api/mcp.
     :param get_api_key_from_authorization_header: Whether to extract API key from authorization header
     :param enable_object_store: Whether tool outputs may be stored in and referenced from the object store. When
         False, tool outputs are always returned as-is, the object-store inspection tools are not registered, and
@@ -46,19 +46,20 @@ async def configure_mcp_server(
     :param object_store_ttl: TTL in seconds for stored objects
     :raises ValueError: If required parameters are missing or invalid
     """
-    if deepset_docs_shareable_prototype_url is None:
-        deepset_docs_shareable_prototype_url = DEEPSET_DOCS_DEFAULT_SHARE_URL
-
     if deepset_api_key is None and not get_api_key_from_authorization_header:
         raise ValueError(
             "API key is required for authentication. "
             "Please provide 'deepset_api_key' or enable 'get_api_key_from_authorization_header'."
         )
 
-    workspace_name, pipeline_name, api_key_docs = await fetch_shared_prototype_details(
-        deepset_docs_shareable_prototype_url
-    )
-    docs_config = DeepsetDocsConfig(api_key=api_key_docs, workspace_name=workspace_name, pipeline_name=pipeline_name)
+    docs_config = None
+    if deepset_docs_shareable_prototype_url:
+        workspace_name, pipeline_name, api_key_docs = await fetch_shared_prototype_details(
+            deepset_docs_shareable_prototype_url
+        )
+        docs_config = DeepsetDocsConfig(
+            api_key=api_key_docs, workspace_name=workspace_name, pipeline_name=pipeline_name
+        )
 
     # Initialize the store before registering tools, unless the object store is disabled entirely
     store = (
