@@ -21,6 +21,45 @@ DOC_SECTIONS: dict[str, str] = {
 }
 
 
+# The search backend has no server-side section filter: the `group` metadata field is not indexed for filtering
+# and the `{"category": ...}` filter is rejected with a 422. We therefore filter returned hits client-side, using
+# the `group` metadata set in the docs frontmatter. API reference pages carry no group and are detected by path.
+_SECTION_GROUPS: dict[str, frozenset[str]] = {
+    "getting-started": frozenset({"getting-started"}),
+    "concepts": frozenset({"concepts", "concept"}),
+    "how-to-guides": frozenset({"how-tos", "how-to-guides"}),
+    "tutorials": frozenset({"tutorials"}),
+    "learn": frozenset({"learn"}),
+}
+
+
+def _meta_in_section(meta: dict[str, Any], section: str) -> bool:
+    """Check whether a search hit's metadata belongs to a documentation section."""
+    if section == "api":
+        path = str(meta.get("original_file_path") or "")
+        url = str(meta.get("url") or "")
+        return path.startswith("api/") or "/docs/api/" in url
+
+    platform_meta = meta.get("deepset_platform_metadata")
+    group = meta.get("group") or (platform_meta.get("group") if isinstance(platform_meta, dict) else None)
+    return isinstance(group, str) and group in _SECTION_GROUPS[section]
+
+
+def _filter_response_by_section(data: dict[str, Any], section: str) -> dict[str, Any]:
+    """Keep only answers and documents that belong to the section."""
+    filtered_results = []
+    for result in data.get("results") or []:
+        answers = [a for a in result.get("answers") or [] if _meta_in_section(a.get("meta") or {}, section)]
+        documents = [d for d in result.get("documents") or [] if _meta_in_section(d.get("meta") or {}, section)]
+        if answers or documents:
+            filtered_results.append({**result, "answers": answers, "documents": documents})
+    return {**data, "results": filtered_results}
+
+
+def _no_results_in_section(section: str) -> str:
+    return f"No results found in section '{section}' for your query. Try again without the section filter."
+
+
 def _invalid_doc_section_error(section: str) -> str:
     valid_sections = ", ".join(sorted(DOC_SECTIONS))
     return (
@@ -168,7 +207,8 @@ async def search_docs_via_docs_api(
 
     :param query: The search query to execute.
     :param section: Optional documentation section id from list_doc_sections (for example,
-        ``how-to-guides`` or ``api``). Limits results to that section.
+        ``how-to-guides`` or ``api``). Limits results to that section (applied to the returned hits,
+        so it may return fewer results than an unfiltered search).
     :param search_url: Documentation search endpoint. Defaults to the public docs search API.
     :returns: Formatted search results or an error message.
     """
@@ -179,13 +219,9 @@ async def search_docs_via_docs_api(
     if section_error:
         return section_error
 
-    request_body: dict[str, str] = {"query": query}
-    if normalized_section:
-        request_body["filter"] = normalized_section
-
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(search_url, json=request_body)
+            response = await client.post(search_url, json={"query": query})
     except Exception as error:
         return f"Error: {error}"
 
@@ -199,6 +235,11 @@ async def search_docs_via_docs_api(
 
     if not isinstance(data, dict):
         return "Error: Search API returned an unexpected response."
+
+    if normalized_section:
+        data = _filter_response_by_section(data, normalized_section)
+        if not data["results"]:
+            return _no_results_in_section(normalized_section)
 
     return format_docs_search_response(data)
 
@@ -221,21 +262,23 @@ async def search_docs(
     :param workspace: The workspace name for the docs pipeline.
     :param pipeline_name: Name of the pipeline to use for doc search.
     :param query: The search query to execute.
-    :param section: Optional documentation section id from list_doc_sections. Limits results to that section.
+    :param section: Optional documentation section id from list_doc_sections. Limits results to that section
+        (applied to the returned hits, so it may return fewer results than an unfiltered search).
     :returns: A string containing the formatted search results or error message.
     """
     normalized_section, section_error = _normalize_doc_section(section)
     if section_error:
         return section_error
 
-    filters = {"category": normalized_section} if normalized_section else None
-
     try:
-        search_response = await client.pipelines(workspace=workspace).search(
-            pipeline_name=pipeline_name,
-            query=query,
-            filters=filters,
-        )
+        search_response = await client.pipelines(workspace=workspace).search(pipeline_name=pipeline_name, query=query)
+
+        if normalized_section:
+            search_response.documents = [
+                doc for doc in search_response.documents if _meta_in_section(doc.meta, normalized_section)
+            ]
+            if not search_response.documents:
+                return _no_results_in_section(normalized_section)
 
         return doc_search_results_to_llm_readable_string(results=search_response)
 

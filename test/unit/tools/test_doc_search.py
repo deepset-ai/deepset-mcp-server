@@ -359,15 +359,12 @@ async def test_search_docs_via_docs_api_empty_query() -> None:
     assert result == "Error: No query provided."
 
 
-@pytest.mark.asyncio
-async def test_search_docs_via_docs_api_with_section(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Section ids from list_doc_sections should be sent as a search filter."""
-
+def _patch_docs_api(monkeypatch: pytest.MonkeyPatch, payload: dict[str, object], sent: list[dict[str, str]]) -> None:
     class FakeResponse:
         status_code = 200
 
         def json(self) -> dict[str, object]:
-            return {"results": []}
+            return payload
 
     class FakeAsyncClient:
         def __init__(self, *args: object, **kwargs: object) -> None:
@@ -380,14 +377,73 @@ async def test_search_docs_via_docs_api_with_section(monkeypatch: pytest.MonkeyP
             return None
 
         async def post(self, url: str, json: dict[str, str]) -> FakeResponse:
-            assert json == {"query": "deploy pipeline", "filter": "how-to-guides"}
+            sent.append(json)
             return FakeResponse()
 
     monkeypatch.setattr("deepset_mcp.tools.doc_search.httpx.AsyncClient", FakeAsyncClient)
 
-    result = await search_docs_via_docs_api(query="deploy pipeline", section="how-to-guides")
 
-    assert result == "No results found for your query."
+SECTION_PAYLOAD: dict[str, object] = {
+    "results": [
+        {
+            "query": "deploy",
+            "answers": [],
+            "documents": [
+                {
+                    "content": "Guide body",
+                    "meta": {"heading": "Deploy a Pipeline", "url": "/docs/deploy", "group": "how-tos"},
+                },
+                {
+                    "content": "API body",
+                    "meta": {
+                        "heading": "Deploy Pipeline",
+                        "url": "/docs/api/main/deploy",
+                        "original_file_path": "api/main/deploy/index.html",
+                    },
+                },
+                {
+                    "content": "Concept body",
+                    "meta": {"heading": "Pipelines", "url": "/docs/pipelines", "group": "concepts"},
+                },
+            ],
+        }
+    ]
+}
+
+
+@pytest.mark.asyncio
+async def test_search_docs_via_docs_api_section_filters_client_side(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The section is applied to returned hits; the search API must not receive a filter."""
+    sent: list[dict[str, str]] = []
+    _patch_docs_api(monkeypatch, SECTION_PAYLOAD, sent)
+
+    result = await search_docs_via_docs_api(query="deploy", section="how-to-guides")
+
+    assert sent == [{"query": "deploy"}]
+    assert "Deploy a Pipeline" in result
+    assert "API body" not in result
+    assert "Concept body" not in result
+
+
+@pytest.mark.asyncio
+async def test_search_docs_via_docs_api_api_section_matches_by_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    """API reference pages have no group metadata and are matched by path."""
+    _patch_docs_api(monkeypatch, SECTION_PAYLOAD, [])
+
+    result = await search_docs_via_docs_api(query="deploy", section="api")
+
+    assert "API body" in result
+    assert "Guide body" not in result
+
+
+@pytest.mark.asyncio
+async def test_search_docs_via_docs_api_section_without_matches(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A section with no hits should say so and hint at retrying without the filter."""
+    _patch_docs_api(monkeypatch, SECTION_PAYLOAD, [])
+
+    result = await search_docs_via_docs_api(query="deploy", section="tutorials")
+
+    assert result == "No results found in section 'tutorials' for your query. Try again without the section filter."
 
 
 @pytest.mark.asyncio
