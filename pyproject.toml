@@ -48,7 +48,7 @@ dependencies = [
     "model2vec",
     "glom",
     "rich",
-    "pyjwt[crypto]",
+    "pyjwt[crypto]>=2.14.0",
     "typer",
     "orjson",
     "jq>=1.12.0",
