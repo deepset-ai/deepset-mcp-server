@@ -104,7 +104,7 @@ def grid_dict() -> dict[str, Any]:
                             "status": "ENDED",
                             "outcome": "SUCCEEDED",
                             "metrics": [
-                                {"metric_key": "answered", "address": "turn/0", "kind": "label", "label": "yes"}
+                                {"metric_key": "answered", "address": "turn/1", "kind": "label", "label": "yes"}
                             ],
                             "evaluator_version_id": VERSION_ID,
                             "session_id": SESSION_ID,

@@ -81,10 +81,10 @@ def grid() -> ExperimentRunGrid:
                             "SUCCEEDED",
                             [
                                 {"metric_key": "accuracy", "address": "session", "kind": "score", "score": 0.8},
-                                {"metric_key": "answered", "address": "turn/0", "kind": "label", "label": "yes"},
+                                {"metric_key": "answered", "address": "turn/1", "kind": "label", "label": "yes"},
                                 {
                                     "metric_key": "answered",
-                                    "address": "turn/1",
+                                    "address": "turn/2",
                                     "kind": "label",
                                     "label": "no",
                                     "rationale": "The reply asks the question back.",
@@ -109,7 +109,7 @@ def grid() -> ExperimentRunGrid:
                                 {"metric_key": "accuracy", "address": "session", "kind": "score", "score": 0.4},
                                 {
                                     "metric_key": "answered",
-                                    "address": "turn/0",
+                                    "address": "turn/1",
                                     "kind": "not_applicable",
                                     "reason": "No reply.",
                                 },
