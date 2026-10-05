@@ -10,6 +10,7 @@ from typing import Any, Literal, Self, TypeVar, overload
 
 from deepset_mcp.api.custom_components.resource import CustomComponentsResource
 from deepset_mcp.api.deployment.resource import DeploymentResource
+from deepset_mcp.api.evaluation.resource import EvaluationResource
 from deepset_mcp.api.haystack_service.resource import HaystackServiceResource
 from deepset_mcp.api.indexes.resource import IndexResource
 from deepset_mcp.api.integrations.resource import IntegrationResource
@@ -105,6 +106,14 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         :returns: Deployment resource instance
         """
         return DeploymentResource(client=self, workspace=workspace)
+
+    def evaluation(self, workspace: str) -> EvaluationResource:
+        """Resource to interact with Evaluators, Experiments, their runs, and Sessions in the specified workspace.
+
+        :param workspace: Workspace identifier
+        :returns: Evaluation resource instance
+        """
+        return EvaluationResource(client=self, workspace=workspace)
 
     def pipeline_templates(self, workspace: str) -> PipelineTemplateResource:
         """Resource to interact with pipeline templates in the specified workspace.

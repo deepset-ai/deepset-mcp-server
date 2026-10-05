@@ -176,7 +176,9 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
             for experiment_id, name in [(EXPERIMENT_ID, "Weekly"), ("00000000-0000-0000-0000-00000000000e", "Fresh")]
         ]
 
-    async def list_experiment_runs(self, pipeline_name: str, experiment_id: str, limit: int = 50) -> list[ExperimentRun]:
+    async def list_experiment_runs(
+        self, pipeline_name: str, experiment_id: str, limit: int = 50
+    ) -> list[ExperimentRun]:
         self._record("list_experiment_runs", experiment_id=experiment_id, limit=limit)
         return [run()] if experiment_id == EXPERIMENT_ID else []
 
@@ -247,7 +249,8 @@ async def test_get_experiment_run_flattens_cells_and_caps_rows() -> None:
     judged, broken = report.rows[0].cells
     assert (judged.evaluator_id, judged.outcome, judged.evaluator_version_id) == (E1, "SUCCEEDED", V1)
     assert judged.metrics[2].rationale == "The reply asks the question back."
-    assert (broken.outcome, broken.error_detail) == ("ERRORED", {"type": "KeyError", "message": "'replies'", "stacktrace": []})
+    assert broken.outcome == "ERRORED"
+    assert broken.error_detail == {"type": "KeyError", "message": "'replies'", "stacktrace": []}
 
 
 @pytest.mark.asyncio

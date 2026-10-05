@@ -23,6 +23,7 @@ from .deployment import (
     update_deployment,
 )
 from .doc_search import list_doc_sections, search_docs
+from .evaluation import get_evaluator, get_experiment_run, list_evaluators, list_experiments, list_sessions
 from .haystack_service import (
     get_component_definition,
     get_custom_components,
@@ -132,6 +133,11 @@ __all__ = [
     "get_pipeline_trace",
     "get_pipeline_trace_span_tags",
     "get_pipeline_trace_logs",
+    "list_evaluators",
+    "get_evaluator",
+    "list_experiments",
+    "get_experiment_run",
+    "list_sessions",
     "get_secret",
     "list_secrets",
     "load_skill",

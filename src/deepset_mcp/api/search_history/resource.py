@@ -9,6 +9,7 @@ import builtins
 from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import quote
 
+from deepset_mcp.api import ids
 from deepset_mcp.api.search_history.models import (
     HaystackTraceLog,
     PipelineTraceEntry,
@@ -64,14 +65,12 @@ class SearchHistoryResource(SearchHistoryResourceProtocol):
         async def _fetch_workspace_id() -> str:
             if self._workspace_id is not None:
                 return self._workspace_id
-            workspace_obj = await self._client.workspaces().get(self._workspace)
-            return str(workspace_obj.workspace_id)
+            return await ids.workspace_id(self._client, self._workspace)
 
         async def _fetch_pipeline_id() -> str:
             if cached_pipeline_id is not None:
                 return cached_pipeline_id
-            pipeline_obj = await self._client.pipelines(self._workspace).get(pipeline_name)
-            return pipeline_obj.id
+            return await ids.pipeline_id(self._client, self._workspace, pipeline_name)
 
         workspace_id, pipeline_id = await asyncio.gather(_fetch_workspace_id(), _fetch_pipeline_id())
 
