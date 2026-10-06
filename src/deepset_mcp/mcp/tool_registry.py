@@ -37,6 +37,13 @@ from deepset_mcp.tools.doc_search import (
     search_docs as search_docs_tool,
     search_docs_via_docs_api,
 )
+from deepset_mcp.tools.evaluation import (
+    get_evaluator as get_evaluator_tool,
+    get_experiment_run as get_experiment_run_tool,
+    list_evaluators as list_evaluators_tool,
+    list_experiments as list_experiments_tool,
+    list_sessions as list_sessions_tool,
+)
 from deepset_mcp.tools.haystack_service import (
     get_component_definition as get_component_definition_tool,
     get_custom_components as get_custom_components_tool,
@@ -353,6 +360,26 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     ),
     "get_pipeline_trace_logs": (
         get_pipeline_trace_logs_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "list_evaluators": (
+        list_evaluators_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_evaluator": (
+        get_evaluator_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "list_experiments": (
+        list_experiments_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_experiment_run": (
+        get_experiment_run_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "list_sessions": (
+        list_sessions_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
     "list_custom_component_installations": (

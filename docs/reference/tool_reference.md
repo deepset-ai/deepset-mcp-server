@@ -109,6 +109,16 @@ draft/version history. Each deployment tracks its own history of served pipeline
 | `get_pipeline_trace_span_tags` | required | explorable | Fetch the tags of a single span, to inspect one component's input/output cheaply. |
 | `get_pipeline_trace_logs` | required | explorable | Fetch only the log entries for one run. |
 
+### Evaluation
+
+| MCP tool name | Workspace | Memory | Description |
+| --- | --- | --- | --- |
+| `list_evaluators` | required | explorable | List the workspace's Evaluators with the Metrics each declares. |
+| `get_evaluator` | required | explorable | Fetch one Evaluator with its versions, or one version with its Python source. |
+| `list_experiments` | required | explorable | List a pipeline's Experiments, each with its most recent run. |
+| `get_experiment_run` | required | explorable | Read one Experiment run: cell counts, a summary per Metric, and the grid rows. |
+| `list_sessions` | required | explorable | List the Sessions of a pipeline that an Experiment run can judge. |
+
 ### Templates
 
 | MCP tool name | Workspace | Memory | Description |
