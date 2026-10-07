@@ -297,3 +297,86 @@ async def test_404_from_the_route_raises_not_found() -> None:
 
     with pytest.raises(ResourceNotFoundError):
         await resource(client).get_evaluator(EVALUATOR_ID)
+
+
+TRIES = f"v2/workspaces/{WORKSPACE_UUID}/pipelines/{PIPELINE_UUID}/evaluations/try"
+REPLAYS = f"v2/workspaces/{WORKSPACE_UUID}/pipelines/{PIPELINE_UUID}/session-replay"
+TRY_ID = "signed-try-id"
+REPLAY_RUN_ID = "77777777-7777-7777-7777-777777777777"
+DRAFT_VERSION_ID = "88888888-8888-8888-8888-888888888888"
+
+
+def try_result_dict() -> dict[str, Any]:
+    return {
+        "content_hash": "abc",
+        "session_id": SESSION_ID,
+        "outcome": "SUCCEEDED",
+        "metrics": [{"metric_key": "answered", "address": "turn/1", "kind": "label", "label": "yes"}],
+        "trace_ids": [SESSION_ID],
+        "trace": {"traces": [], "status": "success"},
+        "error_detail": None,
+    }
+
+
+def replay_run_dict(status: str = "ENDED", trace_ids: list[str] | None = None) -> dict[str, Any]:
+    return {
+        "session_replay_run_id": REPLAY_RUN_ID,
+        "pipeline_id": PIPELINE_UUID,
+        "pipeline_version_id": DRAFT_VERSION_ID,
+        "status": status,
+        "source_session_id": SESSION_ID,
+        "result": None,
+        "trace_ids": trace_ids if trace_ids is not None else [EVALUATION_RUN_ID],
+        "error_detail": None,
+        "created_at": "2026-10-07T00:00:00Z",
+    }
+
+
+@pytest.mark.asyncio
+async def test_start_try_posts_the_source_and_the_session() -> None:
+    client = FakeEvaluationClient({TRIES: {"try_id": TRY_ID}})
+
+    try_id = await resource(client).start_try(PIPELINE_NAME, "def evaluate(session, focus): ...", SESSION_ID)
+
+    assert try_id == TRY_ID
+    assert client.requests[0]["method"] == "POST"
+    assert client.requests[0]["data"] == {"python_code": "def evaluate(session, focus): ...", "session_id": SESSION_ID}
+
+
+@pytest.mark.asyncio
+async def test_get_try_reads_running_ready_and_expired() -> None:
+    running = FakeEvaluationClient({f"{TRIES}/{TRY_ID}": TransportResponse(text="", status_code=202, json=None)})
+    ready = FakeEvaluationClient({f"{TRIES}/{TRY_ID}": try_result_dict()})
+    gone = FakeEvaluationClient(
+        {f"{TRIES}/{TRY_ID}": TransportResponse(text="{}", status_code=410, json={"code": "try_expired"})}
+    )
+
+    assert (await resource(running).get_try(PIPELINE_NAME, TRY_ID)).status == "RUNNING"
+    state = await resource(ready).get_try(PIPELINE_NAME, TRY_ID)
+    assert state.status == "READY"
+    assert state.result is not None and state.result.metrics[0].label == "yes"
+    assert (await resource(gone).get_try(PIPELINE_NAME, TRY_ID)).status == "EXPIRED"
+
+
+@pytest.mark.asyncio
+async def test_start_session_replay_sends_replay_mode_only_when_set() -> None:
+    client = FakeEvaluationClient({REPLAYS: {"session_replay_run_id": REPLAY_RUN_ID}})
+
+    await resource(client).start_session_replay(PIPELINE_NAME, SESSION_ID, DRAFT_VERSION_ID)
+    await resource(client).start_session_replay(
+        PIPELINE_NAME, SESSION_ID, DRAFT_VERSION_ID, replay_mode="ALL_USER_MESSAGES"
+    )
+
+    first, second = (r for r in client.requests if r["endpoint"] == REPLAYS)
+    assert first["method"] == "POST"
+    assert first["data"] == {"session_id": SESSION_ID, "pipeline_version_id": DRAFT_VERSION_ID}
+    assert second["data"]["replay_mode"] == "ALL_USER_MESSAGES"
+
+
+@pytest.mark.asyncio
+async def test_get_session_replay_reads_the_run() -> None:
+    client = FakeEvaluationClient({f"{REPLAYS}/{REPLAY_RUN_ID}": replay_run_dict()})
+
+    run = await resource(client).get_session_replay(PIPELINE_NAME, REPLAY_RUN_ID)
+
+    assert (run.status, run.source_session_id, run.trace_ids) == ("ENDED", SESSION_ID, [EVALUATION_RUN_ID])
