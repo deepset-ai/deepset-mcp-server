@@ -217,3 +217,76 @@ class SessionList(BaseModel):
 
     data: list[SessionListItem]
     next: str | None = Field(default=None, description="Pass as cursor for the next page. Null on the last page.")
+
+
+class EvaluationTryResult(BaseModel):
+    """What an ad-hoc try found, as hub-api returns it. Never persisted; it ages out within the hour."""
+
+    session_id: str
+    outcome: Literal["SUCCEEDED", "ERRORED"] | None = None
+    metrics: list[MetricRow] = Field(default_factory=list)
+    trace_ids: list[str] = Field(default_factory=list)
+    trace: dict[str, Any] | None = Field(default=None, description="The judge's own haystack-trace/v1 artifact")
+    error_detail: dict[str, Any] | None = None
+
+
+class TryState(BaseModel):
+    """Where an ad-hoc try stands: still running, finished with a result, or aged out."""
+
+    status: Literal["RUNNING", "READY", "EXPIRED"]
+    result: EvaluationTryResult | None = None
+
+
+class TraceSummary(BaseModel):
+    """What an evaluator did while judging, without the Session content its trace quotes."""
+
+    tool_calls: list[str] = Field(default_factory=list, description="Session Tools it called, in order")
+    failed: bool = Field(description="Whether the evaluator's own run failed")
+
+
+class TryReport(BaseModel):
+    """An ad-hoc try, read for the assistant."""
+
+    status: Literal["RUNNING", "READY", "EXPIRED"] = Field(
+        description="RUNNING: poll get_evaluation_try with try_id. EXPIRED: the result aged out, try again."
+    )
+    try_id: str
+    session_id: str | None = None
+    outcome: Literal["SUCCEEDED", "ERRORED"] | None = Field(
+        default=None, description="ERRORED means the evaluator's code broke; read error_detail"
+    )
+    metrics: list[MetricRow] = Field(default_factory=list)
+    trace_ids: list[str] = Field(default_factory=list, description="The turns judged, in order")
+    trace_summary: TraceSummary | None = None
+    error_detail: dict[str, Any] | None = None
+
+
+class SessionReplayRun(BaseModel):
+    """A session replay run, as hub-api returns it."""
+
+    session_replay_run_id: str
+    pipeline_version_id: str
+    status: str = Field(description="CREATED, STARTED, ENDED or FAILED")
+    source_session_id: str
+    replay_mode: str | None = None
+    trace_ids: list[str] = Field(default_factory=list, description="The traces the replay produced, in order")
+    error_detail: dict[str, Any] | None = None
+
+
+class SessionReplayReport(BaseModel):
+    """A session replay, read for the assistant: what was replayed, and the Session it produced."""
+
+    status: str = Field(
+        description="ENDED or FAILED once done; CREATED or STARTED: poll get_session_replay with replay_run_id"
+    )
+    replay_run_id: str
+    source_session_id: str
+    replayed_session_id: str | None = Field(
+        default=None, description="The new Session the replay produced; pass it to try_evaluator"
+    )
+    pipeline_version_id: str
+    replay_mode: str | None = Field(
+        default=None, description="FIRST_USER_MESSAGE replays the first turn only; ALL_USER_MESSAGES every turn"
+    )
+    trace_ids: list[str] = Field(default_factory=list)
+    error_detail: dict[str, Any] | None = None

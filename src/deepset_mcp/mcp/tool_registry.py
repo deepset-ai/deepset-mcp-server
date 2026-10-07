@@ -38,11 +38,15 @@ from deepset_mcp.tools.doc_search import (
     search_docs_via_docs_api,
 )
 from deepset_mcp.tools.evaluation import (
+    get_evaluation_try as get_evaluation_try_tool,
     get_evaluator as get_evaluator_tool,
     get_experiment_run as get_experiment_run_tool,
+    get_session_replay as get_session_replay_tool,
     list_evaluators as list_evaluators_tool,
     list_experiments as list_experiments_tool,
     list_sessions as list_sessions_tool,
+    replay_session as replay_session_tool,
+    try_evaluator as try_evaluator_tool,
 )
 from deepset_mcp.tools.haystack_service import (
     get_component_definition as get_component_definition_tool,
@@ -381,6 +385,22 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "list_sessions": (
         list_sessions_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "try_evaluator": (
+        try_evaluator_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "get_evaluation_try": (
+        get_evaluation_try_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "replay_session": (
+        replay_session_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "get_session_replay": (
+        get_session_replay_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
     ),
     "list_custom_component_installations": (
         list_custom_component_installations_tool,

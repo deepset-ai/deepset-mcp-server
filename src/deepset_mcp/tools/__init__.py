@@ -23,7 +23,17 @@ from .deployment import (
     update_deployment,
 )
 from .doc_search import list_doc_sections, search_docs
-from .evaluation import get_evaluator, get_experiment_run, list_evaluators, list_experiments, list_sessions
+from .evaluation import (
+    get_evaluation_try,
+    get_evaluator,
+    get_experiment_run,
+    get_session_replay,
+    list_evaluators,
+    list_experiments,
+    list_sessions,
+    replay_session,
+    try_evaluator,
+)
 from .haystack_service import (
     get_component_definition,
     get_custom_components,
@@ -138,6 +148,10 @@ __all__ = [
     "list_experiments",
     "get_experiment_run",
     "list_sessions",
+    "try_evaluator",
+    "get_evaluation_try",
+    "replay_session",
+    "get_session_replay",
     "get_secret",
     "list_secrets",
     "load_skill",

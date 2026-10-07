@@ -223,6 +223,26 @@ def evaluate(session, focus):
 
 Answered-or-not is the example under [The function](#the-function).
 
+## Checking a pipeline change on real Sessions
+
+Use this after a change to the pipeline (usually on its draft version) to see whether it holds up on Sessions it has already served. It is a check, not a measurement.
+
+1. **Pick the Sessions.** Take the ones that motivated the change, plus a small sample of recent ones from `list_sessions`. Use at most five.
+2. **Pick the Evaluators.** Choose the saved ones that measure what the change is about (`list_evaluators`), and read each one's source with `get_evaluator(evaluator_id, version_id=latest_version.evaluator_version_id)`.
+3. **Say what it costs, and wait for a yes.**
+   - Each replay runs the pipeline once per replayed turn on the customer's models.
+   - Each try of a judged Evaluator costs about one model call per judged turn.
+4. **Replay** each Session against the draft: `replay_session(session_id, pipeline_version_id=<draft version id>)`.
+   - For a chat pipeline, pass `replay_mode="ALL_USER_MESSAGES"` where the server supports it. Otherwise only the first turn is replayed.
+   - Keep each `replayed_session_id`.
+5. **Try** each Evaluator's source on the source Session and on its replay with `try_evaluator`.
+6. **Report per Session.**
+   - Say what held, what changed, and both rationales.
+   - Use "held" or "changed on these Sessions", never "improved": a handful of Sessions is a sanity check.
+   - Say how many turns were replayed.
+
+A replay leaves the source Session and the deployed pipeline untouched. Its new Session is tagged as a replay.
+
 ## Checklist before showing a draft
 
 1. One public function, `(session, focus)`, imports from `dc_haystack_utilities.evaluation`.

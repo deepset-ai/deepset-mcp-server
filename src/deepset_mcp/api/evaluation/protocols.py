@@ -11,6 +11,8 @@ from deepset_mcp.api.evaluation.models import (
     ExperimentRun,
     ExperimentRunGrid,
     SessionList,
+    SessionReplayRun,
+    TryState,
 )
 
 
@@ -55,4 +57,22 @@ class EvaluationResourceProtocol(Protocol):
         cursor: str | None = None,
     ) -> SessionList:
         """List a pipeline's Sessions that a run can judge."""
+        ...
+
+    async def start_try(self, pipeline_name: str, python_code: str, session_id: str) -> str:
+        """Start an ad-hoc try of Evaluator source on one Session."""
+        ...
+
+    async def get_try(self, pipeline_name: str, try_id: str) -> TryState:
+        """Read an ad-hoc try."""
+        ...
+
+    async def start_session_replay(
+        self, pipeline_name: str, session_id: str, pipeline_version_id: str, replay_mode: str | None = None
+    ) -> str:
+        """Start replaying a Session against a pipeline version."""
+        ...
+
+    async def get_session_replay(self, pipeline_name: str, replay_run_id: str) -> SessionReplayRun:
+        """Read a session replay run."""
         ...

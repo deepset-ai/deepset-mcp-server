@@ -2,12 +2,18 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Tools for reading Evaluators, Experiments, their runs, and the Sessions a run can judge."""
+"""Tools for reading evaluation state and running the assistant's two checks.
+
+The reads cover Evaluators, Experiments, their runs and Sessions. The checks are an ad-hoc try of
+Evaluator source and a session replay against a pipeline version.
+"""
 
 import asyncio
+import time
 from collections import Counter
+from collections.abc import Awaitable, Callable
 from statistics import fmean
-from typing import Literal
+from typing import Any, Literal, TypeVar
 
 from deepset_mcp.api.evaluation.models import (
     Evaluator,
@@ -19,6 +25,11 @@ from deepset_mcp.api.evaluation.models import (
     ReportCell,
     ReportRow,
     SessionList,
+    SessionReplayReport,
+    SessionReplayRun,
+    TraceSummary,
+    TryReport,
+    TryState,
 )
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.protocols import AsyncClientProtocol
@@ -251,3 +262,216 @@ async def list_sessions(
         return f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}' (not found)."
     except (BadRequestError, UnexpectedAPIError) as e:
         return f"Failed to list sessions for pipeline '{pipeline_name}': {e}"
+
+
+# ---------------------------------------------------------------------------------------------
+# Checks: the ad-hoc try and session replay
+# ---------------------------------------------------------------------------------------------
+
+POLL_INTERVAL_SECONDS = 2.0
+REPLAY_DONE_STATUSES = frozenset({"ENDED", "FAILED"})
+TOOL_NAME_TAG = "haystack.tool.name"
+
+_State = TypeVar("_State")
+
+
+async def _poll(
+    read: Callable[[], Awaitable[_State]], is_done: Callable[[_State], bool], wait_seconds: float
+) -> _State:
+    """Read until done or until the wait runs out, and return the last state read."""
+    deadline = time.monotonic() + wait_seconds
+    state = await read()
+    while not is_done(state) and time.monotonic() < deadline:
+        await asyncio.sleep(POLL_INTERVAL_SECONDS)
+        state = await read()
+    return state
+
+
+def _trace_summary(trace: dict[str, Any] | None) -> TraceSummary | None:
+    """The Session Tools an evaluator called and whether it failed, without the content it read."""
+    if trace is None:
+        return None
+    spans = trace.get("traces")
+    names = (
+        [
+            span["tags"][TOOL_NAME_TAG]
+            for span in spans
+            if isinstance(span, dict) and isinstance((span.get("tags") or {}).get(TOOL_NAME_TAG), str)
+        ]
+        if isinstance(spans, list)
+        else []
+    )
+    status = trace.get("status")
+    return TraceSummary(tool_calls=names, failed=status is not None and status != "success")
+
+
+def _try_report(try_id: str, state: TryState) -> TryReport:
+    result = state.result
+    if result is None:
+        return TryReport(status=state.status, try_id=try_id)
+    return TryReport(
+        status=state.status,
+        try_id=try_id,
+        session_id=result.session_id,
+        outcome=result.outcome,
+        metrics=result.metrics,
+        trace_ids=result.trace_ids,
+        trace_summary=_trace_summary(result.trace),
+        error_detail=result.error_detail,
+    )
+
+
+async def try_evaluator(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    python_code: str,
+    session_id: str,
+    wait_seconds: int = 120,
+) -> TryReport | str:
+    """Tries Evaluator source on one Session and returns what it found. Persists nothing.
+
+    Use it to check a draft before showing it as ready, and to judge a replayed Session against
+    its source. The source is an Evaluation Function as the `evaluation` skill describes; to try a
+    saved Evaluator, read a version's ``python_code`` with ``get_evaluator`` and pass it. A try that
+    judges with a model costs a model call per judged turn on the customer's provider.
+
+    ``outcome`` ERRORED means the code broke: read ``error_detail`` and fix it. ``metrics`` are the
+    values per address with their rationales. ``trace_summary`` says which Session Tools the
+    evaluator called. If ``status`` is RUNNING the wait ran out: poll ``get_evaluation_try``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline the Session belongs to.
+    :param python_code: The Evaluation Function's source.
+    :param session_id: The Session to judge: a ``search_session_id``, or a single-turn run's ``query_id``.
+    :param wait_seconds: How long to wait for the result before handing back the id to poll.
+    :returns: The try report, or an error message.
+    """
+    resource = client.evaluation(workspace=workspace)
+    try:
+        try_id = await resource.start_try(pipeline_name, python_code, session_id)
+        state = await _poll(
+            lambda: resource.get_try(pipeline_name, try_id), lambda s: s.status != "RUNNING", wait_seconds
+        )
+    except ResourceNotFoundError:
+        return f"Pipeline '{pipeline_name}' or Session '{session_id}' not found in workspace '{workspace}'."
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to try the evaluator on Session '{session_id}': {e}"
+    return _try_report(try_id, state)
+
+
+async def get_evaluation_try(
+    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str, try_id: str
+) -> TryReport | str:
+    """Reads an ad-hoc try that ``try_evaluator`` handed back while it was still running.
+
+    EXPIRED means the result aged out (tries are kept for an hour): run ``try_evaluator`` again.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline.
+    :param try_id: The ``try_id`` from ``try_evaluator``.
+    :returns: The try report, or an error message.
+    """
+    try:
+        state = await client.evaluation(workspace=workspace).get_try(pipeline_name, try_id)
+    except ResourceNotFoundError:
+        return f"Try '{try_id}' not found for pipeline '{pipeline_name}'."
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to read try '{try_id}': {e}"
+    return _try_report(try_id, state)
+
+
+async def _replay_report(
+    client: AsyncClientProtocol, workspace: str, pipeline_name: str, run: SessionReplayRun
+) -> SessionReplayReport:
+    """The run, with the Session it produced: read off its first trace, else that trace itself."""
+    replayed_session_id = None
+    if run.status == "ENDED" and run.trace_ids:
+        first = run.trace_ids[0]
+        traces = await client.search_history(workspace=workspace).list_pipeline_traces(
+            pipeline_name=pipeline_name, limit=1, query_filter=f"query_id eq '{first}'"
+        )
+        row = traces.data[0] if traces.data else None
+        replayed_session_id = (getattr(row, "search_session_id", None) if row else None) or first
+    return SessionReplayReport(
+        status=run.status,
+        replay_run_id=run.session_replay_run_id,
+        source_session_id=run.source_session_id,
+        replayed_session_id=replayed_session_id,
+        pipeline_version_id=run.pipeline_version_id,
+        replay_mode=run.replay_mode,
+        trace_ids=run.trace_ids,
+        error_detail=run.error_detail,
+    )
+
+
+async def replay_session(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    session_id: str,
+    pipeline_version_id: str,
+    replay_mode: Literal["FIRST_USER_MESSAGE", "ALL_USER_MESSAGES"] | None = None,
+    wait_seconds: int = 300,
+) -> SessionReplayReport | str:
+    """Replays a recorded Session against a pipeline version, a draft included, into a new Session.
+
+    Use it to check a pipeline change on real Sessions: replay the Sessions behind the change
+    against the draft version, then ``try_evaluator`` the relevant Evaluators on each source
+    Session and on its ``replayed_session_id``, and compare. Each replay runs the pipeline on the
+    customer's models, so say what it costs and get a yes before replaying. The source Session and
+    the deployed pipeline are untouched.
+
+    FIRST_USER_MESSAGE replays the first turn only; ALL_USER_MESSAGES replays every turn of a chat in
+    order. Leave it unset to use the server's default (the first turn), and say so when reporting.
+    If ``status`` is still CREATED or STARTED the wait ran out: poll ``get_session_replay``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline.
+    :param session_id: The Session to replay: a ``search_session_id``, or a single-turn run's ``query_id``.
+    :param pipeline_version_id: The pipeline version to replay against, e.g. the current draft's.
+    :param replay_mode: FIRST_USER_MESSAGE or ALL_USER_MESSAGES; unset uses the server's default.
+    :param wait_seconds: How long to wait for the replay before handing back the id to poll.
+    :returns: The replay report with the new Session's id, or an error message.
+    """
+    resource = client.evaluation(workspace=workspace)
+    try:
+        run_id = await resource.start_session_replay(pipeline_name, session_id, pipeline_version_id, replay_mode)
+        run = await _poll(
+            lambda: resource.get_session_replay(pipeline_name, run_id),
+            lambda r: r.status in REPLAY_DONE_STATUSES,
+            wait_seconds,
+        )
+        return await _replay_report(client, workspace, pipeline_name, run)
+    except ResourceNotFoundError:
+        return (
+            f"Pipeline '{pipeline_name}', Session '{session_id}' or version '{pipeline_version_id}' "
+            f"not found in workspace '{workspace}'."
+        )
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to replay Session '{session_id}': {e}"
+
+
+async def get_session_replay(
+    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str, replay_run_id: str
+) -> SessionReplayReport | str:
+    """Reads a session replay that ``replay_session`` handed back while it was still running.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline.
+    :param replay_run_id: The ``replay_run_id`` from ``replay_session``.
+    :returns: The replay report with the new Session's id once it ended, or an error message.
+    """
+    try:
+        run = await client.evaluation(workspace=workspace).get_session_replay(pipeline_name, replay_run_id)
+        return await _replay_report(client, workspace, pipeline_name, run)
+    except ResourceNotFoundError:
+        return f"Replay '{replay_run_id}' not found for pipeline '{pipeline_name}'."
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to read replay '{replay_run_id}': {e}"
