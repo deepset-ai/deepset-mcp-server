@@ -7,13 +7,13 @@ from typing import Any
 import pytest
 
 from deepset_mcp.api.evaluation.models import (
+    EvaluationTryResult,
     Evaluator,
     EvaluatorVersion,
     Experiment,
     ExperimentRun,
     ExperimentRunGrid,
     ExperimentRunReport,
-    EvaluationTryResult,
     SessionList,
     SessionReplayReport,
     SessionReplayRun,
@@ -137,9 +137,18 @@ def grid() -> ExperimentRunGrid:
 
 
 class FakeEvaluationResource(EvaluationResourceProtocol):
-    def __init__(self, error: Exception | None = None) -> None:
+    """Answers reads with fixtures, and each check poll with the next state in line, then the last."""
+
+    def __init__(
+        self,
+        error: Exception | None = None,
+        try_states: list[TryState] | None = None,
+        replay_states: list[SessionReplayRun] | None = None,
+    ) -> None:
         self.error = error
         self.calls: list[tuple[str, dict[str, Any]]] = []
+        self.try_states = try_states or []
+        self.replay_states = replay_states or []
 
     def _record(self, name: str, **kwargs: Any) -> None:
         self.calls.append((name, kwargs))
@@ -211,6 +220,29 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
     ) -> SessionList:
         self._record("list_sessions", origin=origin, since=since, limit=limit, cursor=cursor)
         return SessionList.model_validate({"data": [], "next": None})
+
+    async def start_try(self, pipeline_name: str, python_code: str, session_id: str) -> str:
+        self._record("start_try", python_code=python_code, session_id=session_id)
+        return TRY_ID
+
+    async def get_try(self, pipeline_name: str, try_id: str) -> TryState:
+        self._record("get_try", try_id=try_id)
+        return self.try_states.pop(0) if len(self.try_states) > 1 else self.try_states[0]
+
+    async def start_session_replay(
+        self, pipeline_name: str, session_id: str, pipeline_version_id: str, replay_mode: str | None = None
+    ) -> str:
+        self._record(
+            "start_session_replay",
+            session_id=session_id,
+            pipeline_version_id=pipeline_version_id,
+            replay_mode=replay_mode,
+        )
+        return REPLAY_RUN_ID
+
+    async def get_session_replay(self, pipeline_name: str, replay_run_id: str) -> SessionReplayRun:
+        self._record("get_session_replay", replay_run_id=replay_run_id)
+        return self.replay_states.pop(0) if len(self.replay_states) > 1 else self.replay_states[0]
 
 
 class FakeClient(BaseFakeClient):
@@ -378,49 +410,14 @@ def replay_run(status: str, trace_ids: list[str] | None = None) -> SessionReplay
     )
 
 
-class FakeCheckResource(FakeEvaluationResource):
-    """Answers each poll with the next state in line, then repeats the last one."""
-
-    def __init__(
-        self,
-        try_states: list[TryState] | None = None,
-        replay_states: list[SessionReplayRun] | None = None,
-        error: Exception | None = None,
-    ) -> None:
-        super().__init__(error=error)
-        self.try_states = try_states or []
-        self.replay_states = replay_states or []
-
-    async def start_try(self, pipeline_name: str, python_code: str, session_id: str) -> str:
-        self._record("start_try", python_code=python_code, session_id=session_id)
-        return TRY_ID
-
-    async def get_try(self, pipeline_name: str, try_id: str) -> TryState:
-        self._record("get_try", try_id=try_id)
-        return self.try_states.pop(0) if len(self.try_states) > 1 else self.try_states[0]
-
-    async def start_session_replay(
-        self, pipeline_name: str, session_id: str, pipeline_version_id: str, replay_mode: str | None = None
-    ) -> str:
-        self._record(
-            "start_session_replay",
-            session_id=session_id,
-            pipeline_version_id=pipeline_version_id,
-            replay_mode=replay_mode,
-        )
-        return REPLAY_RUN_ID
-
-    async def get_session_replay(self, pipeline_name: str, replay_run_id: str) -> SessionReplayRun:
-        self._record("get_session_replay", replay_run_id=replay_run_id)
-        return self.replay_states.pop(0) if len(self.replay_states) > 1 else self.replay_states[0]
-
-
 class FakeTraces:
     def __init__(self, search_session_id: str | None) -> None:
         self.search_session_id = search_session_id
         self.filters: list[str | None] = []
 
-    async def list_pipeline_traces(self, pipeline_name: str, limit: int = 10, query_filter: str | None = None, **_: Any) -> Any:
+    async def list_pipeline_traces(
+        self, pipeline_name: str, limit: int = 10, query_filter: str | None = None, **_: Any
+    ) -> Any:
         self.filters.append(query_filter)
         row = {
             "query_id": REPLAYED_QUERY_ID,
@@ -448,7 +445,7 @@ def no_poll_delay(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.asyncio
 async def test_try_evaluator_polls_until_ready_and_keeps_only_a_summary_of_the_judge_trace() -> None:
-    resource = FakeCheckResource(
+    resource = FakeEvaluationResource(
         try_states=[TryState(status="RUNNING"), TryState(status="READY", result=try_result())]
     )
 
@@ -472,7 +469,7 @@ async def test_try_evaluator_polls_until_ready_and_keeps_only_a_summary_of_the_j
 
 @pytest.mark.asyncio
 async def test_try_evaluator_hands_back_the_id_when_the_wait_runs_out() -> None:
-    resource = FakeCheckResource(try_states=[TryState(status="RUNNING")])
+    resource = FakeEvaluationResource(try_states=[TryState(status="RUNNING")])
 
     report = await try_evaluator(
         client=FakeCheckClient(resource),
@@ -489,7 +486,7 @@ async def test_try_evaluator_hands_back_the_id_when_the_wait_runs_out() -> None:
 
 @pytest.mark.asyncio
 async def test_get_evaluation_try_says_an_expired_try_must_run_again() -> None:
-    resource = FakeCheckResource(try_states=[TryState(status="EXPIRED")])
+    resource = FakeEvaluationResource(try_states=[TryState(status="EXPIRED")])
 
     report = await get_evaluation_try(
         client=FakeCheckClient(resource), workspace=WORKSPACE, pipeline_name=PIPELINE, try_id=TRY_ID
@@ -502,7 +499,7 @@ async def test_get_evaluation_try_says_an_expired_try_must_run_again() -> None:
 @pytest.mark.asyncio
 async def test_replay_session_polls_until_ended_and_names_the_replayed_session() -> None:
     traces = FakeTraces(REPLAYED_SESSION_ID)
-    resource = FakeCheckResource(
+    resource = FakeEvaluationResource(
         replay_states=[replay_run("STARTED"), replay_run("ENDED", trace_ids=[REPLAYED_QUERY_ID])]
     )
 
@@ -527,7 +524,7 @@ async def test_replay_session_polls_until_ended_and_names_the_replayed_session()
 
 @pytest.mark.asyncio
 async def test_a_replay_without_a_search_session_is_named_by_its_query_id() -> None:
-    resource = FakeCheckResource(replay_states=[replay_run("ENDED", trace_ids=[REPLAYED_QUERY_ID])])
+    resource = FakeEvaluationResource(replay_states=[replay_run("ENDED", trace_ids=[REPLAYED_QUERY_ID])])
 
     report = await get_session_replay(
         client=FakeCheckClient(resource, FakeTraces(None)),
@@ -542,7 +539,7 @@ async def test_a_replay_without_a_search_session_is_named_by_its_query_id() -> N
 
 @pytest.mark.asyncio
 async def test_a_failed_replay_names_no_session() -> None:
-    resource = FakeCheckResource(replay_states=[replay_run("FAILED")])
+    resource = FakeEvaluationResource(replay_states=[replay_run("FAILED")])
 
     report = await replay_session(
         client=FakeCheckClient(resource),
@@ -566,7 +563,7 @@ async def test_a_failed_replay_names_no_session() -> None:
     ],
 )
 async def test_check_errors_come_back_as_readable_strings(error: Exception, expected: str) -> None:
-    client = FakeCheckClient(FakeCheckResource(error=error))
+    client = FakeCheckClient(FakeEvaluationResource(error=error))
 
     results = [
         await try_evaluator(

@@ -9,14 +9,18 @@ from urllib.parse import quote
 
 from deepset_mcp.api import ids
 from deepset_mcp.api.evaluation.models import (
+    EvaluationTryResult,
     Evaluator,
     EvaluatorVersion,
     Experiment,
     ExperimentRun,
     ExperimentRunGrid,
     SessionList,
+    SessionReplayRun,
+    TryState,
 )
 from deepset_mcp.api.evaluation.protocols import EvaluationResourceProtocol
+from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.transport import raise_for_status
 
 if TYPE_CHECKING:
@@ -38,6 +42,13 @@ class EvaluationResource(EvaluationResourceProtocol):
         """
         self._client = client
         self._workspace = workspace
+
+    async def _post(self, path: str, data: dict[str, Any]) -> Any:
+        resp = await self._client.request(endpoint=path, method="POST", data=data)
+        raise_for_status(resp)
+        if resp.json is None:
+            raise UnexpectedAPIError(status_code=resp.status_code, message="Empty response", detail=None)
+        return resp.json
 
     async def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         resp = await self._client.request(endpoint=path, method="GET", params=params)
@@ -151,3 +162,58 @@ class EvaluationResource(EvaluationResourceProtocol):
         path = await self._pipeline_path(pipeline_name, "sessions")
         data = await self._get(path, {k: v for k, v in params.items() if v is not None})
         return SessionList.model_validate(data or {"data": []})
+
+    async def start_try(self, pipeline_name: str, python_code: str, session_id: str) -> str:
+        """Start an ad-hoc try of Evaluator source on one Session. Persists nothing.
+
+        :param pipeline_name: Name of the pipeline.
+        :param python_code: The Evaluation Function's source.
+        :param session_id: The Session to judge.
+        :returns: The try id to poll.
+        """
+        path = await self._pipeline_path(pipeline_name, "evaluations", "try")
+        data = await self._post(path, {"python_code": python_code, "session_id": session_id})
+        return str(data["try_id"])
+
+    async def get_try(self, pipeline_name: str, try_id: str) -> TryState:
+        """Read an ad-hoc try: running (202), finished (200) or aged out (410).
+
+        :param pipeline_name: Name of the pipeline.
+        :param try_id: The id `start_try` returned.
+        :returns: The try's state, with its result once finished.
+        """
+        path = await self._pipeline_path(pipeline_name, "evaluations", "try", try_id)
+        resp = await self._client.request(endpoint=path, method="GET")
+        if resp.status_code == 202:
+            return TryState(status="RUNNING")
+        if resp.status_code == 410:
+            return TryState(status="EXPIRED")
+        raise_for_status(resp)
+        return TryState(status="READY", result=EvaluationTryResult.model_validate(resp.json))
+
+    async def start_session_replay(
+        self, pipeline_name: str, session_id: str, pipeline_version_id: str, replay_mode: str | None = None
+    ) -> str:
+        """Start replaying a Session against a pipeline version, a draft included.
+
+        :param pipeline_name: Name of the pipeline.
+        :param session_id: The Session to replay.
+        :param pipeline_version_id: The pipeline version to replay it against.
+        :param replay_mode: FIRST_USER_MESSAGE or ALL_USER_MESSAGES; omitted, the server's default.
+        :returns: The replay run id to poll.
+        """
+        body = {"session_id": session_id, "pipeline_version_id": pipeline_version_id}
+        if replay_mode is not None:
+            body["replay_mode"] = replay_mode
+        data = await self._post(await self._pipeline_path(pipeline_name, "session-replay"), body)
+        return str(data["session_replay_run_id"])
+
+    async def get_session_replay(self, pipeline_name: str, replay_run_id: str) -> SessionReplayRun:
+        """Read a session replay run.
+
+        :param pipeline_name: Name of the pipeline.
+        :param replay_run_id: The id `start_session_replay` returned.
+        :returns: The run.
+        """
+        path = await self._pipeline_path(pipeline_name, "session-replay", replay_run_id)
+        return SessionReplayRun.model_validate(await self._get(path))

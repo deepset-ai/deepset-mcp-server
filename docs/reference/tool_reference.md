@@ -118,6 +118,10 @@ draft/version history. Each deployment tracks its own history of served pipeline
 | `list_experiments` | required | explorable | List a pipeline's Experiments, each with its most recent run. |
 | `get_experiment_run` | required | explorable | Read one Experiment run: cell counts, a summary per Metric, and the grid rows. |
 | `list_sessions` | required | explorable | List the Sessions of a pipeline that an Experiment run can judge. |
+| `try_evaluator` | required | none | Try Evaluator source on one Session and return its Metrics; persists nothing. |
+| `get_evaluation_try` | required | none | Read a try that was still running. |
+| `replay_session` | required | none | Replay a Session against a pipeline version, a draft included, into a new Session. |
+| `get_session_replay` | required | none | Read a session replay that was still running. |
 
 ### Templates
 
