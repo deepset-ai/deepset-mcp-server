@@ -8,6 +8,7 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from types import TracebackType
 from typing import Any, Literal, Self, TypeVar, overload
 
+from deepset_mcp.api.cost.protocols import CostResourceProtocol
 from deepset_mcp.api.custom_components.protocols import CustomComponentsProtocol
 from deepset_mcp.api.deployment.protocols import DeploymentResourceProtocol
 from deepset_mcp.api.evaluation.protocols import EvaluationResourceProtocol
@@ -274,6 +275,10 @@ class BaseFakeClient(AsyncClientProtocol):
 
     def evaluation(self, workspace: str) -> EvaluationResourceProtocol:
         """Overwrite this method when testing EvaluationResource."""
+        raise NotImplementedError
+
+    def cost(self, workspace: str) -> CostResourceProtocol:
+        """Overwrite this method when testing CostResource."""
         raise NotImplementedError
 
     def custom_components(self, workspace: str) -> CustomComponentsProtocol:

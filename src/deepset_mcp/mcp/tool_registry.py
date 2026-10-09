@@ -9,6 +9,11 @@ from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.config import DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME, LIST_DOC_SECTIONS_TOOL_NAME
 from deepset_mcp.initialize_embedding_model import get_initialized_model
 from deepset_mcp.mcp.tool_models import DeepsetDocsConfig, ExplorerConfig, MemoryType, ToolConfig
+from deepset_mcp.tools.cost import (
+    get_cost_breakdown as get_cost_breakdown_tool,
+    get_cost_over_time as get_cost_over_time_tool,
+    get_cost_totals as get_cost_totals_tool,
+)
 from deepset_mcp.tools.custom_components import (
     get_latest_custom_component_installation_logs as get_latest_custom_component_installation_logs_tool,
     list_custom_component_installations as list_custom_component_installations_tool,
@@ -401,6 +406,19 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "get_session_replay": (
         get_session_replay_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    # Cost tools
+    "get_cost_totals": (
+        get_cost_totals_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_cost_over_time": (
+        get_cost_over_time_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_cost_breakdown": (
+        get_cost_breakdown_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
     "list_custom_component_installations": (
         list_custom_component_installations_tool,

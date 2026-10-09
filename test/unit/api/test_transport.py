@@ -10,8 +10,8 @@ import httpx
 import pytest
 import pytest_asyncio
 
-from deepset_mcp.api.exceptions import RequestTimeoutError
-from deepset_mcp.api.transport import AsyncTransport, TransportResponse
+from deepset_mcp.api.exceptions import DeepsetAPIError, RequestTimeoutError, ResourceNotFoundError
+from deepset_mcp.api.transport import AsyncTransport, TransportResponse, raise_for_status
 
 
 @pytest.mark.asyncio
@@ -270,3 +270,24 @@ class TestAsyncTransport:
             assert second_call_args["headers"]["Authorization"] == "Bearer test-key-2"
             assert second_call_args["headers"]["Custom-Header"] == "value"
             assert second_call_args["headers"]["Another-Header"] == "another-value"
+
+
+@pytest.mark.parametrize(
+    ("body", "expected_message"),
+    [
+        ({"message": "Pipeline not found", "details": None}, "Pipeline not found"),
+        ({"errors": ["Workspace not found"]}, "Workspace not found"),
+        ({"errors": ["first", "second"]}, "first; second"),
+        ({"detail": {"errors": ["Workspace not found"]}}, "Workspace not found"),
+        ({"detail": "Not Found"}, "Not Found"),
+        ({"detail": [{"loc": ["query"], "msg": "bad"}]}, '[{"loc": ["query"], "msg": "bad"}]'),
+    ],
+)
+def test_raise_for_status_reads_the_error_message(body: dict[str, Any], expected_message: str) -> None:
+    response = TransportResponse(text=json.dumps(body), status_code=404, json=body)
+
+    with pytest.raises(DeepsetAPIError) as exc_info:
+        raise_for_status(response)
+
+    assert exc_info.value.message == expected_message
+    assert isinstance(exc_info.value, ResourceNotFoundError)

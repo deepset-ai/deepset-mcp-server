@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from .cost import get_cost_breakdown, get_cost_over_time, get_cost_totals
 from .custom_components import get_latest_custom_component_installation_logs, list_custom_component_installations
 from .deployment import (
     activate_deployment,
@@ -152,6 +153,9 @@ __all__ = [
     "get_evaluation_try",
     "replay_session",
     "get_session_replay",
+    "get_cost_totals",
+    "get_cost_over_time",
+    "get_cost_breakdown",
     "get_secret",
     "list_secrets",
     "load_skill",

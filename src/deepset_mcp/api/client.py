@@ -8,6 +8,7 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from types import TracebackType
 from typing import Any, Literal, Self, TypeVar, overload
 
+from deepset_mcp.api.cost.resource import CostResource
 from deepset_mcp.api.custom_components.resource import CustomComponentsResource
 from deepset_mcp.api.deployment.resource import DeploymentResource
 from deepset_mcp.api.evaluation.resource import EvaluationResource
@@ -114,6 +115,14 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         :returns: Evaluation resource instance
         """
         return EvaluationResource(client=self, workspace=workspace)
+
+    def cost(self, workspace: str) -> CostResource:
+        """Resource to read LLM cost in the specified workspace.
+
+        :param workspace: Workspace identifier
+        :returns: Cost resource instance
+        """
+        return CostResource(client=self, workspace=workspace)
 
     def pipeline_templates(self, workspace: str) -> PipelineTemplateResource:
         """Resource to interact with pipeline templates in the specified workspace.
