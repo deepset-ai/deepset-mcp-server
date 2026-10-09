@@ -123,6 +123,14 @@ draft/version history. Each deployment tracks its own history of served pipeline
 | `replay_session` | required | none | Replay a Session against a pipeline version, a draft included, into a new Session. |
 | `get_session_replay` | required | none | Read a session replay that was still running. |
 
+### Cost
+
+| MCP tool name | Workspace | Memory | Description |
+| --- | --- | --- | --- |
+| `get_cost_totals` | required | explorable | Read the LLM cost, tokens and requests of a workspace or pipeline over a date range. |
+| `get_cost_over_time` | required | explorable | Read the LLM cost of a workspace or pipeline per UTC day. |
+| `get_cost_breakdown` | required | explorable | Read the LLM cost grouped by model, workspace, pipeline, deployment, API key or provider. |
+
 ### Templates
 
 | MCP tool name | Workspace | Memory | Description |

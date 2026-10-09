@@ -7,6 +7,9 @@
 import asyncio
 from typing import TYPE_CHECKING
 
+from deepset_mcp.api.exceptions import UnexpectedAPIError
+from deepset_mcp.api.transport import raise_for_status
+
 if TYPE_CHECKING:
     from deepset_mcp.api.protocols import AsyncClientProtocol
 
@@ -26,3 +29,15 @@ async def workspace_and_pipeline_ids(
 ) -> tuple[str, str]:
     """Resolve both UUIDs concurrently."""
     return await asyncio.gather(workspace_id(client, workspace), pipeline_id(client, workspace, pipeline_name))
+
+
+async def organization_id(client: "AsyncClientProtocol") -> str:
+    """Resolve the organization UUID of the API key's user."""
+    resp = await client.request(endpoint="v1/me", method="GET")
+    raise_for_status(resp)
+    try:
+        return str(resp.json["organization"]["organization_id"])  # type: ignore[index]
+    except (KeyError, TypeError) as e:
+        raise UnexpectedAPIError(
+            status_code=resp.status_code, message="No organization in /v1/me response", detail=None
+        ) from e

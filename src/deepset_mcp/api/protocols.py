@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol, Self, TypeVar, overloa
 from deepset_mcp.api.transport import StreamingResponse, TransportResponse
 
 if TYPE_CHECKING:
+    from deepset_mcp.api.cost.protocols import CostResourceProtocol
     from deepset_mcp.api.custom_components.protocols import CustomComponentsProtocol
     from deepset_mcp.api.deployment.protocols import DeploymentResourceProtocol
     from deepset_mcp.api.evaluation.protocols import EvaluationResourceProtocol
@@ -117,6 +118,10 @@ class AsyncClientProtocol(Protocol):
 
     def evaluation(self, workspace: str) -> "EvaluationResourceProtocol":
         """Access Evaluators, Experiments, their runs, and Sessions in the specified workspace."""
+        ...
+
+    def cost(self, workspace: str) -> "CostResourceProtocol":
+        """Access LLM cost in the specified workspace."""
         ...
 
     def custom_components(self, workspace: str) -> "CustomComponentsProtocol":
