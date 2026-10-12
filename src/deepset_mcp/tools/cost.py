@@ -7,6 +7,7 @@
 from typing import Literal
 
 from deepset_mcp.api.cost.models import CostBreakdown, CostGroupBy, CostOverTime, CostSortBy, CostTotals
+from deepset_mcp.api.cost.resource import PipelineLookupForbiddenError
 from deepset_mcp.api.exceptions import (
     BadRequestError,
     RequestTimeoutError,
@@ -24,8 +25,16 @@ def _error_message(error: Exception, action: str, workspace: str, pipeline_name:
             f"Workspace '{workspace}' or pipeline '{pipeline_name}' not found. A deleted pipeline can't be used as a "
             "filter; its cost still shows up in get_cost_breakdown with group_by='pipeline'."
         )
+    if isinstance(error, PipelineLookupForbiddenError):
+        return (
+            f"Failed to {action}: filtering by pipeline name needs Pipelines read in workspace '{workspace}', which "
+            "this API key doesn't have. To see cost per pipeline, use get_cost_breakdown with group_by='pipeline', "
+            "which needs only Costs read."
+        )
     if isinstance(error, UnexpectedAPIError) and error.status_code == 403:
         return f"Failed to {action}: the API key has no permission to read cost in workspace '{workspace}'."
+    if isinstance(error, UnexpectedAPIError) and error.status_code == 401:
+        return f"Failed to {action}: the API key is invalid or has expired."
     if isinstance(error, RequestTimeoutError):
         return f"Failed to {action}: the request timed out. Try a shorter date range."
     return f"Failed to {action}: {error}"
@@ -53,7 +62,8 @@ async def get_cost_totals(
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
-    :param pipeline_name: Restrict to this pipeline. Omit for the whole workspace.
+    :param pipeline_name: Restrict to this pipeline. Omit for the whole workspace. Needs Pipelines read as well as
+        Costs read.
     :param start_date: Inclusive start as an ISO timestamp. Defaults to 30 days before ``end_date``.
     :param end_date: Exclusive end as an ISO timestamp. Defaults to no upper bound.
     :returns: The cost totals, or an error message.
@@ -85,7 +95,8 @@ async def get_cost_over_time(
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
-    :param pipeline_name: Restrict to this pipeline. Omit for the whole workspace.
+    :param pipeline_name: Restrict to this pipeline. Omit for the whole workspace. Needs Pipelines read as well as
+        Costs read.
     :param start_date: Inclusive start as an ISO timestamp. Defaults to 30 days before ``end_date``.
     :param end_date: Exclusive end as an ISO timestamp. Defaults to no upper bound.
     :returns: The daily cost, or an error message.
@@ -124,7 +135,8 @@ async def get_cost_breakdown(
     :param client: The async client for API communication.
     :param workspace: The workspace name.
     :param group_by: The dimension to group by: model, workspace, pipeline, deployment, api_key or provider.
-    :param pipeline_name: Restrict to this pipeline. Omit for the whole workspace.
+    :param pipeline_name: Restrict to this pipeline. Omit for the whole workspace. Needs Pipelines read as well as
+        Costs read.
     :param start_date: Inclusive start as an ISO timestamp. Defaults to 30 days before ``end_date``.
     :param end_date: Exclusive end as an ISO timestamp. Defaults to no upper bound.
     :param sort_by: Sort by label, cost_total, total_tokens or total_requests. Defaults to cost_total.

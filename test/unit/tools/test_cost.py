@@ -8,6 +8,7 @@ import pytest
 
 from deepset_mcp.api.cost.models import CostBreakdown, CostGroupBy, CostOverTime, CostSortBy, CostTotals
 from deepset_mcp.api.cost.protocols import CostResourceProtocol
+from deepset_mcp.api.cost.resource import PipelineLookupForbiddenError
 from deepset_mcp.api.exceptions import RequestTimeoutError, ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.tools.cost import get_cost_breakdown, get_cost_over_time, get_cost_totals
 from test.unit.conftest import BaseFakeClient
@@ -157,6 +158,29 @@ async def test_unknown_pipeline_points_to_the_breakdown() -> None:
     assert isinstance(result, str)
     assert "pipeline 'gone' not found" in result
     assert "group_by='pipeline'" in result
+
+
+@pytest.mark.asyncio
+async def test_forbidden_pipeline_lookup_asks_for_pipelines_read() -> None:
+    client = FakeClient(FakeCostResource(PipelineLookupForbiddenError(PIPELINE)))
+
+    result = await get_cost_totals(client=client, workspace=WORKSPACE, pipeline_name=PIPELINE)
+
+    assert result == (
+        f"Failed to get cost totals: filtering by pipeline name needs Pipelines read in workspace '{WORKSPACE}', "
+        "which this API key doesn't have. To see cost per pipeline, use get_cost_breakdown with "
+        "group_by='pipeline', which needs only Costs read."
+    )
+
+
+@pytest.mark.asyncio
+async def test_invalid_key() -> None:
+    html = "<html><head><title>401 Authorization Required</title></head></html>"
+    client = FakeClient(FakeCostResource(UnexpectedAPIError(status_code=401, message=html)))
+
+    result = await get_cost_over_time(client=client, workspace=WORKSPACE)
+
+    assert result == "Failed to get cost over time: the API key is invalid or has expired."
 
 
 @pytest.mark.asyncio

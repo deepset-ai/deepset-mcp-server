@@ -2,6 +2,6 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-from .resource import CostResource
+from .resource import CostResource, PipelineLookupForbiddenError
 
-__all__ = ["CostResource"]
+__all__ = ["CostResource", "PipelineLookupForbiddenError"]

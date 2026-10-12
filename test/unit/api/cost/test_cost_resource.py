@@ -10,7 +10,7 @@ from uuid import UUID
 import pytest
 
 from deepset_mcp.api.cost.models import CostBreakdown, CostOverTime, CostTotals
-from deepset_mcp.api.cost.resource import CostResource
+from deepset_mcp.api.cost.resource import CostResource, PipelineLookupForbiddenError
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.pipeline.models import DeepsetPipeline
 from deepset_mcp.api.transport import TransportResponse
@@ -196,6 +196,28 @@ async def test_unknown_pipeline_raises_not_found() -> None:
 
 
 @pytest.mark.asyncio
+async def test_forbidden_pipeline_lookup_raises_a_dedicated_error() -> None:
+    client = FakeCostClient({}, pipeline=UnexpectedAPIError(status_code=403, message="Forbidden"))
+
+    with pytest.raises(PipelineLookupForbiddenError) as exc_info:
+        await resource(client).totals(pipeline_name=PIPELINE_NAME)
+
+    assert exc_info.value.pipeline_name == PIPELINE_NAME
+    assert exc_info.value.status_code == 403
+    assert not any(r["endpoint"].startswith(STATS) for r in client.requests)
+
+
+@pytest.mark.asyncio
+async def test_other_pipeline_lookup_errors_pass_through() -> None:
+    client = FakeCostClient({}, pipeline=UnexpectedAPIError(status_code=500, message="Server error"))
+
+    with pytest.raises(UnexpectedAPIError) as exc_info:
+        await resource(client).totals(pipeline_name=PIPELINE_NAME)
+
+    assert not isinstance(exc_info.value, PipelineLookupForbiddenError)
+
+
+@pytest.mark.asyncio
 async def test_forbidden_carries_the_api_error_message() -> None:
     forbidden = TransportResponse(text="", status_code=403, json={"errors": ["Forbidden"]})
     client = FakeCostClient({f"{STATS}/totals": forbidden})
@@ -204,6 +226,7 @@ async def test_forbidden_carries_the_api_error_message() -> None:
         await resource(client).totals()
 
     assert exc_info.value.status_code == 403
+    assert not isinstance(exc_info.value, PipelineLookupForbiddenError)
     assert str(exc_info.value) == "Forbidden (Status Code: 403)"
 
 
