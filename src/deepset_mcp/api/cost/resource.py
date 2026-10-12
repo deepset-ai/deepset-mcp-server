@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from deepset_mcp.api import ids
 from deepset_mcp.api.cost.models import CostBreakdown, CostGroupBy, CostOverTime, CostSortBy, CostTotals
 from deepset_mcp.api.cost.protocols import CostResourceProtocol
+from deepset_mcp.api.exceptions import UnexpectedAPIError
 from deepset_mcp.api.transport import raise_for_status
 
 if TYPE_CHECKING:
@@ -17,6 +18,22 @@ if TYPE_CHECKING:
 
 # Aggregating a wide date range over a large organization can take longer than the default 5s.
 COST_REQUEST_TIMEOUT = 30.0
+
+
+class PipelineLookupForbiddenError(UnexpectedAPIError):
+    """The API key may not read the pipeline, so its name can't be resolved to the ID the cost routes filter by.
+
+    Reading a pipeline needs Pipelines read, which a key with only Costs read doesn't have.
+    """
+
+    def __init__(self, pipeline_name: str, detail: Any | None = None) -> None:
+        """Initialize the exception.
+
+        :param pipeline_name: The pipeline that couldn't be read.
+        :param detail: The error detail from the pipeline lookup.
+        """
+        super().__init__(status_code=403, message=f"Not allowed to read pipeline '{pipeline_name}'", detail=detail)
+        self.pipeline_name = pipeline_name
 
 
 class CostResource(CostResourceProtocol):
@@ -35,10 +52,18 @@ class CostResource(CostResourceProtocol):
         self._client = client
         self._workspace = workspace
 
+    async def _pipeline_id(self, pipeline_name: str) -> str:
+        try:
+            return await ids.pipeline_id(self._client, self._workspace, pipeline_name)
+        except UnexpectedAPIError as e:
+            if e.status_code == 403:
+                raise PipelineLookupForbiddenError(pipeline_name, detail=e.detail) from e
+            raise
+
     async def _get(self, stat: str, pipeline_name: str | None, params: dict[str, Any]) -> Any:
         lookups = [ids.organization_id(self._client), ids.workspace_id(self._client, self._workspace)]
         if pipeline_name is not None:
-            lookups.append(ids.pipeline_id(self._client, self._workspace, pipeline_name))
+            lookups.append(self._pipeline_id(pipeline_name))
         organization_id, workspace_id, *pipeline_id = await asyncio.gather(*lookups)
 
         params = {"workspace_id": workspace_id, **params}
