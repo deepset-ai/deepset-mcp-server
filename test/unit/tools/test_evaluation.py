@@ -11,6 +11,8 @@ from deepset_mcp.api.evaluation.models import (
     Evaluator,
     EvaluatorVersion,
     Experiment,
+    ExperimentResults,
+    ExperimentResultsReport,
     ExperimentRun,
     ExperimentRunGrid,
     ExperimentRunReport,
@@ -29,6 +31,7 @@ from deepset_mcp.tools import evaluation as evaluation_tools
 from deepset_mcp.tools.evaluation import (
     get_evaluation_try,
     get_evaluator,
+    get_experiment_results,
     get_experiment_run,
     get_session_replay,
     list_evaluators,
@@ -101,6 +104,38 @@ def comparison() -> dict[str, Any]:
         "baseline": comparison_side(recorded=True, pipeline_version_id=None, status="FAILED", error="No Sessions"),
         "created_by_user_id": None,
         "created_at": "2026-10-01T00:00:00Z",
+    }
+
+
+def experiment_results(test_cases: int) -> dict[str, Any]:
+    """An Experiment's results as `GET .../evaluation/experiments/{id}/results` returns them."""
+    side = {"value": 0.5, "labels": None, "sessions": test_cases, "errored": 0}
+    return {
+        "comparison_id": COMPARISON_ID,
+        "status": "SCORING",
+        "metrics": [
+            {
+                "evaluator_id": E1,
+                "evaluator_version_ids": [V1],
+                "metric_key": "accuracy",
+                "shape": "score",
+                "candidate": side,
+                "baseline": side,
+                "delta": 0.0,
+                "delta_pct": 0.0,
+                "paired_test_cases": test_cases,
+            }
+        ],
+        "test_cases": [
+            {
+                "session_replay_test_case_id": f"00000000-0000-0000-0000-{i:012d}",
+                "name": f"Case {i}",
+                "candidate_session_ids": [SESSION_A],
+                "baseline_session_ids": [SESSION_B],
+                "values": {f"{E1}:accuracy": {"candidate": 0.5, "baseline": 0.5}},
+            }
+            for i in range(test_cases)
+        ],
     }
 
 
@@ -258,6 +293,10 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
         self._record("list_experiments", pipeline_name=pipeline_name)
         return [Experiment.model_validate(comparison())]
 
+    async def get_experiment_results(self, experiment_id: str) -> ExperimentResults:
+        self._record("get_experiment_results", experiment_id=experiment_id)
+        return ExperimentResults.model_validate(experiment_results(test_cases=3))
+
     async def list_sessions(
         self,
         pipeline_name: str,
@@ -388,6 +427,23 @@ async def test_list_experiments_passes_the_pipeline_and_drops_each_sides_session
 
 
 @pytest.mark.asyncio
+async def test_get_experiment_results_caps_the_test_cases_but_not_the_metrics() -> None:
+    resource = FakeEvaluationResource()
+
+    results = await get_experiment_results(
+        client=FakeClient(resource), workspace=WORKSPACE, experiment_id=COMPARISON_ID, max_test_cases=2
+    )
+
+    assert isinstance(results, ExperimentResultsReport)
+    assert resource.calls == [("get_experiment_results", {"experiment_id": COMPARISON_ID})]
+    assert results.experiment_id == COMPARISON_ID
+    assert results.metrics[0].paired_test_cases == 3
+    assert [case.name for case in results.test_cases] == ["Case 0", "Case 1"]
+    assert results.total_test_cases == 3
+    assert results.test_cases_truncated
+
+
+@pytest.mark.asyncio
 async def test_get_evaluator_reads_the_version_source_only_when_asked() -> None:
     resource = FakeEvaluationResource()
     client = FakeClient(resource)
@@ -436,6 +492,7 @@ async def test_errors_come_back_as_readable_strings(error: Exception, expected: 
         await get_evaluator(client=client, workspace=WORKSPACE, evaluator_id=E1),
         await list_metric_groups(client=client, workspace=WORKSPACE, pipeline_name=PIPELINE),
         await list_experiments(client=client, workspace=WORKSPACE, pipeline_name=PIPELINE),
+        await get_experiment_results(client=client, workspace=WORKSPACE, experiment_id=COMPARISON_ID),
         await get_experiment_run(
             client=client, workspace=WORKSPACE, pipeline_name=PIPELINE, metric_group_id=METRIC_GROUP_ID, run_id=RUN_ID
         ),

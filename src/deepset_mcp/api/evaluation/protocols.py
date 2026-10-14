@@ -8,6 +8,7 @@ from deepset_mcp.api.evaluation.models import (
     Evaluator,
     EvaluatorVersion,
     Experiment,
+    ExperimentResults,
     ExperimentRun,
     ExperimentRunGrid,
     MetricGroup,
@@ -48,6 +49,10 @@ class EvaluationResourceProtocol(Protocol):
 
     async def list_experiments(self, pipeline_name: str | None = None, limit: int = 50) -> list[Experiment]:
         """List the workspace's Experiments, optionally only those touching one pipeline."""
+        ...
+
+    async def get_experiment_results(self, experiment_id: str) -> ExperimentResults:
+        """Fetch an Experiment's results, candidate against baseline."""
         ...
 
     async def list_sessions(

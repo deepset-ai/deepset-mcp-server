@@ -19,6 +19,7 @@ from deepset_mcp.api.evaluation.models import (
     Evaluator,
     EvaluatorVersion,
     Experiment,
+    ExperimentResultsReport,
     ExperimentRunGrid,
     ExperimentRunReport,
     MetricGroupSummary,
@@ -129,7 +130,8 @@ async def list_experiments(
     the same Metric Group. The baseline is another version, or, when ``recorded``, the Sessions the
     Dataset recorded. ``status`` and each side's ``status`` go REPLAYING, SCORING, then ENDED or
     FAILED; a side's ``error`` says why it failed and ``scoring_counts`` how its evaluations ended.
-    To read a side's results, pass its ``scoring_runs[].experiment_run_id``, that entry's
+    Read how the candidate did against the baseline with ``get_experiment_results``. To read one
+    side's scoring run cell by cell, pass its ``scoring_runs[].experiment_run_id``, that entry's
     ``pipeline_id`` resolved to a name with ``list_pipelines``, and the Experiment's
     ``metric_group_id`` to ``get_experiment_run``.
 
@@ -146,6 +148,42 @@ async def list_experiments(
         return f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}' (not found)."
     except (BadRequestError, UnexpectedAPIError) as e:
         return f"Failed to list experiments in workspace '{workspace}': {e}"
+
+
+async def get_experiment_results(
+    *, client: AsyncClientProtocol, workspace: str, experiment_id: str, max_test_cases: int = 100
+) -> ExperimentResultsReport | str:
+    """Reads an Experiment's results: each Metric, candidate against baseline, then each test case.
+
+    Find an Experiment with ``list_experiments``. ``metrics`` has one entry per Metric of the
+    Metric Group, in its order: each side's ``value`` (or ``labels`` for a Label), ``delta`` and
+    ``delta_pct`` of the candidate over the baseline, and how many Sessions ``errored``, meaning
+    the Evaluator's own code broke. A test case's value is the mean over its Sessions, and a Metric
+    is averaged only over the ``paired_test_cases`` both sides have a value for, so check that
+    count before trusting a delta. ``pipeline_metrics`` compares DURATION, TOKENS and COST the
+    same way. Each test case lists the Sessions each side scored and, per Score Metric keyed
+    ``{evaluator_id}:{metric_key}``, each side's mean; that is where to look for the test cases
+    behind a regression. Resolve evaluator ids to names with ``list_evaluators``. Results are
+    partial while ``status`` is REPLAYING or SCORING.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param experiment_id: The Experiment's id.
+    :param max_test_cases: Most test cases to return; ``metrics`` still cover every test case.
+    :returns: The results, or an error message.
+    """
+    try:
+        results = await client.evaluation(workspace=workspace).get_experiment_results(experiment_id)
+    except ResourceNotFoundError:
+        return f"Experiment '{experiment_id}' not found in workspace '{workspace}'."
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to get results of experiment '{experiment_id}': {e}"
+    return ExperimentResultsReport(
+        **results.model_dump(exclude={"test_cases"}),
+        test_cases=results.test_cases[:max_test_cases],
+        total_test_cases=len(results.test_cases),
+        test_cases_truncated=len(results.test_cases) > max_test_cases,
+    )
 
 
 async def get_experiment_run(

@@ -6,7 +6,7 @@
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MetricDeclaration(BaseModel):
@@ -141,6 +141,96 @@ class Experiment(BaseModel):
     baseline: ExperimentSide
     created_at: str
     updated_at: str | None = None
+
+
+class ExperimentValue(BaseModel):
+    """One Metric on one side of an Experiment, over the test cases both sides have a value for."""
+
+    value: float | None = Field(
+        default=None,
+        description="Mean over paired test cases of each test case's mean over its Sessions. Null for a Label.",
+    )
+    labels: dict[str, int] | None = Field(
+        default=None, description="For a Label, how often each label occurred on the paired test cases"
+    )
+    sessions: int = Field(description="Sessions with a value, on the paired test cases")
+    errored: int = Field(description="Sessions this side's Evaluator broke on, so produced no Metric")
+
+
+class ExperimentMetric(BaseModel):
+    """One Metric of the Metric Group, candidate against baseline."""
+
+    evaluator_id: str
+    evaluator_version_ids: list[str] = Field(description="Every Evaluator version that judged either side")
+    metric_key: str
+    shape: str | None = Field(default=None, description="score, label, or null when the rows disagree")
+    candidate: ExperimentValue
+    baseline: ExperimentValue
+    delta: float | None = Field(default=None, description="candidate.value minus baseline.value")
+    delta_pct: float | None = Field(
+        default=None, description="delta as a percentage of the baseline's absolute value. Null if the baseline is 0."
+    )
+    paired_test_cases: int = Field(description="Test cases with a value on both sides, the only ones aggregated")
+
+
+class ExperimentPipelineMetric(BaseModel):
+    """One default Metric every scoring run carries, candidate against baseline."""
+
+    key: str = Field(
+        description=(
+            "DURATION is the pipeline's run time in seconds, summed over a Session's turns. TOKENS is every "
+            "token the pipeline's LLM calls used. COST is what those calls cost in USD, counted only for "
+            "Sessions whose every call is priced."
+        )
+    )
+    candidate: ExperimentValue
+    baseline: ExperimentValue
+    delta: float | None = Field(default=None, description="candidate.value minus baseline.value")
+    delta_pct: float | None = Field(
+        default=None, description="delta as a percentage of the baseline's value. Null if the baseline is 0."
+    )
+    paired_test_cases: int = Field(description="Test cases with a value on both sides, the only ones aggregated")
+
+
+class ExperimentTestCaseValue(BaseModel):
+    """One Metric's mean over a test case's Sessions, per side."""
+
+    candidate: float | None = None
+    baseline: float | None = None
+
+
+class ExperimentTestCaseResult(BaseModel):
+    """One test case: the Sessions each side scored, and each Score Metric's mean per side."""
+
+    test_case_id: str = Field(validation_alias="session_replay_test_case_id")
+    name: str
+    candidate_session_ids: list[str]
+    baseline_session_ids: list[str]
+    values: dict[str, ExperimentTestCaseValue] = Field(
+        default_factory=dict, description="Keyed by '{evaluator_id}:{metric_key}'"
+    )
+    pipeline_values: dict[str, ExperimentTestCaseValue] = Field(
+        default_factory=dict, description="Keyed by DURATION, TOKENS and COST"
+    )
+
+
+class ExperimentResults(BaseModel):
+    """An Experiment's results so far, as the API returns them. Partial while either side is still scoring."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    experiment_id: str = Field(validation_alias="comparison_id")
+    status: str = Field(description="REPLAYING, SCORING, ENDED or FAILED")
+    metrics: list[ExperimentMetric] = Field(description="In the Metric Group's order, then by Metric key")
+    pipeline_metrics: list[ExperimentPipelineMetric] = Field(default_factory=list)
+    test_cases: list[ExperimentTestCaseResult] = Field(default_factory=list)
+
+
+class ExperimentResultsReport(ExperimentResults):
+    """An Experiment's results with the test cases capped."""
+
+    total_test_cases: int
+    test_cases_truncated: bool
 
 
 class MetricRow(BaseModel):
