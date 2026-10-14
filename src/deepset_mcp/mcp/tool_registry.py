@@ -49,6 +49,7 @@ from deepset_mcp.tools.evaluation import (
     get_session_replay as get_session_replay_tool,
     list_evaluators as list_evaluators_tool,
     list_experiments as list_experiments_tool,
+    list_metric_groups as list_metric_groups_tool,
     list_sessions as list_sessions_tool,
     replay_session as replay_session_tool,
     try_evaluator as try_evaluator_tool,
@@ -377,6 +378,10 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     ),
     "get_evaluator": (
         get_evaluator_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "list_metric_groups": (
+        list_metric_groups_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
     "list_experiments": (

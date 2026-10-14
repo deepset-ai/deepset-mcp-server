@@ -14,6 +14,7 @@ from deepset_mcp.api.evaluation.models import (
     ExperimentRun,
     ExperimentRunGrid,
     ExperimentRunReport,
+    MetricGroup,
     SessionList,
     SessionReplayReport,
     SessionReplayRun,
@@ -32,6 +33,7 @@ from deepset_mcp.tools.evaluation import (
     get_session_replay,
     list_evaluators,
     list_experiments,
+    list_metric_groups,
     list_sessions,
     replay_session,
     try_evaluator,
@@ -43,22 +45,63 @@ PIPELINE = "my-pipeline"
 E1 = "11111111-1111-1111-1111-111111111111"
 E2 = "22222222-2222-2222-2222-222222222222"
 V1 = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-EXPERIMENT_ID = "33333333-3333-3333-3333-333333333333"
+METRIC_GROUP_ID = "33333333-3333-3333-3333-333333333333"
 RUN_ID = "44444444-4444-4444-4444-444444444444"
 SESSION_A = "55555555-5555-5555-5555-555555555555"
 SESSION_B = "66666666-6666-6666-6666-666666666666"
+COMPARISON_ID = "99999999-9999-9999-9999-999999999999"
+PIPELINE_ID = "88888888-8888-8888-8888-888888888888"
 
 
 def run(run_id: str = RUN_ID) -> ExperimentRun:
     return ExperimentRun.model_validate(
         {
             "pipeline_experiment_run_id": run_id,
-            "pipeline_experiment_id": EXPERIMENT_ID,
+            "pipeline_experiment_id": METRIC_GROUP_ID,
             "status": "ENDED",
             "selection": "HAND_PICKED",
             "created_at": "2026-10-01T00:00:00Z",
         }
     )
+
+
+def comparison_side(**overrides: Any) -> dict[str, Any]:
+    return {
+        "pipeline_id": PIPELINE_ID,
+        "pipeline_version_id": "00000000-0000-0000-0000-0000000000b1",
+        "recorded": False,
+        "status": "ENDED",
+        "session_replay_suite_id": None,
+        "experiment_run_id": RUN_ID,
+        "scoring_runs": [{"pipeline_id": PIPELINE_ID, "experiment_run_id": RUN_ID}],
+        "reused_sessions": 2,
+        "replays_needed": 0,
+        "run_counts": None,
+        "sessions": [{"session_replay_test_case_id": E2, "session_id": SESSION_A, "source": "ORIGINAL"}],
+        "scoring_counts": {"cells": 2, "succeeded": 1, "errored": 1, "failed": 0, "running": 0},
+        "error": None,
+        **overrides,
+    }
+
+
+def comparison() -> dict[str, Any]:
+    """A comparison as `GET .../evaluation/experiments` lists it."""
+    return {
+        "comparison_id": COMPARISON_ID,
+        "workspace_id": "00000000-0000-0000-0000-00000000000a",
+        "name": "New prompt",
+        "session_replay_dataset_id": "00000000-0000-0000-0000-0000000000d1",
+        "dataset_name": "Regression set",
+        "metric_group_id": METRIC_GROUP_ID,
+        "metric_group_name": "Weekly",
+        "sessions_per_test_case": 1,
+        "replay_mode": "LIVE",
+        "status": "ENDED",
+        "candidate": comparison_side(),
+        "baseline": comparison_side(recorded=True, pipeline_version_id=None, status="FAILED", error="No Sessions"),
+        "created_by_user_id": None,
+        "created_at": "2026-10-01T00:00:00Z",
+    }
 
 
 def cell(evaluator_id: str, outcome: str | None, metrics: list[dict[str, Any]], **extra: Any) -> dict[str, Any]:
@@ -183,29 +226,37 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
             }
         )
 
-    async def list_experiments(self, pipeline_name: str, limit: int = 200) -> list[Experiment]:
-        self._record("list_experiments", pipeline_name=pipeline_name)
+    async def list_metric_groups(self, limit: int = 200) -> list[MetricGroup]:
+        self._record("list_metric_groups", limit=limit)
         return [
-            Experiment.model_validate(
+            MetricGroup.model_validate(
                 {
-                    "pipeline_experiment_id": experiment_id,
+                    "metric_group_id": metric_group_id,
+                    "workspace_id": "00000000-0000-0000-0000-00000000000a",
                     "name": name,
                     "evaluator_ids": [E1],
                     "created_at": "2026-10-01T00:00:00Z",
                 }
             )
-            for experiment_id, name in [(EXPERIMENT_ID, "Weekly"), ("00000000-0000-0000-0000-00000000000e", "Fresh")]
+            for metric_group_id, name in [
+                (METRIC_GROUP_ID, "Weekly"),
+                ("00000000-0000-0000-0000-00000000000e", "Fresh"),
+            ]
         ]
 
     async def list_experiment_runs(
-        self, pipeline_name: str, experiment_id: str, limit: int = 50
+        self, pipeline_name: str, metric_group_id: str, limit: int = 50
     ) -> list[ExperimentRun]:
-        self._record("list_experiment_runs", experiment_id=experiment_id, limit=limit)
-        return [run()] if experiment_id == EXPERIMENT_ID else []
+        self._record("list_experiment_runs", metric_group_id=metric_group_id, limit=limit)
+        return [run()] if metric_group_id == METRIC_GROUP_ID else []
 
-    async def get_experiment_run(self, pipeline_name: str, experiment_id: str, run_id: str) -> ExperimentRunGrid:
-        self._record("get_experiment_run", experiment_id=experiment_id, run_id=run_id)
+    async def get_experiment_run(self, pipeline_name: str, metric_group_id: str, run_id: str) -> ExperimentRunGrid:
+        self._record("get_experiment_run", metric_group_id=metric_group_id, run_id=run_id)
         return grid()
+
+    async def list_experiments(self, pipeline_name: str | None = None, limit: int = 50) -> list[Experiment]:
+        self._record("list_experiments", pipeline_name=pipeline_name)
+        return [Experiment.model_validate(comparison())]
 
     async def list_sessions(
         self,
@@ -260,7 +311,7 @@ async def test_get_experiment_run_summarises_each_metric_over_every_row() -> Non
         client=FakeClient(FakeEvaluationResource()),
         workspace=WORKSPACE,
         pipeline_name=PIPELINE,
-        experiment_id=EXPERIMENT_ID,
+        metric_group_id=METRIC_GROUP_ID,
         run_id=RUN_ID,
         max_rows=1,
     )
@@ -283,7 +334,7 @@ async def test_get_experiment_run_flattens_cells_and_caps_rows() -> None:
         client=FakeClient(FakeEvaluationResource()),
         workspace=WORKSPACE,
         pipeline_name=PIPELINE,
-        experiment_id=EXPERIMENT_ID,
+        metric_group_id=METRIC_GROUP_ID,
         run_id=RUN_ID,
         max_rows=1,
     )
@@ -298,14 +349,42 @@ async def test_get_experiment_run_flattens_cells_and_caps_rows() -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_experiments_attaches_each_last_run() -> None:
+async def test_list_metric_groups_attaches_each_last_run_on_the_given_pipeline() -> None:
+    resource = FakeEvaluationResource()
+
+    groups = await list_metric_groups(client=FakeClient(resource), workspace=WORKSPACE, pipeline_name=PIPELINE)
+
+    assert isinstance(groups, list)
+    assert [(g.name, g.last_run is not None) for g in groups] == [("Weekly", True), ("Fresh", False)]
+    assert {c[1]["limit"] for c in resource.calls if c[0] == "list_experiment_runs"} == {1}
+
+
+@pytest.mark.asyncio
+async def test_list_metric_groups_reads_no_runs_without_a_pipeline() -> None:
+    resource = FakeEvaluationResource()
+
+    groups = await list_metric_groups(client=FakeClient(resource), workspace=WORKSPACE)
+
+    assert isinstance(groups, list)
+    assert [g.last_run for g in groups] == [None, None]
+    assert [c[0] for c in resource.calls] == ["list_metric_groups"]
+
+
+@pytest.mark.asyncio
+async def test_list_experiments_passes_the_pipeline_and_drops_each_sides_sessions() -> None:
     resource = FakeEvaluationResource()
 
     experiments = await list_experiments(client=FakeClient(resource), workspace=WORKSPACE, pipeline_name=PIPELINE)
 
     assert isinstance(experiments, list)
-    assert [(e.name, e.last_run is not None) for e in experiments] == [("Weekly", True), ("Fresh", False)]
-    assert {c[1]["limit"] for c in resource.calls if c[0] == "list_experiment_runs"} == {1}
+    [experiment] = experiments
+    assert resource.calls == [("list_experiments", {"pipeline_name": PIPELINE})]
+    dumped = experiment.model_dump()
+    assert dumped["experiment_id"] == COMPARISON_ID
+    assert dumped["dataset_name"] == "Regression set"
+    assert dumped["candidate"]["scoring_runs"] == [{"pipeline_id": PIPELINE_ID, "experiment_run_id": RUN_ID}]
+    assert dumped["baseline"]["error"] == "No Sessions"
+    assert "sessions" not in dumped["candidate"]
 
 
 @pytest.mark.asyncio
@@ -355,9 +434,10 @@ async def test_errors_come_back_as_readable_strings(error: Exception, expected: 
     results = [
         await list_evaluators(client=client, workspace=WORKSPACE),
         await get_evaluator(client=client, workspace=WORKSPACE, evaluator_id=E1),
+        await list_metric_groups(client=client, workspace=WORKSPACE, pipeline_name=PIPELINE),
         await list_experiments(client=client, workspace=WORKSPACE, pipeline_name=PIPELINE),
         await get_experiment_run(
-            client=client, workspace=WORKSPACE, pipeline_name=PIPELINE, experiment_id=EXPERIMENT_ID, run_id=RUN_ID
+            client=client, workspace=WORKSPACE, pipeline_name=PIPELINE, metric_group_id=METRIC_GROUP_ID, run_id=RUN_ID
         ),
         await list_sessions(client=client, workspace=WORKSPACE, pipeline_name=PIPELINE),
     ]

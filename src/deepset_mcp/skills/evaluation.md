@@ -1,13 +1,13 @@
 ---
 name: evaluation
-description: Use this skill before writing, reviewing or fixing an Evaluator (an Evaluation Function) for the Haystack Enterprise Platform, before suggesting which Evaluators a pipeline needs, and before picking the Sessions an Experiment should run on. Covers the @metrics declaration and its grains, the return shape the worker enforces, the judge() contract for LLM-judged criteria, the exact source shape the Judge form can open, how to find Sessions (including failed and negatively rated ones), and structural recipes over the Session helpers.
+description: Use this skill before writing, reviewing or fixing an Evaluator (an Evaluation Function) for the Haystack Enterprise Platform, before suggesting which Evaluators a pipeline needs, and before picking the Sessions a scoring run should judge. Covers the @metrics declaration and its grains, the return shape the worker enforces, the judge() contract for LLM-judged criteria, the exact source shape the Judge form can open, how to find Sessions (including failed and negatively rated ones), and structural recipes over the Session helpers.
 ---
 
 # Evaluators on the Haystack Enterprise Platform
 
 ## Overview
 
-An **Evaluator** is a versioned Python function, the Evaluation Function, that reads one **Session** and reports named **Metrics**. A Session is one user's turns that share a `search_session_id`; a run without one is a single-turn Session named by its `query_id`. An **Experiment** is a named set of Evaluators run against chosen Sessions of one pipeline; each run is a grid of Sessions by Evaluators.
+An **Evaluator** is a versioned Python function, the Evaluation Function, that reads one **Session** and reports named **Metrics**. A Session is one user's turns that share a `search_session_id`; a run without one is a single-turn Session named by its `query_id`. A **Metric Group** is a named set of Evaluators; a **scoring run** judges chosen Sessions of one pipeline with it, as a grid of Sessions by Evaluators. An **Experiment** compares a candidate pipeline version against a baseline on the test cases of a Dataset, scoring both sides with one Metric Group.
 
 Two kinds of Evaluator, one mechanism:
 
