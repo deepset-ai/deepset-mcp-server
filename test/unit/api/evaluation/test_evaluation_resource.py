@@ -35,10 +35,12 @@ RUN_ID = "44444444-4444-4444-4444-444444444444"
 SESSION_ID = "55555555-5555-5555-5555-555555555555"
 EVALUATION_RUN_ID = "66666666-6666-6666-6666-666666666666"
 
-EVALUATORS = f"v2/workspaces/{WORKSPACE_UUID}/evaluators"
-EXPERIMENTS = f"v2/workspaces/{WORKSPACE_UUID}/pipelines/{PIPELINE_UUID}/experiments"
-RUNS = f"{EXPERIMENTS}/{EXPERIMENT_ID}/runs"
-SESSIONS = f"v2/workspaces/{WORKSPACE_UUID}/pipelines/{PIPELINE_UUID}/sessions"
+EVALUATION = f"v2/workspaces/{WORKSPACE_UUID}/evaluation"
+PIPELINE = f"{EVALUATION}/pipelines/{PIPELINE_UUID}"
+EVALUATORS = f"{EVALUATION}/evaluators"
+EXPERIMENTS = f"{PIPELINE}/experiments"
+RUNS = f"{PIPELINE}/metric-groups/{EXPERIMENT_ID}/scoring-runs"
+SESSIONS = f"{PIPELINE}/sessions"
 
 
 def version_summary() -> dict[str, Any]:
@@ -299,8 +301,8 @@ async def test_404_from_the_route_raises_not_found() -> None:
         await resource(client).get_evaluator(EVALUATOR_ID)
 
 
-TRIES = f"v2/workspaces/{WORKSPACE_UUID}/pipelines/{PIPELINE_UUID}/evaluations/try"
-REPLAYS = f"v2/workspaces/{WORKSPACE_UUID}/pipelines/{PIPELINE_UUID}/session-replay"
+TRIES = f"{PIPELINE}/tries"
+REPLAYS = f"{PIPELINE}/replay-runs"
 TRY_ID = "signed-try-id"
 REPLAY_RUN_ID = "77777777-7777-7777-7777-777777777777"
 DRAFT_VERSION_ID = "88888888-8888-8888-8888-888888888888"

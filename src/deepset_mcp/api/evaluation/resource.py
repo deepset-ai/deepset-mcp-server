@@ -60,11 +60,11 @@ class EvaluationResource(EvaluationResourceProtocol):
         return "v2/workspaces/" + "/".join(quote(segment, safe="") for segment in segments)
 
     async def _evaluators_path(self, *parts: str) -> str:
-        return self._path(await ids.workspace_id(self._client, self._workspace), "evaluators", *parts)
+        return self._path(await ids.workspace_id(self._client, self._workspace), "evaluation", "evaluators", *parts)
 
     async def _pipeline_path(self, pipeline_name: str, *parts: str) -> str:
         workspace_id, pipeline_id = await ids.workspace_and_pipeline_ids(self._client, self._workspace, pipeline_name)
-        return self._path(workspace_id, "pipelines", pipeline_id, *parts)
+        return self._path(workspace_id, "evaluation", "pipelines", pipeline_id, *parts)
 
     async def list_evaluators(self, limit: int = 200) -> list[Evaluator]:
         """List the workspace's Evaluators, each with its newest version but no source.
@@ -113,7 +113,7 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param limit: Maximum number of runs to return.
         :returns: The runs.
         """
-        path = await self._pipeline_path(pipeline_name, "experiments", experiment_id, "runs")
+        path = await self._pipeline_path(pipeline_name, "metric-groups", experiment_id, "scoring-runs")
         return [ExperimentRun.model_validate(item) for item in await self._get(path, {"limit": limit}) or []]
 
     async def get_experiment_run(self, pipeline_name: str, experiment_id: str, run_id: str) -> ExperimentRunGrid:
@@ -124,7 +124,7 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param run_id: The run's id.
         :returns: The grid.
         """
-        path = await self._pipeline_path(pipeline_name, "experiments", experiment_id, "runs", run_id)
+        path = await self._pipeline_path(pipeline_name, "metric-groups", experiment_id, "scoring-runs", run_id)
         return ExperimentRunGrid.model_validate(await self._get(path))
 
     async def list_sessions(
@@ -171,7 +171,7 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param session_id: The Session to judge.
         :returns: The try id to poll.
         """
-        path = await self._pipeline_path(pipeline_name, "evaluations", "try")
+        path = await self._pipeline_path(pipeline_name, "tries")
         data = await self._post(path, {"python_code": python_code, "session_id": session_id})
         return str(data["try_id"])
 
@@ -182,7 +182,7 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param try_id: The id `start_try` returned.
         :returns: The try's state, with its result once finished.
         """
-        path = await self._pipeline_path(pipeline_name, "evaluations", "try", try_id)
+        path = await self._pipeline_path(pipeline_name, "tries", try_id)
         resp = await self._client.request(endpoint=path, method="GET")
         if resp.status_code == 202:
             return TryState(status="RUNNING")
@@ -205,7 +205,7 @@ class EvaluationResource(EvaluationResourceProtocol):
         body = {"session_id": session_id, "pipeline_version_id": pipeline_version_id}
         if replay_mode is not None:
             body["replay_mode"] = replay_mode
-        data = await self._post(await self._pipeline_path(pipeline_name, "session-replay"), body)
+        data = await self._post(await self._pipeline_path(pipeline_name, "replay-runs"), body)
         return str(data["session_replay_run_id"])
 
     async def get_session_replay(self, pipeline_name: str, replay_run_id: str) -> SessionReplayRun:
@@ -215,5 +215,5 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param replay_run_id: The id `start_session_replay` returned.
         :returns: The run.
         """
-        path = await self._pipeline_path(pipeline_name, "session-replay", replay_run_id)
+        path = await self._pipeline_path(pipeline_name, "replay-runs", replay_run_id)
         return SessionReplayRun.model_validate(await self._get(path))
