@@ -10,6 +10,7 @@ from deepset_mcp.api.evaluation.models import (
     Experiment,
     ExperimentRun,
     ExperimentRunGrid,
+    MetricGroup,
     SessionList,
     SessionReplayRun,
     TryState,
@@ -31,18 +32,22 @@ class EvaluationResourceProtocol(Protocol):
         """Fetch one Evaluator version with its source."""
         ...
 
-    async def list_experiments(self, pipeline_name: str, limit: int = 200) -> list[Experiment]:
-        """List a pipeline's Experiments."""
+    async def list_metric_groups(self, limit: int = 200) -> list[MetricGroup]:
+        """List the workspace's Metric Groups."""
         ...
 
     async def list_experiment_runs(
-        self, pipeline_name: str, experiment_id: str, limit: int = 50
+        self, pipeline_name: str, metric_group_id: str, limit: int = 50
     ) -> list[ExperimentRun]:
-        """List an Experiment's runs, newest first."""
+        """List a Metric Group's scoring runs on one pipeline, newest first."""
         ...
 
-    async def get_experiment_run(self, pipeline_name: str, experiment_id: str, run_id: str) -> ExperimentRunGrid:
-        """Fetch one Experiment run as a grid."""
+    async def get_experiment_run(self, pipeline_name: str, metric_group_id: str, run_id: str) -> ExperimentRunGrid:
+        """Fetch one scoring run as a grid."""
+        ...
+
+    async def list_experiments(self, pipeline_name: str | None = None, limit: int = 50) -> list[Experiment]:
+        """List the workspace's Experiments, optionally only those touching one pipeline."""
         ...
 
     async def list_sessions(

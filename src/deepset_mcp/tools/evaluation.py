@@ -4,8 +4,8 @@
 
 """Tools for reading evaluation state and running the assistant's two checks.
 
-The reads cover Evaluators, Experiments, their runs and Sessions. The checks are an ad-hoc try of
-Evaluator source and a session replay against a pipeline version.
+The reads cover Evaluators, Metric Groups and their scoring runs, Experiments, and Sessions. The
+checks are an ad-hoc try of Evaluator source and a session replay against a pipeline version.
 """
 
 import asyncio
@@ -18,9 +18,10 @@ from typing import Any, Literal, TypeVar
 from deepset_mcp.api.evaluation.models import (
     Evaluator,
     EvaluatorVersion,
+    Experiment,
     ExperimentRunGrid,
     ExperimentRunReport,
-    ExperimentSummary,
+    MetricGroupSummary,
     MetricSummary,
     ReportCell,
     ReportRow,
@@ -41,7 +42,7 @@ async def list_evaluators(*, client: AsyncClientProtocol, workspace: str) -> lis
     An Evaluator is a versioned Python function that judges a Session and reports named Metrics.
     Each entry carries its newest version's id and the Metrics that version declares (name, shape,
     grain and, for a closed Label, its vocabulary), but not the source. Evaluators belong to the
-    workspace, not to a pipeline; an Experiment picks which ones run on its pipeline.
+    workspace, not to a pipeline; a Metric Group picks which ones a scoring run judges with.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
@@ -82,34 +83,69 @@ async def get_evaluator(
         return f"Failed to get evaluator '{evaluator_id}': {e}"
 
 
-async def list_experiments(
-    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str
-) -> list[ExperimentSummary] | str:
-    """Lists a pipeline's Experiments, each with its most recent run.
+async def list_metric_groups(
+    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str | None = None
+) -> list[MetricGroupSummary] | str:
+    """Lists the workspace's Metric Groups, newest first.
 
-    An Experiment is a named set of Evaluators that runs against chosen Sessions of one pipeline.
-    ``last_run`` is the newest run without its grid (status, ``selection``, timing), or null when
-    the Experiment never ran; read a run's results with ``get_experiment_run``.
+    A Metric Group is a named, ordered set of Evaluators. It belongs to the workspace, not to a
+    pipeline: a scoring run judges chosen Sessions of one pipeline with it, and an Experiment scores
+    both its sides with one. With ``pipeline_name``, each entry's ``last_run`` is its newest scoring
+    run on that pipeline without the grid (status, ``selection``, timing), or null when it never ran
+    there; read a run's results with ``get_experiment_run``.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
-    :param pipeline_name: Name of the pipeline.
-    :returns: The Experiments, or an error message.
+    :param pipeline_name: A pipeline to attach each Metric Group's most recent scoring run on.
+    :returns: The Metric Groups, or an error message.
     """
     resource = client.evaluation(workspace=workspace)
     try:
-        experiments = await resource.list_experiments(pipeline_name)
+        groups = await resource.list_metric_groups()
+        if pipeline_name is None:
+            return [MetricGroupSummary(**group.model_dump()) for group in groups]
         last_runs = await asyncio.gather(
-            *(resource.list_experiment_runs(pipeline_name, e.pipeline_experiment_id, limit=1) for e in experiments)
+            *(resource.list_experiment_runs(pipeline_name, group.metric_group_id, limit=1) for group in groups)
         )
     except ResourceNotFoundError:
+        if pipeline_name is None:
+            return f"Workspace '{workspace}' not found."
         return f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}' (not found)."
     except (BadRequestError, UnexpectedAPIError) as e:
-        return f"Failed to list experiments for pipeline '{pipeline_name}': {e}"
+        return f"Failed to list metric groups in workspace '{workspace}': {e}"
     return [
-        ExperimentSummary(**experiment.model_dump(), last_run=runs[0] if runs else None)
-        for experiment, runs in zip(experiments, last_runs, strict=True)
+        MetricGroupSummary(**group.model_dump(), last_run=runs[0] if runs else None)
+        for group, runs in zip(groups, last_runs, strict=True)
     ]
+
+
+async def list_experiments(
+    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str | None = None
+) -> list[Experiment] | str:
+    """Lists the workspace's Experiments, newest first.
+
+    An Experiment compares a candidate pipeline version against a baseline on the test cases of one
+    Dataset: each side gets its Sessions (reused, or replayed against its version) and is scored by
+    the same Metric Group. The baseline is another version, or, when ``recorded``, the Sessions the
+    Dataset recorded. ``status`` and each side's ``status`` go REPLAYING, SCORING, then ENDED or
+    FAILED; a side's ``error`` says why it failed and ``scoring_counts`` how its evaluations ended.
+    To read a side's results, pass its ``scoring_runs[].experiment_run_id``, that entry's
+    ``pipeline_id`` resolved to a name with ``list_pipelines``, and the Experiment's
+    ``metric_group_id`` to ``get_experiment_run``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Only Experiments with either side on this pipeline, when given.
+    :returns: The Experiments, or an error message.
+    """
+    try:
+        return await client.evaluation(workspace=workspace).list_experiments(pipeline_name)
+    except ResourceNotFoundError:
+        if pipeline_name is None:
+            return f"Workspace '{workspace}' not found."
+        return f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}' (not found)."
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to list experiments in workspace '{workspace}': {e}"
 
 
 async def get_experiment_run(
@@ -117,13 +153,15 @@ async def get_experiment_run(
     client: AsyncClientProtocol,
     workspace: str,
     pipeline_name: str,
-    experiment_id: str,
+    metric_group_id: str,
     run_id: str,
     max_rows: int = 100,
 ) -> ExperimentRunReport | str:
-    """Reads one Experiment run: how its cells ended, a summary per Metric, then the grid rows.
+    """Reads one scoring run: how its cells ended, a summary per Metric, then the grid rows.
 
-    A run judges each chosen Session with each Evaluator; one cell per pair. ``counts`` says how
+    A scoring run is a Metric Group judging chosen Sessions of one pipeline. Find one with
+    ``list_metric_groups`` (``last_run``) or ``list_experiments`` (a side's ``scoring_runs``).
+    It judges each chosen Session with each Evaluator; one cell per pair. ``counts`` says how
     the cells ended: ``errored`` is the Evaluator's own code breaking (see the cell's
     ``error_detail``), not a low Metric; ``failed`` is a cell that never ran and can be retried.
     ``metrics`` summarises each Evaluator's Metric over every row, rows past ``max_rows``
@@ -136,15 +174,15 @@ async def get_experiment_run(
     :param client: The async client for API communication.
     :param workspace: The workspace name.
     :param pipeline_name: Name of the pipeline.
-    :param experiment_id: The Experiment's id.
+    :param metric_group_id: The id of the Metric Group the run scored with.
     :param run_id: The run's id.
     :param max_rows: Most rows to return; the summaries still cover every row.
     :returns: The run report, or an error message.
     """
     try:
-        grid = await client.evaluation(workspace=workspace).get_experiment_run(pipeline_name, experiment_id, run_id)
+        grid = await client.evaluation(workspace=workspace).get_experiment_run(pipeline_name, metric_group_id, run_id)
     except ResourceNotFoundError:
-        return f"Run '{run_id}' of experiment '{experiment_id}' on pipeline '{pipeline_name}' not found."
+        return f"Run '{run_id}' of metric group '{metric_group_id}' on pipeline '{pipeline_name}' not found."
     except (BadRequestError, UnexpectedAPIError) as e:
         return f"Failed to get run '{run_id}': {e}"
     rows = [
@@ -227,11 +265,11 @@ async def list_sessions(
     limit: int = 50,
     cursor: str | None = None,
 ) -> SessionList | str:
-    """Lists a pipeline's Sessions that an Experiment run can judge, newest last activity first.
+    """Lists a pipeline's Sessions that a scoring run can judge, newest last activity first.
 
     A Session is the turns that share a ``search_session_id``; a run without one is a single-turn
     Session named by its ``query_id``. Only Sessions whose every turn still has its trace are
-    listed. ``session_id`` is the id an Experiment run takes. To find Sessions that went wrong
+    listed. ``session_id`` is the id a scoring run takes. To find Sessions that went wrong
     (a failed turn, negative feedback), use ``list_pipeline_traces`` with an OData filter instead
     and take each row's ``search_session_id``, or its ``query_id`` when that is empty.
 

@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Models for the evaluation API: Evaluators, Experiments, their runs, and Sessions."""
+"""Models for the evaluation API: Evaluators, Metric Groups, their scoring runs, Experiments, and Sessions."""
 
 from typing import Any, Literal
 
@@ -56,7 +56,7 @@ class Evaluator(BaseModel):
 
 
 class ExperimentRun(BaseModel):
-    """One Experiment run's lifecycle, without its grid."""
+    """One scoring run's lifecycle, without its grid."""
 
     pipeline_experiment_run_id: str
     pipeline_experiment_id: str
@@ -69,20 +69,78 @@ class ExperimentRun(BaseModel):
     created_at: str
 
 
-class Experiment(BaseModel):
-    """A named set of Evaluators run against Sessions of one pipeline."""
+class MetricGroup(BaseModel):
+    """A named, ordered set of the workspace's Evaluators that a scoring run judges with."""
 
-    pipeline_experiment_id: str
+    metric_group_id: str
     name: str
     evaluator_ids: list[str]
     created_at: str
     updated_at: str | None = None
 
 
-class ExperimentSummary(Experiment):
-    """An Experiment and its most recent run, if it has one."""
+class MetricGroupSummary(MetricGroup):
+    """A Metric Group and, when a pipeline was asked about, its most recent scoring run there."""
 
     last_run: ExperimentRun | None = None
+
+
+class ExperimentScoringCounts(BaseModel):
+    """How a side's scoring evaluations ended."""
+
+    cells: int = Field(description="Evaluations the scoring run made: Sessions times Metrics")
+    succeeded: int
+    errored: int = Field(description="Evaluations whose Evaluation Function broke. User code, not a score of 0.")
+    failed: int = Field(description="Evaluations that never ran and can be retried")
+    running: int
+
+
+class ExperimentScoringRun(BaseModel):
+    """One scoring run of a side, on one pipeline. Read it with ``get_experiment_run``."""
+
+    pipeline_id: str
+    experiment_run_id: str | None = Field(default=None, description="Null until it has started")
+
+
+class ExperimentSide(BaseModel):
+    """The candidate or the baseline of an Experiment, and how far it has got."""
+
+    pipeline_id: str | None = Field(default=None, description="Null for a recorded baseline")
+    pipeline_version_id: str | None = Field(default=None, description="Null for a recorded baseline")
+    recorded: bool = Field(
+        default=False,
+        description="True for a baseline made of each test case's own recorded Session, with nothing replayed",
+    )
+    status: str = Field(description="REPLAYING, SCORING, ENDED or FAILED")
+    reused_sessions: int
+    replays_needed: int
+    scoring_runs: list[ExperimentScoringRun] = Field(
+        default_factory=list, description="One per pipeline this side scores on"
+    )
+    scoring_counts: ExperimentScoringCounts | None = Field(default=None, description="Null until scoring has started")
+    error: str | None = Field(default=None, description="Why this side could not be scored")
+
+
+class Experiment(BaseModel):
+    """A comparison of a candidate pipeline version against a baseline on one Dataset, scored by one Metric Group."""
+
+    experiment_id: str = Field(validation_alias="comparison_id")
+    name: str
+    dataset_id: str | None = Field(
+        default=None, validation_alias="session_replay_dataset_id", description="Null once the Dataset is deleted"
+    )
+    dataset_name: str
+    metric_group_id: str | None = Field(default=None, description="Null once the Metric Group is deleted")
+    metric_group_name: str
+    sessions_per_test_case: int
+    replay_mode: str
+    status: str = Field(
+        description="REPLAYING while either side replays, then SCORING, then FAILED if either side failed, else ENDED"
+    )
+    candidate: ExperimentSide
+    baseline: ExperimentSide
+    created_at: str
+    updated_at: str | None = None
 
 
 class MetricRow(BaseModel):
@@ -139,7 +197,7 @@ class ExperimentRunCounts(BaseModel):
 
 
 class ExperimentRunGrid(BaseModel):
-    """One Experiment run as Sessions by Evaluators, as the API returns it."""
+    """One scoring run as Sessions by Evaluators, as the API returns it."""
 
     run: ExperimentRun
     evaluator_ids: list[str]
@@ -182,7 +240,7 @@ class ReportRow(BaseModel):
 
 
 class ExperimentRunReport(BaseModel):
-    """An Experiment run read for explaining it: counts, per-metric summaries, then the rows."""
+    """A scoring run read for explaining it: counts, per-metric summaries, then the rows."""
 
     run: ExperimentRun
     evaluator_ids: list[str]

@@ -15,6 +15,7 @@ from deepset_mcp.api.evaluation.models import (
     Experiment,
     ExperimentRun,
     ExperimentRunGrid,
+    MetricGroup,
     SessionList,
 )
 from deepset_mcp.api.evaluation.resource import EvaluationResource
@@ -30,16 +31,18 @@ PIPELINE_NAME = "my-pipeline"
 PIPELINE_UUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 EVALUATOR_ID = "11111111-1111-1111-1111-111111111111"
 VERSION_ID = "22222222-2222-2222-2222-222222222222"
-EXPERIMENT_ID = "33333333-3333-3333-3333-333333333333"
+METRIC_GROUP_ID = "33333333-3333-3333-3333-333333333333"
 RUN_ID = "44444444-4444-4444-4444-444444444444"
 SESSION_ID = "55555555-5555-5555-5555-555555555555"
 EVALUATION_RUN_ID = "66666666-6666-6666-6666-666666666666"
+COMPARISON_ID = "77777777-7777-7777-7777-777777777777"
 
 EVALUATION = f"v2/workspaces/{WORKSPACE_UUID}/evaluation"
 PIPELINE = f"{EVALUATION}/pipelines/{PIPELINE_UUID}"
 EVALUATORS = f"{EVALUATION}/evaluators"
-EXPERIMENTS = f"{PIPELINE}/experiments"
-RUNS = f"{PIPELINE}/metric-groups/{EXPERIMENT_ID}/scoring-runs"
+METRIC_GROUPS = f"{EVALUATION}/metric-groups"
+EXPERIMENTS = f"{EVALUATION}/experiments"
+RUNS = f"{PIPELINE}/metric-groups/{METRIC_GROUP_ID}/scoring-runs"
 SESSIONS = f"{PIPELINE}/sessions"
 
 
@@ -65,11 +68,10 @@ def evaluator_dict() -> dict[str, Any]:
     }
 
 
-def experiment_dict() -> dict[str, Any]:
+def metric_group_dict() -> dict[str, Any]:
     return {
-        "pipeline_experiment_id": EXPERIMENT_ID,
+        "metric_group_id": METRIC_GROUP_ID,
         "workspace_id": WORKSPACE_UUID,
-        "pipeline_id": PIPELINE_UUID,
         "name": "Weekly",
         "evaluator_ids": [EVALUATOR_ID],
         "created_at": "2026-10-01T00:00:00Z",
@@ -77,10 +79,39 @@ def experiment_dict() -> dict[str, Any]:
     }
 
 
+def comparison_dict() -> dict[str, Any]:
+    side = {
+        "pipeline_id": PIPELINE_UUID,
+        "pipeline_version_id": VERSION_ID,
+        "status": "SCORING",
+        "experiment_run_id": RUN_ID,
+        "scoring_runs": [{"pipeline_id": PIPELINE_UUID, "experiment_run_id": RUN_ID}],
+        "reused_sessions": 1,
+        "replays_needed": 1,
+        "sessions": [],
+        "scoring_counts": None,
+    }
+    return {
+        "comparison_id": COMPARISON_ID,
+        "workspace_id": WORKSPACE_UUID,
+        "name": "New prompt",
+        "session_replay_dataset_id": None,
+        "dataset_name": "Regression set",
+        "metric_group_id": METRIC_GROUP_ID,
+        "metric_group_name": "Weekly",
+        "sessions_per_test_case": 1,
+        "replay_mode": "LIVE",
+        "status": "SCORING",
+        "candidate": side,
+        "baseline": {**side, "status": "ENDED"},
+        "created_at": "2026-10-01T00:00:00Z",
+    }
+
+
 def run_dict() -> dict[str, Any]:
     return {
         "pipeline_experiment_run_id": RUN_ID,
-        "pipeline_experiment_id": EXPERIMENT_ID,
+        "pipeline_experiment_id": METRIC_GROUP_ID,
         "status": "ENDED",
         "started_at": "2026-10-01T00:00:00Z",
         "ended_at": "2026-10-01T00:05:00Z",
@@ -236,26 +267,59 @@ async def test_get_evaluator_and_version() -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_experiments_and_runs_resolve_the_pipeline_uuid() -> None:
-    client = FakeEvaluationClient({EXPERIMENTS: [experiment_dict()], RUNS: [run_dict()]})
+async def test_list_metric_groups_calls_the_workspace_route() -> None:
+    client = FakeEvaluationClient({METRIC_GROUPS: [metric_group_dict()]})
 
-    experiments = await resource(client).list_experiments(PIPELINE_NAME)
-    runs = await resource(client).list_experiment_runs(PIPELINE_NAME, EXPERIMENT_ID, limit=1)
+    groups = await resource(client).list_metric_groups()
 
-    assert isinstance(experiments[0], Experiment)
-    assert experiments[0].evaluator_ids == [EVALUATOR_ID]
+    assert isinstance(groups[0], MetricGroup)
+    assert groups[0].evaluator_ids == [EVALUATOR_ID]
+    assert client.requests[0]["endpoint"] == METRIC_GROUPS
+    assert client.pipeline_resource.calls == []
+
+
+@pytest.mark.asyncio
+async def test_list_experiment_runs_resolves_the_pipeline_uuid() -> None:
+    client = FakeEvaluationClient({RUNS: [run_dict()]})
+
+    runs = await resource(client).list_experiment_runs(PIPELINE_NAME, METRIC_GROUP_ID, limit=1)
+
     assert isinstance(runs[0], ExperimentRun)
     assert runs[0].selection == "SAMPLED"
-    assert client.requests[1]["endpoint"] == RUNS
-    assert client.requests[1]["params"] == {"limit": 1}
-    assert client.pipeline_resource.calls == [PIPELINE_NAME, PIPELINE_NAME]
+    assert client.requests[0]["endpoint"] == RUNS
+    assert client.requests[0]["params"] == {"limit": 1}
+    assert client.pipeline_resource.calls == [PIPELINE_NAME]
+
+
+@pytest.mark.asyncio
+async def test_list_experiments_lists_the_workspace_without_a_pipeline() -> None:
+    client = FakeEvaluationClient({EXPERIMENTS: [comparison_dict()]})
+
+    experiments = await resource(client).list_experiments()
+
+    assert isinstance(experiments[0], Experiment)
+    assert experiments[0].experiment_id == COMPARISON_ID
+    assert experiments[0].candidate.scoring_runs[0].experiment_run_id == RUN_ID
+    assert client.requests[0]["endpoint"] == EXPERIMENTS
+    assert client.requests[0]["params"] == {"limit": 50}
+    assert client.pipeline_resource.calls == []
+
+
+@pytest.mark.asyncio
+async def test_list_experiments_filters_by_the_pipeline_uuid() -> None:
+    client = FakeEvaluationClient({EXPERIMENTS: [comparison_dict()]})
+
+    await resource(client).list_experiments(PIPELINE_NAME, limit=10)
+
+    assert client.requests[0]["endpoint"] == EXPERIMENTS
+    assert client.requests[0]["params"] == {"limit": 10, "pipeline_id": PIPELINE_UUID}
 
 
 @pytest.mark.asyncio
 async def test_get_experiment_run_returns_the_grid() -> None:
     client = FakeEvaluationClient({f"{RUNS}/{RUN_ID}": grid_dict()})
 
-    grid = await resource(client).get_experiment_run(PIPELINE_NAME, EXPERIMENT_ID, RUN_ID)
+    grid = await resource(client).get_experiment_run(PIPELINE_NAME, METRIC_GROUP_ID, RUN_ID)
 
     assert isinstance(grid, ExperimentRunGrid)
     cell = grid.rows[0].cells[0]
