@@ -13,6 +13,7 @@ from deepset_mcp.api.evaluation.models import (
     Evaluator,
     EvaluatorVersion,
     Experiment,
+    ExperimentResults,
     ExperimentRun,
     ExperimentRunGrid,
     MetricGroup,
@@ -147,6 +148,15 @@ class EvaluationResource(EvaluationResourceProtocol):
             path = self._path(workspace_id, "evaluation", "experiments")
         data = await self._get(path, params)
         return [Experiment.model_validate(item) for item in data or []]
+
+    async def get_experiment_results(self, experiment_id: str) -> ExperimentResults:
+        """Fetch an Experiment's results so far: each Metric, candidate against baseline, then per test case.
+
+        :param experiment_id: The Experiment's id.
+        :returns: The results.
+        """
+        path = await self._workspace_path("experiments", experiment_id, "results")
+        return ExperimentResults.model_validate(await self._get(path))
 
     async def list_sessions(
         self,

@@ -27,6 +27,7 @@ from .doc_search import list_doc_sections, search_docs
 from .evaluation import (
     get_evaluation_try,
     get_evaluator,
+    get_experiment_results,
     get_experiment_run,
     get_session_replay,
     list_evaluators,
@@ -149,6 +150,7 @@ __all__ = [
     "get_evaluator",
     "list_metric_groups",
     "list_experiments",
+    "get_experiment_results",
     "get_experiment_run",
     "list_sessions",
     "try_evaluator",

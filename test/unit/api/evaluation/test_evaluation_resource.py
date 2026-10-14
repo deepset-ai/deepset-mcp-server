@@ -13,6 +13,7 @@ from deepset_mcp.api.evaluation.models import (
     Evaluator,
     EvaluatorVersion,
     Experiment,
+    ExperimentResults,
     ExperimentRun,
     ExperimentRunGrid,
     MetricGroup,
@@ -105,6 +106,49 @@ def comparison_dict() -> dict[str, Any]:
         "candidate": side,
         "baseline": {**side, "status": "ENDED"},
         "created_at": "2026-10-01T00:00:00Z",
+    }
+
+
+def results_dict() -> dict[str, Any]:
+    """An Experiment's results as `GET .../evaluation/experiments/{id}/results` returns them."""
+    candidate = {"value": 0.8, "labels": None, "sessions": 2, "errored": 0}
+    baseline = {"value": 0.6, "labels": None, "sessions": 2, "errored": 1}
+    return {
+        "comparison_id": COMPARISON_ID,
+        "status": "ENDED",
+        "metrics": [
+            {
+                "evaluator_id": EVALUATOR_ID,
+                "evaluator_version_ids": [VERSION_ID],
+                "metric_key": "accuracy",
+                "shape": "score",
+                "candidate": candidate,
+                "baseline": baseline,
+                "delta": 0.2,
+                "delta_pct": 33.3,
+                "paired_test_cases": 2,
+            }
+        ],
+        "pipeline_metrics": [
+            {
+                "key": "COST",
+                "candidate": candidate,
+                "baseline": baseline,
+                "delta": 0.2,
+                "delta_pct": 33.3,
+                "paired_test_cases": 2,
+            }
+        ],
+        "test_cases": [
+            {
+                "session_replay_test_case_id": EVALUATION_RUN_ID,
+                "name": "Order status",
+                "candidate_session_ids": [SESSION_ID],
+                "baseline_session_ids": [SESSION_ID],
+                "values": {f"{EVALUATOR_ID}:accuracy": {"candidate": 1.0, "baseline": 0.5}},
+                "pipeline_values": {"COST": {"candidate": 0.01, "baseline": None}},
+            }
+        ],
     }
 
 
@@ -313,6 +357,21 @@ async def test_list_experiments_filters_by_the_pipeline_uuid() -> None:
 
     assert client.requests[0]["endpoint"] == EXPERIMENTS
     assert client.requests[0]["params"] == {"limit": 10, "pipeline_id": PIPELINE_UUID}
+
+
+@pytest.mark.asyncio
+async def test_get_experiment_results_calls_the_workspace_route() -> None:
+    client = FakeEvaluationClient({f"{EXPERIMENTS}/{COMPARISON_ID}/results": results_dict()})
+
+    results = await resource(client).get_experiment_results(COMPARISON_ID)
+
+    assert isinstance(results, ExperimentResults)
+    assert results.experiment_id == COMPARISON_ID
+    assert results.metrics[0].delta == 0.2
+    assert results.pipeline_metrics[0].key == "COST"
+    assert results.test_cases[0].test_case_id == EVALUATION_RUN_ID
+    assert results.test_cases[0].values[f"{EVALUATOR_ID}:accuracy"].baseline == 0.5
+    assert client.pipeline_resource.calls == []
 
 
 @pytest.mark.asyncio

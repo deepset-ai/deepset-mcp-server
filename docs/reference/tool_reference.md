@@ -117,6 +117,7 @@ draft/version history. Each deployment tracks its own history of served pipeline
 | `get_evaluator` | required | explorable | Fetch one Evaluator with its versions, or one version with its Python source. |
 | `list_metric_groups` | required | explorable | List the workspace's Metric Groups, optionally with each one's most recent scoring run on a pipeline. |
 | `list_experiments` | required | explorable | List the workspace's Experiments (a candidate version against a baseline on a Dataset), optionally only those on one pipeline. |
+| `get_experiment_results` | required | explorable | Read an Experiment's results: each Metric and duration, tokens and cost, candidate against baseline, then per test case. |
 | `get_experiment_run` | required | explorable | Read one scoring run: cell counts, a summary per Metric, and the grid rows. |
 | `list_sessions` | required | explorable | List the Sessions of a pipeline that a scoring run can judge. |
 | `try_evaluator` | required | none | Try Evaluator source on one Session and return its Metrics; persists nothing. |
