@@ -360,6 +360,52 @@ async def test_list_experiments_filters_by_the_pipeline_uuid() -> None:
 
 
 @pytest.mark.asyncio
+async def test_create_experiment_posts_the_body_with_resolved_pipeline_ids() -> None:
+    client = FakeEvaluationClient({EXPERIMENTS: comparison_dict()})
+    dataset_id = "88888888-8888-8888-8888-888888888888"
+    candidate_version = "99999999-9999-9999-9999-999999999999"
+    baseline_version = "aaaaaaaa-1111-2222-3333-444444444444"
+
+    recorded = await resource(client).create_experiment(
+        name="New prompt",
+        dataset_id=dataset_id,
+        metric_group_id=METRIC_GROUP_ID,
+        candidate_pipeline_name=PIPELINE_NAME,
+        candidate_pipeline_version_id=candidate_version,
+    )
+    await resource(client).create_experiment(
+        name="Against v1",
+        dataset_id=dataset_id,
+        metric_group_id=METRIC_GROUP_ID,
+        candidate_pipeline_name=PIPELINE_NAME,
+        candidate_pipeline_version_id=candidate_version,
+        baseline_pipeline_name=PIPELINE_NAME,
+        baseline_pipeline_version_id=baseline_version,
+        sessions_per_test_case=3,
+        replay_mode="ALL_USER_MESSAGES",
+    )
+
+    assert isinstance(recorded, Experiment)
+    assert recorded.experiment_id == COMPARISON_ID
+
+    posts = [r for r in client.requests if r["method"] == "POST" and r["endpoint"] == EXPERIMENTS]
+    assert posts[0]["data"] == {
+        "name": "New prompt",
+        "session_replay_dataset_id": dataset_id,
+        "metric_group_id": METRIC_GROUP_ID,
+        "candidate": {"pipeline_id": PIPELINE_UUID, "pipeline_version_id": candidate_version},
+        "sessions_per_test_case": 1,
+        "replay_mode": "FIRST_USER_MESSAGE",
+    }
+    assert posts[1]["data"]["baseline"] == {
+        "pipeline_id": PIPELINE_UUID,
+        "pipeline_version_id": baseline_version,
+    }
+    assert posts[1]["data"]["sessions_per_test_case"] == 3
+    assert posts[1]["data"]["replay_mode"] == "ALL_USER_MESSAGES"
+
+
+@pytest.mark.asyncio
 async def test_get_experiment_results_calls_the_workspace_route() -> None:
     client = FakeEvaluationClient({f"{EXPERIMENTS}/{COMPARISON_ID}/results": results_dict()})
 

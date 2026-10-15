@@ -131,6 +131,50 @@ class EvaluationResource(EvaluationResourceProtocol):
         path = await self._pipeline_path(pipeline_name, "metric-groups", metric_group_id, "scoring-runs", run_id)
         return ExperimentRunGrid.model_validate(await self._get(path))
 
+    async def create_experiment(
+        self,
+        name: str,
+        dataset_id: str,
+        metric_group_id: str,
+        candidate_pipeline_name: str,
+        candidate_pipeline_version_id: str,
+        baseline_pipeline_name: str | None = None,
+        baseline_pipeline_version_id: str | None = None,
+        sessions_per_test_case: int = 1,
+        replay_mode: str = "FIRST_USER_MESSAGE",
+    ) -> Experiment:
+        """Create an Experiment: a candidate pipeline version against a baseline on one Dataset.
+
+        :param name: Human-readable name.
+        :param dataset_id: The Dataset's id (the UI's Dataset dropdown).
+        :param metric_group_id: The Metric Group to score with.
+        :param candidate_pipeline_name: Name of the candidate pipeline.
+        :param candidate_pipeline_version_id: Candidate version id.
+        :param baseline_pipeline_name: Baseline pipeline name; None means a Recorded baseline.
+        :param baseline_pipeline_version_id: Baseline version id; required when baseline_pipeline_name is given.
+        :param sessions_per_test_case: Repetitions per test case (1..50).
+        :param replay_mode: FIRST_USER_MESSAGE or ALL_USER_MESSAGES.
+        :returns: The created Experiment.
+        """
+        workspace_uuid = await ids.workspace_id(self._client, self._workspace)
+        candidate_pid = await ids.pipeline_id(self._client, self._workspace, candidate_pipeline_name)
+        body: dict[str, Any] = {
+            "name": name,
+            "session_replay_dataset_id": dataset_id,
+            "metric_group_id": metric_group_id,
+            "candidate": {"pipeline_id": candidate_pid, "pipeline_version_id": candidate_pipeline_version_id},
+            "sessions_per_test_case": sessions_per_test_case,
+            "replay_mode": replay_mode,
+        }
+        if baseline_pipeline_name is not None:
+            baseline_pid = await ids.pipeline_id(self._client, self._workspace, baseline_pipeline_name)
+            body["baseline"] = {
+                "pipeline_id": baseline_pid,
+                "pipeline_version_id": baseline_pipeline_version_id,
+            }
+        data = await self._post(self._path(workspace_uuid, "evaluation", "experiments"), body)
+        return Experiment.model_validate(data)
+
     async def list_experiments(self, pipeline_name: str | None = None, limit: int = 50) -> list[Experiment]:
         """List the workspace's Experiments, newest first.
 
