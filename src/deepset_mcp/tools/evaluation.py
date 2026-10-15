@@ -120,6 +120,77 @@ async def list_metric_groups(
     ]
 
 
+async def create_experiment(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    name: str,
+    dataset_id: str,
+    metric_group_id: str,
+    candidate_pipeline_name: str,
+    candidate_pipeline_version_id: str,
+    baseline_pipeline_name: str | None = None,
+    baseline_pipeline_version_id: str | None = None,
+    sessions_per_test_case: int = 1,
+    replay_mode: Literal["FIRST_USER_MESSAGE", "ALL_USER_MESSAGES"] = "FIRST_USER_MESSAGE",
+) -> Experiment | str:
+    """Creates an Experiment that compares a candidate pipeline version against a baseline.
+
+    Both sides are scored by the same Metric Group over the test cases of one Dataset. The baseline
+    is either another pipeline version (give ``baseline_pipeline_name`` and
+    ``baseline_pipeline_version_id`` together) or Recorded (leave both unset): a Recorded baseline
+    reuses the Sessions each test case recorded, with nothing replayed. The candidate is always a
+    pipeline version that will be replayed on each test case.
+
+    Replaying runs the pipeline on the customer's models, so get a yes before creating when the
+    cost matters. ``sessions_per_test_case`` sets how many Sessions each side scores per test case
+    (1..50); existing Sessions on that version are reused and only the shortfall is replayed. Find
+    ids with ``list_metric_groups`` (metric groups) and ``list_experiments`` (an existing
+    Experiment's ``dataset_id``). Read the running or finished Experiment with
+    ``get_experiment_results``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param name: Human-readable name for the Experiment.
+    :param dataset_id: The Dataset's id (the UI's Dataset dropdown).
+    :param metric_group_id: The Metric Group id to score both sides with.
+    :param candidate_pipeline_name: Name of the candidate pipeline.
+    :param candidate_pipeline_version_id: The candidate pipeline version to replay.
+    :param baseline_pipeline_name: Baseline pipeline name; omit for a Recorded baseline.
+    :param baseline_pipeline_version_id: Baseline version id; required when baseline_pipeline_name is given.
+    :param sessions_per_test_case: Repetitions per test case (1..50, default 1).
+    :param replay_mode: FIRST_USER_MESSAGE replays the first turn only; ALL_USER_MESSAGES replays every turn.
+    :returns: The created Experiment, or an error message.
+    """
+    if (baseline_pipeline_name is None) != (baseline_pipeline_version_id is None):
+        return (
+            "Give both baseline_pipeline_name and baseline_pipeline_version_id for a Pipeline-version "
+            "baseline, or neither for a Recorded baseline."
+        )
+    try:
+        return await client.evaluation(workspace=workspace).create_experiment(
+            name=name,
+            dataset_id=dataset_id,
+            metric_group_id=metric_group_id,
+            candidate_pipeline_name=candidate_pipeline_name,
+            candidate_pipeline_version_id=candidate_pipeline_version_id,
+            baseline_pipeline_name=baseline_pipeline_name,
+            baseline_pipeline_version_id=baseline_pipeline_version_id,
+            sessions_per_test_case=sessions_per_test_case,
+            replay_mode=replay_mode,
+        )
+    except ResourceNotFoundError:
+        missing = [
+            f"workspace '{workspace}'",
+            f"pipeline '{candidate_pipeline_name}'",
+        ]
+        if baseline_pipeline_name is not None:
+            missing.append(f"baseline pipeline '{baseline_pipeline_name}'")
+        return f"Could not create experiment: one of {', '.join(missing)} not found."
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to create experiment '{name}': {e}"
+
+
 async def list_experiments(
     *, client: AsyncClientProtocol, workspace: str, pipeline_name: str | None = None
 ) -> list[Experiment] | str:

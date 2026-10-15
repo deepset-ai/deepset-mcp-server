@@ -25,6 +25,7 @@ from .deployment import (
 )
 from .doc_search import list_doc_sections, search_docs
 from .evaluation import (
+    create_experiment,
     get_evaluation_try,
     get_evaluator,
     get_experiment_results,
@@ -150,6 +151,7 @@ __all__ = [
     "get_evaluator",
     "list_metric_groups",
     "list_experiments",
+    "create_experiment",
     "get_experiment_results",
     "get_experiment_run",
     "list_sessions",

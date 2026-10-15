@@ -47,6 +47,21 @@ class EvaluationResourceProtocol(Protocol):
         """Fetch one scoring run as a grid."""
         ...
 
+    async def create_experiment(
+        self,
+        name: str,
+        dataset_id: str,
+        metric_group_id: str,
+        candidate_pipeline_name: str,
+        candidate_pipeline_version_id: str,
+        baseline_pipeline_name: str | None = None,
+        baseline_pipeline_version_id: str | None = None,
+        sessions_per_test_case: int = 1,
+        replay_mode: str = "FIRST_USER_MESSAGE",
+    ) -> Experiment:
+        """Create an Experiment comparing a candidate pipeline version against a baseline."""
+        ...
+
     async def list_experiments(self, pipeline_name: str | None = None, limit: int = 50) -> list[Experiment]:
         """List the workspace's Experiments, optionally only those touching one pipeline."""
         ...

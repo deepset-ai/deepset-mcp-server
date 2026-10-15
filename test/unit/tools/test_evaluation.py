@@ -29,6 +29,7 @@ from deepset_mcp.api.search_history.models import PipelineTraceSummary
 from deepset_mcp.api.shared_models import PaginatedResponse
 from deepset_mcp.tools import evaluation as evaluation_tools
 from deepset_mcp.tools.evaluation import (
+    create_experiment,
     get_evaluation_try,
     get_evaluator,
     get_experiment_results,
@@ -293,6 +294,34 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
         self._record("list_experiments", pipeline_name=pipeline_name)
         return [Experiment.model_validate(comparison())]
 
+    async def create_experiment(
+        self,
+        name: str,
+        dataset_id: str,
+        metric_group_id: str,
+        candidate_pipeline_name: str,
+        candidate_pipeline_version_id: str,
+        baseline_pipeline_name: str | None = None,
+        baseline_pipeline_version_id: str | None = None,
+        sessions_per_test_case: int = 1,
+        replay_mode: str = "FIRST_USER_MESSAGE",
+    ) -> Experiment:
+        self._record(
+            "create_experiment",
+            body={
+                "name": name,
+                "dataset_id": dataset_id,
+                "metric_group_id": metric_group_id,
+                "candidate_pipeline_name": candidate_pipeline_name,
+                "candidate_pipeline_version_id": candidate_pipeline_version_id,
+                "baseline_pipeline_name": baseline_pipeline_name,
+                "baseline_pipeline_version_id": baseline_pipeline_version_id,
+                "sessions_per_test_case": sessions_per_test_case,
+                "replay_mode": replay_mode,
+            },
+        )
+        return Experiment.model_validate(comparison())
+
     async def get_experiment_results(self, experiment_id: str) -> ExperimentResults:
         self._record("get_experiment_results", experiment_id=experiment_id)
         return ExperimentResults.model_validate(experiment_results(test_cases=3))
@@ -424,6 +453,50 @@ async def test_list_experiments_passes_the_pipeline_and_drops_each_sides_session
     assert dumped["candidate"]["scoring_runs"] == [{"pipeline_id": PIPELINE_ID, "experiment_run_id": RUN_ID}]
     assert dumped["baseline"]["error"] == "No Sessions"
     assert "sessions" not in dumped["candidate"]
+
+
+@pytest.mark.asyncio
+async def test_create_experiment_refuses_partial_baseline_without_calling_the_resource() -> None:
+    resource = FakeEvaluationResource()
+
+    result = await create_experiment(
+        client=FakeClient(resource),
+        workspace=WORKSPACE,
+        name="Partial",
+        dataset_id="d-1",
+        metric_group_id=METRIC_GROUP_ID,
+        candidate_pipeline_name=PIPELINE,
+        candidate_pipeline_version_id=V1,
+        baseline_pipeline_name=PIPELINE,
+    )
+
+    assert isinstance(result, str)
+    assert "baseline_pipeline_version_id" in result
+    assert resource.calls == []
+
+
+@pytest.mark.asyncio
+async def test_create_experiment_forwards_the_recorded_baseline_as_no_baseline() -> None:
+    resource = FakeEvaluationResource()
+
+    experiment = await create_experiment(
+        client=FakeClient(resource),
+        workspace=WORKSPACE,
+        name="Recorded",
+        dataset_id="d-1",
+        metric_group_id=METRIC_GROUP_ID,
+        candidate_pipeline_name=PIPELINE,
+        candidate_pipeline_version_id=V1,
+    )
+
+    assert isinstance(experiment, Experiment)
+    [(call, kwargs)] = resource.calls
+    assert call == "create_experiment"
+    body = kwargs["body"]
+    assert body["baseline_pipeline_name"] is None
+    assert body["baseline_pipeline_version_id"] is None
+    assert body["replay_mode"] == "FIRST_USER_MESSAGE"
+    assert body["sessions_per_test_case"] == 1
 
 
 @pytest.mark.asyncio
