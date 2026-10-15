@@ -23,6 +23,11 @@ from rich.pretty import Pretty
 
 from deepset_mcp.tokonomics.object_store import ObjectStore
 
+# Shadows `env` and `$ENV` so filters cannot read the server's environment variables (e.g. API keys).
+# Wrapping the filter also rejects top-level `import`/`include`, which could load jq modules from disk.
+# The closing parenthesis goes on its own line so a trailing `# comment` in the filter cannot swallow it.
+_SANDBOXED_JQ_TEMPLATE = "def env: {{}}; {{}} as $ENV | ({filter}\n)"
+
 
 class RichExplorer:
     """Presents Python objects in various Rich formats with navigation support.
@@ -272,7 +277,7 @@ class RichExplorer:
                     source_format = "yaml"
 
         try:
-            program = jq.compile(filter)
+            program = jq.compile(_SANDBOXED_JQ_TEMPLATE.format(filter=filter))
         except ValueError as e:
             return f"Invalid jq filter '{filter}': {e}"
 
