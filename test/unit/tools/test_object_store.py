@@ -221,3 +221,52 @@ class TestYqObjectStore:
 
         assert "Alice" in result
         assert "Result stored as @" not in result
+
+    @pytest.mark.parametrize(
+        ("filter", "expected"),
+        [("env", "{}"), ("$ENV", "{}"), ("env.DEEPSET_API_KEY", "None"), ("$ENV.DEEPSET_API_KEY", "None")],
+    )
+    def test_cannot_read_environment(
+        self,
+        store: ObjectStore,
+        explorer: RichExplorer,
+        monkeypatch: pytest.MonkeyPatch,
+        filter: str,
+        expected: str,
+    ) -> None:
+        monkeypatch.setenv("DEEPSET_API_KEY", "super-secret-key")
+        obj_id = store.put({"name": "Alice"})
+        yq = create_yq_object_store(explorer)
+
+        result = yq(f"@{obj_id}", filter, store=False)
+
+        assert result == f"Filter '{filter}' matched 1 value(s):\n\n{expected}"
+
+    @pytest.mark.parametrize("filter", [".) | env | (.", ".) , $ENV , (."])
+    def test_cannot_break_out_of_environment_sandbox(
+        self, store: ObjectStore, explorer: RichExplorer, monkeypatch: pytest.MonkeyPatch, filter: str
+    ) -> None:
+        monkeypatch.setenv("DEEPSET_API_KEY", "super-secret-key")
+        obj_id = store.put({"name": "Alice"})
+        yq = create_yq_object_store(explorer)
+
+        result = yq(f"@{obj_id}", filter, store=False)
+
+        assert "super-secret-key" not in result
+
+    @pytest.mark.parametrize("filter", ['import "foo" as foo; .', 'include "foo"; .'])
+    def test_rejects_module_imports(self, store: ObjectStore, explorer: RichExplorer, filter: str) -> None:
+        obj_id = store.put({"name": "Alice"})
+        yq = create_yq_object_store(explorer)
+
+        result = yq(f"@{obj_id}", filter)
+
+        assert "Invalid jq filter" in result
+
+    def test_allows_trailing_comment(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        obj_id = store.put({"name": "Alice"})
+        yq = create_yq_object_store(explorer)
+
+        result = yq(f"@{obj_id}", ".name # the name", store=False)
+
+        assert "Alice" in result
