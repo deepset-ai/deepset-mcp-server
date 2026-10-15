@@ -43,6 +43,7 @@ from deepset_mcp.tools.doc_search import (
     search_docs_via_docs_api,
 )
 from deepset_mcp.tools.evaluation import (
+    create_experiment as create_experiment_tool,
     get_evaluation_try as get_evaluation_try_tool,
     get_evaluator as get_evaluator_tool,
     get_experiment_results as get_experiment_results_tool,
@@ -388,6 +389,10 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "list_experiments": (
         list_experiments_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "create_experiment": (
+        create_experiment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
     ),
     "get_experiment_results": (
         get_experiment_results_tool,
