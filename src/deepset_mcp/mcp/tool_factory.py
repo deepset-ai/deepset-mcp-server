@@ -27,9 +27,24 @@ from deepset_mcp.tokonomics import (
 
 ORGANIZATION_ID_DOC = (
     "Optional. The organization to run this call in, as returned by 'list_organizations'. "
-    "Leave empty to use your default organization. Only set it if you belong to several organizations "
-    "and the user asked for a specific one."
+    "Required if you belong to several organizations; leave empty otherwise."
 )
+
+
+async def _ambiguous_organization_error(client: AsyncDeepsetClient) -> str | None:
+    """Returns an error message if the token belongs to several organizations, else None.
+
+    API keys (the endpoint rejects them) and users with a single organization pass.
+
+    :param client: A client that is not scoped to an organization.
+    :returns: Error message listing the organizations to choose from, or None if the call may proceed.
+    """
+    resp = await client.request("/v2/organizations")
+    organizations = (resp.json or {}).get("organizations", []) if resp.success and isinstance(resp.json, dict) else []
+    if len(organizations) <= 1:
+        return None
+    options = ", ".join(f"{org['name']} ({org['organization_id']})" for org in organizations)
+    return f"You belong to several organizations. Call this tool again with 'organization_id' set to one of: {options}."
 
 
 def apply_custom_args(base_func: Callable[..., Any], config: ToolConfig) -> Callable[..., Any]:
@@ -199,6 +214,10 @@ def apply_client(
             if organization_id:
                 client_kwargs["organization_id"] = organization_id
             async with AsyncDeepsetClient(**client_kwargs) as client:
+                if organization_argument and not organization_id:
+                    ambiguity = await _ambiguous_organization_error(client)
+                    if ambiguity:
+                        return ambiguity
                 return await base_func(*args, client=client, **kwargs)
 
         # Remove client from signature and add ctx (and the optional organization_id)

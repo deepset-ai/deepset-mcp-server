@@ -12,6 +12,7 @@ import pytest
 from mcp.server.fastmcp import Context, FastMCP
 
 from deepset_mcp.api.protocols import AsyncClientProtocol
+from deepset_mcp.api.transport import TransportResponse
 from deepset_mcp.mcp.tool_factory import (
     apply_client,
     apply_custom_args,
@@ -402,9 +403,8 @@ class TestApplyClient:
             call_args = mock_client_class.call_args
             assert call_args[1]["api_key"] == "test-token"
 
-    @pytest.mark.asyncio
-    async def test_organization_argument_is_exposed_and_forwarded(self) -> None:
-        """Test that organization_id is an optional tool argument that scopes the client."""
+    def test_organization_argument_is_exposed(self) -> None:
+        """Test that organization_id becomes an optional, documented tool argument."""
 
         async def sample_func(client: AsyncClientProtocol, a: int) -> str:
             """Sample function.
@@ -419,15 +419,6 @@ class TestApplyClient:
         assert inspect.signature(result).parameters["organization_id"].default is None
         assert ":param organization_id:" in (result.__doc__ or "")
 
-        mock_ctx = MagicMock()
-        mock_ctx.request_context.request.headers.get.return_value = "Bearer test-token"
-        with patch("deepset_mcp.mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = BaseFakeClient()
-            await result(a=1, organization_id="org-1", ctx=mock_ctx)
-            assert mock_client_class.call_args[1]["organization_id"] == "org-1"
-            await result(a=1, ctx=mock_ctx)
-            assert "organization_id" not in mock_client_class.call_args[1]
-
     def test_organization_argument_off_by_default(self) -> None:
         async def sample_func(client: AsyncClientProtocol, a: int) -> str:
             return str(a)
@@ -435,6 +426,59 @@ class TestApplyClient:
         result = apply_client(sample_func, ToolConfig(needs_client=True))
 
         assert "organization_id" not in inspect.signature(result).parameters
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("organizations_response", "organization_id", "expected"),
+        [
+            # explicit organization: forwarded, no lookup needed
+            (None, "org-1", "ok"),
+            # API key: endpoint rejects it, call proceeds
+            (TransportResponse(text="", status_code=401, json=None), None, "ok"),
+            # OAuth user with a single organization
+            ({"organizations": [{"organization_id": "org-1", "name": "Acme"}]}, None, "ok"),
+            # OAuth user with several organizations must choose
+            (
+                {
+                    "organizations": [
+                        {"organization_id": "org-1", "name": "Acme"},
+                        {"organization_id": "org-2", "name": "Globex"},
+                    ]
+                },
+                None,
+                "Acme (org-1), Globex (org-2)",
+            ),
+        ],
+    )
+    async def test_organization_argument_behavior(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        organizations_response: Any,
+        organization_id: str | None,
+        expected: str,
+    ) -> None:
+        """Test that a missing organization_id is only an error for OAuth users with several organizations."""
+        created_with: list[dict[str, Any]] = []
+        responses = {} if organizations_response is None else {"/v2/organizations": organizations_response}
+
+        class FakeDeepsetClient(BaseFakeClient):
+            def __init__(self, **kwargs: Any) -> None:
+                super().__init__(responses=responses)
+                created_with.append(kwargs)
+
+        monkeypatch.setattr("deepset_mcp.mcp.tool_factory.AsyncDeepsetClient", FakeDeepsetClient)
+
+        async def sample_func(client: AsyncClientProtocol, a: int) -> str:
+            return "ok"
+
+        result = apply_client(sample_func, ToolConfig(needs_client=True), organization_argument=True)
+        ctx = MagicMock()
+        ctx.request_context.request.headers.get.return_value = "Bearer test-token"
+
+        output = await result(a=1, organization_id=organization_id, ctx=ctx)
+
+        assert expected in output
+        assert created_with[0].get("organization_id") == organization_id
 
     @pytest.mark.asyncio
     async def test_client_with_api_key_and_context_uses_context(self) -> None:
