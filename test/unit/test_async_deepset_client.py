@@ -160,3 +160,16 @@ async def test_close_and_context_manager() -> None:
         assert isinstance(ctx, AsyncDeepsetClient)
     # After exit, close should be called
     assert dummy2.closed is True
+
+
+@pytest.mark.asyncio
+async def test_request_sends_organization_header_only_when_set() -> None:
+    dummy: DummyProtocol = DummyProtocol()
+    scoped = AsyncDeepsetClient(api_key="key", base_url="https://api.test", transport=dummy, organization_id="org-1")
+    unscoped = AsyncDeepsetClient(api_key="key", base_url="https://api.test", transport=dummy)
+
+    await scoped.request("endpoint")
+    await unscoped.request("endpoint")
+
+    assert dummy.requests[0]["headers"]["X-Organization-ID"] == "org-1"
+    assert "X-Organization-ID" not in dummy.requests[1]["headers"]

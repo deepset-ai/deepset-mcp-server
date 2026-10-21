@@ -54,6 +54,7 @@ from .object_store import (
     create_sed_object_store,
     create_yq_object_store,
 )
+from .organization import list_organizations
 from .pipeline import (
     create_pipeline,
     create_pipeline_version,
@@ -165,6 +166,7 @@ __all__ = [
     "get_secret",
     "list_secrets",
     "load_skill",
+    "list_organizations",
     "list_workspaces",
     "get_workspace",
     "create_workspace",

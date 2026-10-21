@@ -25,6 +25,7 @@ async def configure_mcp_server(
     object_store_backend: str = "memory",
     object_store_redis_url: str | None = None,
     object_store_ttl: int = 600,
+    organization_argument: bool = False,
 ) -> None:
     """Configure the MCP server with the specified tools and settings.
 
@@ -44,6 +45,8 @@ async def configure_mcp_server(
     :param object_store_backend: Object store backend type ('memory' or 'redis')
     :param object_store_redis_url: Redis connection URL (required if backend='redis')
     :param object_store_ttl: TTL in seconds for stored objects
+    :param organization_argument: Whether tools get an optional 'organization_id' argument to run in a specific
+        organization. Only has an effect with 'get_api_key_from_authorization_header'.
     :raises ValueError: If required parameters are missing or invalid
     """
     if deepset_api_key is None and not get_api_key_from_authorization_header:
@@ -80,6 +83,7 @@ async def configure_mcp_server(
         base_url=deepset_api_url,
         object_store=store,
         enable_object_store=enable_object_store,
+        organization_argument=organization_argument,
     )
 
 

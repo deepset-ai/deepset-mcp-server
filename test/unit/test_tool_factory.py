@@ -403,6 +403,40 @@ class TestApplyClient:
             assert call_args[1]["api_key"] == "test-token"
 
     @pytest.mark.asyncio
+    async def test_organization_argument_is_exposed_and_forwarded(self) -> None:
+        """Test that organization_id is an optional tool argument that scopes the client."""
+
+        async def sample_func(client: AsyncClientProtocol, a: int) -> str:
+            """Sample function.
+
+            :param client: The client
+            :param a: First param
+            """
+            return str(a)
+
+        result = apply_client(sample_func, ToolConfig(needs_client=True), organization_argument=True)
+
+        assert inspect.signature(result).parameters["organization_id"].default is None
+        assert ":param organization_id:" in (result.__doc__ or "")
+
+        mock_ctx = MagicMock()
+        mock_ctx.request_context.request.headers.get.return_value = "Bearer test-token"
+        with patch("deepset_mcp.mcp.tool_factory.AsyncDeepsetClient") as mock_client_class:
+            mock_client_class.return_value.__aenter__.return_value = BaseFakeClient()
+            await result(a=1, organization_id="org-1", ctx=mock_ctx)
+            assert mock_client_class.call_args[1]["organization_id"] == "org-1"
+            await result(a=1, ctx=mock_ctx)
+            assert "organization_id" not in mock_client_class.call_args[1]
+
+    def test_organization_argument_off_by_default(self) -> None:
+        async def sample_func(client: AsyncClientProtocol, a: int) -> str:
+            return str(a)
+
+        result = apply_client(sample_func, ToolConfig(needs_client=True))
+
+        assert "organization_id" not in inspect.signature(result).parameters
+
+    @pytest.mark.asyncio
     async def test_client_with_api_key_and_context_uses_context(self) -> None:
         """Test that client uses API key from request context."""
 

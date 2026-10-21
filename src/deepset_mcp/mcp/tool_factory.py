@@ -25,6 +25,12 @@ from deepset_mcp.tokonomics import (
     referenceable,
 )
 
+ORGANIZATION_ID_DOC = (
+    "Optional. The organization to run this call in, as returned by 'list_organizations'. "
+    "Leave empty to use your default organization. Only set it if you belong to several organizations "
+    "and the user asked for a specific one."
+)
+
 
 def apply_custom_args(base_func: Callable[..., Any], config: ToolConfig) -> Callable[..., Any]:
     """
@@ -146,6 +152,7 @@ def apply_client(
     use_request_context: bool = True,
     base_url: str | None = None,
     api_key: str | None = None,
+    organization_argument: bool = False,
 ) -> Callable[..., Any]:
     """
     Applies the deepset API client to a function.
@@ -159,6 +166,8 @@ def apply_client(
     :param use_request_context: Whether to collect the API key from the request context.
     :param base_url: Base URL for the deepset API.
     :param api_key: The API key to use.
+    :param organization_argument: Whether to add an optional 'organization_id' argument (request context only) that
+        scopes the API calls of the tool to that organization. Needed for OAuth tokens, which are not bound to one.
     :returns: Function with client injection applied and updated signature/docstring.
     :raises ValueError: If API key cannot be extracted from request context.
     """
@@ -170,6 +179,7 @@ def apply_client(
         @functools.wraps(base_func)
         async def client_wrapper_with_context(*args: Any, **kwargs: Any) -> Any:
             ctx = kwargs.pop("ctx", None)
+            organization_id = kwargs.pop("organization_id", None)
             if not ctx:
                 raise ValueError("Context is required for client authentication")
 
@@ -186,21 +196,28 @@ def apply_client(
             client_kwargs: dict[str, Any] = {"transport_config": transport_config, "api_key": api_key}
             if base_url:
                 client_kwargs["base_url"] = base_url
+            if organization_id:
+                client_kwargs["organization_id"] = organization_id
             async with AsyncDeepsetClient(**client_kwargs) as client:
                 return await base_func(*args, client=client, **kwargs)
 
-        # Remove client from signature and add ctx
+        # Remove client from signature and add ctx (and the optional organization_id)
         original_sig = inspect.signature(base_func)
         new_params = [p for name, p in original_sig.parameters.items() if name != "client"]
+        new_annotations = {k: v for k, v in base_func.__annotations__.items() if k != "client"}
+        doc = remove_params_from_docstring(base_func.__doc__, {"client"})
+        if organization_argument:
+            new_params.append(
+                inspect.Parameter(
+                    "organization_id", inspect.Parameter.KEYWORD_ONLY, default=None, annotation=str | None
+                )
+            )
+            new_annotations["organization_id"] = str | None
+            doc += f"\n\n:param organization_id: {ORGANIZATION_ID_DOC}"
         ctx_param = inspect.Parameter(name="ctx", kind=inspect.Parameter.KEYWORD_ONLY, annotation=Context)
         new_params.append(ctx_param)
         client_wrapper_with_context.__signature__ = original_sig.replace(parameters=new_params)  # type: ignore
-
-        # Remove client from docstring
-        client_wrapper_with_context.__doc__ = remove_params_from_docstring(base_func.__doc__, {"client"})
-
-        # Remove client from annotations and add ctx
-        new_annotations = {k: v for k, v in base_func.__annotations__.items() if k != "client"}
+        client_wrapper_with_context.__doc__ = doc
         new_annotations["ctx"] = Context
         client_wrapper_with_context.__annotations__ = new_annotations
 
@@ -239,6 +256,7 @@ def build_tool(
     use_request_context: bool = True,
     base_url: str | None = None,
     object_store: ObjectStore | None = None,
+    organization_argument: bool = False,
 ) -> Callable[..., Awaitable[Any]]:
     """
     Universal tool creator that handles client injection, workspace, and decorators.
@@ -252,6 +270,7 @@ def build_tool(
     :param use_request_context: Whether to collect the API key from the request context.
     :param base_url: Base URL for the deepset API.
     :param object_store: The ObjectStore instance to use for memory decorators.
+    :param organization_argument: Whether tools get an optional 'organization_id' argument.
     :returns: An enhanced, awaitable tool function with an updated signature and docstring.
     """
     enhanced_func = base_func
@@ -267,7 +286,12 @@ def build_tool(
 
     # Apply client injection (adds ctx parameter if needed)
     enhanced_func = apply_client(
-        enhanced_func, config, use_request_context=use_request_context, base_url=base_url, api_key=api_key
+        enhanced_func,
+        config,
+        use_request_context=use_request_context,
+        base_url=base_url,
+        api_key=api_key,
+        organization_argument=organization_argument,
     )
 
     # Create final async wrapper if needed
@@ -296,6 +320,7 @@ def register_tools(
     base_url: str | None = None,
     object_store: ObjectStore | None = None,
     enable_object_store: bool = True,
+    organization_argument: bool = False,
 ) -> None:
     """Register tools with unified configuration.
 
@@ -314,6 +339,9 @@ def register_tools(
         enable_object_store: Whether tool outputs may be stored in and referenced from the object store. When
             False, the object-store inspection tools are skipped and every other tool is registered with
             'MemoryType.NO_MEMORY', so its raw output is always returned as-is.
+        organization_argument: Whether every tool that calls the deepset API gets an optional 'organization_id'
+            argument (only when reading the token from the request context). Enable it when serving OAuth tokens,
+            which are not bound to a single organization.
 
     Raises:
         ValueError: If an object-store tool is explicitly requested while 'enable_object_store' is False.
@@ -373,6 +401,7 @@ def register_tools(
                 base_url=base_url,
                 object_store=object_store,
                 api_key=api_key,
+                organization_argument=organization_argument,
             )
 
         mcp_server_instance.add_tool(enhanced_tool, name=tool_name, structured_output=False)
