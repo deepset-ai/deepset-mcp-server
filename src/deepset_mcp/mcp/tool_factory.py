@@ -32,15 +32,24 @@ ORGANIZATION_ID_DOC = (
 
 
 async def _ambiguous_organization_error(client: AsyncDeepsetClient) -> str | None:
-    """Returns an error message if the token belongs to several organizations, else None.
+    """Returns an error message if the call must not proceed without an 'organization_id', else None.
 
-    API keys (the endpoint rejects them) and users with a single organization pass.
+    API keys are rejected by the endpoint with a 401 and are bound to one organization, so they proceed, as do users
+    with a single organization. Any other failure fails closed, so that a multi-organization user is never silently
+    run against the default organization.
 
     :param client: A client that is not scoped to an organization.
-    :returns: Error message listing the organizations to choose from, or None if the call may proceed.
+    :returns: Error message, or None if the call may proceed.
     """
     resp = await client.request("/v2/organizations")
-    organizations = (resp.json or {}).get("organizations", []) if resp.success and isinstance(resp.json, dict) else []
+    if resp.status_code == 401:
+        return None
+    organizations = resp.json.get("organizations") if resp.success and isinstance(resp.json, dict) else None
+    if not isinstance(organizations, list):
+        return (
+            f"Could not determine your organizations (HTTP {resp.status_code}). "
+            "Call this tool again with 'organization_id' set, or try again later."
+        )
     if len(organizations) <= 1:
         return None
     options = ", ".join(f"{org['name']} ({org['organization_id']})" for org in organizations)
@@ -383,6 +392,10 @@ def register_tools(
         tools_to_register = tool_names.copy()
     else:
         tools_to_register = set(TOOL_REGISTRY.keys())
+
+    if not organization_argument:
+        # 'list_organizations' only works with OAuth tokens, so it is only exposed together with the argument.
+        tools_to_register.discard("list_organizations")
 
     if not enable_object_store:
         requested_object_store_tools = tools_to_register & OBJECT_STORE_TOOL_NAMES

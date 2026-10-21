@@ -435,6 +435,9 @@ class TestApplyClient:
             (None, "org-1", "ok"),
             # API key: endpoint rejects it, call proceeds
             (TransportResponse(text="", status_code=401, json=None), None, "ok"),
+            # endpoint failure or malformed payload: fail closed
+            (TransportResponse(text="", status_code=503, json=None), None, "Could not determine your organizations"),
+            (TransportResponse(text="{}", status_code=200, json={}), None, "Could not determine your organizations"),
             # OAuth user with a single organization
             ({"organizations": [{"organization_id": "org-1", "name": "Acme"}]}, None, "ok"),
             # OAuth user with several organizations must choose
@@ -835,6 +838,7 @@ class TestRegisterAllTools:
             tool_names={tool_name},
             object_store=object_store,
             docs_config=docs_config,
+            organization_argument=True,
         )
 
         registered = mcp_server._tool_manager._tools[tool_name]
@@ -854,7 +858,7 @@ class TestRegisterToolsWithObjectStoreDisabled:
         register_tools(mcp_server, docs_config=docs_config, enable_object_store=False)
 
         registered_names = set(mcp_server._tool_manager._tools.keys())
-        assert registered_names == set(TOOL_REGISTRY.keys()) - OBJECT_STORE_TOOL_NAMES
+        assert registered_names == set(TOOL_REGISTRY.keys()) - OBJECT_STORE_TOOL_NAMES - {"list_organizations"}
 
     def test_no_object_store_instance_required(self) -> None:
         """Registering tools with the object store disabled must not require an 'ObjectStore' instance."""
@@ -880,3 +884,22 @@ class TestRegisterToolsWithObjectStoreDisabled:
 
         with pytest.raises(ValueError, match="get_from_object_store"):
             register_tools(mcp_server, tool_names={"get_from_object_store"}, enable_object_store=False)
+
+
+class TestListOrganizationsRegistration:
+    """'list_organizations' is OAuth-only, so it is exposed only together with 'organization_argument'."""
+
+    @pytest.mark.parametrize("organization_argument", [False, True])
+    def test_registered_only_with_organization_argument(self, organization_argument: bool) -> None:
+        mcp_server = FastMCP()
+        docs_config = DeepsetDocsConfig(pipeline_name="pipeline", api_key="key", workspace_name="workspace")
+
+        register_tools(
+            mcp_server,
+            tool_names=set(TOOL_REGISTRY),
+            docs_config=docs_config,
+            object_store=ObjectStore(backend=InMemoryBackend()),
+            organization_argument=organization_argument,
+        )
+
+        assert ("list_organizations" in mcp_server._tool_manager._tools) is organization_argument
