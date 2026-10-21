@@ -52,6 +52,7 @@ Rules:
 - **Two shapes.**
   - `Score`: a number. Declared `Score(grain=...)`; returned `Score(score=0.8, rationale="...")`.
   - `Label`: one of a set of answers. Closed with a `vocabulary`, open without one. Returned `Label(label="yes", rationale="...")`. A yes/no is a two-value Label. Labels have no order; if a mean matters, declare a Score.
+  - A Score may add `better="higher"` or `better="lower"`: `Score(grain="session", better="higher")`. It says which way a *change* is an improvement, not whether a value is good, and it is what lets a comparison call a change improved or regressed. Set it only when the direction is clear from the criterion or the user said so; omit it when unsure (the direction is then unknown). Never put it on a Label.
   - Every returned value may carry a `rationale`. It is what a report groups failures by, so write one whenever the value is not self-explanatory.
   - A vocabulary may not contain `n/a` or similar; that is `NotApplicable`.
 - **Grains** say where a Metric repeats:
@@ -251,3 +252,7 @@ A replay leaves the source Session and the deployed pipeline untouched. Its new 
 4. `NotApplicable(reason=...)` instead of a `0` or a missing key.
 5. For a judge: closed Labels, `score_range` when a Score is judged, and a real `chat_generator_config` from `get_models`.
 6. When a try tool is available, try the draft on one to three Sessions before calling it ready, and read the `error_detail` of a try that breaks.
+
+## Reporting results
+
+Experiment results give each Metric a `better` (`higher`, `lower` or null) and a `change` (`improved`, `regressed`, `unchanged` or `unknown`). Say a Metric improved or regressed only from `change`. `unknown` is a change you do not judge: report the numbers and say the direction is not declared. Never infer a direction from a Metric's name.
