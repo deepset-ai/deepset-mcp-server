@@ -12,6 +12,7 @@ import pytest
 from mcp.server.fastmcp import Context, FastMCP
 
 from deepset_mcp.api.protocols import AsyncClientProtocol
+from deepset_mcp.api.transport import TransportResponse
 from deepset_mcp.mcp.tool_factory import (
     apply_client,
     apply_custom_args,
@@ -402,6 +403,86 @@ class TestApplyClient:
             call_args = mock_client_class.call_args
             assert call_args[1]["api_key"] == "test-token"
 
+    def test_organization_argument_is_exposed(self) -> None:
+        """Test that organization_id becomes an optional, documented tool argument."""
+
+        async def sample_func(client: AsyncClientProtocol, a: int) -> str:
+            """Sample function.
+
+            :param client: The client
+            :param a: First param
+            """
+            return str(a)
+
+        result = apply_client(sample_func, ToolConfig(needs_client=True), organization_argument=True)
+
+        assert inspect.signature(result).parameters["organization_id"].default is None
+        assert ":param organization_id:" in (result.__doc__ or "")
+
+    def test_organization_argument_off_by_default(self) -> None:
+        async def sample_func(client: AsyncClientProtocol, a: int) -> str:
+            return str(a)
+
+        result = apply_client(sample_func, ToolConfig(needs_client=True))
+
+        assert "organization_id" not in inspect.signature(result).parameters
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("organizations_response", "organization_id", "expected"),
+        [
+            # explicit organization: forwarded, no lookup needed
+            (None, "org-1", "ok"),
+            # API key: endpoint rejects it, call proceeds
+            (TransportResponse(text="", status_code=401, json=None), None, "ok"),
+            # endpoint failure or malformed payload: fail closed
+            (TransportResponse(text="", status_code=503, json=None), None, "Could not determine your organizations"),
+            (TransportResponse(text="{}", status_code=200, json={}), None, "Could not determine your organizations"),
+            # OAuth user with a single organization
+            ({"organizations": [{"organization_id": "org-1", "name": "Acme"}]}, None, "ok"),
+            # OAuth user with several organizations must choose
+            (
+                {
+                    "organizations": [
+                        {"organization_id": "org-1", "name": "Acme"},
+                        {"organization_id": "org-2", "name": "Globex"},
+                    ]
+                },
+                None,
+                "Acme (org-1), Globex (org-2)",
+            ),
+        ],
+    )
+    async def test_organization_argument_behavior(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        organizations_response: Any,
+        organization_id: str | None,
+        expected: str,
+    ) -> None:
+        """Test that a missing organization_id is only an error for OAuth users with several organizations."""
+        created_with: list[dict[str, Any]] = []
+        responses = {} if organizations_response is None else {"/v2/organizations": organizations_response}
+
+        class FakeDeepsetClient(BaseFakeClient):
+            def __init__(self, **kwargs: Any) -> None:
+                super().__init__(responses=responses)
+                created_with.append(kwargs)
+
+        monkeypatch.setattr("deepset_mcp.mcp.tool_factory.AsyncDeepsetClient", FakeDeepsetClient)
+
+        async def sample_func(client: AsyncClientProtocol, a: int) -> str:
+            return "ok"
+
+        result = apply_client(sample_func, ToolConfig(needs_client=True), organization_argument=True)
+        ctx = MagicMock()
+        ctx.request_context.request.headers.get.return_value = "Bearer test-token"
+
+        output = await result(a=1, organization_id=organization_id, ctx=ctx)
+
+        assert expected in output
+        assert created_with[0].get("organization_id") == organization_id
+
     @pytest.mark.asyncio
     async def test_client_with_api_key_and_context_uses_context(self) -> None:
         """Test that client uses API key from request context."""
@@ -757,6 +838,7 @@ class TestRegisterAllTools:
             tool_names={tool_name},
             object_store=object_store,
             docs_config=docs_config,
+            organization_argument=True,
         )
 
         registered = mcp_server._tool_manager._tools[tool_name]
@@ -776,7 +858,7 @@ class TestRegisterToolsWithObjectStoreDisabled:
         register_tools(mcp_server, docs_config=docs_config, enable_object_store=False)
 
         registered_names = set(mcp_server._tool_manager._tools.keys())
-        assert registered_names == set(TOOL_REGISTRY.keys()) - OBJECT_STORE_TOOL_NAMES
+        assert registered_names == set(TOOL_REGISTRY.keys()) - OBJECT_STORE_TOOL_NAMES - {"list_organizations"}
 
     def test_no_object_store_instance_required(self) -> None:
         """Registering tools with the object store disabled must not require an 'ObjectStore' instance."""
@@ -802,3 +884,22 @@ class TestRegisterToolsWithObjectStoreDisabled:
 
         with pytest.raises(ValueError, match="get_from_object_store"):
             register_tools(mcp_server, tool_names={"get_from_object_store"}, enable_object_store=False)
+
+
+class TestListOrganizationsRegistration:
+    """'list_organizations' is OAuth-only, so it is exposed only together with 'organization_argument'."""
+
+    @pytest.mark.parametrize("organization_argument", [False, True])
+    def test_registered_only_with_organization_argument(self, organization_argument: bool) -> None:
+        mcp_server = FastMCP()
+        docs_config = DeepsetDocsConfig(pipeline_name="pipeline", api_key="key", workspace_name="workspace")
+
+        register_tools(
+            mcp_server,
+            tool_names=set(TOOL_REGISTRY),
+            docs_config=docs_config,
+            object_store=ObjectStore(backend=InMemoryBackend()),
+            organization_argument=organization_argument,
+        )
+
+        assert ("list_organizations" in mcp_server._tool_manager._tools) is organization_argument

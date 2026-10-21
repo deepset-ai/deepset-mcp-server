@@ -62,6 +62,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         base_url: str = "https://api.cloud.deepset.ai/api",
         transport: TransportProtocol | None = None,
         transport_config: dict[str, Any] | None = None,
+        organization_id: str | None = None,
     ) -> None:
         """Initialize an instance of the AsyncDeepsetClient.
 
@@ -70,7 +71,10 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         :param transport: Custom transport implementation
         :param transport_config: Configuration for default transport (e.g. timeout). All configuration parameters are
             forwarded to httpx.AsyncClient.
+        :param organization_id: Organization to scope requests to, sent as 'X-Organization-ID'. Only needed for
+            tokens that are not bound to an organization (OAuth). The platform picks a default when omitted.
         """
+        self.organization_id = organization_id
         self.api_key = api_key or os.environ.get("DEEPSET_API_KEY")
         if not self.api_key:
             raise ValueError("API key not provided and DEEPSET_API_KEY environment variable not set")
@@ -251,6 +255,8 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         }
         if data is not None:
             request_headers["Content-Type"] = "application/json"
+        if self.organization_id:
+            request_headers["X-Organization-ID"] = self.organization_id
         # Merge custom headers
         if headers:
             headers.setdefault("Authorization", request_headers["Authorization"])
@@ -313,6 +319,8 @@ class AsyncDeepsetClient(AsyncClientProtocol):
             }
             if data is not None:
                 request_headers["Content-Type"] = "application/json"
+            if self.organization_id:
+                request_headers["X-Organization-ID"] = self.organization_id
             # Merge custom headers
             if headers:
                 headers.setdefault("Authorization", request_headers["Authorization"])

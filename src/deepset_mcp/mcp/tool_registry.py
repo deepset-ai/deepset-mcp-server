@@ -79,6 +79,7 @@ from deepset_mcp.tools.object_store import (
     create_sed_object_store,
     create_yq_object_store,
 )
+from deepset_mcp.tools.organization import list_organizations as list_organizations_tool
 from deepset_mcp.tools.pipeline import (
     create_pipeline as create_pipeline_tool,
     create_pipeline_version as create_pipeline_version_tool,
@@ -469,6 +470,7 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "list_secrets": (list_secrets_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "get_secret": (get_secret_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "load_skill": (load_skill_tool, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
+    "list_organizations": (list_organizations_tool, ToolConfig(needs_client=True, memory_type=MemoryType.NO_MEMORY)),
     "list_workspaces": (list_workspaces_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "get_workspace": (get_workspace_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "create_workspace": (create_workspace_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),

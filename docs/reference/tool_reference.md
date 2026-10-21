@@ -163,6 +163,7 @@ draft/version history. Each deployment tracks its own history of served pipeline
 
 | MCP tool name | Workspace | Memory | Description |
 | --- | --- | --- | --- |
+| `list_organizations` | not needed | no_memory | List the organizations the user belongs to (OAuth only). |
 | `list_workspaces` | not needed | explorable | List the workspaces available to the API key. |
 | `get_workspace` | not needed | explorable | Fetch a workspace's details. |
 | `create_workspace` | not needed | explorable | Create a new workspace. |
