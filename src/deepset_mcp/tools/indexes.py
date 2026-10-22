@@ -130,59 +130,41 @@ async def update_index(
     client: AsyncClientProtocol,
     workspace: str,
     index_name: str,
-    original_config_snippet: str,
-    replacement_config_snippet: str,
+    yaml_configuration: str,
     skip_validation_errors: bool = True,
 ) -> Index | IndexOperationWithErrors | str:
     """
-    Updates an index configuration in the specified workspace with a replacement configuration snippet.
+    Updates an index in the specified workspace by replacing its YAML configuration with the provided one.
 
-    This function validates the replacement configuration snippet before applying it to the index.
+    Pass the complete, updated YAML configuration of the index, not just the changed parts.
+    The configuration is validated before it is applied to the index.
     If the validation fails and skip_validation_errors is False, it returns error messages.
-    Otherwise, the replacement snippet is used to update the index's configuration.
+    Otherwise, the provided configuration replaces the index's configuration.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
     :param index_name: Name of the index to update.
-    :param original_config_snippet: The configuration snippet to replace.
-    :param replacement_config_snippet: The new configuration snippet.
+    :param yaml_configuration: The complete, updated YAML configuration for the index.
     :param skip_validation_errors: If True (default), updates the index even if validation fails.
                                   If False, stops update when validation fails.
     :returns: Updated index or error message.
     """
-    try:
-        original_index = await client.indexes(workspace=workspace).get(index_name=index_name)
-    except ResourceNotFoundError:
-        return f"There is no index named '{index_name}'. Did you mean to create it?"
-    except (BadRequestError, UnexpectedAPIError) as e:
-        return f"Failed to fetch index '{index_name}': {e}"
-
-    if original_index.yaml_config is None:
-        return f"The index '{index_name}' does not have a YAML configuration."
-
-    occurrences = original_index.yaml_config.count(original_config_snippet)
-
-    if occurrences == 0:
-        return f"No occurrences of the provided configuration snippet were found in the index '{index_name}'."
-
-    if occurrences > 1:
-        return (
-            f"Multiple occurrences ({occurrences}) of the provided configuration snippet were found in the index "
-            f"'{index_name}'. Specify a more precise snippet to proceed with the update."
-        )
-
-    updated_yaml_configuration = original_index.yaml_config.replace(
-        original_config_snippet, replacement_config_snippet, 1
-    )
+    if not yaml_configuration or not yaml_configuration.strip():
+        return "You need to provide a YAML configuration to update the index."
 
     try:
-        validation_response = await client.indexes(workspace=workspace).validate(updated_yaml_configuration)
+        yaml.safe_load(yaml_configuration)
+    except yaml.YAMLError as e:
+        return f"Invalid YAML provided: {e}"
+
+    try:
+        validation_response = await client.indexes(workspace=workspace).validate(yaml_configuration)
 
         if not validation_response.valid and not skip_validation_errors:
             error_messages = [f"{error.code}: {error.message}" for error in validation_response.errors]
             return "Index validation failed:\n" + "\n".join(error_messages)
 
-        await client.indexes(workspace=workspace).update(index_name=index_name, yaml_config=updated_yaml_configuration)
+        await client.indexes(workspace=workspace).update(index_name=index_name, yaml_config=yaml_configuration)
 
         # Get the full index after update
         index = await client.indexes(workspace=workspace).get(index_name)

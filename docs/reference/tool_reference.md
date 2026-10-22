@@ -68,7 +68,7 @@ The *Memory* column describes how a tool interacts with the object store (see
 | `list_indexes` | required | explorable | List all indexes in the workspace. |
 | `get_index` | required | explorable | Fetch an index's configuration. |
 | `create_index` | required | explorable, referenceable | Create a new index from a YAML configuration. |
-| `update_index` | required | explorable, referenceable | Update an existing index's configuration. |
+| `update_index` | required | explorable, referenceable | Replace an existing index's configuration with a full, updated YAML. |
 | `validate_index` | required | explorable, referenceable | Validate an index configuration without saving it. |
 | `deploy_index` | required | explorable | Deploy an index. |
 
