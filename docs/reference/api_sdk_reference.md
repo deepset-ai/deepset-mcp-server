@@ -32,12 +32,6 @@
         heading_level: 3
         filters: [ "!^_(?!_init__)" ]
 
-::: deepset_mcp.api.integrations
-    options:
-        show_submodules: false
-        heading_level: 3
-        filters: [ "!^_(?!_init__)" ]
-
 ::: deepset_mcp.api.custom_components
     options:
         show_submodules: false
@@ -83,12 +77,6 @@
         filters: [ "!^_(?!_init__)" ]
 
 ::: deepset_mcp.api.pipeline_template.models
-    options:
-        show_submodules: false
-        heading_level: 3
-        filters: [ "!^_(?!_init__)" ]
-
-::: deepset_mcp.api.integrations.models
     options:
         show_submodules: false
         heading_level: 3

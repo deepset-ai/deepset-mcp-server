@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from functools import partial
 from typing import Any
 
 from deepset_mcp.api.exceptions import ResourceNotFoundError
@@ -28,6 +29,7 @@ class SecretResource(SecretResourceProtocol):
         field: str = "created_at",
         order: str = "DESC",
         after: str | None = None,
+        workspace: str | None = None,
     ) -> PaginatedResponse[Secret]:
         """List secrets with pagination.
 
@@ -37,6 +39,7 @@ class SecretResource(SecretResourceProtocol):
         :param field: Field to sort by.
         :param order: Sort order (ASC or DESC).
         :param after: The cursor to fetch the next page of results.
+        :param workspace: If set, list the secrets available in this workspace instead of the organization's secrets.
 
         :returns: A `PaginatedResponse` object containing the first page of secrets.
         """
@@ -54,21 +57,24 @@ class SecretResource(SecretResourceProtocol):
         }
         request_params = {k: v for k, v in request_params.items() if v is not None}
 
+        endpoint = f"v2/workspaces/{workspace}/secrets" if workspace else "v2/secrets"
+        fetch_func = partial(self._list_api_call, endpoint)
+
         # 2. Make the first API call using a private, stateless method
-        page = await self._list_api_call(**request_params)
+        page = await fetch_func(**request_params)
 
         # 3. Inject the logic needed for subsequent fetches into the response object
         page._inject_paginator(
-            fetch_func=self._list_api_call,
+            fetch_func=fetch_func,
             # Base args for the *next* fetch don't include initial cursors
             base_args={"limit": str(limit), "field": field, "order": order},
         )
         return page
 
-    async def _list_api_call(self, **kwargs: Any) -> PaginatedResponse[Secret]:
+    async def _list_api_call(self, endpoint: str, **kwargs: Any) -> PaginatedResponse[Secret]:
         """A private, stateless method that performs the raw API call."""
         resp = await self._client.request(
-            endpoint="v2/secrets",
+            endpoint=endpoint,
             method="GET",
             response_type=dict[str, Any],
             params=kwargs,

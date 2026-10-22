@@ -14,7 +14,6 @@ from deepset_mcp.api.deployment.resource import DeploymentResource
 from deepset_mcp.api.evaluation.resource import EvaluationResource
 from deepset_mcp.api.haystack_service.resource import HaystackServiceResource
 from deepset_mcp.api.indexes.resource import IndexResource
-from deepset_mcp.api.integrations.resource import IntegrationResource
 from deepset_mcp.api.model.resource import ModelResource
 from deepset_mcp.api.pipeline.resource import PipelineResource
 from deepset_mcp.api.pipeline_template.resource import PipelineTemplateResource
@@ -150,13 +149,6 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         :returns: Haystack service resource instance
         """
         return HaystackServiceResource(client=self)
-
-    def integrations(self) -> IntegrationResource:
-        """Resource to interact with integrations.
-
-        :returns: Integration resource instance
-        """
-        return IntegrationResource(client=self)
 
     def models(self, workspace: str) -> ModelResource:
         """Resource to interact with models in the specified workspace.
