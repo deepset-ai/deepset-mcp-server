@@ -37,13 +37,10 @@ def _format_organizations(organizations: list[dict[str, Any]]) -> str:
 
 
 async def _organization_error(client: AsyncDeepsetClient, organization_id: str | None) -> str | None:
-    """Returns an error message if the call must not proceed with the given 'organization_id', else None.
+    """Checks whether the tool may run, and returns an error message if it may not.
 
-    Without an 'organization_id', a 401 means an API key, which is bound to one organization, so the call proceeds, as
-    it does for users with a single organization. Any other failure fails closed, so that a multi-organization user is
-    never silently run against the default organization. With an 'organization_id', it must be one of the user's
-    organizations; on a 401 the call is refused, because API keys are bound to one organization and the platform
-    would silently ignore it.
+    - With an 'organization_id': it must be one of the user's organizations. API keys cannot use it.
+    - Without one: users with several organizations must choose one. Everyone else can proceed.
 
     :param client: A client that is not scoped to an organization.
     :param organization_id: The organization requested by the caller, if any.
