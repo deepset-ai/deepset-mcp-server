@@ -24,5 +24,5 @@ async def test_list_organizations_explains_api_keys_on_401() -> None:
     result = await list_organizations(client=client)
 
     assert isinstance(result, str)
-    assert "only works with OAuth" in result
-    assert "bound to a single organization" in result
+    assert "Organization selection requires OAuth" in result
+    assert "API keys are tied to one organization" in result

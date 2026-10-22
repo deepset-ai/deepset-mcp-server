@@ -25,9 +25,9 @@ async def list_organizations(*, client: AsyncClientProtocol) -> list[dict[str, A
     if not resp.success:
         if resp.status_code == 401:
             return (
-                "Failed to list organizations (HTTP 401). This only works with OAuth. If you use an API key, it is "
-                "bound to a single organization and there is nothing to choose: call tools without 'organization_id'. "
-                "Otherwise your credentials may have expired."
+                "Failed to list organizations (HTTP 401). Organization selection requires OAuth. "
+                "API keys are tied to one organization, so omit 'organization_id' when calling tools. "
+                "Otherwise, your credentials may have expired."
             )
         return f"Failed to list organizations (HTTP {resp.status_code}): {resp.text}"
     return list((resp.json or {}).get("organizations", []))
