@@ -26,17 +26,10 @@ from deepset_mcp.tokonomics import (
 )
 
 ORGANIZATION_ID_DOC = (
-    "Optional. The ID (not the name) of the organization to run this call in, as returned by 'list_organizations'. "
+    "Optional. The ID of the organization to run this call in, as returned by 'list_organizations'. "
     "Required if you belong to several organizations; leave empty otherwise. "
     "Not supported with API keys, which are bound to a single organization."
 )
-
-
-def _could_not_determine(status_code: int) -> str:
-    return (
-        f"Could not determine your organizations (HTTP {status_code}). "
-        "Call this tool again with 'organization_id' set, or try again later."
-    )
 
 
 def _format_organizations(organizations: list[dict[str, Any]]) -> str:
@@ -85,7 +78,10 @@ async def _organization_error(client: AsyncDeepsetClient, organization_id: str |
         return await _api_key_organization_error(client, organization_id) if organization_id else None
     organizations = resp.json.get("organizations") if resp.success and isinstance(resp.json, dict) else None
     if not isinstance(organizations, list):
-        return _could_not_determine(resp.status_code)
+        return (
+            f"Could not determine your organizations (HTTP {resp.status_code}). "
+            "Call this tool again with 'organization_id' set, or try again later."
+        )
     if organization_id:
         if any(org.get("organization_id") == organization_id for org in organizations):
             return None
@@ -267,7 +263,6 @@ def apply_client(
                 client_kwargs["base_url"] = base_url
             async with AsyncDeepsetClient(**client_kwargs) as client:
                 if organization_argument:
-                    # The checks run unscoped; the client is scoped to the organization afterwards.
                     error = await _organization_error(client, organization_id)
                     if error:
                         return error
