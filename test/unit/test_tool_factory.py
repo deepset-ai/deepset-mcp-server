@@ -431,90 +431,35 @@ class TestApplyClient:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        ("organizations_response", "me_response", "organization_id", "expected", "me_requested"),
+        ("organizations_response", "organization_id", "expected"),
         [
             # API key without organization_id: endpoint rejects it with a 401, call proceeds
-            (TransportResponse(text="", status_code=401, json=None), None, None, "ok", False),
+            (TransportResponse(text="", status_code=401, json=None), None, "ok"),
             # endpoint failure or malformed payload: fail closed
-            (
-                TransportResponse(text="", status_code=503, json=None),
-                None,
-                None,
-                "Could not determine your organizations",
-                False,
-            ),
-            (
-                TransportResponse(text="{}", status_code=200, json={}),
-                None,
-                None,
-                "Could not determine your organizations",
-                False,
-            ),
+            (TransportResponse(text="", status_code=503, json=None), None, "Could not determine your organizations"),
+            (TransportResponse(text="{}", status_code=200, json={}), None, "Could not determine your organizations"),
             # OAuth user with a single organization
-            ({"organizations": [{"organization_id": "org-1", "name": "Acme"}]}, None, None, "ok", False),
+            ({"organizations": [{"organization_id": "org-1", "name": "Acme"}]}, None, "ok"),
             # OAuth user with several organizations must choose
             (
                 {"organizations": [{"organization_id": "org-1", "name": "Acme"}, _GLOBEX]},
                 None,
-                None,
                 "Acme (org-1), Globex (org-2)",
-                False,
             ),
             # OAuth user with an explicit organization of theirs
-            (
-                {"organizations": [{"organization_id": "org-1", "name": "Acme"}, _GLOBEX]},
-                None,
-                "org-2",
-                "ok",
-                False,
-            ),
+            ({"organizations": [{"organization_id": "org-1", "name": "Acme"}, _GLOBEX]}, "org-2", "ok"),
             # OAuth user with an organization that is not theirs, or a name instead of an ID
             (
                 {"organizations": [{"organization_id": "org-1", "name": "Acme"}, _GLOBEX]},
-                None,
                 "Globex",
                 "'Globex' is not one of your organizations. Call this tool again with 'organization_id' set to one "
                 "of: Acme (org-1), Globex (org-2)",
-                False,
             ),
-            # API key with an organization_id other than its own: it would be silently ignored
+            # API key with an organization_id: the platform would silently ignore it
             (
-                TransportResponse(text="", status_code=401, json=None),
-                {"organization": {"organization_id": "org-1", "name": "Acme"}},
-                "org-2",
-                "cannot be used with an API key: it is bound to a single organization (Acme, org-1)",
-                True,
-            ),
-            # API key with its own organization: harmless
-            (
-                TransportResponse(text="", status_code=401, json=None),
-                {"organization": {"organization_id": "org-1", "name": "Acme"}},
-                "org-1",
-                "ok",
-                True,
-            ),
-            # rejected credentials
-            (
-                TransportResponse(text="", status_code=401, json=None),
                 TransportResponse(text="", status_code=401, json=None),
                 "org-1",
-                "credentials were rejected",
-                True,
-            ),
-            # /v1/me failure or malformed payload: fail closed
-            (
-                TransportResponse(text="", status_code=401, json=None),
-                TransportResponse(text="", status_code=503, json=None),
-                "org-1",
-                "Could not verify 'organization_id' (HTTP 503)",
-                True,
-            ),
-            (
-                TransportResponse(text="", status_code=401, json=None),
-                {"user_id": "u"},
-                "org-1",
-                "Could not verify 'organization_id' (HTTP 200)",
-                True,
+                "'organization_id' cannot be used with an API key",
             ),
         ],
     )
@@ -522,22 +467,17 @@ class TestApplyClient:
         self,
         monkeypatch: pytest.MonkeyPatch,
         organizations_response: Any,
-        me_response: Any,
         organization_id: str | None,
         expected: str,
-        me_requested: bool,
     ) -> None:
         """Test that the organization_id is checked against the user's organizations before the tool runs."""
         clients: list[Any] = []
-        responses = {"/v2/organizations": organizations_response}
-        if me_response is not None:
-            responses["/v1/me"] = me_response
 
         class FakeDeepsetClient(BaseFakeClient):
             organization_id: str | None = None
 
             def __init__(self, **kwargs: Any) -> None:
-                super().__init__(responses=responses)
+                super().__init__(responses={"/v2/organizations": organizations_response})
                 assert "organization_id" not in kwargs
                 clients.append(self)
 
@@ -553,8 +493,6 @@ class TestApplyClient:
         output = await result(a=1, organization_id=organization_id, ctx=ctx)
 
         assert expected in output
-        requested = [request["endpoint"] for request in clients[0].requests]
-        assert ("/v1/me" in requested) is me_requested
         if output == "ok":
             assert clients[0].organization_id == organization_id
 

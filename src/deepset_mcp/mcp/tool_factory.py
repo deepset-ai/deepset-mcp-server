@@ -36,38 +36,14 @@ def _format_organizations(organizations: list[dict[str, Any]]) -> str:
     return ", ".join(f"{org['name']} ({org['organization_id']})" for org in organizations) or "none"
 
 
-async def _api_key_organization_error(client: AsyncDeepsetClient, organization_id: str) -> str | None:
-    """Returns an error message if an 'organization_id' cannot be used with the credentials behind a 401, else None.
-
-    '/v2/organizations' answers 401 both for API keys and for rejected credentials. '/v1/me' tells them apart: it
-    succeeds for API keys, which are bound to one organization and silently ignore 'organization_id'.
-
-    :param client: A client that is not scoped to an organization.
-    :param organization_id: The organization requested by the caller.
-    :returns: Error message, or None if the call may proceed.
-    """
-    resp = await client.request("/v1/me")
-    if resp.status_code == 401:
-        return "Your credentials were rejected (expired or revoked). Reconnect or check your API key."
-    organization = resp.json.get("organization") if resp.success and isinstance(resp.json, dict) else None
-    if not isinstance(organization, dict):
-        return f"Could not verify 'organization_id' (HTTP {resp.status_code}). Try again later."
-    if organization.get("organization_id") == organization_id:
-        return None
-    return (
-        f"'organization_id' cannot be used with an API key: it is bound to a single organization "
-        f"({organization.get('name')}, {organization.get('organization_id')}). "
-        "Call this tool again without 'organization_id'."
-    )
-
-
 async def _organization_error(client: AsyncDeepsetClient, organization_id: str | None) -> str | None:
     """Returns an error message if the call must not proceed with the given 'organization_id', else None.
 
     Without an 'organization_id', a 401 means an API key, which is bound to one organization, so the call proceeds, as
     it does for users with a single organization. Any other failure fails closed, so that a multi-organization user is
     never silently run against the default organization. With an 'organization_id', it must be one of the user's
-    organizations, and API keys are told they cannot switch organizations.
+    organizations; on a 401 the call is refused, because API keys are bound to one organization and the platform
+    would silently ignore it.
 
     :param client: A client that is not scoped to an organization.
     :param organization_id: The organization requested by the caller, if any.
@@ -75,7 +51,13 @@ async def _organization_error(client: AsyncDeepsetClient, organization_id: str |
     """
     resp = await client.request("/v2/organizations")
     if resp.status_code == 401:
-        return await _api_key_organization_error(client, organization_id) if organization_id else None
+        if not organization_id:
+            return None
+        return (
+            "'organization_id' cannot be used with an API key, which is bound to a single organization. "
+            "Call this tool again without 'organization_id'. If you are not using an API key, your credentials "
+            "may have expired."
+        )
     organizations = resp.json.get("organizations") if resp.success and isinstance(resp.json, dict) else None
     if not isinstance(organizations, list):
         return (
