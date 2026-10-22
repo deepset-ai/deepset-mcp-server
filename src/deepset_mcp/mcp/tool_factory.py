@@ -37,7 +37,7 @@ def _format_organizations(organizations: list[dict[str, Any]]) -> str:
 
 
 async def _organization_error(client: AsyncDeepsetClient, organization_id: str | None) -> str | None:
-    """Checks whether the tool may run, and returns an error message if it may not.
+    """Checks whether the tool may run given ``organization_id``, and returns an error message if it may not.
 
     - With an 'organization_id': it must be one of the user's organizations. API keys cannot use it.
     - Without one: users with several organizations must choose one. Everyone else can proceed.
