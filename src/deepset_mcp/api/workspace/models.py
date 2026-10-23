@@ -17,7 +17,7 @@ class Workspace(BaseModel):
     "Human-readable name of the workspace"
     workspace_id: UUID
     "Unique identifier for the workspace"
-    languages: dict[str, Any]
-    "Supported languages and their configuration settings"
+    languages: dict[str, Any] | None = None
+    "Supported languages and their configuration settings; `None` for legacy workspaces"
     default_idle_timeout_in_seconds: int
     "Default timeout in seconds before workspace becomes idle"
