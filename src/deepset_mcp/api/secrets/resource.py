@@ -39,7 +39,8 @@ class SecretResource(SecretResourceProtocol):
         :param field: Field to sort by.
         :param order: Sort order (ASC or DESC).
         :param after: The cursor to fetch the next page of results.
-        :param workspace: If set, list the secrets available in this workspace instead of the organization's secrets.
+        :param workspace: If set, list the secrets available in this workspace (including organization secrets
+            available to the workspace) instead of the organization's secrets.
 
         :returns: A `PaginatedResponse` object containing the first page of secrets.
         """
