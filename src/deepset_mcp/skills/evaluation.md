@@ -19,17 +19,16 @@ Everything below is enforced: hub-api reads the declaration when the Evaluator i
 ## The function
 
 ```python
-from dc_haystack_utilities.evaluation import Label, NotApplicable, Score, metrics, replies, traces
+from dc_haystack_utilities.evaluation import Label, NotApplicable, Score, get_last_reply, metrics, turns
 
 @metrics(
     answered=Label(grain="turn", vocabulary=["answered", "unanswered"]),
     answer_rate=Score(grain="session"),
 )
 def evaluate(session, focus):
-    turns = traces(session)
     answered = {
-        f"turn/{n}": Label(label="answered" if replies(turns[n - 1]) else "unanswered")
-        for n in focus
+        f"turn/{n}": Label(label="answered" if get_last_reply(trace) else "unanswered")
+        for n, trace in turns(session, focus)
     }
     rate = sum(a.label == "answered" for a in answered.values()) / len(focus) if focus else None
     return {
@@ -41,7 +40,7 @@ def evaluate(session, focus):
 Rules:
 
 - **Exactly one public top-level function.** Helpers are underscore-prefixed or imported. The function's name does not matter; `evaluate` is the convention.
-- **Signature `(session, focus)`.** `focus` is the list of turn numbers the run asks about, **numbered from 1**. `traces(session)[n - 1]` is turn `n`.
+- **Signature `(session, focus)`.** `focus` is the list of turn numbers the run asks about, **numbered from 1**. `turns(session, focus)` gives `(n, trace)` for each of them; `turn(session, n)` gives one trace.
 - **Imports** come from `dc_haystack_utilities.evaluation`; the standard library is available.
 - Source is at most 64 000 characters.
 
@@ -134,25 +133,34 @@ Prefer this shape when a user will want to tune the rubric themselves.
 
 ## Structural recipes
 
-The helpers read one trace (`traces(session)[n - 1]`) or the Session with a turn number. They return empty values rather than raising when data is missing, for example when content tracing was off for a run.
+Get the turns with `turns(session, focus)` or `turn(session, n)`, numbered from 1; every reader below takes one turn's trace. A turn number the Session does not have raises `NoSuchTurn`. The readers return empty values rather than raising when data is missing, for example when content tracing was off for a run.
+
+Most readers take `components=`, one component name or a list, to read only those components. An Agent's name covers its LLM steps and tool calls; a component's name covers an LLM call it makes internally. Use it when another LLM runs after the one that answers.
 
 | Helper | Returns |
 | --- | --- |
-| `traces(session)` | the turns' traces, in order |
+| `turns(session, focus=None)` | `(n, trace)` for the focused turns, or every turn |
+| `turn(session, n)` | turn `n`'s trace |
+| `traces(session)` | every turn's trace, in order: for counting turns |
 | `failed(trace)` | whether the run failed |
+| `get_last_reply(trace)` | the answer: what the last LLM to reply generated |
+| `get_last_context(trace, roles=("user", "tool"))` | what the LLM behind the answer was given, as text: the context a faithfulness metric checks it against |
+| `get_intermediate_replies(trace)` | replies before the answer, such as an Agent's "Let me look that up." |
 | `replies(trace)` | every text the run's LLMs replied with |
+| `documents(trace, deduplicate=True)` | documents retrieved or ranked, each once with its last recorded score |
+| `tool_calls(trace)` | `[{"tool", "arguments", "result"}]` for an Agent's run |
+| `available_tools(trace)` | the tools an Agent was offered, called or not: `{"name", "description", "parameters"}` |
+| `available_skills(trace)` | the skills an Agent could load with `load_skill`: `{"name", "description"}` |
 | `token_usage(trace)` | `{"prompt_tokens", "completion_tokens", "total_tokens"}` |
 | `models(trace)` | model names that generated tokens |
 | `component_output(trace, name)` / `component_input(trace, name)` | one component's recorded sockets |
-| `spans(trace, component=None)` | raw spans |
-| `tool_calls_for_turn(session, n)` | `[{"tool", "arguments", "result"}]` for an Agent's turn `n` |
-| `documents_for_turn(session, n)` | documents retrieved in turn `n` |
+| `spans(trace, component=None)` / `spans_within(trace, components)` | raw spans; `spans_within` also returns everything that ran inside the named components |
 | `list_items(session, n, component, socket)` | a list-valued socket item by item, with each item's address |
 
 **Failed turns**
 
 ```python
-from dc_haystack_utilities.evaluation import Label, NotApplicable, Score, failed, metrics, traces
+from dc_haystack_utilities.evaluation import Label, NotApplicable, Score, failed, metrics, turns
 
 
 @metrics(
@@ -160,8 +168,7 @@ from dc_haystack_utilities.evaluation import Label, NotApplicable, Score, failed
     failure_rate=Score(grain="session"),
 )
 def evaluate(session, focus):
-    turns = traces(session)
-    status = {f"turn/{n}": Label(label="failed" if failed(turns[n - 1]) else "ok") for n in focus}
+    status = {f"turn/{n}": Label(label="failed" if failed(trace) else "ok") for n, trace in turns(session, focus)}
     if not focus:
         return {"turn_status": status, "failure_rate": NotApplicable(reason="no turns in focus")}
     rate = sum(value.label == "failed" for value in status.values()) / len(focus)
@@ -171,15 +178,14 @@ def evaluate(session, focus):
 **Tokens per turn**
 
 ```python
-from dc_haystack_utilities.evaluation import Score, metrics, token_usage, traces
+from dc_haystack_utilities.evaluation import Score, metrics, token_usage, turns
 
 
 @metrics(total_tokens=Score(grain="turn"))
 def evaluate(session, focus):
-    turns = traces(session)
     return {
         "total_tokens": {
-            f"turn/{n}": Score(score=token_usage(turns[n - 1])["total_tokens"]) for n in focus
+            f"turn/{n}": Score(score=token_usage(trace)["total_tokens"]) for n, trace in turns(session, focus)
         }
     }
 ```
@@ -189,14 +195,14 @@ def evaluate(session, focus):
 ```python
 import json
 
-from dc_haystack_utilities.evaluation import NotApplicable, Score, metrics, tool_calls_for_turn
+from dc_haystack_utilities.evaluation import NotApplicable, Score, metrics, tool_calls, turns
 
 
 @metrics(tool_calls=Score(grain="turn"), repeated_tool_calls=Score(grain="turn"))
 def evaluate(session, focus):
     calls, repeated = {}, {}
-    for n in focus:
-        made = tool_calls_for_turn(session, n)
+    for n, trace in turns(session, focus):
+        made = tool_calls(trace)
         if not made:
             calls[f"turn/{n}"] = repeated[f"turn/{n}"] = NotApplicable(reason="no tool calls")
             continue
@@ -247,7 +253,7 @@ A replay leaves the source Session and the deployed pipeline untouched. Its new 
 
 1. One public function, `(session, focus)`, imports from `dc_haystack_utilities.evaluation`.
 2. `@metrics` arguments are literals; every key is returned, and every focused turn for a `turn` Metric.
-3. Turn numbers start at 1; addresses are `turn/<n>`.
+3. Turns come from `turns(session, focus)` or `turn(session, n)`, never `traces(session)[n - 1]`; addresses are `turn/<n>`.
 4. `NotApplicable(reason=...)` instead of a `0` or a missing key.
 5. For a judge: closed Labels, `score_range` when a Score is judged, and a real `chat_generator_config` from `get_models`.
 6. When a try tool is available, try the draft on one to three Sessions before calling it ready, and read the `error_detail` of a try that breaks.
