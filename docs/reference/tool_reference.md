@@ -68,7 +68,7 @@ The *Memory* column describes how a tool interacts with the object store (see
 | `list_indexes` | required | explorable | List all indexes in the workspace. |
 | `get_index` | required | explorable | Fetch an index's configuration. |
 | `create_index` | required | explorable, referenceable | Create a new index from a YAML configuration. |
-| `update_index` | required | explorable, referenceable | Update an existing index's configuration. |
+| `update_index` | required | explorable, referenceable | Replace an existing index's configuration with a full, updated YAML. |
 | `validate_index` | required | explorable, referenceable | Validate an index configuration without saving it. |
 | `deploy_index` | required | explorable | Deploy an index. |
 
@@ -167,7 +167,7 @@ draft/version history. Each deployment tracks its own history of served pipeline
 | `list_workspaces` | not needed | explorable | List the workspaces available to the API key. |
 | `get_workspace` | not needed | explorable | Fetch a workspace's details. |
 | `create_workspace` | not needed | explorable | Create a new workspace. |
-| `list_secrets` | not needed | explorable | List the secrets available to the organization. |
+| `list_secrets` | optional | explorable | List the secrets available to the organization, or to a workspace if one is given. |
 | `get_secret` | not needed | explorable | Fetch a secret's metadata by ID. |
 | `get_models` | required | explorable | List models available for use in pipelines. |
 
