@@ -26,34 +26,54 @@ from deepset_mcp.tokonomics import (
 )
 
 ORGANIZATION_ID_DOC = (
-    "Optional. The organization to run this call in, as returned by 'list_organizations'. "
-    "Required if you belong to several organizations; leave empty otherwise."
+    "Optional. The ID of the organization to run this call in, as returned by 'list_organizations'. "
+    "Required if you belong to several organizations; leave empty otherwise. "
+    "Not supported with API keys, which are bound to a single organization."
 )
 
 
-async def _ambiguous_organization_error(client: AsyncDeepsetClient) -> str | None:
-    """Returns an error message if the call must not proceed without an 'organization_id', else None.
+def _format_organizations(organizations: list[dict[str, Any]]) -> str:
+    return ", ".join(f"{org['name']} ({org['organization_id']})" for org in organizations) or "none"
 
-    API keys are rejected by the endpoint with a 401 and are bound to one organization, so they proceed, as do users
-    with a single organization. Any other failure fails closed, so that a multi-organization user is never silently
-    run against the default organization.
+
+async def _organization_error(client: AsyncDeepsetClient, organization_id: str | None) -> str | None:
+    """Checks whether the tool may run given ``organization_id``, and returns an error message if it may not.
+
+    - With an 'organization_id': it must be one of the user's organizations. API keys cannot use it.
+    - Without one: users with several organizations must choose one. Everyone else can proceed.
 
     :param client: A client that is not scoped to an organization.
+    :param organization_id: The organization requested by the caller, if any.
     :returns: Error message, or None if the call may proceed.
     """
     resp = await client.request("/v2/organizations")
     if resp.status_code == 401:
-        return None
+        if not organization_id:
+            return None
+        return (
+            "'organization_id' cannot be used with an API key, which is bound to a single organization. "
+            "Call this tool again without 'organization_id'. If you are not using an API key, your credentials "
+            "may have expired."
+        )
     organizations = resp.json.get("organizations") if resp.success and isinstance(resp.json, dict) else None
     if not isinstance(organizations, list):
         return (
             f"Could not determine your organizations (HTTP {resp.status_code}). "
             "Call this tool again with 'organization_id' set, or try again later."
         )
+    if organization_id:
+        if any(org.get("organization_id") == organization_id for org in organizations):
+            return None
+        return (
+            f"'{organization_id}' is not one of your organizations. "
+            f"Call this tool again with 'organization_id' set to one of: {_format_organizations(organizations)}."
+        )
     if len(organizations) <= 1:
         return None
-    options = ", ".join(f"{org['name']} ({org['organization_id']})" for org in organizations)
-    return f"You belong to several organizations. Call this tool again with 'organization_id' set to one of: {options}."
+    return (
+        "You belong to several organizations. "
+        f"Call this tool again with 'organization_id' set to one of: {_format_organizations(organizations)}."
+    )
 
 
 def apply_custom_args(base_func: Callable[..., Any], config: ToolConfig) -> Callable[..., Any]:
@@ -220,13 +240,12 @@ def apply_client(
             client_kwargs: dict[str, Any] = {"transport_config": transport_config, "api_key": api_key}
             if base_url:
                 client_kwargs["base_url"] = base_url
-            if organization_id:
-                client_kwargs["organization_id"] = organization_id
             async with AsyncDeepsetClient(**client_kwargs) as client:
-                if organization_argument and not organization_id:
-                    ambiguity = await _ambiguous_organization_error(client)
-                    if ambiguity:
-                        return ambiguity
+                if organization_argument:
+                    error = await _organization_error(client, organization_id)
+                    if error:
+                        return error
+                client.organization_id = organization_id
                 return await base_func(*args, client=client, **kwargs)
 
         # Remove client from signature and add ctx (and the optional organization_id)

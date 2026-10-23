@@ -26,6 +26,8 @@ from deepset_mcp.mcp.tool_registry import OBJECT_STORE_TOOL_NAMES, TOOL_REGISTRY
 from deepset_mcp.tokonomics import InMemoryBackend, ObjectStore
 from test.unit.conftest import BaseFakeClient
 
+_GLOBEX = {"organization_id": "org-2", "name": "Globex"}
+
 
 class TestApplyCustomArgs:
     """Test the apply_custom_args function."""
@@ -431,9 +433,7 @@ class TestApplyClient:
     @pytest.mark.parametrize(
         ("organizations_response", "organization_id", "expected"),
         [
-            # explicit organization: forwarded, no lookup needed
-            (None, "org-1", "ok"),
-            # API key: endpoint rejects it, call proceeds
+            # API key without organization_id: endpoint rejects it with a 401, call proceeds
             (TransportResponse(text="", status_code=401, json=None), None, "ok"),
             # endpoint failure or malformed payload: fail closed
             (TransportResponse(text="", status_code=503, json=None), None, "Could not determine your organizations"),
@@ -442,14 +442,24 @@ class TestApplyClient:
             ({"organizations": [{"organization_id": "org-1", "name": "Acme"}]}, None, "ok"),
             # OAuth user with several organizations must choose
             (
-                {
-                    "organizations": [
-                        {"organization_id": "org-1", "name": "Acme"},
-                        {"organization_id": "org-2", "name": "Globex"},
-                    ]
-                },
+                {"organizations": [{"organization_id": "org-1", "name": "Acme"}, _GLOBEX]},
                 None,
                 "Acme (org-1), Globex (org-2)",
+            ),
+            # OAuth user with an explicit organization of theirs
+            ({"organizations": [{"organization_id": "org-1", "name": "Acme"}, _GLOBEX]}, "org-2", "ok"),
+            # OAuth user with an organization that is not theirs, or a name instead of an ID
+            (
+                {"organizations": [{"organization_id": "org-1", "name": "Acme"}, _GLOBEX]},
+                "Globex",
+                "'Globex' is not one of your organizations. Call this tool again with 'organization_id' set to one "
+                "of: Acme (org-1), Globex (org-2)",
+            ),
+            # API key with an organization_id: the platform would silently ignore it
+            (
+                TransportResponse(text="", status_code=401, json=None),
+                "org-1",
+                "'organization_id' cannot be used with an API key",
             ),
         ],
     )
@@ -460,14 +470,16 @@ class TestApplyClient:
         organization_id: str | None,
         expected: str,
     ) -> None:
-        """Test that a missing organization_id is only an error for OAuth users with several organizations."""
-        created_with: list[dict[str, Any]] = []
-        responses = {} if organizations_response is None else {"/v2/organizations": organizations_response}
+        """Test that the organization_id is checked against the user's organizations before the tool runs."""
+        clients: list[Any] = []
 
         class FakeDeepsetClient(BaseFakeClient):
+            organization_id: str | None = None
+
             def __init__(self, **kwargs: Any) -> None:
-                super().__init__(responses=responses)
-                created_with.append(kwargs)
+                super().__init__(responses={"/v2/organizations": organizations_response})
+                assert "organization_id" not in kwargs
+                clients.append(self)
 
         monkeypatch.setattr("deepset_mcp.mcp.tool_factory.AsyncDeepsetClient", FakeDeepsetClient)
 
@@ -481,7 +493,8 @@ class TestApplyClient:
         output = await result(a=1, organization_id=organization_id, ctx=ctx)
 
         assert expected in output
-        assert created_with[0].get("organization_id") == organization_id
+        if output == "ok":
+            assert clients[0].organization_id == organization_id
 
     @pytest.mark.asyncio
     async def test_client_with_api_key_and_context_uses_context(self) -> None:

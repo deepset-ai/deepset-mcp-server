@@ -4,6 +4,7 @@
 
 import pytest
 
+from deepset_mcp.api.transport import TransportResponse
 from deepset_mcp.tools.organization import list_organizations
 from test.unit.conftest import BaseFakeClient
 
@@ -14,3 +15,14 @@ async def test_list_organizations_returns_organizations() -> None:
     client = BaseFakeClient(responses={"/v2/organizations": {"organizations": orgs}})
 
     assert await list_organizations(client=client) == orgs
+
+
+@pytest.mark.asyncio
+async def test_list_organizations_explains_api_keys_on_401() -> None:
+    client = BaseFakeClient(responses={"/v2/organizations": TransportResponse(text="", status_code=401, json=None)})
+
+    result = await list_organizations(client=client)
+
+    assert isinstance(result, str)
+    assert "Organization selection requires OAuth" in result
+    assert "API keys are tied to one organization" in result
