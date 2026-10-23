@@ -270,9 +270,9 @@ async with AsyncDeepsetClient() as client:
 ```
 
 
-### How to Manage Secrets and Integrations
+### How to Manage Secrets
 
-This guide shows you how to securely store API keys and configure external service integrations.
+This guide shows you how to securely store API keys.
 
 ```python
 from deepset_mcp.api import AsyncDeepsetClient
@@ -284,14 +284,11 @@ async with AsyncDeepsetClient() as client:
         name="openai-api-key",
         secret="sk-your-openai-key"
     )
-    
-    # Check available integrations
-    integrations = client.integrations()
-    available = await integrations.list()
-    
-    for integration in available.integrations:
-        print(f"Provider: {integration.provider}")
-        print(f"Domain: {integration.provider_domain}")
+
+    # List secrets available in a specific workspace
+    workspace_secrets = await secrets_client.list(workspace="my-workspace")
+    for secret in workspace_secrets.data:
+        print(f"Secret: {secret.name}")
 ```
 
 ### How to Handle Errors

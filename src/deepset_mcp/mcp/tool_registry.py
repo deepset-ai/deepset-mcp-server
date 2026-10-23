@@ -467,7 +467,10 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
         run_component_tool,
         ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
     ),
-    "list_secrets": (list_secrets_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
+    "list_secrets": (
+        list_secrets_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
     "get_secret": (get_secret_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "load_skill": (load_skill_tool, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
     "list_organizations": (list_organizations_tool, ToolConfig(needs_client=True, memory_type=MemoryType.NO_MEMORY)),

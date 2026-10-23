@@ -14,7 +14,6 @@ from deepset_mcp.api.deployment.protocols import DeploymentResourceProtocol
 from deepset_mcp.api.evaluation.protocols import EvaluationResourceProtocol
 from deepset_mcp.api.haystack_service.protocols import HaystackServiceProtocol
 from deepset_mcp.api.indexes.protocols import IndexResourceProtocol
-from deepset_mcp.api.integrations.protocols import IntegrationResourceProtocol
 from deepset_mcp.api.model.protocols import ModelResourceProtocol
 from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
 from deepset_mcp.api.pipeline_template.protocols import PipelineTemplateResourceProtocol
@@ -295,10 +294,6 @@ class BaseFakeClient(AsyncClientProtocol):
 
     def workspaces(self) -> WorkspaceResourceProtocol:
         """Overwrite this method when testing WorkspaceResource."""
-        raise NotImplementedError
-
-    def integrations(self) -> IntegrationResourceProtocol:
-        """Overwrite this method when testing IntegrationResource."""
         raise NotImplementedError
 
     def models(self, workspace: str) -> ModelResourceProtocol:
