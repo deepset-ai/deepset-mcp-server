@@ -149,6 +149,8 @@ Most readers take `components=`, one component name or a list, to read only thos
 | `replies(trace)` | every text the run's LLMs replied with |
 | `documents(trace, deduplicate=True)` | documents retrieved or ranked, each once with its last recorded score |
 | `tool_calls(trace)` | `[{"tool", "arguments", "result"}]` for an Agent's run |
+| `available_tools(trace)` | the tools an Agent was offered, called or not: `{"name", "description", "parameters"}` |
+| `available_skills(trace)` | the skills an Agent could load with `load_skill`: `{"name", "description"}` |
 | `token_usage(trace)` | `{"prompt_tokens", "completion_tokens", "total_tokens"}` |
 | `models(trace)` | model names that generated tokens |
 | `component_output(trace, name)` / `component_input(trace, name)` | one component's recorded sockets |
