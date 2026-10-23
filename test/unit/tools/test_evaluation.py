@@ -810,6 +810,21 @@ def test_a_metric_declaration_carries_better_and_range_and_defaults_both_to_none
     assert (older.better, older.range) == (None, None)
 
 
+def test_a_label_declaration_carries_its_scale_as_floats_and_defaults_to_none() -> None:
+    scaled = MetricDeclaration.model_validate(
+        {
+            "shape": "label",
+            "grain": "session",
+            "vocabulary": ["wrong", "partial", "correct"],
+            "scale": {"wrong": 0, "partial": 0.5, "correct": 1},
+        }
+    )
+    unscaled = MetricDeclaration.model_validate({"shape": "label", "grain": "session", "vocabulary": ["a", "b"]})
+
+    assert scaled.scale == {"wrong": 0.0, "partial": 0.5, "correct": 1.0}
+    assert unscaled.scale is None
+
+
 def _results_with(metric_extras: list[dict[str, Any]], pipeline_extras: list[dict[str, Any]]) -> dict[str, Any]:
     payload = experiment_results(test_cases=1)
     base = payload["metrics"][0]

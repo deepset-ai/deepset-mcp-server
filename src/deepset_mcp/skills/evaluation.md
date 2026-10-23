@@ -47,11 +47,12 @@ Rules:
 
 ## `@metrics`: declaring what the function reports
 
-- Keyword arguments only, one per Metric: `key=Score(grain=...)` or `key=Label(grain=..., vocabulary=[...])`. Keys are Python identifiers.
+- Keyword arguments only, one per Metric: `key=Score(grain=...)` or `key=Label(grain=..., vocabulary=[...])` (or `vocabulary={...}`, see Scale below). Keys are Python identifiers.
 - **Literals only.** hub-api reads the decorator with `ast.literal_eval` without running the code: no variables, no comprehensions, no constants defined elsewhere.
 - **Two shapes.**
   - `Score`: a number. Declared `Score(grain=...)`; returned `Score(score=0.8, rationale="...")`.
-  - `Label`: one of a set of answers. Closed with a `vocabulary`, open without one. Returned `Label(label="yes", rationale="...")`. A yes/no is a two-value Label. Labels have no order; if a mean matters, declare a Score.
+  - `Label`: one of a set of answers. Closed with a `vocabulary`, open without one. Returned `Label(label="yes", rationale="...")`. A yes/no is a two-value Label. A Label has no order unless it declares a Scale.
+  - A closed Label may give each word a value from 0 to 1 by writing its `vocabulary` as a mapping: `Label(grain="session", vocabulary={"wrong": 0, "partial": 0.5, "correct": 1})`. Higher is better; no two words share a value. Declare one when the answers clearly rank (wrong < partial < correct); omit it for categories that do not (topics). It is what lets the platform order a Label and combine it with Scores. Never add `better` to a Label: the Scale already says which way is better.
   - A Score may add `better="higher"` or `better="lower"`: `Score(grain="session", better="higher")`. It says which way a *change* is an improvement, not whether a value is good, and it is what lets a comparison call a change improved or regressed. Set it only when the direction is clear from the criterion or the user said so; omit it when unsure (the direction is then unknown). Never put it on a Label.
   - Every returned value may carry a `rationale`. It is what a report groups failures by, so write one whenever the value is not self-explanatory.
   - A vocabulary may not contain `n/a` or similar; that is `NotApplicable`.
@@ -102,7 +103,7 @@ def evaluate(session, focus):
 
 - `evaluator=` is the function itself; `judge()` reads each criterion's shape, grain and vocabulary from its `@metrics`. Every key in `criteria` must be declared.
 - **Grains a judge answers**: `session`, `turn`, and item grains that name their component and socket, such as `turn/document_joiner/outputs.documents[*]` (never `turn/*/...`).
-- **A judged Label must be closed** (have a `vocabulary`).
+- **A judged Label must be closed** (have a `vocabulary`; a mapping counts, and the judge still answers with the words).
 - `score_range=(low, high)` is required as soon as one criterion is a Score, and is shared by all of them.
 - `chat_generator` is a workspace Model's whole `chat_generator_config`, inlined; read it with `get_models`. Do not invent one. It carries secret names (`{"type": "env_var", ...}`), never values.
 - Several criteria in one `judge()` share one Agent, one read of the Session and one bill. Criteria judged together correlate; split them into separate Evaluators when that matters.
@@ -250,7 +251,7 @@ A replay leaves the source Session and the deployed pipeline untouched. Its new 
 2. `@metrics` arguments are literals; every key is returned, and every focused turn for a `turn` Metric.
 3. Turn numbers start at 1; addresses are `turn/<n>`.
 4. `NotApplicable(reason=...)` instead of a `0` or a missing key.
-5. For a judge: closed Labels, `score_range` when a Score is judged, and a real `chat_generator_config` from `get_models`.
+5. For a judge: closed Labels (a mapping vocabulary is closed), `score_range` when a Score is judged, and a real `chat_generator_config` from `get_models`.
 6. When a try tool is available, try the draft on one to three Sessions before calling it ready, and read the `error_detail` of a try that breaks.
 
 ## Reporting results

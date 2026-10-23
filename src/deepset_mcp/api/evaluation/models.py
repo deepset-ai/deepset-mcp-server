@@ -39,6 +39,14 @@ class MetricDeclaration(BaseModel):
             "whether a value is good. Null when the Score declares none."
         ),
     )
+    scale: dict[str, float] | None = Field(
+        default=None,
+        description=(
+            "A closed Label's Scale: each word of the vocabulary mapped to a number from 0 to 1, higher is "
+            "better. It orders the words; it does not say which pass. Null when the Label declares none, and "
+            "for a Score."
+        ),
+    )
 
 
 class EvaluatorVersionSummary(BaseModel):
