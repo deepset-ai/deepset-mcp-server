@@ -149,7 +149,7 @@ class SearchHistoryResource(SearchHistoryResourceProtocol):
     ) -> PaginatedResponse[SearchHistoryEntry]:
         """List search history entries for a specific pipeline with pagination.
 
-        Uses the pipeline search history archive endpoint (full history, most recent first).
+        Uses the pipeline search history endpoint, which covers the full history including recent searches.
 
         :param pipeline_name: Name of the pipeline.
         :param limit: Maximum number of entries to return per page.
@@ -170,7 +170,7 @@ class SearchHistoryResource(SearchHistoryResourceProtocol):
             params["filter"] = query_filter
 
         resp = await self._client.request(
-            endpoint=f"{self._pipeline_path(pipeline_name)}_archive",
+            endpoint=self._pipeline_path(pipeline_name),
             method="GET",
             params=params,
             timeout=70.0,
