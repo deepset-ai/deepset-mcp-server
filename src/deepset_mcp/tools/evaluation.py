@@ -42,9 +42,9 @@ async def list_evaluators(*, client: AsyncClientProtocol, workspace: str) -> lis
 
     An Evaluator is a versioned Python function that judges a Session and reports named Metrics.
     Each entry carries its newest version's id and the Metrics that version declares (name, shape,
-    grain and, for a closed Label, its vocabulary; for a Score, its ``range`` and ``better``), but
-    not the source. Evaluators belong to the workspace, not to a pipeline; a Metric Group picks
-    which ones a scoring run judges with.
+    grain and, for a closed Label, its vocabulary and, if it declares one, its ``scale``; for a
+    Score, its ``range`` and ``better``), but not the source. Evaluators belong to the workspace,
+    not to a pipeline; a Metric Group picks which ones a scoring run judges with.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
