@@ -16,6 +16,7 @@ from deepset_mcp.api.evaluation.models import (
     ExperimentRun,
     ExperimentRunGrid,
     ExperimentRunReport,
+    MetricDeclaration,
     MetricGroup,
     SessionList,
     SessionReplayReport,
@@ -223,8 +224,10 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
         error: Exception | None = None,
         try_states: list[TryState] | None = None,
         replay_states: list[SessionReplayRun] | None = None,
+        results: dict[str, Any] | None = None,
     ) -> None:
         self.error = error
+        self.results = results
         self.calls: list[tuple[str, dict[str, Any]]] = []
         self.try_states = try_states or []
         self.replay_states = replay_states or []
@@ -324,7 +327,7 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
 
     async def get_experiment_results(self, experiment_id: str) -> ExperimentResults:
         self._record("get_experiment_results", experiment_id=experiment_id)
-        return ExperimentResults.model_validate(experiment_results(test_cases=3))
+        return ExperimentResults.model_validate(self.results or experiment_results(test_cases=3))
 
     async def list_sessions(
         self,
@@ -795,3 +798,67 @@ async def test_check_errors_come_back_as_readable_strings(error: Exception, expe
     for result in results:
         assert isinstance(result, str)
         assert expected in result
+
+
+def test_a_metric_declaration_carries_better_and_range_and_defaults_both_to_none() -> None:
+    declared = MetricDeclaration.model_validate(
+        {"shape": "score", "grain": "session", "better": "lower", "range": [1, 5]}
+    )
+    older = MetricDeclaration.model_validate({"shape": "score", "grain": "session"})
+
+    assert (declared.better, declared.range) == ("lower", [1.0, 5.0])
+    assert (older.better, older.range) == (None, None)
+
+
+def _results_with(metric_extras: list[dict[str, Any]], pipeline_extras: list[dict[str, Any]]) -> dict[str, Any]:
+    payload = experiment_results(test_cases=1)
+    base = payload["metrics"][0]
+    payload["metrics"] = [{**base, "metric_key": f"m{i}", **extra} for i, extra in enumerate(metric_extras)]
+    side = base["candidate"]
+    payload["pipeline_metrics"] = [
+        {
+            "key": key,
+            "candidate": side,
+            "baseline": side,
+            "delta": 0.0,
+            "delta_pct": 0.0,
+            "paired_test_cases": 1,
+            **extra,
+        }
+        for key, extra in zip(["DURATION", "COST"], pipeline_extras, strict=True)
+    ]
+    return payload
+
+
+@pytest.mark.asyncio
+async def test_get_experiment_results_reports_better_and_change_per_metric() -> None:
+    payload = _results_with(
+        [
+            {"better": "higher", "change": "improved"},
+            {"better": "lower", "change": "regressed"},
+            {"better": None, "change": "unknown"},
+        ],
+        [{"better": "lower", "change": "improved"}, {"better": "lower", "change": "regressed"}],
+    )
+
+    results = await get_experiment_results(
+        client=FakeClient(FakeEvaluationResource(results=payload)), workspace=WORKSPACE, experiment_id=COMPARISON_ID
+    )
+
+    assert isinstance(results, ExperimentResultsReport)
+    assert [(m.better, m.change) for m in results.metrics] == [
+        ("higher", "improved"),
+        ("lower", "regressed"),
+        (None, "unknown"),
+    ]
+    assert [(m.better, m.change) for m in results.pipeline_metrics] == [("lower", "improved"), ("lower", "regressed")]
+
+
+@pytest.mark.asyncio
+async def test_get_experiment_results_from_an_older_api_reads_every_change_as_unknown() -> None:
+    results = await get_experiment_results(
+        client=FakeClient(FakeEvaluationResource()), workspace=WORKSPACE, experiment_id=COMPARISON_ID
+    )
+
+    assert isinstance(results, ExperimentResultsReport)
+    assert [(m.better, m.change) for m in results.metrics] == [(None, "unknown")]
