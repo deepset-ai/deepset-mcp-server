@@ -357,10 +357,44 @@ class TestIndexResource:
         assert last_request["method"] == "PATCH"
         assert last_request["data"] == {"name": "new-name", "config_yaml": "new: config"}
 
+    async def test_update_index_settings(
+        self, fake_client: BaseFakeClient, workspace: str, index_response: dict[str, Any]
+    ) -> None:
+        """Settings fields are sent in the PATCH body and file_meta_filter is serialized to dicts."""
+        from deepset_mcp.api.indexes.models import MetaFilterCondition
+
+        fake_client.responses[f"/v1/workspaces/{workspace}/indexes/test-index"] = TransportResponse(
+            status_code=200, json=index_response, text=json.dumps(index_response)
+        )
+
+        resource = IndexResource(fake_client, workspace)
+        await resource.update(
+            index_name="test-index",
+            description="new desc",
+            max_index_replica_count=3,
+            gpu_enabled=True,
+            capture_traces=False,
+            instance_size="large",
+            file_name_prefix_filter="foo*",
+            file_meta_filter=[MetaFilterCondition(field="lang", operator="==", value="en")],
+        )
+
+        last_request = fake_client.requests[-1]
+        assert last_request["method"] == "PATCH"
+        assert last_request["data"] == {
+            "description": "new desc",
+            "max_index_replica_count": 3,
+            "gpu_enabled": True,
+            "capture_traces": False,
+            "instance_size": "large",
+            "file_name_prefix_filter": "foo*",
+            "file_meta_filter": [{"field": "lang", "operator": "==", "value": "en"}],
+        }
+
     async def test_update_index_without_changes_fails(self, fake_client: BaseFakeClient, workspace: str) -> None:
         """Test that updating an index without any changes raises ValueError."""
         resource = IndexResource(fake_client, workspace)
-        with pytest.raises(ValueError, match="At least one of updated_index_name or yaml_config must be provided"):
+        with pytest.raises(ValueError, match="At least one field to update must be provided"):
             await resource.update(index_name="test-index")
 
     async def test_create_index_invalid_request(
