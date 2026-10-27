@@ -8,6 +8,7 @@ import jwt
 from mcp.server.fastmcp import FastMCP
 
 from deepset_mcp.api.client import AsyncDeepsetClient
+from deepset_mcp.config import CLIENT_SOURCE
 from deepset_mcp.mcp.store import initialize_or_get_initialized_store
 from deepset_mcp.mcp.tool_factory import register_tools
 from deepset_mcp.mcp.tool_models import DeepsetDocsConfig
@@ -120,7 +121,7 @@ async def fetch_shared_prototype_details(share_url: str) -> tuple[str, str, str]
     # For shared prototypes, we need to:
     # 1. Fetch prototype details (pipeline name) using the information encoded in the JWT
     # 2. Create a shared prototype user
-    async with AsyncDeepsetClient(api_key=share_token) as client:
+    async with AsyncDeepsetClient(api_key=share_token, client_source=CLIENT_SOURCE) as client:
         response = await client.request(f"/v1/workspaces/{workspace_name}/shared_prototypes/{share_id}")
         if not response.success:
             raise ValueError(

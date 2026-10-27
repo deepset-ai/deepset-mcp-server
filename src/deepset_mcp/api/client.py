@@ -36,7 +36,8 @@ class AsyncDeepsetClient(AsyncClientProtocol):
     """Async Client for interacting with the deepset API.
 
     This client provides asynchronous access to most deepset API endpoints
-    and resources through a convenient interface.
+    and resources through a convenient interface. Pass ``client_source`` to label your application's requests with
+    an ``X-Client-Source`` header; without it, no such header is sent.
 
     **Example usage:**
 
@@ -253,6 +254,8 @@ class AsyncDeepsetClient(AsyncClientProtocol):
             request_headers["Content-Type"] = "application/json"
         if self.organization_id:
             request_headers["X-Organization-ID"] = self.organization_id
+        if self.client_source:
+            request_headers["X-Client-Source"] = self.client_source
         # Merge custom headers
         if headers:
             headers.setdefault("Authorization", request_headers["Authorization"])
@@ -316,6 +319,8 @@ class AsyncDeepsetClient(AsyncClientProtocol):
                 request_headers["Content-Type"] = "application/json"
             if self.organization_id:
                 request_headers["X-Organization-ID"] = self.organization_id
+            if self.client_source:
+                request_headers["X-Client-Source"] = self.client_source
             # Merge custom headers
             if headers:
                 headers.setdefault("Authorization", request_headers["Authorization"])

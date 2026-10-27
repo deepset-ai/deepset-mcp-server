@@ -6,7 +6,7 @@ from collections.abc import Callable
 from typing import Any
 
 from deepset_mcp.api.client import AsyncDeepsetClient
-from deepset_mcp.config import DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME, LIST_DOC_SECTIONS_TOOL_NAME
+from deepset_mcp.config import CLIENT_SOURCE, DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME, LIST_DOC_SECTIONS_TOOL_NAME
 from deepset_mcp.initialize_embedding_model import get_initialized_model
 from deepset_mcp.mcp.tool_models import DeepsetDocsConfig, ExplorerConfig, MemoryType, ToolConfig
 from deepset_mcp.tools.cost import (
@@ -143,7 +143,9 @@ def get_docs_search_tool(config: DeepsetDocsConfig | None = None) -> Callable[..
         if config is None:
             return await search_docs_via_docs_api(query=query, section=section)
 
-        async with AsyncDeepsetClient(api_key=config.api_key, transport_config=DEFAULT_CLIENT_HEADER) as client:
+        async with AsyncDeepsetClient(
+            api_key=config.api_key, transport_config=DEFAULT_CLIENT_HEADER, client_source=CLIENT_SOURCE
+        ) as client:
             response = await search_docs_tool(
                 client=client,
                 workspace=config.workspace_name,
