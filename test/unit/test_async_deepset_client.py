@@ -176,7 +176,7 @@ async def test_request_sends_organization_header_only_when_set() -> None:
 
 
 class StreamingDummy(DummyProtocol):
-    @asynccontextmanager  # type: ignore[override]
+    @asynccontextmanager
     async def stream(self, method: str, url: str, **kwargs: Any) -> AsyncIterator[StreamingResponse]:
         self.requests.append({"method": method, "url": url, **kwargs})
         yield None  # type: ignore[misc]
@@ -191,3 +191,37 @@ async def test_stream_request_accepts_leading_slash_endpoint() -> None:
         pass
 
     assert dummy.requests[0]["url"] == "https://api.test/endpoint"
+
+
+async def _sent_headers(client: AsyncDeepsetClient, dummy: DummyProtocol, **kwargs: Any) -> list[dict[str, str]]:
+    await client.request("endpoint", **kwargs)
+    async with client.stream_request("/endpoint", **kwargs):
+        pass
+    return [r["headers"] for r in dummy.requests]
+
+
+@pytest.mark.asyncio
+async def test_client_source_header_sent_on_request_and_stream() -> None:
+    dummy = StreamingDummy()
+    client = AsyncDeepsetClient(api_key="key", base_url="https://api.test", transport=dummy, client_source="mcp")
+
+    for headers in await _sent_headers(client, dummy):
+        assert headers["X-Client-Source"] == "mcp"
+
+
+@pytest.mark.asyncio
+async def test_no_client_source_header_by_default() -> None:
+    dummy = StreamingDummy()
+    client = AsyncDeepsetClient(api_key="key", base_url="https://api.test", transport=dummy)
+
+    for headers in await _sent_headers(client, dummy):
+        assert "X-Client-Source" not in headers
+
+
+@pytest.mark.asyncio
+async def test_caller_client_source_header_wins() -> None:
+    dummy = StreamingDummy()
+    client = AsyncDeepsetClient(api_key="key", base_url="https://api.test", transport=dummy, client_source="mcp")
+
+    for headers in await _sent_headers(client, dummy, headers={"X-Client-Source": "custom"}):
+        assert headers["X-Client-Source"] == "custom"

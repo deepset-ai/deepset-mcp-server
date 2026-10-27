@@ -21,4 +21,5 @@ DOCS_SEARCH_TOOL_NAME = "search_docs"
 LIST_DOC_SECTIONS_TOOL_NAME = "list_doc_sections"
 
 DEFAULT_CLIENT_HEADER = {"headers": {"User-Agent": f"deepset-mcp/{__version__}"}}
+CLIENT_SOURCE = "mcp"  # sent as X-Client-Source so the platform can attribute MCP traffic
 DEEPSET_CLIENT_TIMEOUT = float(os.environ.get("DEEPSET_CLIENT_TIMEOUT", 5))  # seconds

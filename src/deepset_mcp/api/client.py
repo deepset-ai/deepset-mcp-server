@@ -62,6 +62,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         transport: TransportProtocol | None = None,
         transport_config: dict[str, Any] | None = None,
         organization_id: str | None = None,
+        client_source: str | None = None,
     ) -> None:
         """Initialize an instance of the AsyncDeepsetClient.
 
@@ -72,8 +73,11 @@ class AsyncDeepsetClient(AsyncClientProtocol):
             forwarded to httpx.AsyncClient.
         :param organization_id: Organization to scope requests to, sent as 'X-Organization-ID'. Only needed for
             tokens that are not bound to an organization (OAuth). The platform picks a default when omitted.
+        :param client_source: Label for the calling application, sent as 'X-Client-Source' on every request. Omitted
+            when None (plain SDK usage).
         """
         self.organization_id = organization_id
+        self.client_source = client_source
         self.api_key = api_key or os.environ.get("DEEPSET_API_KEY")
         if not self.api_key:
             raise ValueError("API key not provided and DEEPSET_API_KEY environment variable not set")
