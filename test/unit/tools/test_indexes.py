@@ -6,7 +6,7 @@
 import pytest
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.indexes.models import Index
+from deepset_mcp.api.indexes.models import Index, MetaFilterConditions
 from deepset_mcp.api.indexes.protocols import IndexResourceProtocol
 from deepset_mcp.api.pipeline.models import PipelineValidationResult, ValidationError
 from deepset_mcp.api.shared_models import PaginatedResponse
@@ -46,6 +46,8 @@ class FakeIndexResource(IndexResourceProtocol):
         self._create_response = create_response
         self._update_response = update_response
         self.updated_yaml_config: str | None = None
+        self.updated_max_allowed_batch_size: int | None = None
+        self.updated_settings: dict[str, object] = {}
         self._validate_response = validate_response
         self._deploy_response = deploy_response
         self._list_exception = list_exception
@@ -88,11 +90,33 @@ class FakeIndexResource(IndexResourceProtocol):
         raise NotImplementedError
 
     async def update(
-        self, index_name: str, updated_index_name: str | None = None, yaml_config: str | None = None
+        self,
+        index_name: str,
+        updated_index_name: str | None = None,
+        yaml_config: str | None = None,
+        description: str | None = None,
+        max_allowed_batch_size: int | None = None,
+        max_index_replica_count: int | None = None,
+        gpu_enabled: bool | None = None,
+        capture_traces: bool | None = None,
+        instance_size: str | None = None,
+        file_name_prefix_filter: str | None = None,
+        file_meta_filter: MetaFilterConditions | None = None,
     ) -> Index:
         if self._update_exception:
             raise self._update_exception
         self.updated_yaml_config = yaml_config
+        self.updated_max_allowed_batch_size = max_allowed_batch_size
+        self.updated_settings = {
+            "updated_index_name": updated_index_name,
+            "description": description,
+            "max_index_replica_count": max_index_replica_count,
+            "gpu_enabled": gpu_enabled,
+            "capture_traces": capture_traces,
+            "instance_size": instance_size,
+            "file_name_prefix_filter": file_name_prefix_filter,
+            "file_meta_filter": file_meta_filter,
+        }
         if self._update_response is not None:
             return self._update_response
 
@@ -373,6 +397,59 @@ async def test_update_index_success_response() -> None:
     assert isinstance(r_success, Index)
     assert r_success.yaml_config == new_yaml
     assert res_succ.updated_yaml_config == new_yaml
+
+
+@pytest.mark.asyncio
+async def test_update_index_batch_size_only() -> None:
+    """Updating only max_allowed_batch_size skips YAML validation and passes the value through."""
+    updated = create_test_index(name="np")
+    # No validate_response set: validate() would raise, proving it is not called on the batch-size-only path.
+    resource = FakeIndexResource(get_response=updated, update_response=updated)
+    client = FakeClient(resource)
+
+    result = await update_index(
+        client=client,
+        workspace="ws",
+        index_name="np",
+        max_allowed_batch_size=50,
+    )
+
+    assert isinstance(result, Index)
+    assert resource.updated_yaml_config is None
+    assert resource.updated_max_allowed_batch_size == 50
+
+
+@pytest.mark.asyncio
+async def test_update_index_settings_passthrough() -> None:
+    """Non-YAML settings are forwarded to the resource without touching the YAML path."""
+    updated = create_test_index(name="np")
+    resource = FakeIndexResource(get_response=updated, update_response=updated)
+    client = FakeClient(resource)
+
+    result = await update_index(
+        client=client,
+        workspace="ws",
+        index_name="np",
+        gpu_enabled=True,
+        instance_size="large",
+    )
+
+    assert isinstance(result, Index)
+    assert resource.updated_yaml_config is None
+    assert resource.updated_settings["gpu_enabled"] is True
+    assert resource.updated_settings["instance_size"] == "large"
+
+
+@pytest.mark.asyncio
+async def test_update_index_requires_an_argument() -> None:
+    """update_index with neither YAML nor batch size returns a helpful message."""
+    resource = FakeIndexResource()
+    client = FakeClient(resource)
+
+    result = await update_index(client=client, workspace="ws", index_name="np")
+
+    assert isinstance(result, str)
+    assert "YAML configuration or at least one setting" in result
 
 
 @pytest.mark.asyncio
