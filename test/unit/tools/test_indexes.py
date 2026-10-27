@@ -6,7 +6,7 @@
 import pytest
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.indexes.models import Index
+from deepset_mcp.api.indexes.models import Index, MetaFilterConditions
 from deepset_mcp.api.indexes.protocols import IndexResourceProtocol
 from deepset_mcp.api.pipeline.models import PipelineValidationResult, ValidationError
 from deepset_mcp.api.shared_models import PaginatedResponse
@@ -94,14 +94,29 @@ class FakeIndexResource(IndexResourceProtocol):
         index_name: str,
         updated_index_name: str | None = None,
         yaml_config: str | None = None,
+        description: str | None = None,
         max_allowed_batch_size: int | None = None,
-        **kwargs: object,
+        max_index_replica_count: int | None = None,
+        gpu_enabled: bool | None = None,
+        capture_traces: bool | None = None,
+        instance_size: str | None = None,
+        file_name_prefix_filter: str | None = None,
+        file_meta_filter: MetaFilterConditions | None = None,
     ) -> Index:
         if self._update_exception:
             raise self._update_exception
         self.updated_yaml_config = yaml_config
         self.updated_max_allowed_batch_size = max_allowed_batch_size
-        self.updated_settings = kwargs
+        self.updated_settings = {
+            "updated_index_name": updated_index_name,
+            "description": description,
+            "max_index_replica_count": max_index_replica_count,
+            "gpu_enabled": gpu_enabled,
+            "capture_traces": capture_traces,
+            "instance_size": instance_size,
+            "file_name_prefix_filter": file_name_prefix_filter,
+            "file_meta_filter": file_meta_filter,
+        }
         if self._update_response is not None:
             return self._update_response
 
