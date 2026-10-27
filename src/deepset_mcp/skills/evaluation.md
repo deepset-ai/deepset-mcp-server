@@ -19,17 +19,16 @@ Everything below is enforced: hub-api reads the declaration when the Evaluator i
 ## The function
 
 ```python
-from dc_haystack_utilities.evaluation import Label, NotApplicable, Score, metrics, replies, traces
+from dc_haystack_utilities.evaluation import Label, NotApplicable, Score, get_last_reply, metrics, turns
 
 @metrics(
     answered=Label(grain="turn", vocabulary=["answered", "unanswered"]),
     answer_rate=Score(grain="session"),
 )
 def evaluate(session, focus):
-    turns = traces(session)
     answered = {
-        f"turn/{n}": Label(label="answered" if replies(turns[n - 1]) else "unanswered")
-        for n in focus
+        f"turn/{n}": Label(label="answered" if get_last_reply(trace) else "unanswered")
+        for n, trace in turns(session, focus)
     }
     rate = sum(a.label == "answered" for a in answered.values()) / len(focus) if focus else None
     return {
@@ -41,17 +40,19 @@ def evaluate(session, focus):
 Rules:
 
 - **Exactly one public top-level function.** Helpers are underscore-prefixed or imported. The function's name does not matter; `evaluate` is the convention.
-- **Signature `(session, focus)`.** `focus` is the list of turn numbers the run asks about, **numbered from 1**. `traces(session)[n - 1]` is turn `n`.
+- **Signature `(session, focus)`.** `focus` is the list of turn numbers the run asks about, **numbered from 1**. `turns(session, focus)` gives `(n, trace)` for each of them; `turn(session, n)` gives one trace.
 - **Imports** come from `dc_haystack_utilities.evaluation`; the standard library is available.
 - Source is at most 64 000 characters.
 
 ## `@metrics`: declaring what the function reports
 
-- Keyword arguments only, one per Metric: `key=Score(grain=...)` or `key=Label(grain=..., vocabulary=[...])`. Keys are Python identifiers.
+- Keyword arguments only, one per Metric: `key=Score(grain=...)` or `key=Label(grain=..., vocabulary=[...])` (or `vocabulary={...}`, see Scale below). Keys are Python identifiers.
 - **Literals only.** hub-api reads the decorator with `ast.literal_eval` without running the code: no variables, no comprehensions, no constants defined elsewhere.
 - **Two shapes.**
   - `Score`: a number. Declared `Score(grain=...)`; returned `Score(score=0.8, rationale="...")`.
-  - `Label`: one of a set of answers. Closed with a `vocabulary`, open without one. Returned `Label(label="yes", rationale="...")`. A yes/no is a two-value Label. Labels have no order; if a mean matters, declare a Score.
+  - `Label`: one of a set of answers. Closed with a `vocabulary`, open without one. Returned `Label(label="yes", rationale="...")`. A yes/no is a two-value Label. A Label has no order unless it declares a Scale.
+  - A closed Label may give each word a value from 0 to 1 by writing its `vocabulary` as a mapping: `Label(grain="session", vocabulary={"wrong": 0, "partial": 0.5, "correct": 1})`. Higher is better; no two words share a value. Declare one when the answers clearly rank (wrong < partial < correct); omit it for categories that do not (topics). It is what lets the platform order a Label and combine it with Scores. Never add `better` to a Label: the Scale already says which way is better.
+  - A Score may add `better="higher"` or `better="lower"`: `Score(grain="session", better="higher")`. It says which way a *change* is an improvement, not whether a value is good, and it is what lets a comparison call a change improved or regressed. Set it only when the direction is clear from the criterion or the user said so; omit it when unsure (the direction is then unknown). Never put it on a Label.
   - Every returned value may carry a `rationale`. It is what a report groups failures by, so write one whenever the value is not self-explanatory.
   - A vocabulary may not contain `n/a` or similar; that is `NotApplicable`.
 - **Grains** say where a Metric repeats:
@@ -101,7 +102,7 @@ def evaluate(session, focus):
 
 - `evaluator=` is the function itself; `judge()` reads each criterion's shape, grain and vocabulary from its `@metrics`. Every key in `criteria` must be declared.
 - **Grains a judge answers**: `session`, `turn`, and item grains that name their component and socket, such as `turn/document_joiner/outputs.documents[*]` (never `turn/*/...`).
-- **A judged Label must be closed** (have a `vocabulary`).
+- **A judged Label must be closed** (have a `vocabulary`; a mapping counts, and the judge still answers with the words).
 - `score_range=(low, high)` is required as soon as one criterion is a Score, and is shared by all of them.
 - `chat_generator` is a workspace Model's whole `chat_generator_config`, inlined; read it with `get_models`. Do not invent one. It carries secret names (`{"type": "env_var", ...}`), never values.
 - Several criteria in one `judge()` share one Agent, one read of the Session and one bill. Criteria judged together correlate; split them into separate Evaluators when that matters.
@@ -134,25 +135,34 @@ Prefer this shape when a user will want to tune the rubric themselves.
 
 ## Structural recipes
 
-The helpers read one trace (`traces(session)[n - 1]`) or the Session with a turn number. They return empty values rather than raising when data is missing, for example when content tracing was off for a run.
+Get the turns with `turns(session, focus)` or `turn(session, n)`, numbered from 1; every reader below takes one turn's trace. A turn number the Session does not have raises `NoSuchTurn`. The readers return empty values rather than raising when data is missing, for example when content tracing was off for a run.
+
+Most readers take `components=`, one component name or a list, to read only those components. An Agent's name covers its LLM steps and tool calls; a component's name covers an LLM call it makes internally. Use it when another LLM runs after the one that answers.
 
 | Helper | Returns |
 | --- | --- |
-| `traces(session)` | the turns' traces, in order |
+| `turns(session, focus=None)` | `(n, trace)` for the focused turns, or every turn |
+| `turn(session, n)` | turn `n`'s trace |
+| `traces(session)` | every turn's trace, in order: for counting turns |
 | `failed(trace)` | whether the run failed |
+| `get_last_reply(trace)` | the answer: what the last LLM to reply generated |
+| `get_last_context(trace, roles=("user", "tool"))` | what the LLM behind the answer was given, as text: the context a faithfulness metric checks it against |
+| `get_intermediate_replies(trace)` | replies before the answer, such as an Agent's "Let me look that up." |
 | `replies(trace)` | every text the run's LLMs replied with |
+| `documents(trace, deduplicate=True)` | documents retrieved or ranked, each once with its last recorded score |
+| `tool_calls(trace)` | `[{"tool", "arguments", "result"}]` for an Agent's run |
+| `available_tools(trace)` | the tools an Agent was offered, called or not: `{"name", "description", "parameters"}` |
+| `available_skills(trace)` | the skills an Agent could load with `load_skill`: `{"name", "description"}` |
 | `token_usage(trace)` | `{"prompt_tokens", "completion_tokens", "total_tokens"}` |
 | `models(trace)` | model names that generated tokens |
 | `component_output(trace, name)` / `component_input(trace, name)` | one component's recorded sockets |
-| `spans(trace, component=None)` | raw spans |
-| `tool_calls_for_turn(session, n)` | `[{"tool", "arguments", "result"}]` for an Agent's turn `n` |
-| `documents_for_turn(session, n)` | documents retrieved in turn `n` |
+| `spans(trace, component=None)` / `spans_within(trace, components)` | raw spans; `spans_within` also returns everything that ran inside the named components |
 | `list_items(session, n, component, socket)` | a list-valued socket item by item, with each item's address |
 
 **Failed turns**
 
 ```python
-from dc_haystack_utilities.evaluation import Label, NotApplicable, Score, failed, metrics, traces
+from dc_haystack_utilities.evaluation import Label, NotApplicable, Score, failed, metrics, turns
 
 
 @metrics(
@@ -160,8 +170,7 @@ from dc_haystack_utilities.evaluation import Label, NotApplicable, Score, failed
     failure_rate=Score(grain="session"),
 )
 def evaluate(session, focus):
-    turns = traces(session)
-    status = {f"turn/{n}": Label(label="failed" if failed(turns[n - 1]) else "ok") for n in focus}
+    status = {f"turn/{n}": Label(label="failed" if failed(trace) else "ok") for n, trace in turns(session, focus)}
     if not focus:
         return {"turn_status": status, "failure_rate": NotApplicable(reason="no turns in focus")}
     rate = sum(value.label == "failed" for value in status.values()) / len(focus)
@@ -171,15 +180,14 @@ def evaluate(session, focus):
 **Tokens per turn**
 
 ```python
-from dc_haystack_utilities.evaluation import Score, metrics, token_usage, traces
+from dc_haystack_utilities.evaluation import Score, metrics, token_usage, turns
 
 
 @metrics(total_tokens=Score(grain="turn"))
 def evaluate(session, focus):
-    turns = traces(session)
     return {
         "total_tokens": {
-            f"turn/{n}": Score(score=token_usage(turns[n - 1])["total_tokens"]) for n in focus
+            f"turn/{n}": Score(score=token_usage(trace)["total_tokens"]) for n, trace in turns(session, focus)
         }
     }
 ```
@@ -189,14 +197,14 @@ def evaluate(session, focus):
 ```python
 import json
 
-from dc_haystack_utilities.evaluation import NotApplicable, Score, metrics, tool_calls_for_turn
+from dc_haystack_utilities.evaluation import NotApplicable, Score, metrics, tool_calls, turns
 
 
 @metrics(tool_calls=Score(grain="turn"), repeated_tool_calls=Score(grain="turn"))
 def evaluate(session, focus):
     calls, repeated = {}, {}
-    for n in focus:
-        made = tool_calls_for_turn(session, n)
+    for n, trace in turns(session, focus):
+        made = tool_calls(trace)
         if not made:
             calls[f"turn/{n}"] = repeated[f"turn/{n}"] = NotApplicable(reason="no tool calls")
             continue
@@ -247,7 +255,11 @@ A replay leaves the source Session and the deployed pipeline untouched. Its new 
 
 1. One public function, `(session, focus)`, imports from `dc_haystack_utilities.evaluation`.
 2. `@metrics` arguments are literals; every key is returned, and every focused turn for a `turn` Metric.
-3. Turn numbers start at 1; addresses are `turn/<n>`.
+3. Turns come from `turns(session, focus)` or `turn(session, n)`, never `traces(session)[n - 1]`; addresses are `turn/<n>`.
 4. `NotApplicable(reason=...)` instead of a `0` or a missing key.
-5. For a judge: closed Labels, `score_range` when a Score is judged, and a real `chat_generator_config` from `get_models`.
+5. For a judge: closed Labels (a mapping vocabulary is closed), `score_range` when a Score is judged, and a real `chat_generator_config` from `get_models`.
 6. When a try tool is available, try the draft on one to three Sessions before calling it ready, and read the `error_detail` of a try that breaks.
+
+## Reporting results
+
+Experiment results give each Metric a `better` (`higher`, `lower` or null) and a `change` (`improved`, `regressed`, `unchanged` or `unknown`). Say a Metric improved or regressed only from `change`. `unknown` is a change you do not judge: report the numbers and say the direction is not declared. Never infer a direction from a Metric's name.

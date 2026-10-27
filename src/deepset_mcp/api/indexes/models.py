@@ -3,12 +3,28 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 from rich.repr import Result
 
 from deepset_mcp.api.shared_models import DeepsetUser
+
+
+class MetaFilterCondition(BaseModel):
+    """A single metadata condition controlling which files an index processes."""
+
+    field: str
+    "The metadata field name to filter on"
+    operator: Literal["==", "!="]
+    "The comparison operator"
+    value: str | int | float | bool | None
+    "The value to compare against"
+
+
+# Module-level alias so annotations don't resolve the bare name `list` against the
+# `list()` method defined on IndexResource / IndexResourceProtocol.
+MetaFilterConditions = list[MetaFilterCondition]
 
 
 class IndexStatus(BaseModel):
@@ -41,6 +57,22 @@ class Index(BaseModel):
     "ID of the workspace containing this index"
     settings: dict[str, Any]
     "Index configuration settings and parameters"
+    max_allowed_batch_size: int | None = None
+    "Per-pipeline cap on files indexed per batch. None uses the platform default."
+    document_store_type: str | None = None
+    "Type of the document store used by this index"
+    embedding_model: str | None = None
+    "Name of the embedding model used by this index"
+    file_name_prefix_filter: str | None = None
+    "Prefix pattern filtering which files are indexed. None indexes all files."
+    file_meta_filter: list[MetaFilterCondition] | None = None
+    "Metadata conditions filtering which files are indexed. None indexes all files."
+    capture_traces: bool = False
+    "Whether every file queued for this index records an indexing trace"
+    instance_size: Literal["small", "medium", "large", "xl"] | None = None
+    "Pod size used to index files. None uses the default pod size."
+    gpu_enabled: bool | None = None
+    "Whether GPU acceleration is enabled for this index"
     desired_status: str
     "Target operational status for the index"
     deployed_at: datetime | None = None

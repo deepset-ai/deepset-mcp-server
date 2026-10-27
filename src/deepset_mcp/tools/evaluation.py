@@ -42,8 +42,9 @@ async def list_evaluators(*, client: AsyncClientProtocol, workspace: str) -> lis
 
     An Evaluator is a versioned Python function that judges a Session and reports named Metrics.
     Each entry carries its newest version's id and the Metrics that version declares (name, shape,
-    grain and, for a closed Label, its vocabulary), but not the source. Evaluators belong to the
-    workspace, not to a pipeline; a Metric Group picks which ones a scoring run judges with.
+    grain and, for a closed Label, its vocabulary and, if it declares one, its ``scale``; for a
+    Score, its ``range`` and ``better``), but not the source. Evaluators belong to the workspace,
+    not to a pipeline; a Metric Group picks which ones a scoring run judges with.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
@@ -228,10 +229,13 @@ async def get_experiment_results(
 
     Find an Experiment with ``list_experiments``. ``metrics`` has one entry per Metric of the
     Metric Group, in its order: each side's ``value`` (or ``labels`` for a Label), ``delta`` and
-    ``delta_pct`` of the candidate over the baseline, and how many Sessions ``errored``, meaning
-    the Evaluator's own code broke. A test case's value is the mean over its Sessions, and a Metric
-    is averaged only over the ``paired_test_cases`` both sides have a value for, so check that
-    count before trusting a delta. ``pipeline_metrics`` compares DURATION, TOKENS and COST the
+    ``delta_pct`` of the candidate over the baseline, ``better`` (which way a change is an
+    improvement, null when undeclared), ``change`` (improved, regressed, unchanged or unknown),
+    and how many Sessions ``errored``, meaning the Evaluator's own code broke. A test case's value
+    is the mean over its Sessions, and a Metric is averaged only over the ``paired_test_cases``
+    both sides have a value for, so check that count before trusting a delta. Say a Metric
+    improved or regressed only from ``change``; ``unknown`` means no judgement, so never infer a
+    direction from the Metric's name. ``pipeline_metrics`` compares DURATION, TOKENS and COST the
     same way. Each test case lists the Sessions each side scored and, per Score Metric keyed
     ``{evaluator_id}:{metric_key}``, each side's mean; that is where to look for the test cases
     behind a regression. Resolve evaluator ids to names with ``list_evaluators``. Results are

@@ -8,6 +8,16 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+Better = Literal["higher", "lower"]
+Change = Literal["improved", "regressed", "unchanged", "unknown"]
+
+_BETTER = "Which way a change in this Metric is an improvement: 'higher', 'lower', or null when unknown."
+_CHANGE = (
+    "How the candidate moved this Metric, read against `better`: 'improved', 'regressed', 'unchanged', or "
+    "'unknown' when no direction is declared or the change cannot be judged. Report improved or regressed "
+    "only from this field, never from the Metric's name."
+)
+
 
 class MetricDeclaration(BaseModel):
     """One Metric an Evaluator version declares in its ``@metrics`` decorator."""
@@ -19,6 +29,24 @@ class MetricDeclaration(BaseModel):
         description="Where the Metric repeats, e.g. 'session', 'turn' or 'turn/retriever/outputs.documents[*]'"
     )
     vocabulary: list[str] | None = Field(default=None, description="The labels a closed Label may take")
+    range: list[float] | None = Field(
+        default=None, description="The scale a Score's values are on, as [low, high]. Null when none is declared."
+    )
+    better: Better | None = Field(
+        default=None,
+        description=(
+            "Which way a change in the Score is an improvement: 'higher' or 'lower'. It says nothing about "
+            "whether a value is good. Null when the Score declares none."
+        ),
+    )
+    scale: dict[str, float] | None = Field(
+        default=None,
+        description=(
+            "A closed Label's Scale: each word of the vocabulary mapped to a number from 0 to 1, higher is "
+            "better. It orders the words; it does not say which pass. Null when the Label declares none, and "
+            "for a Score."
+        ),
+    )
 
 
 class EvaluatorVersionSummary(BaseModel):
@@ -171,6 +199,8 @@ class ExperimentMetric(BaseModel):
         default=None, description="delta as a percentage of the baseline's absolute value. Null if the baseline is 0."
     )
     paired_test_cases: int = Field(description="Test cases with a value on both sides, the only ones aggregated")
+    better: Better | None = Field(default=None, description=_BETTER)
+    change: Change = Field(default="unknown", description=_CHANGE)
 
 
 class ExperimentPipelineMetric(BaseModel):
@@ -190,6 +220,8 @@ class ExperimentPipelineMetric(BaseModel):
         default=None, description="delta as a percentage of the baseline's value. Null if the baseline is 0."
     )
     paired_test_cases: int = Field(description="Test cases with a value on both sides, the only ones aggregated")
+    better: Better | None = Field(default=None, description=_BETTER)
+    change: Change = Field(default="unknown", description=_CHANGE)
 
 
 class ExperimentTestCaseValue(BaseModel):
