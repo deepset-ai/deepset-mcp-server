@@ -12,6 +12,7 @@ import pytest
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.api.cost.models import CostBreakdown, CostOverTime, CostTotals
+from deepset_mcp.api.cost.resource import ServiceNotFoundError
 from deepset_mcp.api.exceptions import ResourceNotFoundError
 
 pytestmark = pytest.mark.integration
@@ -42,3 +43,20 @@ async def test_over_time_and_breakdown_of_an_empty_workspace(client: AsyncDeepse
 async def test_unknown_pipeline_raises_not_found(client: AsyncDeepsetClient, test_workspace: str) -> None:
     with pytest.raises(ResourceNotFoundError):
         await client.cost(test_workspace).totals(pipeline_name="does-not-exist")
+
+
+@pytest.mark.asyncio
+async def test_provider_and_api_key_filters_of_an_empty_workspace(
+    client: AsyncDeepsetClient, test_workspace: str
+) -> None:
+    totals = await client.cost(test_workspace).totals(
+        providers=["openai"], api_keys=["00000000-0000-0000-0000-000000000000"]
+    )
+
+    assert totals.total_requests == 0
+
+
+@pytest.mark.asyncio
+async def test_unknown_service_name_is_not_found(client: AsyncDeepsetClient, test_workspace: str) -> None:
+    with pytest.raises(ServiceNotFoundError):
+        await client.cost(test_workspace).totals(services=["does-not-exist"])
