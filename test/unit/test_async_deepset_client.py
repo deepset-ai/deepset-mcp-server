@@ -173,3 +173,21 @@ async def test_request_sends_organization_header_only_when_set() -> None:
 
     assert dummy.requests[0]["headers"]["X-Organization-ID"] == "org-1"
     assert "X-Organization-ID" not in dummy.requests[1]["headers"]
+
+
+class StreamingDummy(DummyProtocol):
+    @asynccontextmanager  # type: ignore[override]
+    async def stream(self, method: str, url: str, **kwargs: Any) -> AsyncIterator[StreamingResponse]:
+        self.requests.append({"method": method, "url": url, **kwargs})
+        yield None  # type: ignore[misc]
+
+
+@pytest.mark.asyncio
+async def test_stream_request_accepts_leading_slash_endpoint() -> None:
+    dummy = StreamingDummy()
+    client = AsyncDeepsetClient(api_key="key", base_url="https://api.test", transport=dummy)
+
+    async with client.stream_request("/endpoint"):
+        pass
+
+    assert dummy.requests[0]["url"] == "https://api.test/endpoint"

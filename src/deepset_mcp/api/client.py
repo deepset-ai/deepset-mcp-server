@@ -300,8 +300,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
 
         @asynccontextmanager
         async def _stream() -> AsyncIterator[StreamingResponse]:
-            if not endpoint.startswith("/"):
-                full_endpoint = f"/{endpoint}"
+            full_endpoint = endpoint if endpoint.startswith("/") else f"/{endpoint}"
             url = self.base_url + full_endpoint
 
             # Default headers for streaming
