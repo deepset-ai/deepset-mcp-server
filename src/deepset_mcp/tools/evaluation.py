@@ -94,7 +94,9 @@ async def list_metric_groups(
     pipeline: a scoring run judges chosen Sessions of one pipeline with it, and an Experiment scores
     both its sides with one. With ``pipeline_name``, each entry's ``last_run`` is its newest scoring
     run on that pipeline without the grid (status, ``selection``, timing), or null when it never ran
-    there; read a run's results with ``get_experiment_run``.
+    there; read a run's results with ``get_experiment_run``. ``weights`` says how much each Metric
+    counts toward the group's Composite (empty: no Composite); a weight with ``usable`` false
+    says in ``unusable_reason`` why it will not count in a new run.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
@@ -239,7 +241,9 @@ async def get_experiment_results(
     same way. Each test case lists the Sessions each side scored and, per Score Metric keyed
     ``{evaluator_id}:{metric_key}``, each side's mean; that is where to look for the test cases
     behind a regression. Resolve evaluator ids to names with ``list_evaluators``. Results are
-    partial while ``status`` is REPLAYING or SCORING.
+    partial while ``status`` is REPLAYING or SCORING. ``headline`` gives each side's Composite
+    (0 to 1, 1 best) and ``normalized_means``. When ``comparable`` is false the two sides used
+    different formulas: report no change between them and give ``incomparable_reason``.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
@@ -282,7 +286,10 @@ async def get_experiment_run(
     not apply. Each row is a Session with its cells; a cell's ``metrics`` carry the value per
     address (``session``, ``turn/2``, ...) and the rationale the Evaluator wrote, which is what to
     group failures by. ``run.selection`` says whether the Sessions were SAMPLED or HAND_PICKED;
-    only sampled runs say anything about traffic as a whole.
+    only sampled runs say anything about traffic as a whole. ``composite`` is the Metric Group's
+    single number for the run, 0 to 1 with 1 best, from ``normalized_means`` (each Metric on that
+    scale) weighted by ``run.composite_weights``, the formula the run started with. When it has
+    no value it says ``reason`` and lists the Metrics that block it in ``missing``.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
@@ -320,6 +327,8 @@ async def get_experiment_run(
         evaluator_ids=grid.evaluator_ids,
         counts=grid.counts,
         metrics=_summarise(grid),
+        normalized_means=grid.normalized_means,
+        composite=grid.composite,
         rows=rows[:max_rows],
         total_rows=len(rows),
         rows_truncated=len(rows) > max_rows,

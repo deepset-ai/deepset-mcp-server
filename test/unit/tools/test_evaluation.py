@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from deepset_mcp.api.evaluation.models import (
+    Composite,
     EvaluationTryResult,
     Evaluator,
     EvaluatorVersion,
@@ -18,6 +19,9 @@ from deepset_mcp.api.evaluation.models import (
     ExperimentRunReport,
     MetricDeclaration,
     MetricGroup,
+    NoComposite,
+    NoNormalizedMean,
+    NormalizedMean,
     SessionList,
     SessionReplayReport,
     SessionReplayRun,
@@ -225,8 +229,12 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
         try_states: list[TryState] | None = None,
         replay_states: list[SessionReplayRun] | None = None,
         results: dict[str, Any] | None = None,
+        weights: list[dict[str, Any]] | None = None,
+        run_grid: ExperimentRunGrid | None = None,
     ) -> None:
         self.error = error
+        self.weights = weights or []
+        self.run_grid = run_grid
         self.results = results
         self.calls: list[tuple[str, dict[str, Any]]] = []
         self.try_states = try_states or []
@@ -274,6 +282,7 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
                     "workspace_id": "00000000-0000-0000-0000-00000000000a",
                     "name": name,
                     "evaluator_ids": [E1],
+                    "weights": self.weights,
                     "created_at": "2026-10-01T00:00:00Z",
                 }
             )
@@ -291,7 +300,7 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
 
     async def get_experiment_run(self, pipeline_name: str, metric_group_id: str, run_id: str) -> ExperimentRunGrid:
         self._record("get_experiment_run", metric_group_id=metric_group_id, run_id=run_id)
-        return grid()
+        return self.run_grid or grid()
 
     async def list_experiments(self, pipeline_name: str | None = None, limit: int = 50) -> list[Experiment]:
         self._record("list_experiments", pipeline_name=pipeline_name)
@@ -877,3 +886,157 @@ async def test_get_experiment_results_from_an_older_api_reads_every_change_as_un
 
     assert isinstance(results, ExperimentResultsReport)
     assert [(m.better, m.change) for m in results.metrics] == [(None, "unknown")]
+
+
+WEIGHT = {"evaluator_id": E1, "metric_key": "accuracy", "weight": 2.0}
+
+
+def test_a_metric_group_carries_its_weights_and_defaults_to_none() -> None:
+    base = {
+        "metric_group_id": METRIC_GROUP_ID,
+        "name": "W",
+        "evaluator_ids": [E1],
+        "created_at": "2026-10-01T00:00:00Z",
+    }
+    weighted = MetricGroup.model_validate(
+        {
+            **base,
+            "weights": [
+                {**WEIGHT, "usable": True},
+                {**WEIGHT, "metric_key": "gone", "usable": False, "unusable_reason": "no longer declared"},
+            ],
+        }
+    )
+    older = MetricGroup.model_validate(base)
+
+    assert [(w.metric_key, w.weight, w.usable, w.unusable_reason) for w in weighted.weights] == [
+        ("accuracy", 2.0, True, None),
+        ("gone", 2.0, False, "no longer declared"),
+    ]
+    assert older.weights == []
+
+
+@pytest.mark.asyncio
+async def test_list_metric_groups_keeps_each_groups_weights() -> None:
+    groups = await list_metric_groups(
+        client=FakeClient(FakeEvaluationResource(weights=[{**WEIGHT, "usable": True}])), workspace=WORKSPACE
+    )
+
+    assert isinstance(groups, list)
+    assert [len(g.weights) for g in groups] == [1, 1]
+
+
+def _grid_with(**extra: Any) -> ExperimentRunGrid:
+    payload = grid().model_dump()
+    payload["run"] = {**payload["run"], **extra.pop("run", {})}
+    return ExperimentRunGrid.model_validate({**payload, **extra})
+
+
+async def _report(resource_grid: ExperimentRunGrid) -> ExperimentRunReport:
+    resource = FakeEvaluationResource(run_grid=resource_grid)
+    report = await get_experiment_run(
+        client=FakeClient(resource),
+        workspace=WORKSPACE,
+        pipeline_name=PIPELINE,
+        metric_group_id=METRIC_GROUP_ID,
+        run_id=RUN_ID,
+    )
+    assert isinstance(report, ExperimentRunReport)
+    return report
+
+
+@pytest.mark.asyncio
+async def test_get_experiment_run_reports_the_formula_normalized_means_and_composite() -> None:
+    report = await _report(
+        _grid_with(
+            run={"composite_weights": [WEIGHT]},
+            normalized_means=[
+                {"kind": "value", "evaluator_id": E1, "metric_key": "accuracy", "value": 0.6},
+                {"kind": "missing", "evaluator_id": E1, "metric_key": "answered", "reason": "no Scale"},
+            ],
+            composite={"kind": "value", "value": 0.6, "coverage": 1.0},
+        )
+    )
+
+    assert [(w.metric_key, w.weight) for w in report.run.composite_weights or []] == [("accuracy", 2.0)]
+    assert [type(m) for m in report.normalized_means] == [NormalizedMean, NoNormalizedMean]
+    assert report.composite == Composite(value=0.6, coverage=1.0)
+
+
+@pytest.mark.asyncio
+async def test_get_experiment_run_says_why_there_is_no_composite() -> None:
+    report = await _report(
+        _grid_with(
+            composite={
+                "kind": "missing",
+                "reason": "some weighted Metrics have no Normalized mean",
+                "missing": [{"kind": "missing", "evaluator_id": E1, "metric_key": "answered", "reason": "no Scale"}],
+            }
+        )
+    )
+
+    assert isinstance(report.composite, NoComposite)
+    assert [(m.metric_key, m.reason) for m in report.composite.missing] == [("answered", "no Scale")]
+    assert report.run.composite_weights is None
+
+
+@pytest.mark.asyncio
+async def test_get_experiment_run_from_an_older_api_has_no_composite_fields() -> None:
+    report = await _report(grid())
+
+    assert (report.run.composite_weights, report.normalized_means, report.composite) == (None, [], None)
+
+
+def _side(composite: dict[str, Any]) -> dict[str, Any]:
+    return {"normalized_means": [], "composite": composite}
+
+
+@pytest.mark.asyncio
+async def test_get_experiment_results_reports_each_sides_composite_and_why_they_are_incomparable() -> None:
+    payload = experiment_results(test_cases=1)
+    payload["headline"] = {
+        "candidate": _side({"kind": "value", "value": 0.8, "coverage": 1.0}),
+        "baseline": _side({"kind": "value", "value": 0.7, "coverage": 0.5}),
+        "comparable": False,
+        "incomparable_reason": "the runs weighed different Metrics",
+    }
+
+    results = await get_experiment_results(
+        client=FakeClient(FakeEvaluationResource(results=payload)), workspace=WORKSPACE, experiment_id=COMPARISON_ID
+    )
+
+    assert isinstance(results, ExperimentResultsReport)
+    assert results.headline is not None
+    assert results.headline.candidate.composite == Composite(value=0.8, coverage=1.0)
+    assert (results.headline.comparable, results.headline.incomparable_reason) == (
+        False,
+        "the runs weighed different Metrics",
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_experiment_results_headline_is_comparable_without_a_reason_and_may_lack_a_composite() -> None:
+    payload = experiment_results(test_cases=1)
+    payload["headline"] = {
+        "candidate": _side({"kind": "value", "value": 0.8, "coverage": 1.0}),
+        "baseline": _side({"kind": "missing", "reason": "not scored yet"}),
+    }
+
+    results = await get_experiment_results(
+        client=FakeClient(FakeEvaluationResource(results=payload)), workspace=WORKSPACE, experiment_id=COMPARISON_ID
+    )
+
+    assert isinstance(results, ExperimentResultsReport)
+    assert results.headline is not None
+    assert (results.headline.comparable, results.headline.incomparable_reason) == (True, None)
+    assert results.headline.baseline.composite == NoComposite(reason="not scored yet")
+
+
+@pytest.mark.asyncio
+async def test_get_experiment_results_from_an_older_api_has_no_headline() -> None:
+    results = await get_experiment_results(
+        client=FakeClient(FakeEvaluationResource()), workspace=WORKSPACE, experiment_id=COMPARISON_ID
+    )
+
+    assert isinstance(results, ExperimentResultsReport)
+    assert results.headline is None
