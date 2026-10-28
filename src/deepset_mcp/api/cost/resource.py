@@ -5,12 +5,14 @@
 """Resource for the LLM cost stats API."""
 
 import asyncio
+from collections.abc import Coroutine
 from typing import TYPE_CHECKING, Any, Literal
+from uuid import UUID
 
 from deepset_mcp.api import ids
 from deepset_mcp.api.cost.models import CostBreakdown, CostGroupBy, CostOverTime, CostSortBy, CostTotals
 from deepset_mcp.api.cost.protocols import CostResourceProtocol
-from deepset_mcp.api.exceptions import UnexpectedAPIError
+from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.transport import raise_for_status
 
 if TYPE_CHECKING:
@@ -36,11 +38,59 @@ class PipelineLookupForbiddenError(UnexpectedAPIError):
         self.pipeline_name = pipeline_name
 
 
+class ServiceLookupForbiddenError(UnexpectedAPIError):
+    """The API key may not list the workspace's Services, so a Service name can't be resolved to its ID.
+
+    Listing Services needs Services read, which a key with only Costs read doesn't have. A Service ID needs no
+    lookup.
+    """
+
+    def __init__(self, detail: Any | None = None) -> None:
+        """Initialize the exception.
+
+        :param detail: The error detail from the Service listing.
+        """
+        super().__init__(status_code=403, message="Not allowed to list the workspace's Services", detail=detail)
+
+
+class ServiceNotFoundError(ResourceNotFoundError):
+    """No Service in the workspace has the given name."""
+
+    def __init__(self, service: str) -> None:
+        """Initialize the exception.
+
+        :param service: The Service name that matched nothing.
+        """
+        super().__init__(message=f"No Service named '{service}'")
+        self.service = service
+
+
+class AmbiguousServiceError(UnexpectedAPIError):
+    """More than one Service in the workspace has the given name, so it can't be resolved to one ID."""
+
+    def __init__(self, service: str) -> None:
+        """Initialize the exception.
+
+        :param service: The Service name that matched several Services.
+        """
+        super().__init__(status_code=400, message=f"Several Services are named '{service}'")
+        self.service = service
+
+
+def _is_uuid(value: str) -> bool:
+    try:
+        UUID(value)
+    except ValueError:
+        return False
+    return True
+
+
 class CostResource(CostResourceProtocol):
     """Reads one workspace's LLM cost through the v2 cost stats routes.
 
-    The routes are keyed by organization UUID and filter by workspace and pipeline UUIDs; this resource
-    takes names and resolves them on each call. Costs are in USD.
+    The routes are keyed by organization UUID and filter by workspace, pipeline and Service UUIDs; this resource
+    takes names and resolves them on each call. Provider and API key filters are passed through as given.
+    Costs are in USD.
     """
 
     def __init__(self, client: "AsyncClientProtocol", workspace: str) -> None:
@@ -60,15 +110,57 @@ class CostResource(CostResourceProtocol):
                 raise PipelineLookupForbiddenError(pipeline_name, detail=e.detail) from e
             raise
 
-    async def _get(self, stat: str, pipeline_name: str | None, params: dict[str, Any]) -> Any:
-        lookups = [ids.organization_id(self._client), ids.workspace_id(self._client, self._workspace)]
+    async def _service_ids(self, services: list[str]) -> list[str]:
+        """Resolve Service names to IDs. Values that already are IDs pass through without a lookup."""
+        by_name: dict[str, list[str]] = {}
+        if not all(_is_uuid(service) for service in services):
+            try:
+                async for deployment in await self._client.deployments(self._workspace).list():
+                    by_name.setdefault(deployment.name, []).append(str(deployment.deployment_id))
+            except UnexpectedAPIError as e:
+                if e.status_code == 403:
+                    raise ServiceLookupForbiddenError(detail=e.detail) from e
+                raise
+
+        service_ids = []
+        for service in services:
+            if _is_uuid(service):
+                service_ids.append(service)
+                continue
+            matches = by_name.get(service, [])
+            if not matches:
+                raise ServiceNotFoundError(service)
+            if len(matches) > 1:
+                raise AmbiguousServiceError(service)
+            service_ids.append(matches[0])
+        return service_ids
+
+    async def _get(
+        self,
+        stat: str,
+        pipeline_name: str | None,
+        params: dict[str, Any],
+        services: list[str] | None,
+        providers: list[str] | None,
+        api_keys: list[str] | None,
+    ) -> Any:
+        lookups: list[Coroutine[Any, Any, Any]] = [
+            ids.organization_id(self._client),
+            ids.workspace_id(self._client, self._workspace),
+        ]
         if pipeline_name is not None:
             lookups.append(self._pipeline_id(pipeline_name))
-        organization_id, workspace_id, *pipeline_id = await asyncio.gather(*lookups)
+        if services:
+            lookups.append(self._service_ids(services))
+        organization_id, workspace_id, *resolved = await asyncio.gather(*lookups)
 
         params = {"workspace_id": workspace_id, **params}
-        if pipeline_id:
-            params["pipeline_id"] = pipeline_id[0]
+        if pipeline_name is not None:
+            params["pipeline_id"] = resolved.pop(0)
+        if services:
+            params["deployment_id"] = resolved.pop(0)
+        params["provider"] = providers or None
+        params["api_token_id"] = api_keys or None
         resp = await self._client.request(
             endpoint=f"v2/cost/organizations/{organization_id}/stats/{stat}",
             method="GET",
@@ -79,29 +171,56 @@ class CostResource(CostResourceProtocol):
         return resp.json
 
     async def totals(
-        self, pipeline_name: str | None = None, start_date: str | None = None, end_date: str | None = None
+        self,
+        pipeline_name: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        services: list[str] | None = None,
+        providers: list[str] | None = None,
+        api_keys: list[str] | None = None,
     ) -> CostTotals:
         """Read the workspace's LLM cost totals.
 
         :param pipeline_name: Restrict to this pipeline.
         :param start_date: Inclusive ISO timestamp. Defaults to 30 days before ``end_date``.
         :param end_date: Exclusive ISO timestamp. Defaults to no upper bound.
+        :param services: Restrict to these Services, by name or ID.
+        :param providers: Restrict to these providers, by the provider IDs the breakdown returns.
+        :param api_keys: Restrict to these API keys, by key ID (never the secret token).
         :returns: The totals.
         """
-        data = await self._get("totals", pipeline_name, {"start_date": start_date, "end_date": end_date})
+        data = await self._get(
+            "totals", pipeline_name, {"start_date": start_date, "end_date": end_date}, services, providers, api_keys
+        )
         return CostTotals.model_validate(data)
 
     async def over_time(
-        self, pipeline_name: str | None = None, start_date: str | None = None, end_date: str | None = None
+        self,
+        pipeline_name: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        services: list[str] | None = None,
+        providers: list[str] | None = None,
+        api_keys: list[str] | None = None,
     ) -> CostOverTime:
         """Read the workspace's LLM cost per UTC day.
 
         :param pipeline_name: Restrict to this pipeline.
         :param start_date: Inclusive ISO timestamp. Defaults to 30 days before ``end_date``.
         :param end_date: Exclusive ISO timestamp. Defaults to no upper bound.
+        :param services: Restrict to these Services, by name or ID.
+        :param providers: Restrict to these providers, by the provider IDs the breakdown returns.
+        :param api_keys: Restrict to these API keys, by key ID (never the secret token).
         :returns: One point per day with usage.
         """
-        data = await self._get("cost-over-time", pipeline_name, {"start_date": start_date, "end_date": end_date})
+        data = await self._get(
+            "cost-over-time",
+            pipeline_name,
+            {"start_date": start_date, "end_date": end_date},
+            services,
+            providers,
+            api_keys,
+        )
         return CostOverTime.model_validate(data)
 
     async def breakdown(
@@ -114,6 +233,9 @@ class CostResource(CostResourceProtocol):
         sort_order: Literal["ASC", "DESC"] | None = None,
         limit: int = 10,
         page_number: int = 1,
+        services: list[str] | None = None,
+        providers: list[str] | None = None,
+        api_keys: list[str] | None = None,
     ) -> CostBreakdown:
         """Read the workspace's LLM cost grouped by a dimension.
 
@@ -125,6 +247,9 @@ class CostResource(CostResourceProtocol):
         :param sort_order: ``ASC`` or ``DESC``. The API defaults to ``DESC``.
         :param limit: Groups per page, from 1 to 100.
         :param page_number: The page to read, starting at 1.
+        :param services: Restrict to these Services, by name or ID.
+        :param providers: Restrict to these providers, by the provider IDs the breakdown returns.
+        :param api_keys: Restrict to these API keys, by key ID (never the secret token).
         :returns: One page of groups.
         """
         params = {
@@ -136,4 +261,6 @@ class CostResource(CostResourceProtocol):
             "limit": limit,
             "page_number": page_number,
         }
-        return CostBreakdown.model_validate(await self._get("breakdown", pipeline_name, params))
+        return CostBreakdown.model_validate(
+            await self._get("breakdown", pipeline_name, params, services, providers, api_keys)
+        )

@@ -4,13 +4,21 @@
 
 """Unit tests for CostResource."""
 
+from collections.abc import AsyncIterator
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
 
 import pytest
 
 from deepset_mcp.api.cost.models import CostBreakdown, CostOverTime, CostTotals
-from deepset_mcp.api.cost.resource import CostResource, PipelineLookupForbiddenError
+from deepset_mcp.api.cost.resource import (
+    AmbiguousServiceError,
+    CostResource,
+    PipelineLookupForbiddenError,
+    ServiceLookupForbiddenError,
+    ServiceNotFoundError,
+)
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.pipeline.models import DeepsetPipeline
 from deepset_mcp.api.transport import TransportResponse
@@ -22,6 +30,10 @@ WORKSPACE_UUID = "76d361b5-a551-40e3-a5c9-fdbc20028021"
 PIPELINE_NAME = "my-pipeline"
 PIPELINE_UUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 ORGANIZATION_UUID = "0b5e1b5a-1111-2222-3333-444444444444"
+SERVICE_NAME = "Global Assistant"
+SERVICE_UUID = "11111111-2222-3333-4444-555555555555"
+OTHER_SERVICE_UUID = "66666666-7777-8888-9999-000000000000"
+API_KEY_ID = "5f0c6d55-9d57-4f0e-9a6e-0d2f6a1f7c11"
 
 STATS = f"v2/cost/organizations/{ORGANIZATION_UUID}/stats"
 ME = {"user_id": "u-1", "organization": {"organization_id": ORGANIZATION_UUID, "name": "acme"}}
@@ -87,11 +99,38 @@ class FakePipelineResource:
         return self._result
 
 
+class FakeServicePage:
+    def __init__(self, services: list[SimpleNamespace]) -> None:
+        self._services = services
+
+    async def __aiter__(self) -> AsyncIterator[SimpleNamespace]:
+        for service in self._services:
+            yield service
+
+
+class FakeDeploymentResource:
+    def __init__(self, services: list[tuple[str, str]] | Exception) -> None:
+        self._services = services
+        self.list_calls = 0
+
+    async def list(self) -> FakeServicePage:
+        self.list_calls += 1
+        if isinstance(self._services, Exception):
+            raise self._services
+        return FakeServicePage([SimpleNamespace(name=name, deployment_id=UUID(uid)) for name, uid in self._services])
+
+
 class FakeCostClient(BaseFakeClient):
     """Resolves the workspace and pipeline through fakes and answers HTTP calls from a dict."""
 
-    def __init__(self, http_responses: dict[str, Any], pipeline: DeepsetPipeline | Exception | None = None) -> None:
+    def __init__(
+        self,
+        http_responses: dict[str, Any],
+        pipeline: DeepsetPipeline | Exception | None = None,
+        services: list[tuple[str, str]] | Exception | None = None,
+    ) -> None:
         super().__init__(responses={"v1/me": ME, **http_responses})
+        self.deployment_resource = FakeDeploymentResource(services if services is not None else [])
         self.pipeline_resource = FakePipelineResource(
             pipeline
             if pipeline is not None
@@ -112,6 +151,9 @@ class FakeCostClient(BaseFakeClient):
 
     def pipelines(self, workspace: str) -> FakePipelineResource:  # type: ignore[override]
         return self.pipeline_resource
+
+    def deployments(self, workspace: str) -> FakeDeploymentResource:  # type: ignore[override]
+        return self.deployment_resource
 
     def stats_request(self) -> dict[str, Any]:
         return next(r for r in self.requests if r["endpoint"].startswith(STATS))
@@ -236,3 +278,127 @@ async def test_me_without_organization_raises() -> None:
 
     with pytest.raises(UnexpectedAPIError):
         await resource(client).totals()
+
+
+@pytest.mark.asyncio
+async def test_provider_and_api_key_filters_are_sent_as_repeated_params() -> None:
+    client = FakeCostClient({f"{STATS}/totals": totals_dict()})
+
+    await resource(client).totals(providers=["openai", "bedrock_converse"], api_keys=[API_KEY_ID])
+
+    assert client.stats_request()["params"] == {
+        "workspace_id": WORKSPACE_UUID,
+        "provider": ["openai", "bedrock_converse"],
+        "api_token_id": [API_KEY_ID],
+    }
+
+
+@pytest.mark.asyncio
+async def test_empty_filter_lists_send_nothing() -> None:
+    client = FakeCostClient({f"{STATS}/totals": totals_dict()})
+
+    await resource(client).totals(services=[], providers=[], api_keys=[])
+
+    assert client.stats_request()["params"] == {"workspace_id": WORKSPACE_UUID}
+    assert client.deployment_resource.list_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_service_ids_pass_through_without_a_lookup() -> None:
+    client = FakeCostClient({f"{STATS}/cost-over-time": {"data": []}})
+
+    await resource(client).over_time(services=[SERVICE_UUID])
+
+    assert client.stats_request()["params"] == {"workspace_id": WORKSPACE_UUID, "deployment_id": [SERVICE_UUID]}
+    assert client.deployment_resource.list_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_service_names_resolve_to_ids_and_mix_with_ids() -> None:
+    client = FakeCostClient(
+        {f"{STATS}/breakdown": breakdown_dict()},
+        services=[(SERVICE_NAME, SERVICE_UUID), ("Other", "99999999-9999-9999-9999-999999999999")],
+    )
+
+    await resource(client).breakdown(group_by="model", services=[SERVICE_NAME, OTHER_SERVICE_UUID])
+
+    assert client.stats_request()["params"]["deployment_id"] == [SERVICE_UUID, OTHER_SERVICE_UUID]
+    assert client.deployment_resource.list_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_service_filter_combines_with_pipeline_and_the_other_filters() -> None:
+    client = FakeCostClient({f"{STATS}/totals": totals_dict()}, services=[(SERVICE_NAME, SERVICE_UUID)])
+
+    await resource(client).totals(
+        pipeline_name=PIPELINE_NAME, services=[SERVICE_NAME], providers=["openai"], api_keys=[API_KEY_ID]
+    )
+
+    assert client.stats_request()["params"] == {
+        "workspace_id": WORKSPACE_UUID,
+        "pipeline_id": PIPELINE_UUID,
+        "deployment_id": [SERVICE_UUID],
+        "provider": ["openai"],
+        "api_token_id": [API_KEY_ID],
+    }
+
+
+@pytest.mark.asyncio
+async def test_unknown_service_name_raises_not_found() -> None:
+    client = FakeCostClient({}, services=[(SERVICE_NAME, SERVICE_UUID)])
+
+    with pytest.raises(ServiceNotFoundError) as exc_info:
+        await resource(client).totals(services=["Gone"])
+
+    assert exc_info.value.service == "Gone"
+    assert not any(r["endpoint"].startswith(STATS) for r in client.requests)
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_service_name_raises() -> None:
+    client = FakeCostClient({}, services=[(SERVICE_NAME, SERVICE_UUID), (SERVICE_NAME, OTHER_SERVICE_UUID)])
+
+    with pytest.raises(AmbiguousServiceError) as exc_info:
+        await resource(client).totals(services=[SERVICE_NAME])
+
+    assert exc_info.value.service == SERVICE_NAME
+    assert not any(r["endpoint"].startswith(STATS) for r in client.requests)
+
+
+@pytest.mark.asyncio
+async def test_forbidden_service_listing_raises_a_dedicated_error() -> None:
+    client = FakeCostClient({}, services=UnexpectedAPIError(status_code=403, message="Forbidden"))
+
+    with pytest.raises(ServiceLookupForbiddenError) as exc_info:
+        await resource(client).totals(services=[SERVICE_NAME])
+
+    assert exc_info.value.status_code == 403
+    assert not any(r["endpoint"].startswith(STATS) for r in client.requests)
+
+
+@pytest.mark.asyncio
+async def test_other_service_listing_errors_pass_through() -> None:
+    client = FakeCostClient({}, services=UnexpectedAPIError(status_code=500, message="Server error"))
+
+    with pytest.raises(UnexpectedAPIError) as exc_info:
+        await resource(client).totals(services=[SERVICE_NAME])
+
+    assert not isinstance(exc_info.value, ServiceLookupForbiddenError)
+
+
+@pytest.mark.asyncio
+async def test_api_key_of_another_workspace_is_scoped_by_the_workspace_and_returns_nothing() -> None:
+    """The backend ANDs ``api_token_id`` with ``workspace_id``, so a key id from another workspace (or one that
+    doesn't exist) narrows to no usage: a zero result, not an error. The resource must therefore always send
+    ``workspace_id`` and never widen the request.
+    """
+    empty = {**totals_dict(), "total_cost": None, "total_tokens": 0, "total_requests": 0, "unpriced_models": []}
+    client = FakeCostClient({f"{STATS}/totals": empty})
+
+    totals = await resource(client).totals(api_keys=[API_KEY_ID])
+
+    assert totals.total_requests == 0
+    assert totals.total_cost is None
+    params = client.stats_request()["params"]
+    assert params["workspace_id"] == WORKSPACE_UUID
+    assert params["api_token_id"] == [API_KEY_ID]
