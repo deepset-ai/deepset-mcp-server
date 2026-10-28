@@ -9,7 +9,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, SerializerFunctionWrapHandler, model_serializer, model_validator
 
 from deepset_mcp.api.shared_models import DeepsetUser
 
@@ -33,6 +33,23 @@ class ModelProvider(StrEnum):
     OPENAI = "openai"
     GEMINI = "gemini"
     ANTHROPIC = "anthropic"
+
+
+class ModelPrice(BaseModel):
+    """The effective price of a model, in USD per 1,000 tokens, with custom prices applied."""
+
+    input_price_per_1k_tokens: float
+    "Price per 1,000 input tokens"
+    output_price_per_1k_tokens: float
+    "Price per 1,000 output tokens"
+    cache_read_price_per_1k_tokens: float | None = None
+    "Price per 1,000 cache-read tokens, if the model has one"
+    cache_write_price_per_1k_tokens: float | None = None
+    "Price per 1,000 cache-write tokens, if the model has one"
+    cache_write_1h_price_per_1k_tokens: float | None = None
+    "Price per 1,000 one-hour cache-write tokens, if the model has one"
+    source: str
+    'How the price entry was created, e.g. "workspace-override" or "org-override" for a custom price'
 
 
 class Model(BaseModel):
@@ -63,6 +80,19 @@ class Model(BaseModel):
     "Timestamp when the model was created, if it is a custom model"
     updated_at: datetime | None = None
     "Timestamp when the model was last updated, if it is a custom model"
+    price: ModelPrice | None = None
+    "The effective price of the model. Only set when prices were requested and the model has a known price."
+
+    @model_serializer(mode="wrap")
+    def _omit_missing_price(self, handler: SerializerFunctionWrapHandler):  # type: ignore[no-untyped-def]
+        """Leave `price` out unless set, so output without prices looks as before.
+
+        Deliberately unannotated: a return annotation would replace the model's serialization JSON schema.
+        """
+        data = handler(self)
+        if data.get("price") is None:
+            data.pop("price", None)
+        return data
 
     @model_validator(mode="before")
     @classmethod
