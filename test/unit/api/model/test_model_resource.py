@@ -318,3 +318,60 @@ async def test_list_models_filter_paginates_filtered_results() -> None:
     assert [m.name for m in result.data] == ["gpt-2", "gpt-3"]
     assert result.total == 5
     assert result.has_more is True
+
+
+@pytest.mark.asyncio
+async def test_list_models_does_not_send_include_price_by_default() -> None:
+    """Test that the include_price query param is only sent when requested."""
+    mock_data = {"data": [_model_data()], "has_more": False, "total": 1}
+    fake_client = FakeModelClient(responses={f"v2/workspaces/{WORKSPACE_ID}/models": mock_data})
+
+    result = await ModelResource(client=fake_client, workspace="my-workspace").list()
+
+    assert "include_price" not in fake_client.requests[0]["params"]
+    assert result.data[0].price is None
+    assert "price" not in result.data[0].model_dump(mode="json")
+
+
+@pytest.mark.asyncio
+async def test_list_models_include_price_sends_param_and_parses_all_price_columns() -> None:
+    """Test that include_price is sent and every price column, including cache write 1h, is parsed."""
+    priced = {
+        **_model_data(),
+        "price": {
+            "input_price_per_1k_tokens": 0.001,
+            "output_price_per_1k_tokens": 0.002,
+            "cache_read_price_per_1k_tokens": 0.0001,
+            "cache_write_price_per_1k_tokens": 0.0002,
+            "cache_write_1h_price_per_1k_tokens": 0.0003,
+            "source": "org-override",
+        },
+    }
+    unpriced = _model_data(model_id=uuid.uuid4(), name="custom", chat_model_name=None)
+    mock_data = {"data": [priced, unpriced], "has_more": False, "total": 2}
+    fake_client = FakeModelClient(responses={f"v2/workspaces/{WORKSPACE_ID}/models": mock_data})
+
+    result = await ModelResource(client=fake_client, workspace="my-workspace").list(include_price=True)
+
+    assert fake_client.requests[0]["params"]["include_price"] is True
+    price = result.data[0].price
+    assert price is not None
+    assert price.input_price_per_1k_tokens == 0.001
+    assert price.output_price_per_1k_tokens == 0.002
+    assert price.cache_read_price_per_1k_tokens == 0.0001
+    assert price.cache_write_price_per_1k_tokens == 0.0002
+    assert price.cache_write_1h_price_per_1k_tokens == 0.0003
+    assert price.source == "org-override"
+    assert result.data[0].model_dump(mode="json")["price"]["cache_write_1h_price_per_1k_tokens"] == 0.0003
+    assert result.data[1].price is None
+
+
+@pytest.mark.asyncio
+async def test_list_models_include_price_is_sent_when_filtering_locally() -> None:
+    """Test that include_price is also sent on every page fetched for local provider/model filtering."""
+    mock_data = {"data": [_model_data()], "has_more": False, "total": 1}
+    fake_client = FakeModelClient(responses={f"v2/workspaces/{WORKSPACE_ID}/models": mock_data})
+
+    await ModelResource(client=fake_client, workspace="my-workspace").list(provider="openai", include_price=True)
+
+    assert all(request["params"]["include_price"] is True for request in fake_client.requests)
