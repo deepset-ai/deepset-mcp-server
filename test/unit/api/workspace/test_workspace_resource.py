@@ -20,6 +20,29 @@ class TestWorkspaceResourceList:
     """Test cases for WorkspaceResource.list method."""
 
     @pytest.mark.asyncio
+    async def test_list_tolerates_null_languages(self) -> None:
+        """Legacy workspaces can have `languages: null`; it must not break the whole list."""
+
+        class FakeWorkspaceClient(BaseFakeClient):
+            def __init__(self) -> None:
+                super().__init__(
+                    responses={
+                        "v1/workspaces": [
+                            {
+                                "name": "default",
+                                "workspace_id": "91ee7798-004d-4808-906a-1777ea262d1c",
+                                "languages": None,
+                                "default_idle_timeout_in_seconds": 43200,
+                            }
+                        ]
+                    }
+                )
+
+        result = await WorkspaceResource(client=FakeWorkspaceClient()).list()
+
+        assert result[0].languages is None
+
+    @pytest.mark.asyncio
     async def test_list_success(self) -> None:
         """Test successful workspace listing."""
         # Arrange
