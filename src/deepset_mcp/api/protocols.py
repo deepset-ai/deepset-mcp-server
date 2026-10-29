@@ -119,8 +119,8 @@ class AsyncClientProtocol(Protocol):
         """Access Evaluators, Experiments, their runs, and Sessions in the specified workspace."""
         ...
 
-    def cost(self, workspace: str) -> "CostResourceProtocol":
-        """Access LLM cost in the specified workspace."""
+    def cost(self, workspace: str | None = None) -> "CostResourceProtocol":
+        """Access LLM cost in the specified workspace, or in the whole organization when it is omitted."""
         ...
 
     def custom_components(self, workspace: str) -> "CustomComponentsProtocol":

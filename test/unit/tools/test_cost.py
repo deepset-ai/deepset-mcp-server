@@ -10,9 +10,11 @@ from deepset_mcp.api.cost.models import CostBreakdown, CostGroupBy, CostOverTime
 from deepset_mcp.api.cost.protocols import CostResourceProtocol
 from deepset_mcp.api.cost.resource import (
     AmbiguousServiceError,
+    OrganizationCostForbiddenError,
     PipelineLookupForbiddenError,
     ServiceLookupForbiddenError,
     ServiceNotFoundError,
+    WorkspaceRequiredError,
 )
 from deepset_mcp.api.exceptions import BadRequestError, RequestTimeoutError, ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.tools.cost import get_cost_breakdown, get_cost_over_time, get_cost_totals
@@ -129,9 +131,9 @@ class FakeClient(BaseFakeClient):
     def __init__(self, resource: FakeCostResource) -> None:
         super().__init__()
         self.resource = resource
-        self.workspaces_used: list[str] = []
+        self.workspaces_used: list[str | None] = []
 
-    def cost(self, workspace: str) -> FakeCostResource:
+    def cost(self, workspace: str | None = None) -> FakeCostResource:
         self.workspaces_used.append(workspace)
         return self.resource
 
@@ -350,3 +352,46 @@ async def test_error_messages_do_not_echo_api_key_ids() -> None:
     assert isinstance(result, str)
     assert API_KEY_ID not in result
     assert result == "Failed to get cost totals: Invalid api_token_id <api key id> (Status Code: 400)"
+
+
+@pytest.mark.asyncio
+async def test_without_a_workspace_the_tools_read_the_organization() -> None:
+    client = FakeClient(FakeCostResource())
+
+    assert await get_cost_totals(client=client) == TOTALS
+    assert await get_cost_over_time(client=client) == OVER_TIME
+    assert await get_cost_breakdown(client=client, group_by="workspace") == BREAKDOWN
+
+    assert client.workspaces_used == [None, None, None]
+
+
+@pytest.mark.asyncio
+async def test_a_given_workspace_is_still_used() -> None:
+    client = FakeClient(FakeCostResource())
+
+    await get_cost_totals(client=client, workspace=WORKSPACE)
+
+    assert client.workspaces_used == [WORKSPACE]
+
+
+@pytest.mark.asyncio
+async def test_organization_read_without_the_admin_role_asks_for_a_workspace() -> None:
+    client = FakeClient(FakeCostResource(OrganizationCostForbiddenError()))
+
+    result = await get_cost_totals(client=client)
+
+    assert isinstance(result, str)
+    assert "needs the organization admin role" in result
+    assert "Pass workspace" in result
+    assert "has no permission to read cost" not in result
+
+
+@pytest.mark.asyncio
+async def test_pipeline_name_without_a_workspace_explains_what_to_do() -> None:
+    client = FakeClient(FakeCostResource(WorkspaceRequiredError("pipeline_name")))
+
+    result = await get_cost_breakdown(client=client, group_by="model", pipeline_name=PIPELINE)
+
+    assert isinstance(result, str)
+    assert "pipeline_name needs a workspace" in result
+    assert "group_by='pipeline'" in result

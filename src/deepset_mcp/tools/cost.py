@@ -9,9 +9,11 @@ from typing import Literal
 from deepset_mcp.api.cost.models import CostBreakdown, CostGroupBy, CostOverTime, CostSortBy, CostTotals
 from deepset_mcp.api.cost.resource import (
     AmbiguousServiceError,
+    OrganizationCostForbiddenError,
     PipelineLookupForbiddenError,
     ServiceLookupForbiddenError,
     ServiceNotFoundError,
+    WorkspaceRequiredError,
 )
 from deepset_mcp.api.exceptions import (
     BadRequestError,
@@ -25,8 +27,21 @@ _REDACTED_KEY_ID = "<api key id>"
 
 
 def _error_message(
-    error: Exception, action: str, workspace: str, pipeline_name: str | None, api_keys: list[str] | None = None
+    error: Exception, action: str, workspace: str | None, pipeline_name: str | None, api_keys: list[str] | None = None
 ) -> str:
+    if isinstance(error, WorkspaceRequiredError):
+        return (
+            f"Failed to {action}: {error.what} needs a workspace. Pass workspace, or for the whole organization pass "
+            "a Service id (the key from get_cost_breakdown with group_by='deployment') and leave out pipeline_name; "
+            "get_cost_breakdown with group_by='pipeline' shows each pipeline's cost without one."
+        )
+    if isinstance(error, OrganizationCostForbiddenError):
+        return (
+            f"Failed to {action}: reading the cost of the whole organization needs the organization admin role, which "
+            "this API key doesn't have. Pass workspace to read one workspace's cost."
+        )
+    if workspace is None and isinstance(error, ResourceNotFoundError):
+        return "Organization not found."
     if isinstance(error, ServiceNotFoundError):
         return (
             f"Failed to {action}: {error.message}. Pass a Service name as shown on the Cost Management page, or its "
@@ -71,7 +86,7 @@ def _error_message(
 async def get_cost_totals(
     *,
     client: AsyncClientProtocol,
-    workspace: str,
+    workspace: str | None = None,
     pipeline_name: str | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
@@ -85,6 +100,11 @@ async def get_cost_totals(
     Without dates the range is the last 30 days. ``start_date`` is inclusive and ``end_date`` exclusive, so
     for September 2026 pass ``2026-09-01T00:00:00Z`` and ``2026-10-01T00:00:00Z``.
 
+    Without ``workspace`` the figures cover the whole organization, as the Cost Management page does for an
+    organization admin; this needs the organization admin role. Use ``workspace`` for one workspace. In that
+    organization view ``pipeline_name`` and Service names can't be used (they belong to a workspace); pass
+    Service ids instead.
+
     Narrow the figures with ``services``, ``providers`` and ``api_keys``. They combine: usage must match every
     kind you set, and any one value within a list.
 
@@ -95,7 +115,8 @@ async def get_cost_totals(
     can make several LLM calls.
 
     :param client: The async client for API communication.
-    :param workspace: The workspace name.
+    :param workspace: The workspace name. Omit for the whole organization, which needs the organization admin role;
+        then ``pipeline_name`` and Service names can't be used, only Service ids.
     :param pipeline_name: Restrict to this pipeline. Omit for the whole workspace. Needs Pipelines read as well as
         Costs read.
     :param start_date: Inclusive start as an ISO timestamp. Defaults to 30 days before ``end_date``.
@@ -126,7 +147,7 @@ async def get_cost_totals(
 async def get_cost_over_time(
     *,
     client: AsyncClientProtocol,
-    workspace: str,
+    workspace: str | None = None,
     pipeline_name: str | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
@@ -143,11 +164,17 @@ async def get_cost_over_time(
     The daily figures leave out unpriced LLM calls; use ``get_cost_totals`` to check whether the cost is
     complete.
 
+    Without ``workspace`` the figures cover the whole organization, as the Cost Management page does for an
+    organization admin; this needs the organization admin role. Use ``workspace`` for one workspace. In that
+    organization view ``pipeline_name`` and Service names can't be used (they belong to a workspace); pass
+    Service ids instead.
+
     Narrow the figures with ``services``, ``providers`` and ``api_keys``. They combine: usage must match every
     kind you set, and any one value within a list.
 
     :param client: The async client for API communication.
-    :param workspace: The workspace name.
+    :param workspace: The workspace name. Omit for the whole organization, which needs the organization admin role;
+        then ``pipeline_name`` and Service names can't be used, only Service ids.
     :param pipeline_name: Restrict to this pipeline. Omit for the whole workspace. Needs Pipelines read as well as
         Costs read.
     :param start_date: Inclusive start as an ISO timestamp. Defaults to 30 days before ``end_date``.
@@ -178,7 +205,7 @@ async def get_cost_over_time(
 async def get_cost_breakdown(
     *,
     client: AsyncClientProtocol,
-    workspace: str,
+    workspace: str | None = None,
     group_by: CostGroupBy,
     pipeline_name: str | None = None,
     start_date: str | None = None,
@@ -206,11 +233,17 @@ async def get_cost_breakdown(
     so never add Service groups and pipeline groups together. Usage that did not go through a Service shows up
     as ``__unattributed__`` under ``group_by='deployment'``.
 
+    Without ``workspace`` the figures cover the whole organization, as the Cost Management page does for an
+    organization admin; this needs the organization admin role. Use ``workspace`` for one workspace. In that
+    organization view ``pipeline_name`` and Service names can't be used (they belong to a workspace); pass
+    Service ids instead.
+
     Narrow the breakdown with ``services``, ``providers`` and ``api_keys``, for example the models of one
     Service. They combine: usage must match every kind you set, and any one value within a list.
 
     :param client: The async client for API communication.
-    :param workspace: The workspace name.
+    :param workspace: The workspace name. Omit for the whole organization, which needs the organization admin role;
+        then ``pipeline_name`` and Service names can't be used, only Service ids.
     :param group_by: The dimension to group by: model, workspace, pipeline, deployment (a Service), api_key or
         provider.
     :param pipeline_name: Restrict to this pipeline. Omit for the whole workspace. Needs Pipelines read as well as

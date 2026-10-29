@@ -12,7 +12,7 @@ import pytest
 
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.api.cost.models import CostBreakdown, CostOverTime, CostTotals
-from deepset_mcp.api.cost.resource import ServiceNotFoundError
+from deepset_mcp.api.cost.resource import OrganizationCostForbiddenError, ServiceNotFoundError
 from deepset_mcp.api.exceptions import ResourceNotFoundError
 
 pytestmark = pytest.mark.integration
@@ -60,3 +60,14 @@ async def test_provider_and_api_key_filters_of_an_empty_workspace(
 async def test_unknown_service_name_is_not_found(client: AsyncDeepsetClient, test_workspace: str) -> None:
     with pytest.raises(ServiceNotFoundError):
         await client.cost(test_workspace).totals(services=["does-not-exist"])
+
+
+@pytest.mark.asyncio
+async def test_organization_totals_need_no_workspace(client: AsyncDeepsetClient) -> None:
+    try:
+        totals = await client.cost().totals()
+    except OrganizationCostForbiddenError:
+        pytest.skip("The API key is not an organization admin")
+
+    assert isinstance(totals, CostTotals)
+    assert totals.currency == "USD"

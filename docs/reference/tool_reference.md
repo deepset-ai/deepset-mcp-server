@@ -130,9 +130,9 @@ draft/version history. Each deployment tracks its own history of served pipeline
 
 | MCP tool name | Workspace | Memory | Description |
 | --- | --- | --- | --- |
-| `get_cost_totals` | required | explorable | Read the LLM cost, tokens and requests of a workspace or pipeline over a date range. |
-| `get_cost_over_time` | required | explorable | Read the LLM cost of a workspace or pipeline per UTC day. |
-| `get_cost_breakdown` | required | explorable | Read the LLM cost grouped by model, workspace, pipeline, deployment, API key or provider. |
+| `get_cost_totals` | optional | explorable | Read the LLM cost, tokens and requests of a workspace or pipeline over a date range, or of the whole organization when no workspace is given (organization admins). |
+| `get_cost_over_time` | optional | explorable | Read the LLM cost of a workspace or pipeline per UTC day, or of the whole organization when no workspace is given (organization admins). |
+| `get_cost_breakdown` | optional | explorable | Read the LLM cost grouped by model, workspace, pipeline, deployment, API key or provider, for a workspace or (organization admins, no workspace given) the whole organization. |
 
 ### Templates
 
