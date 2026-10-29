@@ -25,6 +25,7 @@ mcp = FastMCP("Haystack Enterprise Platform MCP server")
 configure_mcp_server(
     mcp_server_instance=mcp,
     deepset_api_key="your-api-key",
+    deepset_api_url="https://api.us.deepset.ai/api",
     deepset_workspace="your-workspace",  # Optional: leave as None to require workspace in tool calls
     tools_to_register=None,  # Register all available tools
 )
@@ -44,6 +45,8 @@ configure_mcp_server(
     deepset_api_key="your-api-key",
 )
 ```
+
+`deepset_api_url` is optional and defaults to `https://api.cloud.deepset.ai/api`. Set it to the API root for a regional deployment, for example `https://api.us.deepset.ai/api`. The `deepset-mcp` command accepts the equivalent `--api-url` option, and `DEEPSET_API_URL` can configure it through the environment. Documentation search URLs remain on the documentation service.
 
 #### Dynamic API key from request headers
 Extract API key from authorization headers (useful for multi-user scenarios):

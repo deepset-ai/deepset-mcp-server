@@ -51,7 +51,8 @@ Create a file named `mcp.json` in your `.cursor` directory at the project root:
       "args": ["deepset-mcp"],
       "env": {
         "DEEPSET_WORKSPACE": "your_workspace_name",
-        "DEEPSET_API_KEY": "your_api_key"
+        "DEEPSET_API_KEY": "your_api_key",
+        "DEEPSET_API_URL": "https://api.us.deepset.ai"
       }
     }
   }
@@ -120,8 +121,10 @@ uvx deepset-mcp --workspace your_workspace --api-key your_api_key
 
 **If installed globally:**
 ```bash
-deepset-mcp --workspace your_workspace --api-key your_api_key
+deepset-mcp --workspace your_workspace --api-key your_api_key --api-url https://api.us.deepset.ai
 ```
+
+The API URL defaults to `https://api.cloud.deepset.ai`. Set `DEEPSET_API_URL` or pass `--api-url` to connect to another regional API. The environment variable also works with MCP client and Docker configurations. Documentation search and shared documentation prototype URLs continue to use the documentation service.
 
 💡 **Note:** The `--workspace` parameter is optional. If omitted, the AI agent will need to specify the workspace name when calling tools.
 

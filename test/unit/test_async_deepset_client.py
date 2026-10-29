@@ -86,6 +86,11 @@ async def test_init_with_api_key_and_transport() -> None:
     assert client._transport is dummy
 
 
+def test_client_default_base_url() -> None:
+    client = AsyncDeepsetClient(api_key="testkey", transport=DummyProtocol())
+    assert client.base_url == "https://api.cloud.deepset.ai/api"
+
+
 @pytest.mark.asyncio
 async def test_init_without_api_key_raises() -> None:
     # No API key in args or env

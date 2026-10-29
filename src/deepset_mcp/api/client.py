@@ -28,6 +28,7 @@ from deepset_mcp.api.transport import (
 )
 from deepset_mcp.api.user.resource import UserResource
 from deepset_mcp.api.workspace.resource import WorkspaceResource
+from deepset_mcp.config import DEEPSET_API_DEFAULT_BASE_URL
 
 T = TypeVar("T")
 
@@ -58,7 +59,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
     def __init__(
         self,
         api_key: str | None = None,
-        base_url: str = "https://api.cloud.deepset.ai/api",
+        base_url: str = DEEPSET_API_DEFAULT_BASE_URL,
         transport: TransportProtocol | None = None,
         transport_config: dict[str, Any] | None = None,
         organization_id: str | None = None,
