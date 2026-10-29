@@ -673,6 +673,77 @@ class TestRichExplorer:
         assert isinstance(new_value, str)
         assert yaml.safe_load(new_value) == {"config": {"timeout": 30}}
 
+    @pytest.mark.parametrize(
+        "source",
+        [
+            pytest.param(
+                "# pipeline\n"
+                "components:\n"
+                "  prompt_builder:\n"
+                "    type: haystack.components.builders.PromptBuilder\n"
+                "    init_parameters:\n"
+                "      # system prompt\n"
+                "      template: |\n"
+                "        You are a helpful assistant for {{ customer }}.\n"
+                "        Answer only from the documents below.\n"
+                "      timeout: 10\n"
+                '      model: "gpt-4o"\n'
+                "  code:\n"
+                "    init_parameters:\n"
+                "      code: |-\n"
+                "        def run(x):\n"
+                "            return x\n"
+                "connections:\n"
+                "- sender: a.b\n"
+                "  receiver: c.d\n",
+                id="comments-blocks-quotes",
+            ),
+            pytest.param(
+                "components:\n"
+                "    prompt_builder:\n"
+                "        init_parameters:\n"
+                "            timeout: 10\n"
+                "connections:\n"
+                "    - sender: a.b\n"
+                "      receiver: c.d\n",
+                id="four-space-indented-sequences",
+            ),
+        ],
+    )
+    def test_query_transform_keeps_yaml_formatting(
+        self, store: ObjectStore, explorer: RichExplorer, source: str
+    ) -> None:
+        """Test that a YAML transform changes only the edited line, so a version diff shows only real changes."""
+        obj_id = store.put(source)
+
+        result = explorer.query(obj_id, ".components.prompt_builder.init_parameters.timeout = 30")
+
+        new_id = result.split("@")[1].split(".")[0].strip()
+        assert store.get(new_id) == source.replace("timeout: 10", "timeout: 30")
+
+    def test_query_transform_writes_new_multiline_strings_as_blocks(
+        self, store: ObjectStore, explorer: RichExplorer
+    ) -> None:
+        """Test that a multi-line string added by a transform is written as a `|` block, not a quoted string."""
+        obj_id = store.put("components:\n  a:\n    type: x\n")
+
+        result = explorer.query(obj_id, '.components.a.template = "line 1\\nline 2\\n"')
+
+        new_id = result.split("@")[1].split(".")[0].strip()
+        assert store.get(new_id) == "components:\n  a:\n    type: x\n    template: |\n      line 1\n      line 2\n"
+
+    def test_query_transform_removes_and_appends_yaml_items(self, store: ObjectStore, explorer: RichExplorer) -> None:
+        """Test that removing keys and appending list items still yields the transformed document."""
+        source = "a: 1  # keep\nb: 2\nitems:\n- x\n- y\n"
+        obj_id = store.put(source)
+
+        result = explorer.query(obj_id, 'del(.b) | .items += ["z"] | .c = true')
+
+        new_id = result.split("@")[1].split(".")[0].strip()
+        new_value = store.get(new_id)
+        assert yaml.safe_load(new_value) == {"a": 1, "items": ["x", "y", "z"], "c": True}
+        assert "a: 1  # keep" in new_value
+
     def test_query_plain_string_not_treated_as_yaml(self, store: ObjectStore, explorer: RichExplorer) -> None:
         """Test that a plain (non-structured) string is queried as an opaque string, not parsed."""
         obj_id = store.put("The quick brown fox")

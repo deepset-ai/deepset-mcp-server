@@ -11,6 +11,7 @@ navigation, searching, and slicing.
 
 from __future__ import annotations
 
+import io
 import json
 import re
 from typing import Any
@@ -20,6 +21,11 @@ import yaml
 from glom import GlomError, Path, T, glom
 from rich.console import Console
 from rich.pretty import Pretty
+from ruamel.yaml import YAML
+from ruamel.yaml.comments import CommentedMap, CommentedSeq
+from ruamel.yaml.error import YAMLError as RuamelYAMLError
+from ruamel.yaml.scalarstring import LiteralScalarString
+from ruamel.yaml.util import load_yaml_guess_indent
 
 from deepset_mcp.tokonomics.object_store import ObjectStore
 
@@ -27,6 +33,75 @@ from deepset_mcp.tokonomics.object_store import ObjectStore
 # Wrapping the filter also rejects top-level `import`/`include`, which could load jq modules from disk.
 # The closing parenthesis goes on its own line so a trailing `# comment` in the filter cannot swallow it.
 _SANDBOXED_JQ_TEMPLATE = "def env: {{}}; {{}} as $ENV | ({filter}\n)"
+
+_KEY_ONLY_LINE = re.compile(r"^( *)[^\s#-][^#]*:\s*$")
+
+
+def _restyle(value: Any) -> Any:
+    """A new value, with multi-line strings written as `|` blocks instead of quoted one-liners."""
+    if isinstance(value, str) and "\n" in value:
+        return LiteralScalarString(value)
+    if isinstance(value, dict):
+        return CommentedMap((k, _restyle(v)) for k, v in value.items())
+    if isinstance(value, list):
+        return CommentedSeq(_restyle(v) for v in value)
+    return value
+
+
+def _merge(original: Any, new: Any) -> Any:
+    """`new`, reusing the nodes of `original` it did not change so they keep their comments and style."""
+    if isinstance(original, CommentedMap) and isinstance(new, dict):
+        for key in [k for k in original if k not in new]:
+            del original[key]
+        for key, value in new.items():
+            original[key] = _merge(original[key], value) if key in original else _restyle(value)
+        return original
+    if isinstance(original, CommentedSeq) and isinstance(new, list):
+        # ponytail: list items are matched by position, so an insert mid-list restyles the items after it.
+        del original[len(new) :]
+        for i, value in enumerate(new):
+            if i < len(original):
+                original[i] = _merge(original[i], value)
+            else:
+                original.append(_restyle(value))
+        return original
+    # `True == 1` in Python, so a bool must stay a bool to count as unchanged.
+    if original == new and isinstance(original, bool) == isinstance(new, bool):
+        return original
+    return _restyle(new)
+
+
+def _mapping_indent(source: str) -> int:
+    """How far the source indents a nested mapping (2 when nothing in it shows)."""
+    lines = source.splitlines()
+    for line, next_line in zip(lines, lines[1:], strict=False):
+        key = _KEY_ONLY_LINE.match(line)
+        stripped = next_line.lstrip(" ")
+        if key and stripped and not stripped.startswith(("-", "#")):
+            step = len(next_line) - len(stripped) - len(key.group(1))
+            if step > 0:
+                return step
+    return 2
+
+
+def _dump_yaml_like(source: str, result: Any) -> str:
+    """Writes `result` as YAML in the style of `source`, so only the values that changed differ from it.
+
+    A plain dump would rewrite the whole document: comments dropped, `|` blocks (prompts, code) turned into
+    quoted strings, quoting and indentation changed. A pipeline version saved from that shows every line
+    as changed in a diff.
+    """
+    try:
+        rt = YAML()
+        rt.preserve_quotes = True
+        rt.width = 4096
+        _, sequence_indent, block_seq_indent = load_yaml_guess_indent(source)
+        rt.indent(mapping=_mapping_indent(source), sequence=sequence_indent, offset=block_seq_indent)
+        out = io.StringIO()
+        rt.dump(_merge(rt.load(source), result), out)
+        return out.getvalue()
+    except RuamelYAMLError:
+        return yaml.safe_dump(result, sort_keys=False)
 
 
 class RichExplorer:
@@ -245,7 +320,8 @@ class RichExplorer:
         applied, so filters can navigate into its fields (e.g. a pipeline's YAML config). Filters that
         transform the document (e.g. ``.field = "value"``) work the same way as ones that only extract data
         (e.g. ``.field``), since both are plain jq filters. If the input was parsed from JSON or YAML, a
-        non-string result is re-serialized back to that same format before being stored.
+        non-string result is re-serialized back to that same format before being stored; YAML keeps the
+        comments and formatting of the parts the filter left unchanged.
 
         :param obj_id: Identifier obtained from the store.
         :param filter: jq filter expression (e.g. ``.items[] | select(.active) | .name`` or ``.field = "value"``).
@@ -294,7 +370,7 @@ class RichExplorer:
         if source_format == "json" and isinstance(result, dict | list):
             result = json.dumps(result, indent=2)
         elif source_format == "yaml" and isinstance(result, dict | list):
-            result = yaml.safe_dump(result, sort_keys=False)
+            result = _dump_yaml_like(obj, result)
 
         if not store:
             body = result if isinstance(result, str) else self._get_pretty_repr(result)
