@@ -276,7 +276,7 @@ class BaseFakeClient(AsyncClientProtocol):
         """Overwrite this method when testing EvaluationResource."""
         raise NotImplementedError
 
-    def cost(self, workspace: str) -> CostResourceProtocol:
+    def cost(self, workspace: str | None = None) -> CostResourceProtocol:
         """Overwrite this method when testing CostResource."""
         raise NotImplementedError
 

@@ -15,9 +15,11 @@ from deepset_mcp.api.cost.models import CostBreakdown, CostOverTime, CostTotals
 from deepset_mcp.api.cost.resource import (
     AmbiguousServiceError,
     CostResource,
+    OrganizationCostForbiddenError,
     PipelineLookupForbiddenError,
     ServiceLookupForbiddenError,
     ServiceNotFoundError,
+    WorkspaceRequiredError,
 )
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.pipeline.models import DeepsetPipeline
@@ -402,3 +404,93 @@ async def test_api_key_of_another_workspace_is_scoped_by_the_workspace_and_retur
     params = client.stats_request()["params"]
     assert params["workspace_id"] == WORKSPACE_UUID
     assert params["api_token_id"] == [API_KEY_ID]
+
+
+def organization_resource(client: FakeCostClient) -> CostResource:
+    return CostResource(client=client, workspace=None)
+
+
+@pytest.mark.asyncio
+async def test_without_a_workspace_the_whole_organization_is_read() -> None:
+    client = FakeCostClient({f"{STATS}/totals": totals_dict()})
+
+    totals = await organization_resource(client).totals(start_date="2026-09-01T00:00:00Z")
+
+    assert isinstance(totals, CostTotals)
+    request = client.stats_request()
+    assert request["endpoint"] == f"{STATS}/totals"
+    assert request["params"] == {"start_date": "2026-09-01T00:00:00Z"}
+    assert [r["endpoint"] for r in client.requests] == ["v1/me", f"{STATS}/totals"]
+
+
+@pytest.mark.asyncio
+async def test_organization_over_time_and_breakdown_send_no_workspace() -> None:
+    client = FakeCostClient(
+        {
+            f"{STATS}/cost-over-time": {"data": [{"date": "2026-10-01T00:00:00Z", "cost_total": 1.5}]},
+            f"{STATS}/breakdown": breakdown_dict(),
+        }
+    )
+
+    await organization_resource(client).over_time()
+    await organization_resource(client).breakdown(group_by="workspace")
+
+    for request in (r for r in client.requests if r["endpoint"].startswith(STATS)):
+        assert "workspace_id" not in request["params"]
+
+
+@pytest.mark.asyncio
+async def test_organization_filters_combine_with_service_ids_providers_and_api_keys() -> None:
+    client = FakeCostClient({f"{STATS}/totals": totals_dict()})
+
+    await organization_resource(client).totals(services=[SERVICE_UUID], providers=["openai"], api_keys=[API_KEY_ID])
+
+    assert client.stats_request()["params"] == {
+        "deployment_id": [SERVICE_UUID],
+        "provider": ["openai"],
+        "api_token_id": [API_KEY_ID],
+    }
+    assert client.deployment_resource.list_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_organization_view_cannot_resolve_a_pipeline_name() -> None:
+    client = FakeCostClient({f"{STATS}/totals": totals_dict()})
+
+    with pytest.raises(WorkspaceRequiredError) as exc_info:
+        await organization_resource(client).totals(pipeline_name=PIPELINE_NAME)
+
+    assert exc_info.value.what == "pipeline_name"
+    assert not any(r["endpoint"].startswith(STATS) for r in client.requests)
+
+
+@pytest.mark.asyncio
+async def test_organization_view_cannot_resolve_a_service_name() -> None:
+    client = FakeCostClient({f"{STATS}/totals": totals_dict()})
+
+    with pytest.raises(WorkspaceRequiredError):
+        await organization_resource(client).totals(services=[SERVICE_NAME])
+
+    assert not any(r["endpoint"].startswith(STATS) for r in client.requests)
+
+
+@pytest.mark.asyncio
+async def test_forbidden_organization_read_raises_a_dedicated_error() -> None:
+    forbidden = TransportResponse(text="", status_code=403, json={"errors": ["Forbidden"]})
+    client = FakeCostClient({f"{STATS}/totals": forbidden})
+
+    with pytest.raises(OrganizationCostForbiddenError) as exc_info:
+        await organization_resource(client).totals()
+
+    assert exc_info.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_forbidden_workspace_read_is_not_an_organization_error() -> None:
+    forbidden = TransportResponse(text="", status_code=403, json={"errors": ["Forbidden"]})
+    client = FakeCostClient({f"{STATS}/totals": forbidden})
+
+    with pytest.raises(UnexpectedAPIError) as exc_info:
+        await resource(client).totals()
+
+    assert not isinstance(exc_info.value, OrganizationCostForbiddenError)

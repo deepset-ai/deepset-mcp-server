@@ -38,6 +38,29 @@ class PipelineLookupForbiddenError(UnexpectedAPIError):
         self.pipeline_name = pipeline_name
 
 
+class WorkspaceRequiredError(UnexpectedAPIError):
+    """A pipeline or Service name was given without a workspace, so it can't be resolved to an ID."""
+
+    def __init__(self, what: str) -> None:
+        """Initialize the exception.
+
+        :param what: What needs the workspace, such as ``pipeline_name`` or ``services`` by name.
+        """
+        super().__init__(status_code=400, message=f"{what} needs a workspace")
+        self.what = what
+
+
+class OrganizationCostForbiddenError(UnexpectedAPIError):
+    """The API key may not read the cost of the whole organization, which needs the organization admin role."""
+
+    def __init__(self, detail: Any | None = None) -> None:
+        """Initialize the exception.
+
+        :param detail: The error detail from the cost route.
+        """
+        super().__init__(status_code=403, message="Not allowed to read the organization's cost", detail=detail)
+
+
 class ServiceLookupForbiddenError(UnexpectedAPIError):
     """The API key may not list the workspace's Services, so a Service name can't be resolved to its ID.
 
@@ -90,19 +113,22 @@ class CostResource(CostResourceProtocol):
 
     The routes are keyed by organization UUID and filter by workspace, pipeline and Service UUIDs; this resource
     takes names and resolves them on each call. Provider and API key filters are passed through as given.
+    Without a workspace it reads the whole organization, which needs the organization admin role.
     Costs are in USD.
     """
 
-    def __init__(self, client: "AsyncClientProtocol", workspace: str) -> None:
+    def __init__(self, client: "AsyncClientProtocol", workspace: str | None = None) -> None:
         """Initialize the cost resource.
 
         :param client: The async REST client.
-        :param workspace: The workspace to use.
+        :param workspace: The workspace to use. ``None`` reads the whole organization.
         """
         self._client = client
         self._workspace = workspace
 
     async def _pipeline_id(self, pipeline_name: str) -> str:
+        if self._workspace is None:
+            raise WorkspaceRequiredError("pipeline_name")
         try:
             return await ids.pipeline_id(self._client, self._workspace, pipeline_name)
         except UnexpectedAPIError as e:
@@ -114,6 +140,8 @@ class CostResource(CostResourceProtocol):
         """Resolve Service names to IDs. Values that already are IDs pass through without a lookup."""
         by_name: dict[str, list[str]] = {}
         if not all(_is_uuid(service) for service in services):
+            if self._workspace is None:
+                raise WorkspaceRequiredError("A Service name")
             try:
                 async for deployment in await self._client.deployments(self._workspace).list():
                     by_name.setdefault(deployment.name, []).append(str(deployment.deployment_id))
@@ -144,17 +172,17 @@ class CostResource(CostResourceProtocol):
         providers: list[str] | None,
         api_keys: list[str] | None,
     ) -> Any:
-        lookups: list[Coroutine[Any, Any, Any]] = [
-            ids.organization_id(self._client),
-            ids.workspace_id(self._client, self._workspace),
-        ]
+        lookups: list[Coroutine[Any, Any, Any]] = [ids.organization_id(self._client)]
+        if self._workspace is not None:
+            lookups.append(ids.workspace_id(self._client, self._workspace))
         if pipeline_name is not None:
             lookups.append(self._pipeline_id(pipeline_name))
         if services:
             lookups.append(self._service_ids(services))
-        organization_id, workspace_id, *resolved = await asyncio.gather(*lookups)
+        organization_id, *resolved = await asyncio.gather(*lookups)
 
-        params = {"workspace_id": workspace_id, **params}
+        if self._workspace is not None:
+            params = {"workspace_id": resolved.pop(0), **params}
         if pipeline_name is not None:
             params["pipeline_id"] = resolved.pop(0)
         if services:
@@ -167,7 +195,12 @@ class CostResource(CostResourceProtocol):
             params={key: value for key, value in params.items() if value is not None},
             timeout=COST_REQUEST_TIMEOUT,
         )
-        raise_for_status(resp)
+        try:
+            raise_for_status(resp)
+        except UnexpectedAPIError as e:
+            if e.status_code == 403 and self._workspace is None:
+                raise OrganizationCostForbiddenError(detail=e.detail) from e
+            raise
         return resp.json
 
     async def totals(
