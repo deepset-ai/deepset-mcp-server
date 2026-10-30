@@ -424,6 +424,17 @@ async def test_without_a_workspace_the_whole_organization_is_read() -> None:
 
 
 @pytest.mark.asyncio
+async def test_an_empty_workspace_reads_the_whole_organization() -> None:
+    client = FakeCostClient({f"{STATS}/totals": totals_dict()})
+
+    totals = await CostResource(client=client, workspace="").totals(start_date="2026-09-01T00:00:00Z")
+
+    assert isinstance(totals, CostTotals)
+    assert client.stats_request()["params"] == {"start_date": "2026-09-01T00:00:00Z"}
+    assert [r["endpoint"] for r in client.requests] == ["v1/me", f"{STATS}/totals"]
+
+
+@pytest.mark.asyncio
 async def test_organization_over_time_and_breakdown_send_no_workspace() -> None:
     client = FakeCostClient(
         {

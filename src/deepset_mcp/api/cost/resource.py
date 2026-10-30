@@ -121,10 +121,11 @@ class CostResource(CostResourceProtocol):
         """Initialize the cost resource.
 
         :param client: The async REST client.
-        :param workspace: The workspace to use. ``None`` reads the whole organization.
+        :param workspace: The workspace to use. ``None`` or an empty string reads the whole organization: some
+            tool callers send an omitted optional argument as ``""``.
         """
         self._client = client
-        self._workspace = workspace
+        self._workspace = workspace or None
 
     async def _pipeline_id(self, pipeline_name: str) -> str:
         if self._workspace is None:
