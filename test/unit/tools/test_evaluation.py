@@ -27,6 +27,7 @@ from deepset_mcp.api.evaluation.models import (
     ExperimentRunPreview,
     ExperimentRunReport,
     ExperimentUpdatePlan,
+    LabelAggregate,
     MetricDeclaration,
     MetricGroup,
     MetricWeight,
@@ -34,6 +35,7 @@ from deepset_mcp.api.evaluation.models import (
     NoComposite,
     NoNormalizedMean,
     NormalizedMean,
+    ScoreAggregate,
     SessionList,
     SessionReplayReport,
     SessionReplayRun,
@@ -1967,3 +1969,98 @@ async def test_run_tools_return_the_api_message_instead_of_raising(error: Except
     ]
 
     assert all(isinstance(result, str) and str(error.args[0]) in result for result in results)
+
+
+def _aggregate(**fields: Any) -> dict[str, Any]:
+    """One side's whole-run entry for a Metric, as hub-api's Aggregate reports it."""
+    return {
+        "evaluator_id": E1,
+        "evaluator_version_ids": ["22222222-2222-2222-2222-222222222222"],
+        "sessions": {"valued": 2, "not_applicable": 0, "unusable": 0, "errored": 0, "failed": 0, "pending": 0},
+        "coverage": 1.0,
+        **fields,
+    }
+
+
+@pytest.mark.asyncio
+async def test_get_experiment_results_reports_each_sides_whole_run_aggregate_and_formula() -> None:
+    weights = [{"evaluator_id": E1, "metric_key": "helpful", "weight": 2.0}]
+    payload = experiment_results(test_cases=1)
+    payload["headline"] = {
+        "candidate": {**_side({"kind": "value", "value": 0.8, "coverage": 1.0}), "composite_weights": weights},
+        "baseline": _side({"kind": "missing", "reason": "not scored yet"}),
+    }
+    payload["aggregates"] = [
+        {
+            "evaluator_id": E1,
+            "metric_key": "helpful",
+            "shape": "score",
+            "candidate": _aggregate(metric_key="helpful", shape="score", mean=0.9, better="higher", range=[0, 1]),
+            "baseline": _aggregate(metric_key="helpful", shape="score", mean=0.6, better="higher", range=[0, 1]),
+            "delta": 0.3,
+            "share_deltas": None,
+            "change": "improved",
+        },
+        {
+            "evaluator_id": E1,
+            "metric_key": "tone",
+            "shape": "label",
+            "candidate": _aggregate(metric_key="tone", shape="label", shares={"kind": 1.0}, vocabulary=None),
+            "baseline": None,
+            "delta": None,
+            "share_deltas": None,
+            "change": "unknown",
+        },
+    ]
+
+    results = await get_experiment_results(
+        client=FakeClient(FakeEvaluationResource(results=payload)), workspace=WORKSPACE, experiment_id=COMPARISON_ID
+    )
+
+    assert isinstance(results, ExperimentResultsReport)
+    assert results.headline is not None
+    assert [(w.metric_key, w.weight) for w in results.headline.candidate.composite_weights] == [("helpful", 2.0)]
+    assert results.headline.baseline.composite_weights == []
+    helpful, tone = results.aggregates
+    assert (helpful.delta, helpful.change) == (0.3, "improved")
+    assert isinstance(helpful.candidate, ScoreAggregate) and helpful.candidate.mean == 0.9
+    assert isinstance(tone.candidate, LabelAggregate) and tone.candidate.shares == {"kind": 1.0}
+    assert (tone.baseline, tone.change) == (None, "unknown")
+
+
+@pytest.mark.asyncio
+async def test_get_experiment_results_from_an_older_api_has_no_aggregates() -> None:
+    results = await get_experiment_results(
+        client=FakeClient(FakeEvaluationResource()), workspace=WORKSPACE, experiment_id=COMPARISON_ID
+    )
+
+    assert isinstance(results, ExperimentResultsReport)
+    assert results.aggregates == []
+
+
+@pytest.mark.asyncio
+async def test_get_session_replay_reports_a_run_of_inputs_without_a_source_session_or_version() -> None:
+    run = SessionReplayRun.model_validate(
+        {
+            "session_replay_run_id": REPLAY_RUN_ID,
+            "pipeline_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            "pipeline_version_id": None,
+            "pipeline_optimization_candidate_id": "dddddddd-1111-2222-3333-444444444444",
+            "status": "FAILED",
+            "source_session_id": None,
+            "inputs": {"query": "who wrote Dune?"},
+            "session_id": "eeeeeeee-1111-2222-3333-444444444444",
+            "trace_ids": [],
+            "created_at": "2026-10-07T00:00:00Z",
+        }
+    )
+
+    report = await get_session_replay(
+        client=FakeCheckClient(FakeEvaluationResource(replay_states=[run])),
+        workspace=WORKSPACE,
+        pipeline_name=PIPELINE,
+        replay_run_id=REPLAY_RUN_ID,
+    )
+
+    assert isinstance(report, SessionReplayReport)
+    assert (report.status, report.source_session_id, report.pipeline_version_id) == ("FAILED", None, None)

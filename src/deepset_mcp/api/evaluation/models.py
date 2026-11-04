@@ -107,6 +107,18 @@ _NORMALIZED_MEANS = (
 )
 
 
+class ScoreAggregate(BaseModel):
+    """Stub."""
+
+    mean: float | None = None
+
+
+class LabelAggregate(BaseModel):
+    """Stub."""
+
+    shares: dict[str, float] | None = None
+
+
 class MetricDeclaration(BaseModel):
     """One Metric an Evaluator version declares in its ``@metrics`` decorator."""
 
