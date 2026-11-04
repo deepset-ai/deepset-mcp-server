@@ -13,7 +13,8 @@ license = "Apache-2.0"
 readme = "README.md"
 authors = [
     { name = "Mathis Lucka", email = "mathis.lucka@deepset.ai" },
-    { name = "Tanay Soni", email = "tanay.soni@deepset.ai" }
+    { name = "Tanay Soni", email = "tanay.soni@deepset.ai" },
+    { name = "Thomas Stadelmann", email = "thomas.stadelmann@deepset.ai" }
 ]
 keywords = [
   "MCP",
@@ -26,14 +27,13 @@ keywords = [
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: Freely Distributable",
-    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 requires-python = ">=3.11"

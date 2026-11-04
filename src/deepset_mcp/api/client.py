@@ -119,10 +119,10 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         """
         return EvaluationResource(client=self, workspace=workspace)
 
-    def cost(self, workspace: str) -> CostResource:
-        """Resource to read LLM cost in the specified workspace.
+    def cost(self, workspace: str | None = None) -> CostResource:
+        """Resource to read LLM cost in the specified workspace, or in the whole organization.
 
-        :param workspace: Workspace identifier
+        :param workspace: Workspace identifier. Omit for the whole organization.
         :returns: Cost resource instance
         """
         return CostResource(client=self, workspace=workspace)

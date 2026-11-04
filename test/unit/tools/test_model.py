@@ -30,6 +30,7 @@ class FakeModelResource(ModelResourceProtocol):
         connected: bool | None = None,
         provider: ModelProvider | str | None = None,
         model: str | None = None,
+        include_price: bool = False,
     ) -> ModelList:
         self.last_call_kwargs = {
             "limit": limit,
@@ -37,6 +38,7 @@ class FakeModelResource(ModelResourceProtocol):
             "connected": connected,
             "provider": provider,
             "model": model,
+            "include_price": include_price,
         }
         if self.list_exception:
             raise self.list_exception
@@ -93,6 +95,7 @@ async def test_get_models_forwards_params() -> None:
         connected=False,
         provider="openai",
         model="gpt-4o",
+        include_price=True,
     )
 
     assert fake_resource.last_call_kwargs == {
@@ -101,7 +104,40 @@ async def test_get_models_forwards_params() -> None:
         "connected": False,
         "provider": "openai",
         "model": "gpt-4o",
+        "include_price": True,
     }
+
+
+@pytest.mark.asyncio
+async def test_get_models_does_not_request_prices_by_default() -> None:
+    """Test that prices are only requested when asked for."""
+    fake_resource = FakeModelResource(list_response=ModelList(data=[], has_more=False, total=0))
+
+    await get_models(client=FakeClient(model_resource=fake_resource), workspace="my-workspace")
+
+    assert fake_resource.last_call_kwargs["include_price"] is False
+
+
+@pytest.mark.asyncio
+async def test_get_models_include_price_forbidden_explains_missing_costs_access() -> None:
+    """Test that a 403 on prices points to the missing costs access and to the call without prices."""
+    client = FakeClient(model_resource=FakeModelResource(list_exception=UnexpectedAPIError(403, "Forbidden")))
+
+    result = await get_models(client=client, workspace="my-workspace", include_price=True)
+
+    assert isinstance(result, str)
+    assert "read access to costs" in result
+    assert "without include_price" in result
+
+
+@pytest.mark.asyncio
+async def test_get_models_forbidden_without_prices_is_a_plain_failure() -> None:
+    """Test that a 403 that is not about prices keeps the generic message."""
+    client = FakeClient(model_resource=FakeModelResource(list_exception=UnexpectedAPIError(403, "Forbidden")))
+
+    result = await get_models(client=client, workspace="my-workspace")
+
+    assert result == "Failed to list models: Forbidden (Status Code: 403)"
 
 
 @pytest.mark.asyncio
