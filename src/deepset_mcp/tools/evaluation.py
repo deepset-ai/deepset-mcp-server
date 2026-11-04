@@ -284,7 +284,11 @@ async def get_experiment_results(
     behind a regression. Resolve evaluator ids to names with ``list_evaluators``. Results are
     partial while ``status`` is REPLAYING or SCORING. ``headline`` gives each side's Composite
     (0 to 1, 1 best) and ``normalized_means``. When ``comparable`` is false the two sides used
-    different formulas: report no change between them and give ``incomparable_reason``.
+    different formulas: report no change between them and give ``incomparable_reason``; each side's
+    ``composite_weights`` shows the formula it used. ``aggregates`` gives each Metric over every Session
+    a side scored, not just the paired test cases: each side's whole-run entry (a Score's ``mean``, a
+    Label's ``shares``), ``delta``, ``share_deltas`` for a Label and ``change``. Empty until a side's
+    scoring runs end.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
@@ -767,7 +771,8 @@ async def update_dataset(*, client: AsyncClientProtocol, workspace: str, dataset
 async def delete_dataset(*, client: AsyncClientProtocol, workspace: str, dataset_id: str) -> str:
     """Deletes a Dataset and all its test cases. This cannot be undone: get a yes first.
 
-    Experiments that used the Dataset keep their results but lose the link to it.
+    Experiments that used the Dataset keep their results but lose the link to it. hub-api refuses with a
+    message while a Service's gate replays the Dataset.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
@@ -1107,7 +1112,7 @@ async def delete_metric_group(*, client: AsyncClientProtocol, workspace: str, me
     """Deletes a Metric Group together with all its scoring runs. This cannot be undone: get a yes first.
 
     The Evaluators themselves stay. hub-api refuses with a message while an optimization goal judges
-    with the group; change the goal first.
+    with the group or a Service's gate checks it; change that first.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.

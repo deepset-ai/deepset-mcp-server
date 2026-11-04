@@ -107,16 +107,53 @@ _NORMALIZED_MEANS = (
 )
 
 
-class ScoreAggregate(BaseModel):
-    """Stub."""
+class SessionCounts(BaseModel):
+    """How a run's Sessions fared on one Metric."""
 
-    mean: float | None = None
+    valued: int = Field(default=0, description="Sessions with a value")
+    not_applicable: int = 0
+    unusable: int = Field(default=0, description="Sessions whose values the Metric's declaration cannot fold")
+    errored: int = Field(default=0, description="Sessions the Evaluator's own code broke on")
+    failed: int = Field(default=0, description="Sessions whose evaluation never completed. Retryable.")
+    pending: int = Field(default=0, description="Sessions still being judged")
 
 
-class LabelAggregate(BaseModel):
-    """Stub."""
+class _MetricAggregateBase(BaseModel):
+    evaluator_id: str = Field(description=_EVALUATOR_ID)
+    metric_key: str = Field(description=_METRIC_KEY)
+    evaluator_version_ids: list[str] = Field(default_factory=list)
+    sessions: SessionCounts = Field(default_factory=SessionCounts)
+    coverage: float | None = Field(
+        default=None, description="Share of judged Sessions with a value. Null when nothing was judged."
+    )
 
-    shares: dict[str, float] | None = None
+
+class ScoreAggregate(_MetricAggregateBase):
+    """A Score Metric over a whole run."""
+
+    shape: Literal["score"] = "score"
+    mean: float | None = Field(default=None, description="The mean of each Session's mean, in the declared units")
+    better: Better | None = Field(default=None, description=_BETTER)
+    range: list[float] | None = Field(default=None, description="The declared [min, max]")
+
+
+class LabelAggregate(_MetricAggregateBase):
+    """A Label Metric over a whole run."""
+
+    shape: Literal["label"] = "label"
+    shares: dict[str, float] | None = Field(
+        default=None, description="Each label's average share of a Session's values. Null when no Session has one."
+    )
+    vocabulary: list[str] | None = Field(default=None, description="The declared labels. Null for an open Label.")
+
+
+class MixedAggregate(_MetricAggregateBase):
+    """A Metric whose versions or values disagree on its shape, so it has no whole-run value."""
+
+    shape: Literal["mixed"] = "mixed"
+
+
+MetricAggregate = Annotated[ScoreAggregate | LabelAggregate | MixedAggregate, Field(discriminator="shape")]
 
 
 class MetricDeclaration(BaseModel):
@@ -502,6 +539,13 @@ class ExperimentSideHeadline(BaseModel):
             "'missing' it says why there is none, for example the side is not scored yet."
         )
     )
+    composite_weights: list[CompositeWeight] = Field(
+        default_factory=list,
+        description=(
+            "The formula the side's scoring run started with: what its Composite weighs. Empty when the side "
+            "has no single scored run, or the run weighed nothing."
+        ),
+    )
 
 
 class ExperimentHeadline(BaseModel):
@@ -522,6 +566,31 @@ class ExperimentHeadline(BaseModel):
     )
 
 
+class ExperimentAggregate(BaseModel):
+    """One Metric over every Session each side scored, and how the candidate moved it."""
+
+    evaluator_id: str = Field(description=_EVALUATOR_ID)
+    metric_key: str = Field(description=_METRIC_KEY)
+    shape: Literal["score", "label", "mixed"]
+    candidate: MetricAggregate | None = Field(
+        default=None, description="Null until the candidate's scoring run ends, or when it does not report the Metric"
+    )
+    baseline: MetricAggregate | None = Field(
+        default=None, description="Null until the baseline's scoring runs end, or when it does not report the Metric"
+    )
+    delta: float | None = Field(
+        default=None,
+        description=(
+            "Candidate minus baseline: a Score's mean, or a Label's Normalized mean on its Scale. Null when a side "
+            "has no value, the shapes differ, or the Label has no Scale."
+        ),
+    )
+    share_deltas: dict[str, float] | None = Field(
+        default=None, description="For a Label on both sides, each label's share on the candidate minus the baseline's"
+    )
+    change: Change = Field(default="unknown", description=_CHANGE)
+
+
 class ExperimentResults(BaseModel):
     """An Experiment's results so far, as the API returns them. Partial while either side is still scoring."""
 
@@ -537,6 +606,13 @@ class ExperimentResults(BaseModel):
         description=(
             "Each side's Normalized means and Composite, so the two sides compare on one number when "
             "`comparable` is true. Null from an API that predates it."
+        ),
+    )
+    aggregates: list[ExperimentAggregate] = Field(
+        default_factory=list,
+        description=(
+            "Every Metric over all Sessions of each side, unpaired, ordered by Evaluator id then Metric key. "
+            "Empty until a side's scoring runs end."
         ),
     )
 
@@ -801,9 +877,9 @@ class SessionReplayRun(BaseModel):
     """A session replay run, as hub-api returns it."""
 
     session_replay_run_id: str
-    pipeline_version_id: str
+    pipeline_version_id: str | None = Field(default=None, description="Null when no pipeline version was replayed")
     status: str = Field(description="CREATED, STARTED, ENDED or FAILED")
-    source_session_id: str
+    source_session_id: str | None = Field(default=None, description="Null for a test case that sends inputs")
     replay_mode: str | None = None
     trace_ids: list[str] = Field(default_factory=list, description="The traces the replay produced, in order")
     error_detail: dict[str, Any] | None = None
@@ -816,11 +892,11 @@ class SessionReplayReport(BaseModel):
         description="ENDED or FAILED once done; CREATED or STARTED: poll get_session_replay with replay_run_id"
     )
     replay_run_id: str
-    source_session_id: str
+    source_session_id: str | None = Field(default=None, description="Null for a test case that sends inputs")
     replayed_session_id: str | None = Field(
         default=None, description="The new Session the replay produced; pass it to try_evaluator"
     )
-    pipeline_version_id: str
+    pipeline_version_id: str | None = None
     replay_mode: str | None = Field(
         default=None, description="FIRST_USER_MESSAGE replays the first turn only; ALL_USER_MESSAGES every turn"
     )
