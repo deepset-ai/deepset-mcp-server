@@ -250,6 +250,7 @@ def grid() -> ExperimentRunGrid:
             "rows": [
                 {
                     "session_id": SESSION_A,
+                    "session_replay_run_id": REPLAY_RUN_ID,
                     "cells": [
                         cell(
                             E1,
@@ -762,6 +763,20 @@ async def test_get_experiment_run_flattens_cells_and_caps_rows() -> None:
     assert judged.metrics[2].rationale == "The reply asks the question back."
     assert broken.outcome == "ERRORED"
     assert broken.error_detail == {"type": "KeyError", "message": "'replies'", "stacktrace": []}
+
+
+@pytest.mark.asyncio
+async def test_get_experiment_run_rows_name_the_replay_that_produced_the_session() -> None:
+    report = await get_experiment_run(
+        client=FakeClient(FakeEvaluationResource()),
+        workspace=WORKSPACE,
+        pipeline_name=PIPELINE,
+        metric_group_id=METRIC_GROUP_ID,
+        run_id=RUN_ID,
+    )
+
+    assert isinstance(report, ExperimentRunReport)
+    assert [row.session_replay_run_id for row in report.rows] == [REPLAY_RUN_ID, None]
 
 
 @pytest.mark.asyncio
