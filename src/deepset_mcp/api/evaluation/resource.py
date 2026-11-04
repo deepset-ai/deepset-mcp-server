@@ -29,18 +29,13 @@ from deepset_mcp.api.evaluation.models import (
     MetricGroup,
     MetricWeight,
     NewTestCase,
-    ReplaySuite,
-    ReplaySuiteAccepted,
-    ReplaySuiteSummary,
     SessionList,
-    SessionReplayRun,
     SessionWindow,
     TestCase,
     TryState,
 )
 from deepset_mcp.api.evaluation.protocols import EvaluationResourceProtocol
 from deepset_mcp.api.exceptions import UnexpectedAPIError
-from deepset_mcp.api.search_history.models import PipelineTraceEntry
 from deepset_mcp.api.transport import raise_for_status
 
 if TYPE_CHECKING:
@@ -631,138 +626,6 @@ class EvaluationResource(EvaluationResourceProtocol):
             return TryState(status="EXPIRED")
         raise_for_status(resp)
         return TryState(status="READY", result=EvaluationTryResult.model_validate(resp.json))
-
-    async def start_session_replay(
-        self,
-        pipeline_name: str,
-        session_id: str,
-        pipeline_version_id: str,
-        replay_mode: str | None = None,
-        setup_source: str | None = None,
-        cleanup_source: str | None = None,
-    ) -> str:
-        """Start replaying a Session against a pipeline version, a draft included.
-
-        :param pipeline_name: Name of the pipeline.
-        :param session_id: The Session to replay.
-        :param pipeline_version_id: The pipeline version to replay it against.
-        :param replay_mode: FIRST_USER_MESSAGE or ALL_USER_MESSAGES; omitted, the server's default.
-        :param setup_source: Python source run before the pipeline; omitted, no setup step.
-        :param cleanup_source: Python source run after the pipeline; omitted, no cleanup step.
-        :returns: The replay run id to poll.
-        """
-        body = {"session_id": session_id, "pipeline_version_id": pipeline_version_id}
-        optional = {"replay_mode": replay_mode, "setup_source": setup_source, "cleanup_source": cleanup_source}
-        body.update({k: v for k, v in optional.items() if v is not None})
-        data = await self._post(await self._pipeline_path(pipeline_name, "replay-runs"), body)
-        return str(data["session_replay_run_id"])
-
-    async def get_session_replay(self, pipeline_name: str, replay_run_id: str) -> SessionReplayRun:
-        """Read a session replay run.
-
-        :param pipeline_name: Name of the pipeline.
-        :param replay_run_id: The id `start_session_replay` returned.
-        :returns: The run.
-        """
-        path = await self._pipeline_path(pipeline_name, "replay-runs", replay_run_id)
-        return SessionReplayRun.model_validate(await self._get(path))
-
-    async def list_session_replays(self, pipeline_name: str, limit: int = 50) -> list[SessionReplayRun]:
-        """List a pipeline's replay runs, newest first.
-
-        :param pipeline_name: Name of the pipeline.
-        :param limit: Maximum number of runs to return (the API caps it at 200).
-        :returns: The runs.
-        """
-        path = await self._pipeline_path(pipeline_name, "replay-runs")
-        return [SessionReplayRun.model_validate(item) for item in await self._get(path, {"limit": limit}) or []]
-
-    async def start_replay_suite(
-        self,
-        pipeline_name: str,
-        dataset_id: str,
-        pipeline_version_id: str,
-        repetitions: int = 1,
-        replay_mode: str = "FIRST_USER_MESSAGE",
-        metric_group_id: str | None = None,
-        reuse: str | None = None,
-    ) -> ReplaySuiteAccepted:
-        """Replay every test case of a Dataset on a pipeline version, optionally scoring it afterwards.
-
-        :param pipeline_name: Name of the pipeline.
-        :param dataset_id: The Dataset whose test cases to replay.
-        :param pipeline_version_id: The version to replay on.
-        :param repetitions: How many times to replay each test case.
-        :param replay_mode: FIRST_USER_MESSAGE or ALL_USER_MESSAGES.
-        :param metric_group_id: A Metric Group to score both the source and the replayed Sessions with.
-        :param reuse: With a Metric Group, RERUN_ALL or REUSE_SUCCEEDED; omitted, the server's default.
-        :returns: The queued suite.
-        """
-        body: dict[str, Any] = {
-            "session_replay_dataset_id": dataset_id,
-            "pipeline_version_id": pipeline_version_id,
-            "repetitions": repetitions,
-            "replay_mode": replay_mode,
-        }
-        if metric_group_id is not None:
-            # hub-api calls a Metric Group a pipeline experiment.
-            body["experiment"] = {"pipeline_experiment_id": metric_group_id}
-            if reuse is not None:
-                body["experiment"]["reuse"] = reuse
-        data = await self._post(await self._pipeline_path(pipeline_name, "replay-suites"), body)
-        return ReplaySuiteAccepted.model_validate(data)
-
-    async def list_replay_suites(self, pipeline_name: str, limit: int = 50) -> list[ReplaySuiteSummary]:
-        """List a pipeline's Replay Suites, newest first, without their runs.
-
-        :param pipeline_name: Name of the pipeline.
-        :param limit: Maximum number of suites to return (the API caps it at 200).
-        :returns: The suites.
-        """
-        path = await self._pipeline_path(pipeline_name, "replay-suites")
-        return [ReplaySuiteSummary.model_validate(item) for item in await self._get(path, {"limit": limit}) or []]
-
-    async def get_replay_suite(self, pipeline_name: str, suite_id: str) -> ReplaySuite:
-        """Fetch one Replay Suite with every run.
-
-        :param pipeline_name: Name of the pipeline.
-        :param suite_id: The suite's id.
-        :returns: The suite.
-        """
-        path = await self._pipeline_path(pipeline_name, "replay-suites", suite_id)
-        return ReplaySuite.model_validate(await self._get(path))
-
-    async def list_imported_session_traces(self, session_id: str) -> list[PipelineTraceEntry]:
-        """List every turn of an imported Session, oldest first, with spans (component-type tags only).
-
-        :param session_id: The imported Session's id.
-        :returns: The turns.
-        """
-        path = await self._workspace_path("imported-sessions", session_id, "traces")
-        return [PipelineTraceEntry.model_validate(item) for item in await self._get(path) or []]
-
-    async def get_imported_session_trace(self, session_id: str, query_id: str) -> PipelineTraceEntry:
-        """Fetch one turn of an imported Session with spans (component-type tags only).
-
-        :param session_id: The imported Session's id.
-        :param query_id: The turn's id.
-        :returns: The turn.
-        """
-        path = await self._workspace_path("imported-sessions", session_id, "traces", query_id)
-        return PipelineTraceEntry.model_validate(await self._get(path))
-
-    async def get_imported_session_trace_span_tags(
-        self, session_id: str, query_id: str, span_id: str
-    ) -> dict[str, Any]:
-        """Fetch every tag of one span of an imported Session's turn, inputs and outputs included.
-
-        :param session_id: The imported Session's id.
-        :param query_id: The turn's id.
-        :param span_id: The span's id.
-        :returns: The span's tags.
-        """
-        path = await self._workspace_path("imported-sessions", session_id, "traces", query_id, "tags", span_id)
-        return dict(await self._get(path) or {})
 
     async def list_datasets(self, pipeline_name: str | None = None, limit: int = 50) -> list[DatasetSummary]:
         """List the workspace's Datasets without their test cases, newest first.

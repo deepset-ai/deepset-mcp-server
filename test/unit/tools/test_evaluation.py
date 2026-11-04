@@ -35,13 +35,8 @@ from deepset_mcp.api.evaluation.models import (
     NoComposite,
     NoNormalizedMean,
     NormalizedMean,
-    ReplaySuite,
-    ReplaySuiteAccepted,
-    ReplaySuiteSummary,
     ScoreAggregate,
     SessionList,
-    SessionReplayReport,
-    SessionReplayRun,
     SessionWindow,
     TestCase,
     TryReport,
@@ -49,8 +44,6 @@ from deepset_mcp.api.evaluation.models import (
 )
 from deepset_mcp.api.evaluation.protocols import EvaluationResourceProtocol
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.search_history.models import PipelineTraceEntry, PipelineTraceSummary
-from deepset_mcp.api.shared_models import PaginatedResponse
 from deepset_mcp.tools import evaluation as evaluation_tools
 from deepset_mcp.tools.evaluation import (
     add_test_cases,
@@ -70,29 +63,20 @@ from deepset_mcp.tools.evaluation import (
     get_experiment,
     get_experiment_results,
     get_experiment_run,
-    get_imported_session_trace,
-    get_imported_session_trace_span_tags,
-    get_replay_suite,
-    get_session_replay,
     list_datasets,
     list_evaluation_runs,
     list_evaluator_templates,
     list_evaluators,
     list_experiment_runs,
     list_experiments,
-    list_imported_session_traces,
     list_metric_groups,
-    list_replay_suites,
-    list_session_replays,
     list_sessions,
     remove_test_cases,
-    replay_session,
     rerun_failed_experiment,
     rescore_experiment,
     run_evaluator,
     set_evaluator_archived,
     start_experiment_run,
-    start_replay_suite,
     try_evaluator,
     update_dataset,
     update_evaluator,
@@ -313,60 +297,6 @@ def grid() -> ExperimentRunGrid:
     )
 
 
-SUITE_ID = "dddddddd-1111-2222-3333-555555555555"
-IMPORTED_SESSION_ID = "eeeeeeee-1111-2222-3333-555555555555"
-IMPORTED_QUERY_ID = "ffffffff-1111-2222-3333-555555555555"
-IMPORTED_SPAN_ID = "abababab-1111-2222-3333-555555555555"
-
-
-def suite_dict() -> dict[str, Any]:
-    return {
-        "session_replay_suite_id": SUITE_ID,
-        "pipeline_version_id": "88888888-8888-8888-8888-888888888888",
-        "test_case_count": 1,
-        "repetitions": 2,
-        "status": "ENDED",
-        "run_counts": {"ended": 1, "failed": 1},
-        "experiment": {"pipeline_experiment_id": METRIC_GROUP_ID, "source_experiment_run_id": RUN_ID},
-        "created_at": "2026-10-07T00:00:00Z",
-        "test_cases": [
-            {
-                "session_replay_test_case_id": "cccccccc-1111-2222-3333-444444444444",
-                "name": "Order status",
-                "runs": [
-                    {
-                        "session_replay_run_id": "77777777-7777-7777-7777-777777777777",
-                        "status": "FAILED",
-                        "repetition": 2,
-                    }
-                ],
-            }
-        ],
-    }
-
-
-def imported_turn_dict() -> dict[str, Any]:
-    return {
-        "query_id": IMPORTED_QUERY_ID,
-        "query": "who wrote Dune?",
-        "duration_s": 1.5,
-        "created_at": "2026-10-07T00:00:00Z",
-        "haystack_trace": {
-            "schema_version": "haystack-trace/v1",
-            "run_id": RUN_ID,
-            "started_at": "2026-10-07T00:00:00Z",
-            "traces": [
-                {
-                    "span_id": IMPORTED_SPAN_ID,
-                    "operation_name": "haystack.component.run",
-                    "start_time": "2026-10-07T00:00:00Z",
-                    "tags": {"haystack.component.type": "Retriever"},
-                }
-            ],
-        },
-    }
-
-
 class FakeEvaluationResource(EvaluationResourceProtocol):
     """Answers reads with fixtures, and each check poll with the next state in line, then the last."""
 
@@ -374,7 +304,6 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
         self,
         error: Exception | None = None,
         try_states: list[TryState] | None = None,
-        replay_states: list[SessionReplayRun] | None = None,
         results: dict[str, Any] | None = None,
         weights: list[dict[str, Any]] | None = None,
         run_grid: ExperimentRunGrid | None = None,
@@ -387,7 +316,6 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
         self.results = results
         self.calls: list[tuple[str, dict[str, Any]]] = []
         self.try_states = try_states or []
-        self.replay_states = replay_states or []
 
     def _record(self, name: str, /, **kwargs: Any) -> None:
         self.calls.append((name, kwargs))
@@ -585,76 +513,6 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
     async def get_try(self, pipeline_name: str, try_id: str) -> TryState:
         self._record("get_try", try_id=try_id)
         return self.try_states.pop(0) if len(self.try_states) > 1 else self.try_states[0]
-
-    async def start_session_replay(
-        self,
-        pipeline_name: str,
-        session_id: str,
-        pipeline_version_id: str,
-        replay_mode: str | None = None,
-        setup_source: str | None = None,
-        cleanup_source: str | None = None,
-    ) -> str:
-        self._record(
-            "start_session_replay",
-            session_id=session_id,
-            pipeline_version_id=pipeline_version_id,
-            replay_mode=replay_mode,
-            setup_source=setup_source,
-            cleanup_source=cleanup_source,
-        )
-        return REPLAY_RUN_ID
-
-    async def get_session_replay(self, pipeline_name: str, replay_run_id: str) -> SessionReplayRun:
-        self._record("get_session_replay", replay_run_id=replay_run_id)
-        return self.replay_states.pop(0) if len(self.replay_states) > 1 else self.replay_states[0]
-
-    async def list_session_replays(self, pipeline_name: str, limit: int = 50) -> list[SessionReplayRun]:
-        self._record("list_session_replays", pipeline_name=pipeline_name, limit=limit)
-        return [replay_run("ENDED")]
-
-    async def start_replay_suite(
-        self,
-        pipeline_name: str,
-        dataset_id: str,
-        pipeline_version_id: str,
-        repetitions: int = 1,
-        replay_mode: str = "FIRST_USER_MESSAGE",
-        metric_group_id: str | None = None,
-        reuse: str | None = None,
-    ) -> ReplaySuiteAccepted:
-        self._record(
-            "start_replay_suite",
-            dataset_id=dataset_id,
-            pipeline_version_id=pipeline_version_id,
-            repetitions=repetitions,
-            replay_mode=replay_mode,
-            metric_group_id=metric_group_id,
-            reuse=reuse,
-        )
-        return ReplaySuiteAccepted.model_validate({"session_replay_suite_id": SUITE_ID, "run_count": 6})
-
-    async def list_replay_suites(self, pipeline_name: str, limit: int = 50) -> list[ReplaySuiteSummary]:
-        self._record("list_replay_suites", pipeline_name=pipeline_name, limit=limit)
-        return [ReplaySuiteSummary.model_validate(suite_dict())]
-
-    async def get_replay_suite(self, pipeline_name: str, suite_id: str) -> ReplaySuite:
-        self._record("get_replay_suite", suite_id=suite_id)
-        return ReplaySuite.model_validate(suite_dict())
-
-    async def list_imported_session_traces(self, session_id: str) -> list[PipelineTraceEntry]:
-        self._record("list_imported_session_traces", session_id=session_id)
-        return [PipelineTraceEntry.model_validate(imported_turn_dict())]
-
-    async def get_imported_session_trace(self, session_id: str, query_id: str) -> PipelineTraceEntry:
-        self._record("get_imported_session_trace", session_id=session_id, query_id=query_id)
-        return PipelineTraceEntry.model_validate(imported_turn_dict())
-
-    async def get_imported_session_trace_span_tags(
-        self, session_id: str, query_id: str, span_id: str
-    ) -> dict[str, Any]:
-        self._record("get_imported_session_trace_span_tags", session_id=session_id, query_id=query_id, span_id=span_id)
-        return {"haystack.component.input": {"query": "x"}}
 
     async def list_datasets(self, pipeline_name: str | None = None, limit: int = 50) -> list[DatasetSummary]:
         self._record("list_datasets", pipeline_name=pipeline_name, limit=limit)
@@ -1041,14 +899,11 @@ async def test_errors_come_back_as_readable_strings(error: Exception, expected: 
 
 
 # ---------------------------------------------------------------------------------------------
-# Checks: the try and session replay
+# Checks: the try
 # ---------------------------------------------------------------------------------------------
 
 TRY_ID = "signed-try-id"
-REPLAY_RUN_ID = "77777777-7777-7777-7777-777777777777"
 DRAFT_VERSION_ID = "88888888-8888-8888-8888-888888888888"
-REPLAYED_QUERY_ID = "99999999-9999-9999-9999-999999999990"
-REPLAYED_SESSION_ID = "99999999-9999-9999-9999-999999999991"
 
 
 def try_result(**overrides: Any) -> EvaluationTryResult:
@@ -1071,46 +926,6 @@ def try_result(**overrides: Any) -> EvaluationTryResult:
     )
 
 
-def replay_run(status: str, trace_ids: list[str] | None = None) -> SessionReplayRun:
-    return SessionReplayRun.model_validate(
-        {
-            "session_replay_run_id": REPLAY_RUN_ID,
-            "pipeline_version_id": DRAFT_VERSION_ID,
-            "status": status,
-            "source_session_id": SESSION_A,
-            "trace_ids": trace_ids if trace_ids is not None else [],
-        }
-    )
-
-
-class FakeTraces:
-    def __init__(self, search_session_id: str | None) -> None:
-        self.search_session_id = search_session_id
-        self.filters: list[str | None] = []
-
-    async def list_pipeline_traces(
-        self, pipeline_name: str, limit: int = 10, query_filter: str | None = None, **_: Any
-    ) -> Any:
-        self.filters.append(query_filter)
-        row = {
-            "query_id": REPLAYED_QUERY_ID,
-            "query": "who wrote Dune?",
-            "duration_s": 1.0,
-            "created_at": "2026-10-07T00:00:00Z",
-            "search_session_id": self.search_session_id,
-        }
-        return PaginatedResponse[PipelineTraceSummary](data=[PipelineTraceSummary.model_validate(row)], has_more=False)
-
-
-class FakeCheckClient(FakeClient):
-    def __init__(self, evaluation_resource: FakeEvaluationResource, traces: FakeTraces | None = None) -> None:
-        super().__init__(evaluation_resource)
-        self.traces = traces or FakeTraces(REPLAYED_SESSION_ID)
-
-    def search_history(self, workspace: str) -> FakeTraces:  # type: ignore[override]
-        return self.traces
-
-
 @pytest.fixture(autouse=True)
 def no_poll_delay(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(evaluation_tools, "POLL_INTERVAL_SECONDS", 0)
@@ -1123,7 +938,7 @@ async def test_try_evaluator_polls_until_ready_and_keeps_only_a_summary_of_the_j
     )
 
     report = await try_evaluator(
-        client=FakeCheckClient(resource),
+        client=FakeClient(resource),
         workspace=WORKSPACE,
         pipeline_name=PIPELINE,
         python_code="def evaluate(session, focus): ...",
@@ -1145,7 +960,7 @@ async def test_try_evaluator_hands_back_the_id_when_the_wait_runs_out() -> None:
     resource = FakeEvaluationResource(try_states=[TryState(status="RUNNING")])
 
     report = await try_evaluator(
-        client=FakeCheckClient(resource),
+        client=FakeClient(resource),
         workspace=WORKSPACE,
         pipeline_name=PIPELINE,
         python_code="def evaluate(session, focus): ...",
@@ -1162,74 +977,11 @@ async def test_get_evaluation_try_says_an_expired_try_must_run_again() -> None:
     resource = FakeEvaluationResource(try_states=[TryState(status="EXPIRED")])
 
     report = await get_evaluation_try(
-        client=FakeCheckClient(resource), workspace=WORKSPACE, pipeline_name=PIPELINE, try_id=TRY_ID
+        client=FakeClient(resource), workspace=WORKSPACE, pipeline_name=PIPELINE, try_id=TRY_ID
     )
 
     assert isinstance(report, TryReport)
     assert report.status == "EXPIRED"
-
-
-@pytest.mark.asyncio
-async def test_replay_session_polls_until_ended_and_names_the_replayed_session() -> None:
-    traces = FakeTraces(REPLAYED_SESSION_ID)
-    resource = FakeEvaluationResource(
-        replay_states=[replay_run("STARTED"), replay_run("ENDED", trace_ids=[REPLAYED_QUERY_ID])]
-    )
-
-    report = await replay_session(
-        client=FakeCheckClient(resource, traces),
-        workspace=WORKSPACE,
-        pipeline_name=PIPELINE,
-        session_id=SESSION_A,
-        pipeline_version_id=DRAFT_VERSION_ID,
-        replay_mode="ALL_USER_MESSAGES",
-    )
-
-    assert isinstance(report, SessionReplayReport)
-    assert (report.status, report.replay_run_id) == ("ENDED", REPLAY_RUN_ID)
-    assert (report.source_session_id, report.replayed_session_id) == (SESSION_A, REPLAYED_SESSION_ID)
-    assert traces.filters == [f"query_id eq '{REPLAYED_QUERY_ID}'"]
-    assert resource.calls[0] == (
-        "start_session_replay",
-        {
-            "session_id": SESSION_A,
-            "pipeline_version_id": DRAFT_VERSION_ID,
-            "replay_mode": "ALL_USER_MESSAGES",
-            "setup_source": None,
-            "cleanup_source": None,
-        },
-    )
-
-
-@pytest.mark.asyncio
-async def test_a_replay_without_a_search_session_is_named_by_its_query_id() -> None:
-    resource = FakeEvaluationResource(replay_states=[replay_run("ENDED", trace_ids=[REPLAYED_QUERY_ID])])
-
-    report = await get_session_replay(
-        client=FakeCheckClient(resource, FakeTraces(None)),
-        workspace=WORKSPACE,
-        pipeline_name=PIPELINE,
-        replay_run_id=REPLAY_RUN_ID,
-    )
-
-    assert isinstance(report, SessionReplayReport)
-    assert report.replayed_session_id == REPLAYED_QUERY_ID
-
-
-@pytest.mark.asyncio
-async def test_a_failed_replay_names_no_session() -> None:
-    resource = FakeEvaluationResource(replay_states=[replay_run("FAILED")])
-
-    report = await replay_session(
-        client=FakeCheckClient(resource),
-        workspace=WORKSPACE,
-        pipeline_name=PIPELINE,
-        session_id=SESSION_A,
-        pipeline_version_id=DRAFT_VERSION_ID,
-    )
-
-    assert isinstance(report, SessionReplayReport)
-    assert (report.status, report.replayed_session_id) == ("FAILED", None)
 
 
 @pytest.mark.asyncio
@@ -1242,23 +994,13 @@ async def test_a_failed_replay_names_no_session() -> None:
     ],
 )
 async def test_check_errors_come_back_as_readable_strings(error: Exception, expected: str) -> None:
-    client = FakeCheckClient(FakeEvaluationResource(error=error))
+    client = FakeClient(FakeEvaluationResource(error=error))
 
     results = [
         await try_evaluator(
             client=client, workspace=WORKSPACE, pipeline_name=PIPELINE, python_code="x", session_id=SESSION_A
         ),
         await get_evaluation_try(client=client, workspace=WORKSPACE, pipeline_name=PIPELINE, try_id=TRY_ID),
-        await replay_session(
-            client=client,
-            workspace=WORKSPACE,
-            pipeline_name=PIPELINE,
-            session_id=SESSION_A,
-            pipeline_version_id=DRAFT_VERSION_ID,
-        ),
-        await get_session_replay(
-            client=client, workspace=WORKSPACE, pipeline_name=PIPELINE, replay_run_id=REPLAY_RUN_ID
-        ),
     ]
 
     for result in results:
@@ -2184,167 +1926,6 @@ async def test_get_experiment_results_from_an_older_api_has_no_aggregates() -> N
 
 
 @pytest.mark.asyncio
-async def test_get_session_replay_reports_a_run_of_inputs_without_a_source_session_or_version() -> None:
-    run = SessionReplayRun.model_validate(
-        {
-            "session_replay_run_id": REPLAY_RUN_ID,
-            "pipeline_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-            "pipeline_version_id": None,
-            "pipeline_optimization_candidate_id": "dddddddd-1111-2222-3333-444444444444",
-            "status": "FAILED",
-            "source_session_id": None,
-            "inputs": {"query": "who wrote Dune?"},
-            "session_id": "eeeeeeee-1111-2222-3333-444444444444",
-            "trace_ids": [],
-            "created_at": "2026-10-07T00:00:00Z",
-        }
-    )
-
-    report = await get_session_replay(
-        client=FakeCheckClient(FakeEvaluationResource(replay_states=[run])),
-        workspace=WORKSPACE,
-        pipeline_name=PIPELINE,
-        replay_run_id=REPLAY_RUN_ID,
-    )
-
-    assert isinstance(report, SessionReplayReport)
-    assert (report.status, report.source_session_id, report.pipeline_version_id) == ("FAILED", None, None)
-
-
-@pytest.mark.asyncio
-async def test_list_session_replays_returns_the_runs() -> None:
-    resource = FakeEvaluationResource()
-
-    runs = await list_session_replays(client=FakeClient(resource), workspace=WORKSPACE, pipeline_name=PIPELINE, limit=5)
-
-    assert isinstance(runs, list)
-    assert runs[0].session_replay_run_id == REPLAY_RUN_ID
-    assert resource.calls == [("list_session_replays", {"pipeline_name": PIPELINE, "limit": 5})]
-
-
-@pytest.mark.asyncio
-async def test_start_replay_suite_hands_back_the_suite_without_waiting() -> None:
-    resource = FakeEvaluationResource()
-
-    accepted = await start_replay_suite(
-        client=FakeClient(resource),
-        workspace=WORKSPACE,
-        pipeline_name=PIPELINE,
-        dataset_id="bbbbbbbb-1111-2222-3333-444444444444",
-        pipeline_version_id=DRAFT_VERSION_ID,
-        repetitions=3,
-        metric_group_id=METRIC_GROUP_ID,
-        reuse="REUSE_SUCCEEDED",
-    )
-
-    assert isinstance(accepted, ReplaySuiteAccepted)
-    assert (accepted.suite_id, accepted.run_count) == (SUITE_ID, 6)
-    assert resource.calls == [
-        (
-            "start_replay_suite",
-            {
-                "dataset_id": "bbbbbbbb-1111-2222-3333-444444444444",
-                "pipeline_version_id": DRAFT_VERSION_ID,
-                "repetitions": 3,
-                "replay_mode": "FIRST_USER_MESSAGE",
-                "metric_group_id": METRIC_GROUP_ID,
-                "reuse": "REUSE_SUCCEEDED",
-            },
-        )
-    ]
-
-
-@pytest.mark.asyncio
-async def test_reuse_without_a_metric_group_is_refused_before_any_replay_starts() -> None:
-    resource = FakeEvaluationResource()
-
-    result = await start_replay_suite(
-        client=FakeClient(resource),
-        workspace=WORKSPACE,
-        pipeline_name=PIPELINE,
-        dataset_id="bbbbbbbb-1111-2222-3333-444444444444",
-        pipeline_version_id=DRAFT_VERSION_ID,
-        reuse="RERUN_ALL",
-    )
-
-    assert isinstance(result, str)
-    assert "metric_group_id" in result
-    assert resource.calls == []
-
-
-@pytest.mark.asyncio
-async def test_list_and_get_replay_suite_return_the_suite_with_its_counts_and_runs() -> None:
-    client = FakeClient(FakeEvaluationResource())
-
-    suites = await list_replay_suites(client=client, workspace=WORKSPACE, pipeline_name=PIPELINE)
-    suite = await get_replay_suite(client=client, workspace=WORKSPACE, pipeline_name=PIPELINE, suite_id=SUITE_ID)
-
-    assert isinstance(suites, list)
-    assert suites[0].run_counts.failed == 1
-    assert isinstance(suite, ReplaySuite)
-    assert suite.test_cases[0].runs[0].repetition == 2
-
-
-@pytest.mark.asyncio
-async def test_imported_session_traces_read_like_pipeline_traces() -> None:
-    resource = FakeEvaluationResource()
-    client = FakeClient(resource)
-
-    turns = await list_imported_session_traces(client=client, workspace=WORKSPACE, session_id=IMPORTED_SESSION_ID)
-    turn = await get_imported_session_trace(
-        client=client, workspace=WORKSPACE, session_id=IMPORTED_SESSION_ID, query_id=IMPORTED_QUERY_ID
-    )
-    tags = await get_imported_session_trace_span_tags(
-        client=client,
-        workspace=WORKSPACE,
-        session_id=IMPORTED_SESSION_ID,
-        query_id=IMPORTED_QUERY_ID,
-        span_id=IMPORTED_SPAN_ID,
-    )
-
-    assert isinstance(turns, list)
-    assert isinstance(turn, PipelineTraceEntry)
-    assert turns[0].query_id == turn.query_id == IMPORTED_QUERY_ID
-    assert tags == {"haystack.component.input": {"query": "x"}}
-    assert [name for name, _ in resource.calls] == [
-        "list_imported_session_traces",
-        "get_imported_session_trace",
-        "get_imported_session_trace_span_tags",
-    ]
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("error", "expected"),
-    [
-        (ResourceNotFoundError(), "not found"),
-        (BadRequestError(message="bad"), "Failed"),
-        (UnexpectedAPIError(status_code=503, message="queue down"), "Failed"),
-    ],
-)
-async def test_replay_suite_and_imported_trace_errors_come_back_as_readable_strings(
-    error: Exception, expected: str
-) -> None:
-    client = FakeClient(FakeEvaluationResource(error=error))
-    base: dict[str, Any] = {"client": client, "workspace": WORKSPACE}
-    imported = {**base, "session_id": IMPORTED_SESSION_ID}
-
-    results = [
-        await list_session_replays(**base, pipeline_name=PIPELINE),
-        await start_replay_suite(**base, pipeline_name=PIPELINE, dataset_id="d", pipeline_version_id=DRAFT_VERSION_ID),
-        await list_replay_suites(**base, pipeline_name=PIPELINE),
-        await get_replay_suite(**base, pipeline_name=PIPELINE, suite_id=SUITE_ID),
-        await list_imported_session_traces(**imported),
-        await get_imported_session_trace(**imported, query_id=IMPORTED_QUERY_ID),
-        await get_imported_session_trace_span_tags(**imported, query_id=IMPORTED_QUERY_ID, span_id=IMPORTED_SPAN_ID),
-    ]
-
-    for result in results:
-        assert isinstance(result, str)
-        assert expected in result
-
-
-@pytest.mark.asyncio
 async def test_lists_without_paging_pass_the_limit_so_the_agent_can_raise_it_to_the_api_cap() -> None:
     resource = FakeEvaluationResource()
     client = FakeClient(resource)
@@ -2474,7 +2055,7 @@ async def test_try_evaluator_hands_the_chosen_test_case_to_the_try() -> None:
     resource = FakeEvaluationResource(try_states=[TryState(status="READY", result=None)])
 
     await try_evaluator(
-        client=FakeCheckClient(resource),
+        client=FakeClient(resource),
         workspace=WORKSPACE,
         pipeline_name=PIPELINE,
         python_code="code",
@@ -2483,24 +2064,6 @@ async def test_try_evaluator_hands_the_chosen_test_case_to_the_try() -> None:
     )
 
     assert resource.calls[0][1]["test_case_id"] == TEST_CASE_ID
-
-
-@pytest.mark.asyncio
-async def test_replay_session_forwards_setup_and_cleanup_source() -> None:
-    resource = FakeEvaluationResource(replay_states=[replay_run("FAILED")])
-
-    await replay_session(
-        client=FakeCheckClient(resource),
-        workspace=WORKSPACE,
-        pipeline_name=PIPELINE,
-        session_id=SESSION_A,
-        pipeline_version_id=DRAFT_VERSION_ID,
-        setup_source="def setup(): ...",
-        cleanup_source="def cleanup(state): ...",
-    )
-
-    kwargs = resource.calls[0][1]
-    assert (kwargs["setup_source"], kwargs["cleanup_source"]) == ("def setup(): ...", "def cleanup(state): ...")
 
 
 @pytest.mark.asyncio

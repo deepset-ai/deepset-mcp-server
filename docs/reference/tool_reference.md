@@ -133,15 +133,6 @@ draft/version history. Each deployment tracks its own history of served pipeline
 | `list_sessions` | required | explorable | List the Sessions of a pipeline that a scoring run can judge. |
 | `try_evaluator` | required | none | Try Evaluator source on one Session and return its Metrics; persists nothing. |
 | `get_evaluation_try` | required | none | Read a try that was still running. |
-| `replay_session` | required | none | Replay a Session against a pipeline version, a draft included, into a new Session. |
-| `get_session_replay` | required | none | Read a session replay that was still running. |
-| `list_session_replays` | required | explorable | List a pipeline's replay runs, newest first: single replays and the runs of Replay Suites. |
-| `start_replay_suite` | required | none | Replay every test case of a Dataset on one pipeline version, several times each (costs money; optionally scores afterwards with a Metric Group). |
-| `list_replay_suites` | required | explorable | List a pipeline's Replay Suites with their status and run counts. |
-| `get_replay_suite` | required | explorable | Read one Replay Suite with every run by test case and repetition, and its scoring runs. |
-| `list_imported_session_traces` | required | explorable | List every turn of an imported Dataset Session with its spans. |
-| `get_imported_session_trace` | required | explorable | Read one turn of an imported Session with its spans. |
-| `get_imported_session_trace_span_tags` | required | explorable | Read the tags of one span of an imported Session's turn, input and output included. |
 | `list_datasets` | required | explorable | List the workspace's Datasets (named lists of test cases), optionally only those on one pipeline. |
 | `get_dataset` | required | explorable | Fetch one Dataset with all its test cases. |
 | `create_dataset` | required | none | Create a Dataset, optionally with its first test cases (recorded Sessions or inputs). |

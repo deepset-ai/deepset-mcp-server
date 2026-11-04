@@ -24,16 +24,11 @@ from deepset_mcp.api.evaluation.models import (
     MetricGroup,
     MetricWeight,
     NewTestCase,
-    ReplaySuite,
-    ReplaySuiteAccepted,
-    ReplaySuiteSummary,
     SessionList,
-    SessionReplayRun,
     SessionWindow,
     TestCase,
     TryState,
 )
-from deepset_mcp.api.search_history.models import PipelineTraceEntry
 
 
 class EvaluationResourceProtocol(Protocol):
@@ -158,61 +153,6 @@ class EvaluationResourceProtocol(Protocol):
 
     async def get_try(self, pipeline_name: str, try_id: str) -> TryState:
         """Read an ad-hoc try."""
-        ...
-
-    async def start_session_replay(
-        self,
-        pipeline_name: str,
-        session_id: str,
-        pipeline_version_id: str,
-        replay_mode: str | None = None,
-        setup_source: str | None = None,
-        cleanup_source: str | None = None,
-    ) -> str:
-        """Start replaying a Session against a pipeline version."""
-        ...
-
-    async def get_session_replay(self, pipeline_name: str, replay_run_id: str) -> SessionReplayRun:
-        """Read a session replay run."""
-        ...
-
-    async def list_session_replays(self, pipeline_name: str, limit: int = 50) -> list[SessionReplayRun]:
-        """List a pipeline's replay runs, newest first."""
-        ...
-
-    async def start_replay_suite(
-        self,
-        pipeline_name: str,
-        dataset_id: str,
-        pipeline_version_id: str,
-        repetitions: int = 1,
-        replay_mode: str = "FIRST_USER_MESSAGE",
-        metric_group_id: str | None = None,
-        reuse: str | None = None,
-    ) -> ReplaySuiteAccepted:
-        """Replay every test case of a Dataset on a pipeline version, optionally scoring it afterwards."""
-        ...
-
-    async def list_replay_suites(self, pipeline_name: str, limit: int = 50) -> list[ReplaySuiteSummary]:
-        """List a pipeline's Replay Suites, newest first."""
-        ...
-
-    async def get_replay_suite(self, pipeline_name: str, suite_id: str) -> ReplaySuite:
-        """Fetch one Replay Suite with every run."""
-        ...
-
-    async def list_imported_session_traces(self, session_id: str) -> list[PipelineTraceEntry]:
-        """List every turn of an imported Session with its spans."""
-        ...
-
-    async def get_imported_session_trace(self, session_id: str, query_id: str) -> PipelineTraceEntry:
-        """Fetch one turn of an imported Session with its spans."""
-        ...
-
-    async def get_imported_session_trace_span_tags(
-        self, session_id: str, query_id: str, span_id: str
-    ) -> dict[str, Any]:
-        """Fetch every tag of one span of an imported Session's turn."""
         ...
 
     async def list_datasets(self, pipeline_name: str | None = None, limit: int = 50) -> list[DatasetSummary]:
