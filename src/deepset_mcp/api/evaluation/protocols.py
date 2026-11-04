@@ -2,9 +2,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-from typing import Protocol
+from typing import Any, Protocol
 
 from deepset_mcp.api.evaluation.models import (
+    Dataset,
+    DatasetSummary,
     Evaluator,
     EvaluatorVersion,
     Experiment,
@@ -12,8 +14,10 @@ from deepset_mcp.api.evaluation.models import (
     ExperimentRun,
     ExperimentRunGrid,
     MetricGroup,
+    NewTestCase,
     SessionList,
     SessionReplayRun,
+    TestCase,
     TryState,
 )
 
@@ -100,4 +104,44 @@ class EvaluationResourceProtocol(Protocol):
 
     async def get_session_replay(self, pipeline_name: str, replay_run_id: str) -> SessionReplayRun:
         """Read a session replay run."""
+        ...
+
+    async def list_datasets(self, pipeline_name: str | None = None, limit: int = 50) -> list[DatasetSummary]:
+        """List the workspace's Datasets, optionally only those with a test case on one pipeline."""
+        ...
+
+    async def get_dataset(self, dataset_id: str) -> Dataset:
+        """Fetch one Dataset with its test cases."""
+        ...
+
+    async def create_dataset(
+        self, name: str, pipeline_name: str | None = None, test_cases: list[NewTestCase] | None = None
+    ) -> Dataset:
+        """Create a Dataset, optionally with its first test cases."""
+        ...
+
+    async def update_dataset(self, dataset_id: str, name: str) -> Dataset:
+        """Rename a Dataset."""
+        ...
+
+    async def delete_dataset(self, dataset_id: str) -> None:
+        """Delete a Dataset and its test cases."""
+        ...
+
+    async def add_test_cases(
+        self, dataset_id: str, test_cases: list[NewTestCase], pipeline_name: str | None = None
+    ) -> Dataset:
+        """Append test cases to a Dataset."""
+        ...
+
+    async def copy_test_cases(self, dataset_id: str, test_case_ids: list[str]) -> Dataset:
+        """Copy existing test cases into a Dataset."""
+        ...
+
+    async def remove_test_cases(self, dataset_id: str, test_case_ids: list[str]) -> Dataset:
+        """Remove test cases from a Dataset."""
+        ...
+
+    async def update_test_case(self, dataset_id: str, test_case_id: str, changes: dict[str, Any]) -> TestCase:
+        """Change one test case; a field left out of ``changes`` is kept, one sent as None is removed."""
         ...

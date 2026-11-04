@@ -125,6 +125,15 @@ draft/version history. Each deployment tracks its own history of served pipeline
 | `get_evaluation_try` | required | none | Read a try that was still running. |
 | `replay_session` | required | none | Replay a Session against a pipeline version, a draft included, into a new Session. |
 | `get_session_replay` | required | none | Read a session replay that was still running. |
+| `list_datasets` | required | explorable | List the workspace's Datasets (named lists of test cases), optionally only those on one pipeline. |
+| `get_dataset` | required | explorable | Fetch one Dataset with all its test cases. |
+| `create_dataset` | required | none | Create a Dataset, optionally with its first test cases (recorded Sessions or inputs). |
+| `update_dataset` | required | none | Rename a Dataset. |
+| `delete_dataset` | required | none | Delete a Dataset and its test cases (destructive). |
+| `add_test_cases` | required | none | Add test cases to a Dataset. |
+| `update_test_case` | required | none | Change one test case's name, inputs, expected data or scripts. |
+| `copy_test_cases` | required | none | Copy test cases from any Dataset of the workspace into a Dataset. |
+| `remove_test_cases` | required | none | Remove test cases from a Dataset (destructive). |
 
 ### Cost
 

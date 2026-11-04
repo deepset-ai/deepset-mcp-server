@@ -9,6 +9,8 @@ from urllib.parse import quote
 
 from deepset_mcp.api import ids
 from deepset_mcp.api.evaluation.models import (
+    Dataset,
+    DatasetSummary,
     EvaluationTryResult,
     Evaluator,
     EvaluatorVersion,
@@ -17,8 +19,10 @@ from deepset_mcp.api.evaluation.models import (
     ExperimentRun,
     ExperimentRunGrid,
     MetricGroup,
+    NewTestCase,
     SessionList,
     SessionReplayRun,
+    TestCase,
     TryState,
 )
 from deepset_mcp.api.evaluation.protocols import EvaluationResourceProtocol
@@ -292,3 +296,88 @@ class EvaluationResource(EvaluationResourceProtocol):
         """
         path = await self._pipeline_path(pipeline_name, "replay-runs", replay_run_id)
         return SessionReplayRun.model_validate(await self._get(path))
+
+    async def list_datasets(self, pipeline_name: str | None = None, limit: int = 50) -> list[DatasetSummary]:
+        """List the workspace's Datasets without their test cases, newest first.
+
+        :param pipeline_name: Only Datasets with a test case on this pipeline, when given.
+        :param limit: Maximum number of Datasets to return (the API caps it at 200).
+        :returns: The Datasets.
+        """
+        raise NotImplementedError
+
+    async def get_dataset(self, dataset_id: str) -> Dataset:
+        """Fetch one Dataset with its test cases.
+
+        :param dataset_id: The Dataset's id.
+        :returns: The Dataset.
+        """
+        raise NotImplementedError
+
+    async def create_dataset(
+        self, name: str, pipeline_name: str | None = None, test_cases: list[NewTestCase] | None = None
+    ) -> Dataset:
+        """Create a Dataset, optionally with its first test cases. Replays nothing.
+
+        :param name: What the Dataset is called.
+        :param pipeline_name: The pipeline the test cases' Sessions were recorded on; needed for Sessions.
+        :param test_cases: The test cases to start with.
+        :returns: The created Dataset.
+        """
+        raise NotImplementedError
+
+    async def update_dataset(self, dataset_id: str, name: str) -> Dataset:
+        """Rename a Dataset.
+
+        :param dataset_id: The Dataset's id.
+        :param name: The new name.
+        :returns: The Dataset.
+        """
+        raise NotImplementedError
+
+    async def delete_dataset(self, dataset_id: str) -> None:
+        """Delete a Dataset and its test cases.
+
+        :param dataset_id: The Dataset's id.
+        """
+        raise NotImplementedError
+
+    async def add_test_cases(
+        self, dataset_id: str, test_cases: list[NewTestCase], pipeline_name: str | None = None
+    ) -> Dataset:
+        """Append test cases to a Dataset.
+
+        :param dataset_id: The Dataset's id.
+        :param test_cases: The test cases to add, in order.
+        :param pipeline_name: The pipeline the test cases' Sessions were recorded on; needed for Sessions.
+        :returns: The Dataset with all its test cases.
+        """
+        raise NotImplementedError
+
+    async def copy_test_cases(self, dataset_id: str, test_case_ids: list[str]) -> Dataset:
+        """Copy existing test cases, from any Dataset of the workspace, into a Dataset.
+
+        :param dataset_id: The Dataset to copy into.
+        :param test_case_ids: The test cases to copy, in order.
+        :returns: The Dataset with all its test cases.
+        """
+        raise NotImplementedError
+
+    async def remove_test_cases(self, dataset_id: str, test_case_ids: list[str]) -> Dataset:
+        """Remove test cases from a Dataset. Ids it does not hold are ignored.
+
+        :param dataset_id: The Dataset's id.
+        :param test_case_ids: The test cases to remove.
+        :returns: The Dataset with the test cases left.
+        """
+        raise NotImplementedError
+
+    async def update_test_case(self, dataset_id: str, test_case_id: str, changes: dict[str, Any]) -> TestCase:
+        """Change one test case. A field left out of ``changes`` is kept; one sent as None is removed.
+
+        :param dataset_id: The Dataset's id.
+        :param test_case_id: The test case's id.
+        :param changes: The fields to change: name, inputs, expected, setup_source, cleanup_source.
+        :returns: The test case.
+        """
+        raise NotImplementedError

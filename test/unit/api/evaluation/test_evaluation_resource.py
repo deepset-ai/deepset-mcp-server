@@ -10,6 +10,8 @@ from uuid import UUID
 import pytest
 
 from deepset_mcp.api.evaluation.models import (
+    Dataset,
+    DatasetSummary,
     Evaluator,
     EvaluatorVersion,
     Experiment,
@@ -17,7 +19,9 @@ from deepset_mcp.api.evaluation.models import (
     ExperimentRun,
     ExperimentRunGrid,
     MetricGroup,
+    NewTestCase,
     SessionList,
+    TestCase,
 )
 from deepset_mcp.api.evaluation.resource import EvaluationResource
 from deepset_mcp.api.exceptions import ResourceNotFoundError
@@ -45,6 +49,10 @@ METRIC_GROUPS = f"{EVALUATION}/metric-groups"
 EXPERIMENTS = f"{EVALUATION}/experiments"
 RUNS = f"{PIPELINE}/metric-groups/{METRIC_GROUP_ID}/scoring-runs"
 SESSIONS = f"{PIPELINE}/sessions"
+DATASETS = f"{EVALUATION}/datasets"
+DATASET_ID = "bbbbbbbb-1111-2222-3333-444444444444"
+TEST_CASE_ID = "cccccccc-1111-2222-3333-444444444444"
+DATASET = f"{DATASETS}/{DATASET_ID}"
 
 
 def version_summary() -> dict[str, Any]:
@@ -551,3 +559,195 @@ async def test_get_session_replay_reads_the_run() -> None:
     run = await resource(client).get_session_replay(PIPELINE_NAME, REPLAY_RUN_ID)
 
     assert (run.status, run.source_session_id, run.trace_ids) == ("ENDED", SESSION_ID, [EVALUATION_RUN_ID])
+
+
+def test_case_dict(**overrides: Any) -> dict[str, Any]:
+    return {
+        "session_replay_test_case_id": TEST_CASE_ID,
+        "pipeline_id": PIPELINE_UUID,
+        "session_id": SESSION_ID,
+        "inputs": None,
+        "expected": {"answer": "Paris"},
+        "name": "Capital of France",
+        "setup_source": None,
+        "cleanup_source": None,
+        "is_imported": False,
+        "created_at": "2026-10-01T00:00:00Z",
+        "updated_at": None,
+        **overrides,
+    }
+
+
+def dataset_dict() -> dict[str, Any]:
+    return {
+        "session_replay_dataset_id": DATASET_ID,
+        "workspace_id": WORKSPACE_UUID,
+        "pipeline_ids": [PIPELINE_UUID],
+        "name": "Regression set",
+        "test_case_count": 1,
+        "created_at": "2026-10-01T00:00:00Z",
+        "updated_at": None,
+        "test_cases": [test_case_dict()],
+    }
+
+
+@pytest.mark.asyncio
+async def test_list_datasets_calls_the_workspace_route_and_renames_the_id() -> None:
+    summary = {k: v for k, v in dataset_dict().items() if k != "test_cases"}
+    client = FakeEvaluationClient({DATASETS: [summary]})
+
+    datasets = await resource(client).list_datasets(limit=10)
+
+    assert isinstance(datasets[0], DatasetSummary)
+    assert datasets[0].dataset_id == DATASET_ID
+    assert datasets[0].test_case_count == 1
+    assert client.requests[0]["method"] == "GET"
+    assert client.requests[0]["endpoint"] == DATASETS
+    assert client.requests[0]["params"] == {"limit": 10}
+
+
+@pytest.mark.asyncio
+async def test_list_datasets_filters_by_the_pipeline_uuid() -> None:
+    client = FakeEvaluationClient({DATASETS: []})
+
+    await resource(client).list_datasets(pipeline_name=PIPELINE_NAME)
+
+    assert client.requests[0]["params"] == {"limit": 50, "pipeline_id": PIPELINE_UUID}
+
+
+@pytest.mark.asyncio
+async def test_get_dataset_returns_its_test_cases() -> None:
+    client = FakeEvaluationClient({DATASET: dataset_dict()})
+
+    dataset = await resource(client).get_dataset(DATASET_ID)
+
+    assert isinstance(dataset, Dataset)
+    assert dataset.dataset_id == DATASET_ID
+    assert dataset.test_cases[0].test_case_id == TEST_CASE_ID
+    assert dataset.test_cases[0].expected == {"answer": "Paris"}
+    assert client.requests[0]["endpoint"] == DATASET
+
+
+@pytest.mark.asyncio
+async def test_create_dataset_posts_the_pipeline_uuid_and_only_the_fields_set() -> None:
+    client = FakeEvaluationClient({DATASETS: dataset_dict()})
+
+    dataset = await resource(client).create_dataset(
+        "Regression set",
+        pipeline_name=PIPELINE_NAME,
+        test_cases=[NewTestCase(session_id=SESSION_ID), NewTestCase(inputs={"query": "hi"}, expected={"a": 1})],
+    )
+
+    assert dataset.name == "Regression set"
+    [request] = client.requests
+    assert request["method"] == "POST"
+    assert request["endpoint"] == DATASETS
+    assert request["data"] == {
+        "name": "Regression set",
+        "pipeline_id": PIPELINE_UUID,
+        "test_cases": [{"session_id": SESSION_ID}, {"inputs": {"query": "hi"}, "expected": {"a": 1}}],
+    }
+
+
+@pytest.mark.asyncio
+async def test_create_dataset_without_pipeline_or_test_cases_sends_just_the_name() -> None:
+    client = FakeEvaluationClient({DATASETS: dataset_dict()})
+
+    await resource(client).create_dataset("Empty")
+
+    assert client.requests[0]["data"] == {"name": "Empty"}
+
+
+@pytest.mark.asyncio
+async def test_update_dataset_puts_the_new_name() -> None:
+    client = FakeEvaluationClient({DATASET: dataset_dict()})
+
+    await resource(client).update_dataset(DATASET_ID, "Renamed")
+
+    [request] = client.requests
+    assert request["method"] == "PUT"
+    assert request["endpoint"] == DATASET
+    assert request["data"] == {"name": "Renamed"}
+
+
+@pytest.mark.asyncio
+async def test_delete_dataset_calls_delete_on_the_dataset() -> None:
+    client = FakeEvaluationClient({DATASET: None})
+
+    await resource(client).delete_dataset(DATASET_ID)
+
+    [request] = client.requests
+    assert request["method"] == "DELETE"
+    assert request["endpoint"] == DATASET
+
+
+@pytest.mark.asyncio
+async def test_add_test_cases_posts_them_with_the_pipeline_uuid() -> None:
+    client = FakeEvaluationClient({f"{DATASET}/test-cases": dataset_dict()})
+
+    await resource(client).add_test_cases(
+        DATASET_ID, [NewTestCase(session_id=SESSION_ID, name="n", setup_source="x")], pipeline_name=PIPELINE_NAME
+    )
+
+    [request] = client.requests
+    assert request["method"] == "POST"
+    assert request["endpoint"] == f"{DATASET}/test-cases"
+    assert request["data"] == {
+        "pipeline_id": PIPELINE_UUID,
+        "test_cases": [{"session_id": SESSION_ID, "name": "n", "setup_source": "x"}],
+    }
+
+
+@pytest.mark.asyncio
+async def test_add_test_cases_with_inputs_needs_no_pipeline() -> None:
+    client = FakeEvaluationClient({f"{DATASET}/test-cases": dataset_dict()})
+
+    await resource(client).add_test_cases(DATASET_ID, [NewTestCase(inputs={"query": "hi"})])
+
+    assert client.requests[0]["data"] == {"test_cases": [{"inputs": {"query": "hi"}}]}
+
+
+@pytest.mark.asyncio
+async def test_copy_test_cases_posts_the_ids() -> None:
+    client = FakeEvaluationClient({f"{DATASET}/test-cases/copy": dataset_dict()})
+
+    await resource(client).copy_test_cases(DATASET_ID, [TEST_CASE_ID])
+
+    [request] = client.requests
+    assert request["method"] == "POST"
+    assert request["endpoint"] == f"{DATASET}/test-cases/copy"
+    assert request["data"] == {"session_replay_test_case_ids": [TEST_CASE_ID]}
+
+
+@pytest.mark.asyncio
+async def test_remove_test_cases_posts_the_ids() -> None:
+    client = FakeEvaluationClient({f"{DATASET}/test-cases/remove": dataset_dict()})
+
+    await resource(client).remove_test_cases(DATASET_ID, [TEST_CASE_ID])
+
+    [request] = client.requests
+    assert request["method"] == "POST"
+    assert request["endpoint"] == f"{DATASET}/test-cases/remove"
+    assert request["data"] == {"session_replay_test_case_ids": [TEST_CASE_ID]}
+
+
+@pytest.mark.asyncio
+async def test_update_test_case_puts_the_changes_and_keeps_an_explicit_null() -> None:
+    client = FakeEvaluationClient({f"{DATASET}/test-cases/{TEST_CASE_ID}": test_case_dict(name="New")})
+
+    test_case = await resource(client).update_test_case(DATASET_ID, TEST_CASE_ID, {"name": "New", "setup_source": None})
+
+    assert isinstance(test_case, TestCase)
+    assert test_case.name == "New"
+    [request] = client.requests
+    assert request["method"] == "PUT"
+    assert request["endpoint"] == f"{DATASET}/test-cases/{TEST_CASE_ID}"
+    assert request["data"] == {"name": "New", "setup_source": None}
+
+
+@pytest.mark.asyncio
+async def test_dataset_methods_surface_a_not_found_from_the_api() -> None:
+    client = FakeEvaluationClient({DATASET: ResourceNotFoundError("Dataset not found")})
+
+    with pytest.raises(ResourceNotFoundError):
+        await resource(client).get_dataset(DATASET_ID)

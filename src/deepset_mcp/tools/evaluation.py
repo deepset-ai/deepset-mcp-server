@@ -16,6 +16,8 @@ from statistics import fmean
 from typing import Any, Literal, TypeVar
 
 from deepset_mcp.api.evaluation.models import (
+    Dataset,
+    DatasetSummary,
     Evaluator,
     EvaluatorVersion,
     Experiment,
@@ -24,11 +26,13 @@ from deepset_mcp.api.evaluation.models import (
     ExperimentRunReport,
     MetricGroupSummary,
     MetricSummary,
+    NewTestCase,
     ReportCell,
     ReportRow,
     SessionList,
     SessionReplayReport,
     SessionReplayRun,
+    TestCase,
     TraceSummary,
     TryReport,
     TryState,
@@ -636,3 +640,179 @@ async def get_session_replay(
         return f"Replay '{replay_run_id}' not found for pipeline '{pipeline_name}'."
     except (BadRequestError, UnexpectedAPIError) as e:
         return f"Failed to read replay '{replay_run_id}': {e}"
+
+
+_DATASET_ERRORS = (ResourceNotFoundError, BadRequestError, UnexpectedAPIError)
+
+
+async def list_datasets(
+    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str | None = None
+) -> list[DatasetSummary] | str:
+    """Lists the workspace's Datasets, newest first, without their test cases.
+
+    A Dataset is a named list of test cases (a recorded Session or a set of inputs, with optional
+    expected data) that an Experiment replays against a pipeline version. Each entry has its
+    ``dataset_id``, ``test_case_count`` and the ``pipeline_ids`` its test cases belong to. Read the
+    test cases with ``get_dataset``; pass ``dataset_id`` to ``create_experiment``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Only Datasets with a test case on this pipeline, when given.
+    :returns: The Datasets, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def get_dataset(*, client: AsyncClientProtocol, workspace: str, dataset_id: str) -> Dataset | str:
+    """Fetches one Dataset with all its test cases, in the order an Experiment replays them.
+
+    Each test case has its ``test_case_id`` (for ``update_test_case``, ``copy_test_cases`` and
+    ``remove_test_cases``), the ``session_id`` it replays or the ``inputs`` it sends, its ``expected``
+    data and its setup and cleanup source.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param dataset_id: The Dataset's id.
+    :returns: The Dataset, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def create_dataset(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    name: str,
+    pipeline_name: str | None = None,
+    test_cases: list[NewTestCase] | None = None,
+) -> Dataset | str:
+    """Creates a Dataset, optionally with its first test cases. Replays nothing and costs nothing.
+
+    Each test case is either a recorded Session (``session_id``, find them with ``list_sessions``)
+    or ``inputs`` to send to the pipeline, never both. A Session needs ``pipeline_name``, the
+    pipeline it was recorded on. A Session sent twice becomes one test case. Add more later with
+    ``add_test_cases``. Then run it with ``create_experiment`` using the returned ``dataset_id``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param name: What the Dataset is called.
+    :param pipeline_name: The pipeline the Sessions were recorded on; required when a test case has a ``session_id``.
+    :param test_cases: The test cases to start with; none by default.
+    :returns: The created Dataset, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def update_dataset(*, client: AsyncClientProtocol, workspace: str, dataset_id: str, name: str) -> Dataset | str:
+    """Renames a Dataset. Change its test cases with the test case tools.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param dataset_id: The Dataset's id.
+    :param name: The new name.
+    :returns: The Dataset, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def delete_dataset(*, client: AsyncClientProtocol, workspace: str, dataset_id: str) -> str:
+    """Deletes a Dataset and all its test cases. This cannot be undone: get a yes first.
+
+    Experiments that used the Dataset keep their results but lose the link to it.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param dataset_id: The Dataset's id.
+    :returns: A confirmation, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def add_test_cases(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    dataset_id: str,
+    test_cases: list[NewTestCase],
+    pipeline_name: str | None = None,
+) -> Dataset | str:
+    """Adds test cases to the end of a Dataset. Replays nothing and costs nothing.
+
+    Each test case is either a recorded Session (``session_id``) or ``inputs``, never both. A
+    Session needs ``pipeline_name``. A Session the Dataset already holds is skipped. To reuse test
+    cases from another Dataset use ``copy_test_cases``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param dataset_id: The Dataset's id.
+    :param test_cases: The test cases to add, in order.
+    :param pipeline_name: The pipeline the Sessions were recorded on; required when a test case has a ``session_id``.
+    :returns: The Dataset with all its test cases, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def update_test_case(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    dataset_id: str,
+    test_case_id: str,
+    name: str | None = None,
+    inputs: dict[str, Any] | None = None,
+    expected: dict[str, Any] | None = None,
+    setup_source: str | None = None,
+    cleanup_source: str | None = None,
+    clear: list[Literal["expected", "setup_source", "cleanup_source"]] | None = None,
+) -> TestCase | str:
+    """Changes one test case of a Dataset. Fields you leave out are kept.
+
+    ``inputs`` replaces the inputs and works only on a test case created with ``inputs``, not on a
+    Session-based one. ``expected`` replaces the expected data.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param dataset_id: The Dataset's id.
+    :param test_case_id: The test case's id.
+    :param name: The new name.
+    :param inputs: The new pipeline inputs, as ``{name: value}``.
+    :param expected: The new expected data.
+    :param setup_source: New Python source that runs before every replay.
+    :param cleanup_source: New Python source that runs after every replay.
+    :param clear: Fields to remove from the test case.
+    :returns: The test case, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def copy_test_cases(
+    *, client: AsyncClientProtocol, workspace: str, dataset_id: str, test_case_ids: list[str]
+) -> Dataset | str:
+    """Copies test cases from any Dataset of the workspace to the end of this one.
+
+    Each copy keeps the Session or inputs, name, expected data and scripts, and gets its own id, so
+    editing a copy leaves the original untouched. Find ids with ``get_dataset``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param dataset_id: The Dataset to copy into.
+    :param test_case_ids: The test cases to copy, in order.
+    :returns: The Dataset with all its test cases, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def remove_test_cases(
+    *, client: AsyncClientProtocol, workspace: str, dataset_id: str, test_case_ids: list[str]
+) -> Dataset | str:
+    """Removes test cases from a Dataset. Destructive: the removed test cases are gone, so get a yes first.
+
+    Ids that are not in the Dataset are ignored.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param dataset_id: The Dataset's id.
+    :param test_case_ids: The test cases to remove.
+    :returns: The Dataset with the test cases left, or an error message.
+    """
+    raise NotImplementedError

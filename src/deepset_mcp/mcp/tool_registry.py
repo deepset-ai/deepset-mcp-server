@@ -43,18 +43,27 @@ from deepset_mcp.tools.doc_search import (
     search_docs_via_docs_api,
 )
 from deepset_mcp.tools.evaluation import (
+    add_test_cases as add_test_cases_tool,
+    copy_test_cases as copy_test_cases_tool,
+    create_dataset as create_dataset_tool,
     create_experiment as create_experiment_tool,
+    delete_dataset as delete_dataset_tool,
+    get_dataset as get_dataset_tool,
     get_evaluation_try as get_evaluation_try_tool,
     get_evaluator as get_evaluator_tool,
     get_experiment_results as get_experiment_results_tool,
     get_experiment_run as get_experiment_run_tool,
     get_session_replay as get_session_replay_tool,
+    list_datasets as list_datasets_tool,
     list_evaluators as list_evaluators_tool,
     list_experiments as list_experiments_tool,
     list_metric_groups as list_metric_groups_tool,
     list_sessions as list_sessions_tool,
+    remove_test_cases as remove_test_cases_tool,
     replay_session as replay_session_tool,
     try_evaluator as try_evaluator_tool,
+    update_dataset as update_dataset_tool,
+    update_test_case as update_test_case_tool,
 )
 from deepset_mcp.tools.haystack_service import (
     get_component_definition as get_component_definition_tool,
@@ -421,6 +430,42 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     ),
     "get_session_replay": (
         get_session_replay_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "list_datasets": (
+        list_datasets_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_dataset": (
+        get_dataset_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "create_dataset": (
+        create_dataset_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "update_dataset": (
+        update_dataset_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "delete_dataset": (
+        delete_dataset_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "add_test_cases": (
+        add_test_cases_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "update_test_case": (
+        update_test_case_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "copy_test_cases": (
+        copy_test_cases_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "remove_test_cases": (
+        remove_test_cases_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
     ),
     # Cost tools

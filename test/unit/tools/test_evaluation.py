@@ -8,6 +8,8 @@ import pytest
 
 from deepset_mcp.api.evaluation.models import (
     Composite,
+    Dataset,
+    DatasetSummary,
     EvaluationTryResult,
     Evaluator,
     EvaluatorVersion,
@@ -19,12 +21,14 @@ from deepset_mcp.api.evaluation.models import (
     ExperimentRunReport,
     MetricDeclaration,
     MetricGroup,
+    NewTestCase,
     NoComposite,
     NoNormalizedMean,
     NormalizedMean,
     SessionList,
     SessionReplayReport,
     SessionReplayRun,
+    TestCase,
     TryReport,
     TryState,
 )
@@ -34,18 +38,27 @@ from deepset_mcp.api.search_history.models import PipelineTraceSummary
 from deepset_mcp.api.shared_models import PaginatedResponse
 from deepset_mcp.tools import evaluation as evaluation_tools
 from deepset_mcp.tools.evaluation import (
+    add_test_cases,
+    copy_test_cases,
+    create_dataset,
     create_experiment,
+    delete_dataset,
+    get_dataset,
     get_evaluation_try,
     get_evaluator,
     get_experiment_results,
     get_experiment_run,
     get_session_replay,
+    list_datasets,
     list_evaluators,
     list_experiments,
     list_metric_groups,
     list_sessions,
+    remove_test_cases,
     replay_session,
     try_evaluator,
+    update_dataset,
+    update_test_case,
 )
 from test.unit.conftest import BaseFakeClient
 
@@ -60,6 +73,27 @@ SESSION_A = "55555555-5555-5555-5555-555555555555"
 SESSION_B = "66666666-6666-6666-6666-666666666666"
 COMPARISON_ID = "99999999-9999-9999-9999-999999999999"
 PIPELINE_ID = "88888888-8888-8888-8888-888888888888"
+
+DATASET_ID = "bbbbbbbb-1111-2222-3333-444444444444"
+TEST_CASE_ID = "cccccccc-1111-2222-3333-444444444444"
+
+
+def dataset_dict() -> dict[str, Any]:
+    return {
+        "session_replay_dataset_id": DATASET_ID,
+        "pipeline_ids": [PIPELINE_ID],
+        "name": "Regression set",
+        "test_case_count": 1,
+        "created_at": "2026-10-01T00:00:00Z",
+        "test_cases": [
+            {
+                "session_replay_test_case_id": TEST_CASE_ID,
+                "session_id": SESSION_A,
+                "name": "Order status",
+                "created_at": "2026-10-01T00:00:00Z",
+            }
+        ],
+    }
 
 
 def run(run_id: str = RUN_ID) -> ExperimentRun:
@@ -374,6 +408,45 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
     async def get_session_replay(self, pipeline_name: str, replay_run_id: str) -> SessionReplayRun:
         self._record("get_session_replay", replay_run_id=replay_run_id)
         return self.replay_states.pop(0) if len(self.replay_states) > 1 else self.replay_states[0]
+
+    async def list_datasets(self, pipeline_name: str | None = None, limit: int = 50) -> list[DatasetSummary]:
+        self._record("list_datasets", pipeline_name=pipeline_name)
+        return [DatasetSummary.model_validate({k: v for k, v in dataset_dict().items() if k != "test_cases"})]
+
+    async def get_dataset(self, dataset_id: str) -> Dataset:
+        self._record("get_dataset", dataset_id=dataset_id)
+        return Dataset.model_validate(dataset_dict())
+
+    async def create_dataset(
+        self, name: str, pipeline_name: str | None = None, test_cases: list[NewTestCase] | None = None
+    ) -> Dataset:
+        self._record("create_dataset", dataset_name=name, pipeline_name=pipeline_name, test_cases=test_cases)
+        return Dataset.model_validate(dataset_dict())
+
+    async def update_dataset(self, dataset_id: str, name: str) -> Dataset:
+        self._record("update_dataset", dataset_id=dataset_id, dataset_name=name)
+        return Dataset.model_validate(dataset_dict())
+
+    async def delete_dataset(self, dataset_id: str) -> None:
+        self._record("delete_dataset", dataset_id=dataset_id)
+
+    async def add_test_cases(
+        self, dataset_id: str, test_cases: list[NewTestCase], pipeline_name: str | None = None
+    ) -> Dataset:
+        self._record("add_test_cases", dataset_id=dataset_id, test_cases=test_cases, pipeline_name=pipeline_name)
+        return Dataset.model_validate(dataset_dict())
+
+    async def copy_test_cases(self, dataset_id: str, test_case_ids: list[str]) -> Dataset:
+        self._record("copy_test_cases", dataset_id=dataset_id, test_case_ids=test_case_ids)
+        return Dataset.model_validate(dataset_dict())
+
+    async def remove_test_cases(self, dataset_id: str, test_case_ids: list[str]) -> Dataset:
+        self._record("remove_test_cases", dataset_id=dataset_id, test_case_ids=test_case_ids)
+        return Dataset.model_validate(dataset_dict())
+
+    async def update_test_case(self, dataset_id: str, test_case_id: str, changes: dict[str, Any]) -> TestCase:
+        self._record("update_test_case", dataset_id=dataset_id, test_case_id=test_case_id, changes=changes)
+        return TestCase.model_validate(dataset_dict()["test_cases"][0])
 
 
 class FakeClient(BaseFakeClient):
@@ -1040,3 +1113,119 @@ async def test_get_experiment_results_from_an_older_api_has_no_headline() -> Non
 
     assert isinstance(results, ExperimentResultsReport)
     assert results.headline is None
+
+
+@pytest.mark.asyncio
+async def test_dataset_reads_return_the_dataset_models() -> None:
+    resource = FakeEvaluationResource()
+    client = FakeClient(resource)
+
+    listed = await list_datasets(client=client, workspace=WORKSPACE, pipeline_name=PIPELINE)
+    dataset = await get_dataset(client=client, workspace=WORKSPACE, dataset_id=DATASET_ID)
+
+    assert isinstance(listed, list)
+    assert listed[0].dataset_id == DATASET_ID
+    assert isinstance(dataset, Dataset)
+    assert dataset.test_cases[0].test_case_id == TEST_CASE_ID
+    assert resource.calls == [
+        ("list_datasets", {"pipeline_name": PIPELINE}),
+        ("get_dataset", {"dataset_id": DATASET_ID}),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_dataset_writes_forward_their_arguments_and_return_the_dataset() -> None:
+    resource = FakeEvaluationResource()
+    client = FakeClient(resource)
+    cases = [NewTestCase(session_id=SESSION_A)]
+
+    results = [
+        await create_dataset(client=client, workspace=WORKSPACE, name="N", pipeline_name=PIPELINE, test_cases=cases),
+        await update_dataset(client=client, workspace=WORKSPACE, dataset_id=DATASET_ID, name="R"),
+        await add_test_cases(
+            client=client, workspace=WORKSPACE, dataset_id=DATASET_ID, test_cases=cases, pipeline_name=PIPELINE
+        ),
+        await copy_test_cases(client=client, workspace=WORKSPACE, dataset_id=DATASET_ID, test_case_ids=[TEST_CASE_ID]),
+        await remove_test_cases(
+            client=client, workspace=WORKSPACE, dataset_id=DATASET_ID, test_case_ids=[TEST_CASE_ID]
+        ),
+    ]
+
+    assert all(isinstance(result, Dataset) for result in results)
+    assert resource.calls == [
+        ("create_dataset", {"dataset_name": "N", "pipeline_name": PIPELINE, "test_cases": cases}),
+        ("update_dataset", {"dataset_id": DATASET_ID, "dataset_name": "R"}),
+        ("add_test_cases", {"dataset_id": DATASET_ID, "test_cases": cases, "pipeline_name": PIPELINE}),
+        ("copy_test_cases", {"dataset_id": DATASET_ID, "test_case_ids": [TEST_CASE_ID]}),
+        ("remove_test_cases", {"dataset_id": DATASET_ID, "test_case_ids": [TEST_CASE_ID]}),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_delete_dataset_confirms_in_a_string() -> None:
+    resource = FakeEvaluationResource()
+
+    result = await delete_dataset(client=FakeClient(resource), workspace=WORKSPACE, dataset_id=DATASET_ID)
+
+    assert DATASET_ID in result
+    assert resource.calls == [("delete_dataset", {"dataset_id": DATASET_ID})]
+
+
+@pytest.mark.asyncio
+async def test_update_test_case_sends_only_what_changes_and_nulls_what_is_cleared() -> None:
+    resource = FakeEvaluationResource()
+
+    result = await update_test_case(
+        client=FakeClient(resource),
+        workspace=WORKSPACE,
+        dataset_id=DATASET_ID,
+        test_case_id=TEST_CASE_ID,
+        name="New",
+        expected={"answer": "Paris"},
+        clear=["setup_source"],
+    )
+
+    assert isinstance(result, TestCase)
+    [(_, kwargs)] = resource.calls
+    assert kwargs["changes"] == {"name": "New", "expected": {"answer": "Paris"}, "setup_source": None}
+
+
+@pytest.mark.asyncio
+async def test_update_test_case_without_a_change_does_not_call_the_api() -> None:
+    resource = FakeEvaluationResource()
+
+    result = await update_test_case(
+        client=FakeClient(resource), workspace=WORKSPACE, dataset_id=DATASET_ID, test_case_id=TEST_CASE_ID
+    )
+
+    assert isinstance(result, str)
+    assert resource.calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "error",
+    [
+        ResourceNotFoundError(message="Dataset not found"),
+        BadRequestError(message="bad"),
+        UnexpectedAPIError(status_code=422, message="Dataset over its size limit"),
+    ],
+)
+async def test_dataset_tools_return_the_api_message_instead_of_raising(error: Exception) -> None:
+    client = FakeClient(FakeEvaluationResource(error=error))
+    common: dict[str, Any] = {"client": client, "workspace": WORKSPACE}
+    cases = [NewTestCase(inputs={"query": "hi"})]
+
+    results = [
+        await list_datasets(**common),
+        await get_dataset(**common, dataset_id=DATASET_ID),
+        await create_dataset(**common, name="N"),
+        await update_dataset(**common, dataset_id=DATASET_ID, name="R"),
+        await delete_dataset(**common, dataset_id=DATASET_ID),
+        await add_test_cases(**common, dataset_id=DATASET_ID, test_cases=cases),
+        await copy_test_cases(**common, dataset_id=DATASET_ID, test_case_ids=[TEST_CASE_ID]),
+        await remove_test_cases(**common, dataset_id=DATASET_ID, test_case_ids=[TEST_CASE_ID]),
+        await update_test_case(**common, dataset_id=DATASET_ID, test_case_id=TEST_CASE_ID, name="x"),
+    ]
+
+    assert all(isinstance(result, str) and str(error.args[0]) in result for result in results)

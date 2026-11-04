@@ -651,3 +651,77 @@ class SessionReplayReport(BaseModel):
     )
     trace_ids: list[str] = Field(default_factory=list)
     error_detail: dict[str, Any] | None = None
+
+
+class NewTestCase(BaseModel):
+    """One test case to add to a Dataset: a Session to replay or the inputs to send, never both."""
+
+    session_id: str | None = Field(
+        default=None,
+        description=(
+            "The Session to replay: a ``search_session_id`` or, for a Session that never had one, its "
+            "``query_id``. Needs the call's pipeline. A Dataset holds each Session once. Send this or ``inputs``."
+        ),
+    )
+    inputs: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "A test case without a recorded Session: the named pipeline inputs to send as ``{name: value}``. "
+            "``query`` is sent as the query. Send this or ``session_id``."
+        ),
+    )
+    expected: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            'Data an Evaluator reads beside the Session as ``session["test_case"]["expected"]``, for example '
+            '``{"answer": "Paris"}``. Never sent to the pipeline.'
+        ),
+    )
+    name: str | None = Field(
+        default=None,
+        description="What the test case is called. Omitted, it is named after the Session's first query.",
+    )
+    setup_source: str | None = Field(default=None, description="Python source that runs before every replay.")
+    cleanup_source: str | None = Field(default=None, description="Python source that runs after every replay.")
+
+
+class TestCase(BaseModel):
+    """A test case of a Dataset: the Session it replays or the inputs it sends."""
+
+    __test__ = False  # not a pytest class
+
+    test_case_id: str = Field(validation_alias="session_replay_test_case_id")
+    pipeline_id: str | None = Field(
+        default=None, description="The pipeline the Session was recorded on, or the one its inputs were added for."
+    )
+    session_id: str | None = Field(default=None, description="The Session it replays. Null when it sends inputs.")
+    inputs: dict[str, Any] | None = Field(
+        default=None, description="The named pipeline inputs it sends. Null when it replays a Session."
+    )
+    expected: dict[str, Any] | None = Field(default=None, description="What an Evaluator reads beside the Session.")
+    name: str
+    setup_source: str | None = None
+    cleanup_source: str | None = None
+    is_imported: bool = Field(default=False, description="Whether the Session came in an imported Dataset archive.")
+    created_at: str
+    updated_at: str | None = None
+
+
+class DatasetSummary(BaseModel):
+    """A Dataset without its test cases: a named list of test cases to replay together."""
+
+    dataset_id: str = Field(validation_alias="session_replay_dataset_id")
+    workspace_id: str | None = None
+    pipeline_ids: list[str] = Field(
+        default_factory=list, description="The distinct pipelines of its test cases, in the order they first appear."
+    )
+    name: str
+    test_case_count: int = 0
+    created_at: str
+    updated_at: str | None = None
+
+
+class Dataset(DatasetSummary):
+    """A Dataset and every test case in it, in the order an Experiment replays them."""
+
+    test_cases: list[TestCase] = Field(default_factory=list)
