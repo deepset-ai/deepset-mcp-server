@@ -493,8 +493,9 @@ async def try_evaluator(
     """Tries Evaluator source on one Session and returns what it found. Persists nothing.
 
     Use it to check a draft before showing it as ready, and to judge a replayed Session against
-    its source. The source is an Evaluation Function as the `evaluation` skill describes; to try a
-    saved Evaluator, read a version's ``python_code`` with ``get_evaluator`` and pass it. A try that
+    its source. The source is an Evaluation Function: a Python function that reads one Session and
+    reports named Metrics declared with ``@metrics``. To try a saved Evaluator, read a version's
+    ``python_code`` with ``get_evaluator`` and pass it. A try that
     judges with a model costs a model call per judged turn on the customer's provider.
 
     ``outcome`` ERRORED means the code broke: read ``error_detail`` and fix it. ``metrics`` are the

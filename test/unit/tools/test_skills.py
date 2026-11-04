@@ -98,13 +98,3 @@ class TestBuildDocstring:
         discovered = _discover_skills()
 
         assert "custom-code" in discovered
-
-    @pytest.mark.asyncio
-    async def test_bundled_evaluation_skill_loads(self) -> None:
-        """The bundled `evaluation` skill is discoverable and served whole by `load_skill`."""
-        assert "evaluation" in _discover_skills()
-
-        content = await load_skill(skill_name="evaluation")
-
-        assert "@metrics" in content
-        assert "judge(" in content
