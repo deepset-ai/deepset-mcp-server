@@ -576,8 +576,10 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
         self._record("list_sessions", origin=origin, revision_id=revision_id, since=since, limit=limit, cursor=cursor)
         return SessionList.model_validate({"data": [], "next": None})
 
-    async def start_try(self, pipeline_name: str, python_code: str, session_id: str) -> str:
-        self._record("start_try", python_code=python_code, session_id=session_id)
+    async def start_try(
+        self, pipeline_name: str, python_code: str, session_id: str, test_case_id: str | None = None
+    ) -> str:
+        self._record("start_try", python_code=python_code, session_id=session_id, test_case_id=test_case_id)
         return TRY_ID
 
     async def get_try(self, pipeline_name: str, try_id: str) -> TryState:
@@ -585,13 +587,21 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
         return self.try_states.pop(0) if len(self.try_states) > 1 else self.try_states[0]
 
     async def start_session_replay(
-        self, pipeline_name: str, session_id: str, pipeline_version_id: str, replay_mode: str | None = None
+        self,
+        pipeline_name: str,
+        session_id: str,
+        pipeline_version_id: str,
+        replay_mode: str | None = None,
+        setup_source: str | None = None,
+        cleanup_source: str | None = None,
     ) -> str:
         self._record(
             "start_session_replay",
             session_id=session_id,
             pipeline_version_id=pipeline_version_id,
             replay_mode=replay_mode,
+            setup_source=setup_source,
+            cleanup_source=cleanup_source,
         )
         return REPLAY_RUN_ID
 
@@ -1181,7 +1191,13 @@ async def test_replay_session_polls_until_ended_and_names_the_replayed_session()
     assert traces.filters == [f"query_id eq '{REPLAYED_QUERY_ID}'"]
     assert resource.calls[0] == (
         "start_session_replay",
-        {"session_id": SESSION_A, "pipeline_version_id": DRAFT_VERSION_ID, "replay_mode": "ALL_USER_MESSAGES"},
+        {
+            "session_id": SESSION_A,
+            "pipeline_version_id": DRAFT_VERSION_ID,
+            "replay_mode": "ALL_USER_MESSAGES",
+            "setup_source": None,
+            "cleanup_source": None,
+        },
     )
 
 
@@ -2451,3 +2467,74 @@ async def test_get_experiment_run_from_an_older_api_has_no_aggregate_or_usage() 
     report = await _report(grid())
 
     assert (report.aggregate, report.usage, report.evaluator_versions) == (None, None, [])
+
+
+@pytest.mark.asyncio
+async def test_try_evaluator_hands_the_chosen_test_case_to_the_try() -> None:
+    resource = FakeEvaluationResource(try_states=[TryState(status="READY", result=None)])
+
+    await try_evaluator(
+        client=FakeCheckClient(resource),
+        workspace=WORKSPACE,
+        pipeline_name=PIPELINE,
+        python_code="code",
+        session_id=SESSION_A,
+        test_case_id=TEST_CASE_ID,
+    )
+
+    assert resource.calls[0][1]["test_case_id"] == TEST_CASE_ID
+
+
+@pytest.mark.asyncio
+async def test_replay_session_forwards_setup_and_cleanup_source() -> None:
+    resource = FakeEvaluationResource(replay_states=[replay_run("FAILED")])
+
+    await replay_session(
+        client=FakeCheckClient(resource),
+        workspace=WORKSPACE,
+        pipeline_name=PIPELINE,
+        session_id=SESSION_A,
+        pipeline_version_id=DRAFT_VERSION_ID,
+        setup_source="def setup(): ...",
+        cleanup_source="def cleanup(state): ...",
+    )
+
+    kwargs = resource.calls[0][1]
+    assert (kwargs["setup_source"], kwargs["cleanup_source"]) == ("def setup(): ...", "def cleanup(state): ...")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field", ["expected", "setup_source", "cleanup_source"])
+async def test_update_test_case_refuses_a_field_that_is_both_given_and_cleared(field: str) -> None:
+    resource = FakeEvaluationResource()
+    value: Any = {"answer": "Paris"} if field == "expected" else "def f(): ..."
+
+    result = await update_test_case(
+        client=FakeClient(resource),
+        workspace=WORKSPACE,
+        dataset_id=DATASET_ID,
+        test_case_id=TEST_CASE_ID,
+        clear=[field],  # type: ignore[list-item]
+        **{field: value},
+    )
+
+    assert isinstance(result, str) and field in result
+    assert resource.calls == []
+
+
+@pytest.mark.asyncio
+async def test_create_experiment_not_found_does_not_blame_only_the_pipeline() -> None:
+    error = ResourceNotFoundError(message="Dataset 'abc' not found")
+    result = await create_experiment(
+        client=FakeClient(FakeEvaluationResource(error=error)),
+        workspace=WORKSPACE,
+        name="exp",
+        dataset_id=DATASET_ID,
+        metric_group_id=METRIC_GROUP_ID,
+        candidate_pipeline_name=PIPELINE,
+        candidate_pipeline_version_id=V1,
+    )
+
+    assert isinstance(result, str)
+    assert "Dataset 'abc' not found" in result
+    assert "one of" not in result

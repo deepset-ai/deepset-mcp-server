@@ -597,7 +597,9 @@ class EvaluationResource(EvaluationResourceProtocol):
         data = await self._get(path, {k: v for k, v in params.items() if v is not None})
         return SessionList.model_validate(data or {"data": []})
 
-    async def start_try(self, pipeline_name: str, python_code: str, session_id: str) -> str:
+    async def start_try(
+        self, pipeline_name: str, python_code: str, session_id: str, test_case_id: str | None = None
+    ) -> str:
         """Start an ad-hoc try of Evaluator source on one Session. Persists nothing.
 
         :param pipeline_name: Name of the pipeline.
@@ -626,7 +628,13 @@ class EvaluationResource(EvaluationResourceProtocol):
         return TryState(status="READY", result=EvaluationTryResult.model_validate(resp.json))
 
     async def start_session_replay(
-        self, pipeline_name: str, session_id: str, pipeline_version_id: str, replay_mode: str | None = None
+        self,
+        pipeline_name: str,
+        session_id: str,
+        pipeline_version_id: str,
+        replay_mode: str | None = None,
+        setup_source: str | None = None,
+        cleanup_source: str | None = None,
     ) -> str:
         """Start replaying a Session against a pipeline version, a draft included.
 

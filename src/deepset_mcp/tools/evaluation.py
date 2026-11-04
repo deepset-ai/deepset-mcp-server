@@ -579,6 +579,7 @@ async def try_evaluator(
     pipeline_name: str,
     python_code: str,
     session_id: str,
+    test_case_id: str | None = None,
     wait_seconds: int = 120,
 ) -> TryReport | str:
     """Tries Evaluator source on one Session and returns what it found. Persists nothing.
@@ -668,6 +669,8 @@ async def replay_session(
     session_id: str,
     pipeline_version_id: str,
     replay_mode: Literal["FIRST_USER_MESSAGE", "ALL_USER_MESSAGES"] | None = None,
+    setup_source: str | None = None,
+    cleanup_source: str | None = None,
     wait_seconds: int = 300,
 ) -> SessionReplayReport | str:
     """Replays a recorded Session against a pipeline version, a draft included, into a new Session.

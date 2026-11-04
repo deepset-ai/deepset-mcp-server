@@ -627,6 +627,15 @@ async def test_start_try_posts_the_source_and_the_session() -> None:
 
 
 @pytest.mark.asyncio
+async def test_start_try_sends_the_test_case_only_when_set() -> None:
+    client = FakeEvaluationClient({TRIES: {"try_id": TRY_ID}})
+
+    await resource(client).start_try(PIPELINE_NAME, "code", SESSION_ID, test_case_id=TEST_CASE_ID)
+
+    assert client.requests[0]["data"]["session_replay_test_case_id"] == TEST_CASE_ID
+
+
+@pytest.mark.asyncio
 async def test_get_try_reads_running_ready_and_expired() -> None:
     running = FakeEvaluationClient({f"{TRIES}/{TRY_ID}": TransportResponse(text="", status_code=202, json=None)})
     ready = FakeEvaluationClient({f"{TRIES}/{TRY_ID}": try_result_dict()})
@@ -654,6 +663,22 @@ async def test_start_session_replay_sends_replay_mode_only_when_set() -> None:
     assert first["method"] == "POST"
     assert first["data"] == {"session_id": SESSION_ID, "pipeline_version_id": DRAFT_VERSION_ID}
     assert second["data"]["replay_mode"] == "ALL_USER_MESSAGES"
+
+
+@pytest.mark.asyncio
+async def test_start_session_replay_sends_setup_and_cleanup_only_when_set() -> None:
+    client = FakeEvaluationClient({REPLAYS: {"session_replay_run_id": REPLAY_RUN_ID}})
+
+    await resource(client).start_session_replay(
+        PIPELINE_NAME, SESSION_ID, DRAFT_VERSION_ID, setup_source="s", cleanup_source="c"
+    )
+
+    assert client.requests[0]["data"] == {
+        "session_id": SESSION_ID,
+        "pipeline_version_id": DRAFT_VERSION_ID,
+        "setup_source": "s",
+        "cleanup_source": "c",
+    }
 
 
 @pytest.mark.asyncio
