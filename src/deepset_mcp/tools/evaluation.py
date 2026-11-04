@@ -66,14 +66,18 @@ async def list_evaluators(
     Each entry carries its newest version's id and the Metrics that version declares (name, shape,
     grain and, for a closed Label, its vocabulary and, if it declares one, its ``scale``; for a
     Score, its ``range`` and ``better``), but not the source. Evaluators belong to the workspace,
-    not to a pipeline; a Metric Group picks which ones a scoring run judges with.
+    not to a pipeline; a Metric Group picks which ones a scoring run judges with. The API has no
+    paging: a result of exactly ``limit`` Evaluators may be cut off, and Evaluators past the 200 cap
+    are reachable only by splitting the list with ``archived``.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
+    :param limit: Most Evaluators to return (at most 200).
+    :param archived: ``true`` for only archived Evaluators, ``false`` for only the others; omit for both.
     :returns: The Evaluators, or an error message.
     """
     try:
-        return await client.evaluation(workspace=workspace).list_evaluators()
+        return await client.evaluation(workspace=workspace).list_evaluators(limit, archived)
     except ResourceNotFoundError:
         return f"Workspace '{workspace}' not found."
     except (BadRequestError, UnexpectedAPIError) as e:
@@ -118,16 +122,18 @@ async def list_metric_groups(
     run on that pipeline without the grid (status, ``selection``, timing), or null when it never ran
     there; read a run's results with ``get_experiment_run``. ``weights`` says how much each Metric
     counts toward the group's Composite (empty: no Composite); a weight with ``usable`` false
-    says in ``unusable_reason`` why it will not count in a new run.
+    says in ``unusable_reason`` why it will not count in a new run. The API has no paging: a result
+    of exactly ``limit`` groups may be cut off (at most 200 are ever reachable).
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
     :param pipeline_name: A pipeline to attach each Metric Group's most recent scoring run on.
+    :param limit: Most Metric Groups to return (at most 200). With ``pipeline_name`` each one costs a call.
     :returns: The Metric Groups, or an error message.
     """
     resource = client.evaluation(workspace=workspace)
     try:
-        groups = await resource.list_metric_groups()
+        groups = await resource.list_metric_groups(limit)
         if pipeline_name is None:
             return [MetricGroupSummary(**group.model_dump()) for group in groups]
         last_runs = await asyncio.gather(
@@ -254,15 +260,17 @@ async def list_experiments(
     Read how the candidate did against the baseline with ``get_experiment_results``. To read one
     side's scoring run cell by cell, pass its ``scoring_runs[].experiment_run_id``, that entry's
     ``pipeline_id`` resolved to a name with ``list_pipelines``, and the Experiment's
-    ``metric_group_id`` to ``get_experiment_run``.
+    ``metric_group_id`` to ``get_experiment_run``. The API has no paging: a result of exactly
+    ``limit`` Experiments may be cut off; raise ``limit`` (at most 200) or narrow with ``pipeline_name``.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
     :param pipeline_name: Only Experiments with either side on this pipeline, when given.
+    :param limit: Most Experiments to return (at most 200).
     :returns: The Experiments, or an error message.
     """
     try:
-        return await client.evaluation(workspace=workspace).list_experiments(pipeline_name)
+        return await client.evaluation(workspace=workspace).list_experiments(pipeline_name, limit)
     except ResourceNotFoundError:
         if pipeline_name is None:
             return f"Workspace '{workspace}' not found."
@@ -345,6 +353,15 @@ async def get_experiment_run(
     single number for the run, 0 to 1 with 1 best, from ``normalized_means`` (each Metric on that
     scale) weighted by ``run.composite_weights``, the formula the run started with. When it has
     no value it says ``reason`` and lists the Metrics that block it in ``missing``.
+    ``aggregate`` is the API's whole-run result per Metric: how its Sessions fell out (``valued``,
+    ``errored``, ``failed``, ``pending``, ...), ``coverage`` and the Metric's mean or label
+    ``shares``, in the units it declares; it is null until the run ends. ``usage`` is what the
+    pipeline spent on the run's Sessions (tokens, duration, ``cost`` in USD, null unless
+    ``cost_status`` is ``priced``). ``evaluator_versions`` says which version of each Evaluator
+    judged and what its Metrics declare. The filters keep only the cells whose Session's origin,
+    Service or pipeline version match (a cell still running has no origin and matches none):
+    they narrow ``counts``, ``rows`` and ``metrics``, but not ``aggregate``, ``usage``,
+    ``normalized_means`` or ``composite``, which stay whole-run.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
@@ -352,10 +369,22 @@ async def get_experiment_run(
     :param metric_group_id: The id of the Metric Group the run scored with.
     :param run_id: The run's id.
     :param max_rows: Most rows to return; the summaries still cover every row.
+    :param origin: Only cells whose Session came from a Service, the pipeline's own API, or the Playground.
+    :param deployment_id: Only cells whose Session this Service served.
+    :param pipeline_version_id: Only cells whose Session this pipeline version served.
+    :param session_id: Only this Session's row.
     :returns: The run report, or an error message.
     """
     try:
-        grid = await client.evaluation(workspace=workspace).get_experiment_run(pipeline_name, metric_group_id, run_id)
+        grid = await client.evaluation(workspace=workspace).get_experiment_run(
+            pipeline_name,
+            metric_group_id,
+            run_id,
+            origin=origin,
+            deployment_id=deployment_id,
+            pipeline_version_id=pipeline_version_id,
+            session_id=session_id,
+        )
     except ResourceNotFoundError:
         return f"Run '{run_id}' of metric group '{metric_group_id}' on pipeline '{pipeline_name}' not found."
     except (BadRequestError, UnexpectedAPIError) as e:
@@ -382,6 +411,9 @@ async def get_experiment_run(
         evaluator_ids=grid.evaluator_ids,
         counts=grid.counts,
         metrics=_summarise(grid),
+        aggregate=grid.aggregate,
+        usage=grid.usage,
+        evaluator_versions=grid.evaluator_versions,
         normalized_means=grid.normalized_means,
         composite=grid.composite,
         rows=rows[:max_rows],
@@ -457,6 +489,8 @@ async def list_sessions(
     :param origin: Only Sessions whose every turn came from a Service, the pipeline's own API, or the Playground.
     :param deployment_id: Only Sessions whose every turn this Service served.
     :param pipeline_version_id: Only Sessions whose every turn this pipeline version served.
+    :param revision_id: Only Sessions whose every turn this Service revision served. Exact where a
+        version is not: one version can be pushed to a Service more than once.
     :param since: ISO-8601 time; only Sessions last active at or after it.
     :param until: ISO-8601 time; only Sessions last active at or before it.
     :param limit: Most Sessions per page (at most 200). A page can hold fewer and still have a ``next``.
@@ -469,6 +503,7 @@ async def list_sessions(
             origin=origin,
             deployment_id=deployment_id,
             pipeline_version_id=pipeline_version_id,
+            revision_id=revision_id,
             since=since,
             until=until,
             limit=limit,
@@ -705,15 +740,18 @@ async def list_datasets(
     A Dataset is a named list of test cases (a recorded Session or a set of inputs, with optional
     expected data) that an Experiment replays against a pipeline version. Each entry has its
     ``dataset_id``, ``test_case_count`` and the ``pipeline_ids`` its test cases belong to. Read the
-    test cases with ``get_dataset``; pass ``dataset_id`` to ``create_experiment``.
+    test cases with ``get_dataset``; pass ``dataset_id`` to ``create_experiment``. The API has no
+    paging: a result of exactly ``limit`` Datasets may be cut off; raise ``limit`` (at most 200) or
+    narrow with ``pipeline_name``.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
     :param pipeline_name: Only Datasets with a test case on this pipeline, when given.
+    :param limit: Most Datasets to return (at most 200).
     :returns: The Datasets, or an error message.
     """
     try:
-        return await client.evaluation(workspace=workspace).list_datasets(pipeline_name)
+        return await client.evaluation(workspace=workspace).list_datasets(pipeline_name, limit)
     except _API_ERRORS as e:
         return f"Failed to list datasets: {e}"
 
@@ -1307,7 +1345,8 @@ async def list_experiment_runs(
     :param pipeline_name: Name of the pipeline.
     :param metric_group_id: List this Metric Group's runs. Give this or ``session_id``.
     :param session_id: List the runs that judged this Session. Give this or ``metric_group_id``.
-    :param limit: Maximum number of runs to return (the API caps it at 200).
+    :param limit: Most runs to return (at most 200). The API has no further paging: a result of exactly
+        this many may be cut off.
     :returns: The runs, or an error message.
     """
     if (metric_group_id is None) == (session_id is None):
@@ -1468,7 +1507,8 @@ async def list_evaluation_runs(
     :param client: The async client for API communication.
     :param workspace: The workspace name.
     :param pipeline_name: Name of the pipeline.
-    :param limit: Maximum number of runs to return (the API caps it at 200).
+    :param limit: Most runs to return (at most 200). The API has no further paging: a result of exactly
+        this many may be cut off.
     :returns: The runs, or an error message.
     """
     try:
@@ -1512,7 +1552,8 @@ async def list_session_replays(
     :param client: The async client for API communication.
     :param workspace: The workspace name.
     :param pipeline_name: Name of the pipeline.
-    :param limit: Maximum number of runs to return (the API caps it at 200).
+    :param limit: Most runs to return (at most 200). The API has no further paging: a result of exactly
+        this many may be cut off.
     :returns: The runs, or an error message.
     """
     try:
@@ -1601,7 +1642,8 @@ async def list_replay_suites(
     :param client: The async client for API communication.
     :param workspace: The workspace name.
     :param pipeline_name: Name of the pipeline.
-    :param limit: Maximum number of suites to return (the API caps it at 200).
+    :param limit: Most suites to return (at most 200). The API has no further paging: a result of exactly
+        this many may be cut off.
     :returns: The suites, or an error message.
     """
     try:

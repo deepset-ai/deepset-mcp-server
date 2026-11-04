@@ -120,10 +120,14 @@ class EvaluationResource(EvaluationResourceProtocol):
     async def list_evaluators(self, limit: int = 200, archived: bool | None = None) -> list[Evaluator]:
         """List the workspace's Evaluators, each with its newest version but no source.
 
-        :param limit: Maximum number of Evaluators to return (the API caps it at 200).
+        :param limit: Maximum number of Evaluators to return (the API caps it at 200 and has no further paging).
+        :param archived: ``True`` for only archived Evaluators, ``False`` for only the others; both when omitted.
         :returns: The Evaluators.
         """
-        data = await self._get(await self._evaluators_path(), {"limit": limit})
+        params: dict[str, Any] = {"limit": limit}
+        if archived is not None:
+            params["archived"] = archived
+        data = await self._get(await self._evaluators_path(), params)
         return [Evaluator.model_validate(item) for item in data or []]
 
     async def get_evaluator(self, evaluator_id: str) -> Evaluator:
@@ -276,10 +280,21 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param pipeline_name: Name of the pipeline.
         :param metric_group_id: The Metric Group's id.
         :param run_id: The run's id.
+        :param origin: Only cells whose Session came from SERVICE, PIPELINE_RUN or PLAYGROUND.
+        :param deployment_id: Only cells whose Session this Service served.
+        :param pipeline_version_id: Only cells whose Session this pipeline version served.
+        :param session_id: Only this Session's row.
         :returns: The grid.
         """
+        params = {
+            "origin": origin,
+            "deployment_id": deployment_id,
+            "pipeline_version_id": pipeline_version_id,
+            "session_id": session_id,
+        }
         path = await self._pipeline_path(pipeline_name, "metric-groups", metric_group_id, "scoring-runs", run_id)
-        return ExperimentRunGrid.model_validate(await self._get(path))
+        query = {k: v for k, v in params.items() if v is not None}
+        return ExperimentRunGrid.model_validate(await self._get(path, query))
 
     async def create_experiment(
         self,
@@ -560,6 +575,8 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param origin: Only Sessions whose every turn came from SERVICE, PIPELINE_RUN or PLAYGROUND.
         :param deployment_id: Only Sessions whose every turn this Service served.
         :param pipeline_version_id: Only Sessions whose every turn this pipeline version served.
+        :param revision_id: Only Sessions whose every turn this Service revision served (exact where a version is
+            not: one version can be pushed to a Service more than once).
         :param since: ISO-8601 time; last activity at or after it.
         :param until: ISO-8601 time; last activity at or before it.
         :param limit: Maximum number of Sessions per page (the API caps it at 200).
@@ -570,6 +587,7 @@ class EvaluationResource(EvaluationResourceProtocol):
             "origin": origin,
             "deployment_id": deployment_id,
             "pipeline_version_id": pipeline_version_id,
+            "revision_id": revision_id,
             "from": since,
             "to": until,
             "limit": limit,

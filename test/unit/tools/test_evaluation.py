@@ -573,9 +573,7 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
         limit: int = 50,
         cursor: str | None = None,
     ) -> SessionList:
-        self._record(
-            "list_sessions", origin=origin, revision_id=revision_id, since=since, limit=limit, cursor=cursor
-        )
+        self._record("list_sessions", origin=origin, revision_id=revision_id, since=since, limit=limit, cursor=cursor)
         return SessionList.model_validate({"data": [], "next": None})
 
     async def start_try(self, pipeline_name: str, python_code: str, session_id: str) -> str:
