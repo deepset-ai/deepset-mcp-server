@@ -43,18 +43,44 @@ from deepset_mcp.tools.doc_search import (
     search_docs_via_docs_api,
 )
 from deepset_mcp.tools.evaluation import (
+    add_test_cases as add_test_cases_tool,
+    copy_test_cases as copy_test_cases_tool,
+    create_dataset as create_dataset_tool,
+    create_evaluator as create_evaluator_tool,
     create_experiment as create_experiment_tool,
+    create_metric_group as create_metric_group_tool,
+    delete_dataset as delete_dataset_tool,
+    delete_experiment as delete_experiment_tool,
+    delete_metric_group as delete_metric_group_tool,
+    get_dataset as get_dataset_tool,
+    get_evaluation_run as get_evaluation_run_tool,
     get_evaluation_try as get_evaluation_try_tool,
     get_evaluator as get_evaluator_tool,
+    get_experiment as get_experiment_tool,
     get_experiment_results as get_experiment_results_tool,
     get_experiment_run as get_experiment_run_tool,
     get_session_replay as get_session_replay_tool,
+    list_datasets as list_datasets_tool,
+    list_evaluation_runs as list_evaluation_runs_tool,
+    list_evaluator_templates as list_evaluator_templates_tool,
     list_evaluators as list_evaluators_tool,
+    list_experiment_runs as list_experiment_runs_tool,
     list_experiments as list_experiments_tool,
     list_metric_groups as list_metric_groups_tool,
     list_sessions as list_sessions_tool,
+    remove_test_cases as remove_test_cases_tool,
     replay_session as replay_session_tool,
+    rerun_failed_experiment as rerun_failed_experiment_tool,
+    rescore_experiment as rescore_experiment_tool,
+    run_evaluator as run_evaluator_tool,
+    set_evaluator_archived as set_evaluator_archived_tool,
+    start_experiment_run as start_experiment_run_tool,
     try_evaluator as try_evaluator_tool,
+    update_dataset as update_dataset_tool,
+    update_evaluator as update_evaluator_tool,
+    update_experiment as update_experiment_tool,
+    update_metric_group as update_metric_group_tool,
+    update_test_case as update_test_case_tool,
 )
 from deepset_mcp.tools.haystack_service import (
     get_component_definition as get_component_definition_tool,
@@ -395,12 +421,52 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
         create_experiment_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
     ),
+    "get_experiment": (
+        get_experiment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "update_experiment": (
+        update_experiment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "rerun_failed_experiment": (
+        rerun_failed_experiment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "rescore_experiment": (
+        rescore_experiment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "delete_experiment": (
+        delete_experiment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
     "get_experiment_results": (
         get_experiment_results_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
     "get_experiment_run": (
         get_experiment_run_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "list_experiment_runs": (
+        list_experiment_runs_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "start_experiment_run": (
+        start_experiment_run_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "run_evaluator": (
+        run_evaluator_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "list_evaluation_runs": (
+        list_evaluation_runs_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_evaluation_run": (
+        get_evaluation_run_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
     "list_sessions": (
@@ -421,6 +487,70 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     ),
     "get_session_replay": (
         get_session_replay_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "list_datasets": (
+        list_datasets_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_dataset": (
+        get_dataset_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "create_dataset": (
+        create_dataset_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "update_dataset": (
+        update_dataset_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "delete_dataset": (
+        delete_dataset_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "add_test_cases": (
+        add_test_cases_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "update_test_case": (
+        update_test_case_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "copy_test_cases": (
+        copy_test_cases_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "remove_test_cases": (
+        remove_test_cases_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "create_evaluator": (
+        create_evaluator_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "update_evaluator": (
+        update_evaluator_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "set_evaluator_archived": (
+        set_evaluator_archived_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "list_evaluator_templates": (
+        list_evaluator_templates_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "create_metric_group": (
+        create_metric_group_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "update_metric_group": (
+        update_metric_group_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "delete_metric_group": (
+        delete_metric_group_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
     ),
     # Cost tools
