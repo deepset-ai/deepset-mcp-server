@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import asyncio
+import enum
 import inspect
 from typing import Any
 
@@ -663,12 +664,6 @@ class TestExplorableAndReferenceableDecorator:
 
 
 def test_enum_parameter_coerced_from_string() -> None:
-    import enum
-
-    import pytest
-
-    from deepset_mcp.tokonomics.decorators import _try_coerce_from_string
-
     class Mode(enum.StrEnum):
         MANAGED = "MANAGED"
         SERVERLESS = "SERVERLESS"
