@@ -37,6 +37,7 @@ from deepset_mcp.api.evaluation.models import (
     NormalizedMean,
     ScoreAggregate,
     SessionList,
+    SessionReplayRun,
     SessionWindow,
     TestCase,
     TryReport,
@@ -63,6 +64,7 @@ from deepset_mcp.tools.evaluation import (
     get_experiment,
     get_experiment_results,
     get_experiment_run,
+    get_session_replay,
     list_datasets,
     list_evaluation_runs,
     list_evaluator_templates,
@@ -72,6 +74,7 @@ from deepset_mcp.tools.evaluation import (
     list_metric_groups,
     list_sessions,
     remove_test_cases,
+    replay_session,
     rerun_failed_experiment,
     rescore_experiment,
     run_evaluator,
@@ -303,6 +306,7 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
         self,
         error: Exception | None = None,
         try_states: list[TryState] | None = None,
+        replay_states: list[SessionReplayRun] | None = None,
         results: dict[str, Any] | None = None,
         weights: list[dict[str, Any]] | None = None,
         run_grid: ExperimentRunGrid | None = None,
@@ -315,6 +319,7 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
         self.results = results
         self.calls: list[tuple[str, dict[str, Any]]] = []
         self.try_states = try_states or []
+        self.replay_states = replay_states or []
 
     def _record(self, name: str, /, **kwargs: Any) -> None:
         self.calls.append((name, kwargs))
@@ -512,6 +517,29 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
     async def get_try(self, pipeline_name: str, try_id: str) -> TryState:
         self._record("get_try", try_id=try_id)
         return self.try_states.pop(0) if len(self.try_states) > 1 else self.try_states[0]
+
+    async def start_session_replay(
+        self,
+        pipeline_name: str,
+        session_id: str,
+        pipeline_version_id: str,
+        replay_mode: str | None = None,
+        setup_source: str | None = None,
+        cleanup_source: str | None = None,
+    ) -> str:
+        self._record(
+            "start_session_replay",
+            session_id=session_id,
+            pipeline_version_id=pipeline_version_id,
+            replay_mode=replay_mode,
+            setup_source=setup_source,
+            cleanup_source=cleanup_source,
+        )
+        return REPLAY_RUN_ID
+
+    async def get_session_replay(self, pipeline_name: str, replay_run_id: str) -> SessionReplayRun:
+        self._record("get_session_replay", replay_run_id=replay_run_id)
+        return self.replay_states.pop(0) if len(self.replay_states) > 1 else self.replay_states[0]
 
     async def list_datasets(self, pipeline_name: str | None = None, limit: int = 50) -> list[DatasetSummary]:
         self._record("list_datasets", pipeline_name=pipeline_name, limit=limit)
@@ -869,6 +897,73 @@ async def test_list_evaluators_and_sessions_pass_through() -> None:
 
 
 @pytest.mark.asyncio
+async def test_replay_session_polls_until_ended_and_names_the_new_session() -> None:
+    resource = FakeEvaluationResource(replay_states=[replay_run("STARTED"), replay_run("ENDED")])
+
+    run = await replay_session(
+        client=FakeClient(resource),
+        workspace=WORKSPACE,
+        pipeline_name=PIPELINE,
+        session_id=SESSION_A,
+        pipeline_version_id=DRAFT_VERSION_ID,
+        replay_mode="ALL_USER_MESSAGES",
+        setup_source="def setup(): ...",
+        cleanup_source="def cleanup(state): ...",
+    )
+
+    assert isinstance(run, SessionReplayRun)
+    assert (run.status, run.session_replay_run_id) == ("ENDED", REPLAY_RUN_ID)
+    assert (run.source_session_id, run.session_id) == (SESSION_A, REPLAYED_SESSION_ID)
+    assert [c[0] for c in resource.calls] == ["start_session_replay", "get_session_replay", "get_session_replay"]
+    assert resource.calls[0][1] == {
+        "session_id": SESSION_A,
+        "pipeline_version_id": DRAFT_VERSION_ID,
+        "replay_mode": "ALL_USER_MESSAGES",
+        "setup_source": "def setup(): ...",
+        "cleanup_source": "def cleanup(state): ...",
+    }
+
+
+@pytest.mark.asyncio
+async def test_replay_session_hands_back_the_run_when_the_wait_runs_out() -> None:
+    resource = FakeEvaluationResource(replay_states=[replay_run("STARTED")])
+
+    run = await replay_session(
+        client=FakeClient(resource),
+        workspace=WORKSPACE,
+        pipeline_name=PIPELINE,
+        session_id=SESSION_A,
+        pipeline_version_id=DRAFT_VERSION_ID,
+        wait_seconds=0,
+    )
+
+    assert isinstance(run, SessionReplayRun)
+    assert (run.status, run.session_replay_run_id) == ("STARTED", REPLAY_RUN_ID)
+
+
+@pytest.mark.asyncio
+async def test_get_session_replay_shows_why_a_replay_failed() -> None:
+    failed = replay_run(
+        "FAILED",
+        session_replay_test_case_id=E2,
+        error_detail={"message": "setup raised"},
+        setup_logs=["seeding"],
+        cleanup_logs=["dropped"],
+    )
+
+    run = await get_session_replay(
+        client=FakeClient(FakeEvaluationResource(replay_states=[failed])),
+        workspace=WORKSPACE,
+        pipeline_name=PIPELINE,
+        replay_run_id=REPLAY_RUN_ID,
+    )
+
+    assert isinstance(run, SessionReplayRun)
+    assert (run.status, run.session_id, run.test_case_id) == ("FAILED", REPLAYED_SESSION_ID, E2)
+    assert (run.error_detail, run.setup_logs, run.cleanup_logs) == ({"message": "setup raised"}, ["seeding"], ["dropped"])
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("error", "expected"),
     [
@@ -898,11 +993,13 @@ async def test_errors_come_back_as_readable_strings(error: Exception, expected: 
 
 
 # ---------------------------------------------------------------------------------------------
-# Checks: the try
+# Checks: the try and session replay
 # ---------------------------------------------------------------------------------------------
 
 TRY_ID = "signed-try-id"
+REPLAY_RUN_ID = "77777777-7777-7777-7777-777777777777"
 DRAFT_VERSION_ID = "88888888-8888-8888-8888-888888888888"
+REPLAYED_SESSION_ID = "99999999-9999-9999-9999-999999999991"
 
 
 def try_result(**overrides: Any) -> EvaluationTryResult:
@@ -920,6 +1017,20 @@ def try_result(**overrides: Any) -> EvaluationTryResult:
                     {"operation_name": "haystack.tool.invoke", "tags": {"haystack.tool.name": "report_metric"}},
                 ],
             },
+            **overrides,
+        }
+    )
+
+
+def replay_run(status: str, **overrides: Any) -> SessionReplayRun:
+    return SessionReplayRun.model_validate(
+        {
+            "session_replay_run_id": REPLAY_RUN_ID,
+            "pipeline_version_id": DRAFT_VERSION_ID,
+            "status": status,
+            "source_session_id": SESSION_A,
+            "session_id": REPLAYED_SESSION_ID,
+            "trace_ids": [],
             **overrides,
         }
     )
@@ -1000,6 +1111,16 @@ async def test_check_errors_come_back_as_readable_strings(error: Exception, expe
             client=client, workspace=WORKSPACE, pipeline_name=PIPELINE, python_code="x", session_id=SESSION_A
         ),
         await get_evaluation_try(client=client, workspace=WORKSPACE, pipeline_name=PIPELINE, try_id=TRY_ID),
+        await replay_session(
+            client=client,
+            workspace=WORKSPACE,
+            pipeline_name=PIPELINE,
+            session_id=SESSION_A,
+            pipeline_version_id=DRAFT_VERSION_ID,
+        ),
+        await get_session_replay(
+            client=client, workspace=WORKSPACE, pipeline_name=PIPELINE, replay_run_id=REPLAY_RUN_ID
+        ),
     ]
 
     for result in results:

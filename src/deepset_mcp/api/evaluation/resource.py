@@ -30,6 +30,7 @@ from deepset_mcp.api.evaluation.models import (
     MetricWeight,
     NewTestCase,
     SessionList,
+    SessionReplayRun,
     SessionWindow,
     TestCase,
     TryState,
@@ -626,6 +627,41 @@ class EvaluationResource(EvaluationResourceProtocol):
             return TryState(status="EXPIRED")
         raise_for_status(resp)
         return TryState(status="READY", result=EvaluationTryResult.model_validate(resp.json))
+
+    async def start_session_replay(
+        self,
+        pipeline_name: str,
+        session_id: str,
+        pipeline_version_id: str,
+        replay_mode: str | None = None,
+        setup_source: str | None = None,
+        cleanup_source: str | None = None,
+    ) -> str:
+        """Start replaying a Session against a pipeline version, a draft included.
+
+        :param pipeline_name: Name of the pipeline.
+        :param session_id: The Session to replay.
+        :param pipeline_version_id: The pipeline version to replay it against.
+        :param replay_mode: FIRST_USER_MESSAGE or ALL_USER_MESSAGES; omitted, the server's default.
+        :param setup_source: Python source run before the pipeline; omitted, no setup step.
+        :param cleanup_source: Python source run after the pipeline; omitted, no cleanup step.
+        :returns: The replay run id to poll.
+        """
+        body = {"session_id": session_id, "pipeline_version_id": pipeline_version_id}
+        optional = {"replay_mode": replay_mode, "setup_source": setup_source, "cleanup_source": cleanup_source}
+        body.update({k: v for k, v in optional.items() if v is not None})
+        data = await self._post(await self._pipeline_path(pipeline_name, "replay-runs"), body)
+        return str(data["session_replay_run_id"])
+
+    async def get_session_replay(self, pipeline_name: str, replay_run_id: str) -> SessionReplayRun:
+        """Read a session replay run.
+
+        :param pipeline_name: Name of the pipeline.
+        :param replay_run_id: The id `start_session_replay` returned.
+        :returns: The run.
+        """
+        path = await self._pipeline_path(pipeline_name, "replay-runs", replay_run_id)
+        return SessionReplayRun.model_validate(await self._get(path))
 
     async def list_datasets(self, pipeline_name: str | None = None, limit: int = 50) -> list[DatasetSummary]:
         """List the workspace's Datasets without their test cases, newest first.

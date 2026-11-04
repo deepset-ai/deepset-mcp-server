@@ -25,6 +25,7 @@ from deepset_mcp.api.evaluation.models import (
     MetricWeight,
     NewTestCase,
     SessionList,
+    SessionReplayRun,
     SessionWindow,
     TestCase,
     TryState,
@@ -153,6 +154,22 @@ class EvaluationResourceProtocol(Protocol):
 
     async def get_try(self, pipeline_name: str, try_id: str) -> TryState:
         """Read an ad-hoc try."""
+        ...
+
+    async def start_session_replay(
+        self,
+        pipeline_name: str,
+        session_id: str,
+        pipeline_version_id: str,
+        replay_mode: str | None = None,
+        setup_source: str | None = None,
+        cleanup_source: str | None = None,
+    ) -> str:
+        """Start replaying a Session against a pipeline version."""
+        ...
+
+    async def get_session_replay(self, pipeline_name: str, replay_run_id: str) -> SessionReplayRun:
+        """Read a session replay run."""
         ...
 
     async def list_datasets(self, pipeline_name: str | None = None, limit: int = 50) -> list[DatasetSummary]:

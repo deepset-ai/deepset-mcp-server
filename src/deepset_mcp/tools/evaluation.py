@@ -37,6 +37,7 @@ from deepset_mcp.api.evaluation.models import (
     ReportCell,
     ReportRow,
     SessionList,
+    SessionReplayRun,
     SessionWindow,
     TestCase,
     TraceSummary,
@@ -624,6 +625,29 @@ async def get_evaluation_try(
     except (BadRequestError, UnexpectedAPIError) as e:
         return f"Failed to read try '{try_id}': {e}"
     return _try_report(try_id, state)
+
+
+async def replay_session(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    session_id: str,
+    pipeline_version_id: str,
+    replay_mode: Literal["FIRST_USER_MESSAGE", "ALL_USER_MESSAGES"] | None = None,
+    setup_source: str | None = None,
+    cleanup_source: str | None = None,
+    wait_seconds: int = 300,
+) -> SessionReplayRun | str:
+    """Replays a Session."""
+    raise NotImplementedError
+
+
+async def get_session_replay(
+    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str, replay_run_id: str
+) -> SessionReplayRun | str:
+    """Reads a replay run."""
+    raise NotImplementedError
 
 
 _API_ERRORS = (ResourceNotFoundError, BadRequestError, UnexpectedAPIError)

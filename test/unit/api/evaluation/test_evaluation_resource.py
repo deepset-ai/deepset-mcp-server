@@ -579,7 +579,9 @@ async def test_404_from_the_route_raises_not_found() -> None:
 
 
 TRIES = f"{PIPELINE}/tries"
+REPLAYS = f"{PIPELINE}/replay-runs"
 TRY_ID = "signed-try-id"
+REPLAY_RUN_ID = "77777777-7777-7777-7777-777777777777"
 DRAFT_VERSION_ID = "88888888-8888-8888-8888-888888888888"
 
 
@@ -628,6 +630,83 @@ async def test_get_try_reads_running_ready_and_expired() -> None:
     assert state.status == "READY"
     assert state.result is not None and state.result.metrics[0].label == "yes"
     assert (await resource(gone).get_try(PIPELINE_NAME, TRY_ID)).status == "EXPIRED"
+
+
+def replay_run_dict(**overrides: Any) -> dict[str, Any]:
+    return {
+        "session_replay_run_id": REPLAY_RUN_ID,
+        "pipeline_id": PIPELINE_UUID,
+        "pipeline_version_id": DRAFT_VERSION_ID,
+        "status": "ENDED",
+        "source_session_id": SESSION_ID,
+        "session_id": EVALUATION_RUN_ID,
+        "result": None,
+        "trace_ids": [SESSION_ID],
+        "error_detail": None,
+        "created_at": "2026-10-07T00:00:00Z",
+        **overrides,
+    }
+
+
+@pytest.mark.asyncio
+async def test_start_session_replay_sends_replay_mode_only_when_set() -> None:
+    client = FakeEvaluationClient({REPLAYS: {"session_replay_run_id": REPLAY_RUN_ID}})
+
+    await resource(client).start_session_replay(PIPELINE_NAME, SESSION_ID, DRAFT_VERSION_ID)
+    await resource(client).start_session_replay(
+        PIPELINE_NAME, SESSION_ID, DRAFT_VERSION_ID, replay_mode="ALL_USER_MESSAGES"
+    )
+
+    first, second = (r for r in client.requests if r["endpoint"] == REPLAYS)
+    assert first["method"] == "POST"
+    assert first["data"] == {"session_id": SESSION_ID, "pipeline_version_id": DRAFT_VERSION_ID}
+    assert second["data"]["replay_mode"] == "ALL_USER_MESSAGES"
+
+
+@pytest.mark.asyncio
+async def test_start_session_replay_sends_setup_and_cleanup_only_when_set() -> None:
+    client = FakeEvaluationClient({REPLAYS: {"session_replay_run_id": REPLAY_RUN_ID}})
+
+    await resource(client).start_session_replay(
+        PIPELINE_NAME, SESSION_ID, DRAFT_VERSION_ID, setup_source="s", cleanup_source="c"
+    )
+
+    assert client.requests[0]["data"] == {
+        "session_id": SESSION_ID,
+        "pipeline_version_id": DRAFT_VERSION_ID,
+        "setup_source": "s",
+        "cleanup_source": "c",
+    }
+
+
+@pytest.mark.asyncio
+async def test_get_session_replay_reads_the_run_with_its_session_test_case_and_logs() -> None:
+    client = FakeEvaluationClient(
+        {
+            f"{REPLAYS}/{REPLAY_RUN_ID}": replay_run_dict(
+                status="FAILED",
+                session_replay_test_case_id=TEST_CASE_ID,
+                setup_logs=["seeded"],
+                cleanup_logs=["dropped"],
+                error_detail={"message": "boom"},
+            )
+        }
+    )
+
+    run = await resource(client).get_session_replay(PIPELINE_NAME, REPLAY_RUN_ID)
+
+    assert (run.status, run.source_session_id, run.trace_ids) == ("FAILED", SESSION_ID, [SESSION_ID])
+    assert (run.session_id, run.test_case_id) == (EVALUATION_RUN_ID, TEST_CASE_ID)
+    assert (run.setup_logs, run.cleanup_logs, run.error_detail) == (["seeded"], ["dropped"], {"message": "boom"})
+
+
+@pytest.mark.asyncio
+async def test_get_session_replay_from_an_older_api_has_no_logs_or_test_case() -> None:
+    client = FakeEvaluationClient({f"{REPLAYS}/{REPLAY_RUN_ID}": replay_run_dict()})
+
+    run = await resource(client).get_session_replay(PIPELINE_NAME, REPLAY_RUN_ID)
+
+    assert (run.setup_logs, run.cleanup_logs, run.test_case_id) == (None, None, None)
 
 
 def test_case_dict(**overrides: Any) -> dict[str, Any]:

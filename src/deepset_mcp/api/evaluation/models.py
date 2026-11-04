@@ -931,6 +931,25 @@ class TryReport(BaseModel):
     error_detail: dict[str, Any] | None = None
 
 
+class SessionReplayRun(BaseModel):
+    """A session replay run, as hub-api returns it."""
+
+    session_replay_run_id: str
+    pipeline_version_id: str | None = Field(default=None, description="Null when no pipeline version was replayed")
+    status: str = Field(description="CREATED, STARTED, ENDED or FAILED")
+    source_session_id: str | None = Field(default=None, description="Null for a test case that sends inputs")
+    replay_mode: str | None = None
+    trace_ids: list[str] = Field(default_factory=list, description="The traces the replay produced, in order")
+    error_detail: dict[str, Any] | None = None
+    session_id: str | None = Field(default=None, description="The new Session the replay's traces land in")
+    test_case_id: str | None = Field(
+        default=None,
+        validation_alias="session_replay_test_case_id",
+        description="The Dataset test case this replay is for; null for a replay on its own",
+    )
+    created_at: str | None = None
+
+
 class NewTestCase(BaseModel):
     """One test case to add to a Dataset: a Session to replay or the inputs to send, never both."""
 
