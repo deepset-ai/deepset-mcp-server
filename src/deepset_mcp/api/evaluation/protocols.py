@@ -8,6 +8,7 @@ from deepset_mcp.api.evaluation.models import (
     CombinedEvaluatorTemplates,
     Dataset,
     DatasetSummary,
+    EvaluationRun,
     Evaluator,
     EvaluatorTemplate,
     EvaluatorVersion,
@@ -16,13 +17,16 @@ from deepset_mcp.api.evaluation.models import (
     ExperimentPlan,
     ExperimentResults,
     ExperimentRun,
+    ExperimentRunAccepted,
     ExperimentRunGrid,
+    ExperimentRunPreview,
     ExperimentUpdatePlan,
     MetricGroup,
     MetricWeight,
     NewTestCase,
     SessionList,
     SessionReplayRun,
+    SessionWindow,
     TestCase,
     TryState,
 )
@@ -53,6 +57,43 @@ class EvaluationResourceProtocol(Protocol):
         """List a Metric Group's scoring runs on one pipeline, newest first."""
         ...
 
+    async def list_session_experiment_runs(
+        self, pipeline_name: str, session_id: str, limit: int = 50
+    ) -> list[ExperimentRun]:
+        """List the scoring runs, of any Metric Group, that judged one Session, newest first."""
+        ...
+
+    async def start_experiment_run(
+        self,
+        pipeline_name: str,
+        metric_group_id: str,
+        session_ids: list[str] | None = None,
+        window: SessionWindow | None = None,
+        reuse: str | None = None,
+        selection: str | None = None,
+        focus: dict[str, list[str]] | None = None,
+    ) -> ExperimentRunAccepted:
+        """Start a scoring run: a Metric Group judging named Sessions, or every Session in a window."""
+        ...
+
+    async def preview_experiment_run(
+        self, pipeline_name: str, metric_group_id: str, window: SessionWindow
+    ) -> ExperimentRunPreview:
+        """Count what a window run would judge, without starting it."""
+        ...
+
+    async def run_evaluator(self, pipeline_name: str, evaluator_version_id: str, session_id: str) -> str:
+        """Start one Evaluator version on one Session and return the Evaluation Run id to poll."""
+        ...
+
+    async def list_evaluation_runs(self, pipeline_name: str, limit: int = 50) -> list[EvaluationRun]:
+        """List a pipeline's Evaluation Runs, newest first."""
+        ...
+
+    async def get_evaluation_run(self, pipeline_name: str, evaluation_run_id: str) -> EvaluationRun:
+        """Read one Evaluation Run: its progress, or its Metrics."""
+        ...
+
     async def get_experiment_run(self, pipeline_name: str, metric_group_id: str, run_id: str) -> ExperimentRunGrid:
         """Fetch one scoring run as a grid."""
         ...
@@ -68,6 +109,7 @@ class EvaluationResourceProtocol(Protocol):
         baseline_pipeline_version_id: str | None = None,
         sessions_per_test_case: int = 1,
         replay_mode: str = "FIRST_USER_MESSAGE",
+        reuse_sessions: bool = True,
     ) -> Experiment:
         """Create an Experiment comparing a candidate pipeline version against a baseline."""
         ...
@@ -206,6 +248,7 @@ class EvaluationResourceProtocol(Protocol):
         baseline_pipeline_version_id: str | None = None,
         sessions_per_test_case: int = 1,
         replay_mode: str = "FIRST_USER_MESSAGE",
+        reuse_sessions: bool = True,
     ) -> ExperimentPlan:
         """Plan an Experiment without starting it: Sessions reused and replays needed per side."""
         ...

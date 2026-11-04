@@ -19,6 +19,7 @@ from deepset_mcp.api.evaluation.models import (
     CombinedEvaluatorTemplates,
     Dataset,
     DatasetSummary,
+    EvaluationRun,
     Evaluator,
     EvaluatorTemplate,
     EvaluatorVersion,
@@ -26,7 +27,10 @@ from deepset_mcp.api.evaluation.models import (
     ExperimentDetail,
     ExperimentPlan,
     ExperimentResultsReport,
+    ExperimentRun,
+    ExperimentRunAccepted,
     ExperimentRunGrid,
+    ExperimentRunPreview,
     ExperimentRunReport,
     ExperimentUpdatePlan,
     MetricGroup,
@@ -147,6 +151,7 @@ async def create_experiment(
     baseline_pipeline_version_id: str | None = None,
     sessions_per_test_case: int = 1,
     replay_mode: Literal["FIRST_USER_MESSAGE", "ALL_USER_MESSAGES"] = "FIRST_USER_MESSAGE",
+    reuse_sessions: bool = True,
     preview: bool = False,
 ) -> Experiment | ExperimentPlan | str:
     """Creates an Experiment that compares a candidate pipeline version against a baseline.
@@ -1252,3 +1257,65 @@ async def delete_experiment(*, client: AsyncClientProtocol, workspace: str, expe
     except _API_ERRORS as e:
         return f"Failed to delete experiment '{experiment_id}': {e}"
     return f"Experiment '{experiment_id}' deleted."
+
+
+async def list_experiment_runs(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    metric_group_id: str | None = None,
+    session_id: str | None = None,
+    limit: int = 50,
+) -> list[ExperimentRun] | str:
+    """Not implemented yet."""
+    raise NotImplementedError
+
+
+async def start_experiment_run(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    metric_group_id: str,
+    session_ids: list[str] | None = None,
+    window_from: str | None = None,
+    window_to: str | None = None,
+    origin: Literal["SERVICE", "PIPELINE_RUN", "PLAYGROUND"] | None = None,
+    deployment_id: str | None = None,
+    pipeline_version_id: str | None = None,
+    revision_id: str | None = None,
+    reuse: Literal["RERUN_ALL", "REUSE_SUCCEEDED"] = "RERUN_ALL",
+    selection: Literal["SAMPLED", "HAND_PICKED"] = "SAMPLED",
+    focus: dict[str, list[str]] | None = None,
+    preview: bool = False,
+) -> ExperimentRunAccepted | ExperimentRunPreview | str:
+    """Not implemented yet."""
+    raise NotImplementedError
+
+
+async def run_evaluator(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    evaluator_version_id: str,
+    session_id: str,
+    wait_seconds: int = 120,
+) -> EvaluationRun | str:
+    """Not implemented yet."""
+    raise NotImplementedError
+
+
+async def list_evaluation_runs(
+    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str, limit: int = 50
+) -> list[EvaluationRun] | str:
+    """Not implemented yet."""
+    raise NotImplementedError
+
+
+async def get_evaluation_run(
+    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str, evaluation_run_id: str
+) -> EvaluationRun | str:
+    """Not implemented yet."""
+    raise NotImplementedError

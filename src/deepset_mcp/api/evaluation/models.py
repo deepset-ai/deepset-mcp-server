@@ -6,7 +6,7 @@
 
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 Better = Literal["higher", "lower"]
 Change = Literal["improved", "regressed", "unchanged", "unknown"]
@@ -222,6 +222,12 @@ class ExperimentRun(BaseModel):
             "run's Composite always uses these, so editing the group's weights changes only later runs. Null "
             "when there was nothing to weigh, and the run then has no Composite."
         ),
+    )
+    window: "SessionWindow | None" = Field(
+        default=None, description="The window this run judged, or null for a run that named its Sessions."
+    )
+    resolved_sessions: int | None = Field(
+        default=None, description="How many Sessions the run was launched with. Null for runs before it was recorded."
     )
     created_at: str
 
@@ -555,7 +561,16 @@ class EvaluationRun(BaseModel):
     metrics: list[MetricRow] = Field(default_factory=list)
     evaluator_version_id: str
     session_id: str | None = None
+    trace_ids: list[str] = Field(default_factory=list, description="The Traces evaluated, in the Session's turn order")
+    focus: list[str] | None = Field(
+        default=None, description="The turns the run answered for, by query id. Null for a run over every turn."
+    )
+    provenance: "SessionProvenance | None" = Field(
+        default=None, description="Where the judged Session came from. Null when no Session was resolved."
+    )
     error_detail: dict[str, Any] | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
 class ExperimentRunCell(BaseModel):
@@ -663,6 +678,51 @@ class SessionProvenance(BaseModel):
     origin: str = Field(description="SERVICE, PIPELINE_RUN or PLAYGROUND")
     deployment_id: str | None = Field(default=None, description="The Service that served every turn, if one did")
     pipeline_version_ids: list[str] = Field(default_factory=list)
+
+
+class SessionWindow(BaseModel):
+    """Every Session of a pipeline whose last activity falls in ``[from, to]``, narrowed by optional filters."""
+
+    start: str = Field(
+        validation_alias=AliasChoices("start", "from"),
+        serialization_alias="from",
+        description="Last activity at or after this time (ISO 8601, with a timezone).",
+    )
+    end: str = Field(
+        validation_alias=AliasChoices("end", "to"),
+        serialization_alias="to",
+        description="Last activity at or before this time (ISO 8601, with a timezone). Not in the future.",
+    )
+    origin: Literal["SERVICE", "PIPELINE_RUN", "PLAYGROUND"] | None = Field(
+        default=None, description="Only Sessions from this origin."
+    )
+    deployment_id: str | None = Field(default=None, description="Only Sessions this Service served.")
+    pipeline_version_id: str | None = Field(default=None, description="Only Sessions this version served.")
+    revision_id: str | None = Field(default=None, description="Only Sessions this Service revision served.")
+
+
+class ExperimentRunAccepted(BaseModel):
+    """A queued scoring run: poll it with ``get_experiment_run``."""
+
+    pipeline_experiment_run_id: str
+    cells: int = Field(description="Sessions times Evaluators: how many cells the grid will have")
+
+
+class WindowCeiling(BaseModel):
+    """The largest window run hub-api accepts."""
+
+    sessions: int
+    cells: int
+
+
+class ExperimentRunPreview(BaseModel):
+    """What a window run would judge if it were started now. Advisory: starting it resolves the window again."""
+
+    sessions: int = Field(description="Sessions in the window. With `more_than`, the count stopped here.")
+    more_than: bool = Field(description="The window holds more Sessions than `sessions`, which is over the ceiling")
+    evaluators: int = Field(description="Evaluators in the Metric Group")
+    cells: int = Field(description="Sessions times Evaluators: the judge calls the run would make")
+    ceiling: WindowCeiling
 
 
 class SessionListItem(BaseModel):

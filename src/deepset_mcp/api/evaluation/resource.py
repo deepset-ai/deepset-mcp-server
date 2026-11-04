@@ -12,6 +12,7 @@ from deepset_mcp.api.evaluation.models import (
     CombinedEvaluatorTemplates,
     Dataset,
     DatasetSummary,
+    EvaluationRun,
     EvaluationTryResult,
     Evaluator,
     EvaluatorTemplate,
@@ -21,13 +22,16 @@ from deepset_mcp.api.evaluation.models import (
     ExperimentPlan,
     ExperimentResults,
     ExperimentRun,
+    ExperimentRunAccepted,
     ExperimentRunGrid,
+    ExperimentRunPreview,
     ExperimentUpdatePlan,
     MetricGroup,
     MetricWeight,
     NewTestCase,
     SessionList,
     SessionReplayRun,
+    SessionWindow,
     TestCase,
     TryState,
 )
@@ -158,6 +162,43 @@ class EvaluationResource(EvaluationResourceProtocol):
         path = await self._pipeline_path(pipeline_name, "metric-groups", metric_group_id, "scoring-runs")
         return [ExperimentRun.model_validate(item) for item in await self._get(path, {"limit": limit}) or []]
 
+    async def list_session_experiment_runs(
+        self, pipeline_name: str, session_id: str, limit: int = 50
+    ) -> list[ExperimentRun]:
+        """Not implemented yet."""
+        raise NotImplementedError
+
+    async def start_experiment_run(
+        self,
+        pipeline_name: str,
+        metric_group_id: str,
+        session_ids: list[str] | None = None,
+        window: SessionWindow | None = None,
+        reuse: str | None = None,
+        selection: str | None = None,
+        focus: dict[str, list[str]] | None = None,
+    ) -> ExperimentRunAccepted:
+        """Not implemented yet."""
+        raise NotImplementedError
+
+    async def preview_experiment_run(
+        self, pipeline_name: str, metric_group_id: str, window: SessionWindow
+    ) -> ExperimentRunPreview:
+        """Not implemented yet."""
+        raise NotImplementedError
+
+    async def run_evaluator(self, pipeline_name: str, evaluator_version_id: str, session_id: str) -> str:
+        """Not implemented yet."""
+        raise NotImplementedError
+
+    async def list_evaluation_runs(self, pipeline_name: str, limit: int = 50) -> list[EvaluationRun]:
+        """Not implemented yet."""
+        raise NotImplementedError
+
+    async def get_evaluation_run(self, pipeline_name: str, evaluation_run_id: str) -> EvaluationRun:
+        """Not implemented yet."""
+        raise NotImplementedError
+
     async def get_experiment_run(self, pipeline_name: str, metric_group_id: str, run_id: str) -> ExperimentRunGrid:
         """Fetch one scoring run as a grid of Sessions by Evaluators.
 
@@ -180,6 +221,7 @@ class EvaluationResource(EvaluationResourceProtocol):
         baseline_pipeline_version_id: str | None = None,
         sessions_per_test_case: int = 1,
         replay_mode: str = "FIRST_USER_MESSAGE",
+        reuse_sessions: bool = True,
     ) -> Experiment:
         """Create an Experiment: a candidate pipeline version against a baseline on one Dataset.
 
@@ -247,6 +289,7 @@ class EvaluationResource(EvaluationResourceProtocol):
         baseline_pipeline_version_id: str | None = None,
         sessions_per_test_case: int = 1,
         replay_mode: str = "FIRST_USER_MESSAGE",
+        reuse_sessions: bool = True,
     ) -> ExperimentPlan:
         """Plan an Experiment without starting it: Sessions reused and replays needed per side.
 
