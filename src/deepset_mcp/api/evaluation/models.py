@@ -703,6 +703,9 @@ class ExperimentRunRow(BaseModel):
     """One grid row: a Session and one cell per Evaluator that judged it."""
 
     session_id: str
+    session_replay_run_id: str | None = Field(
+        default=None, description="The replay run that produced this Session; null for a Session a user had"
+    )
     cells: list[ExperimentRunCell] = Field(default_factory=list)
 
 
@@ -778,6 +781,9 @@ class ReportRow(BaseModel):
     """One Session of a run report, with its flattened cells."""
 
     session_id: str
+    session_replay_run_id: str | None = Field(
+        default=None, description="The replay run that produced this Session (get_session_replay); null if none"
+    )
     cells: list[ReportCell]
 
 
@@ -947,6 +953,8 @@ class SessionReplayRun(BaseModel):
         validation_alias="session_replay_test_case_id",
         description="The Dataset test case this replay is for; null for a replay on its own",
     )
+    setup_logs: list[str] | None = Field(default=None, description="Logs the setup step returned, once it finished")
+    cleanup_logs: list[str] | None = Field(default=None, description="Logs the cleanup step returned, once it finished")
     created_at: str | None = None
 
 

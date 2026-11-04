@@ -975,7 +975,8 @@ async def test_get_session_replay_shows_why_a_replay_failed() -> None:
 
     assert isinstance(run, SessionReplayRun)
     assert (run.status, run.session_id, run.test_case_id) == ("FAILED", REPLAYED_SESSION_ID, E2)
-    assert (run.error_detail, run.setup_logs, run.cleanup_logs) == ({"message": "setup raised"}, ["seeding"], ["dropped"])
+    assert run.error_detail == {"message": "setup raised"}
+    assert (run.setup_logs, run.cleanup_logs) == (["seeding"], ["dropped"])
 
 
 @pytest.mark.asyncio

@@ -377,6 +377,7 @@ async def get_experiment_run(
     rows = [
         ReportRow(
             session_id=row.session_id,
+            session_replay_run_id=row.session_replay_run_id,
             cells=[
                 ReportCell(
                     evaluator_id=cell.evaluator_id,
@@ -639,15 +640,86 @@ async def replay_session(
     cleanup_source: str | None = None,
     wait_seconds: int = 300,
 ) -> SessionReplayRun | str:
-    """Replays a Session."""
-    raise NotImplementedError
+    """Replays one Session against a pipeline version into a new Session. Costs money.
+
+    Experiment support, for when you need it: to reproduce or retry the replay of one test case
+    that failed or looks wrong, replay that test case's Session on the version the Experiment's side
+    uses. It is a paid pipeline run on the customer's models: say what it costs and get a yes first.
+    The replay is not linked to the Experiment, so the new Session is not added to it and changes none
+    of its results. To retry an Experiment's failed replays inside the Experiment, use
+    ``rerun_failed_experiment`` with ``rerun="replays"``. The source Session and the deployed pipeline
+    are untouched.
+
+    FIRST_USER_MESSAGE replays the first turn only; ALL_USER_MESSAGES replays every turn of a chat in
+    order. Leave it unset to use the server's default (the first turn), and say so when reporting.
+    The run's ``session_id`` is the new Session; judge it with ``try_evaluator``. If ``status`` is
+    still CREATED or STARTED the wait ran out: poll ``get_session_replay`` with its
+    ``session_replay_run_id``. When it is FAILED, read ``error_detail`` and the logs.
+
+    ``setup_source`` and ``cleanup_source`` are optional Python run around the pipeline in an isolated
+    worker. Setup must define exactly one public top-level function taking no arguments and returning a
+    mapping with optional ``env`` (dict[str, str]), ``inputs`` (dict[str, Any], keyed by the pipeline's
+    declared input names) and ``logs`` (list[str]); its ``env`` and ``inputs`` take precedence over the
+    Session's own. Cleanup runs even when the replay failed; it must define one public top-level function
+    taking the setup's return value (None without a setup) and returning a mapping with optional ``logs``.
+    Helpers must be underscore-prefixed or imported. Omit either to skip that step.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline.
+    :param session_id: The Session to replay: a ``search_session_id``, or a single-turn run's ``query_id``.
+    :param pipeline_version_id: The pipeline version to replay against, e.g. the Experiment side's version.
+    :param replay_mode: FIRST_USER_MESSAGE or ALL_USER_MESSAGES; unset uses the server's default.
+    :param setup_source: Python source run before the pipeline; unset skips the step.
+    :param cleanup_source: Python source run after the pipeline; unset skips the step.
+    :param wait_seconds: How long to wait for the replay before handing back the run to poll.
+    :returns: The replay run, with the new Session's ``session_id``, or an error message.
+    """
+    resource = client.evaluation(workspace=workspace)
+    try:
+        run_id = await resource.start_session_replay(
+            pipeline_name, session_id, pipeline_version_id, replay_mode, setup_source, cleanup_source
+        )
+        return await _poll(
+            lambda: resource.get_session_replay(pipeline_name, run_id),
+            lambda r: r.status in RUN_DONE_STATUSES,
+            wait_seconds,
+        )
+    except ResourceNotFoundError:
+        return (
+            f"Pipeline '{pipeline_name}', Session '{session_id}' or version '{pipeline_version_id}' "
+            f"not found in workspace '{workspace}'."
+        )
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to replay Session '{session_id}': {e}"
 
 
 async def get_session_replay(
     *, client: AsyncClientProtocol, workspace: str, pipeline_name: str, replay_run_id: str
 ) -> SessionReplayRun | str:
-    """Reads a replay run."""
-    raise NotImplementedError
+    """Reads one replay run. Free to call.
+
+    Experiment support, for when you need it: to see why an Experiment's replay failed or looks wrong,
+    read its run. Get the id from a row's ``session_replay_run_id`` in ``get_experiment_run`` (the row
+    is the Session the replay produced), or from ``replay_session``. The run has ``status`` (CREATED,
+    STARTED, ENDED or FAILED), ``error_detail`` when it failed, ``setup_logs`` and ``cleanup_logs`` from
+    the setup and cleanup steps, ``session_id`` (the new Session the replay produced), ``source_session_id``
+    (the Session it replayed), ``test_case_id`` (the Dataset test case it was for, if any), and the
+    ``trace_ids`` it produced. Only a FAILED run is retryable, with ``rerun_failed_experiment``
+    (``rerun="replays"``).
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline.
+    :param replay_run_id: The replay run's ``session_replay_run_id``.
+    :returns: The replay run, or an error message.
+    """
+    try:
+        return await client.evaluation(workspace=workspace).get_session_replay(pipeline_name, replay_run_id)
+    except ResourceNotFoundError:
+        return f"Replay '{replay_run_id}' not found for pipeline '{pipeline_name}'."
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to read replay '{replay_run_id}': {e}"
 
 
 _API_ERRORS = (ResourceNotFoundError, BadRequestError, UnexpectedAPIError)
@@ -1111,7 +1183,8 @@ async def get_experiment(*, client: AsyncClientProtocol, workspace: str, experim
     again), ``scoring_counts`` (evaluations; ``failed`` and ``errored`` ones can be judged again),
     ``error`` (why it could not be scored) and ``experiment_run_id`` (the scoring run, for
     ``get_experiment_run``). The Sessions each side scored are not included; they are per test case
-    in ``get_experiment_results``. To retry what failed use ``rerun_failed_experiment``.
+    in ``get_experiment_results``. To retry what failed use ``rerun_failed_experiment``; to see why one
+    replay failed, read it with ``get_session_replay`` (its id is on the Session's row in ``get_experiment_run``).
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.

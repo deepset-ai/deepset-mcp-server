@@ -133,6 +133,8 @@ draft/version history. Each deployment tracks its own history of served pipeline
 | `list_sessions` | required | explorable | List the Sessions of a pipeline that a scoring run can judge. |
 | `try_evaluator` | required | none | Try Evaluator source on one Session and return its Metrics; persists nothing. |
 | `get_evaluation_try` | required | none | Read a try that was still running. |
+| `replay_session` | required | none | Experiment support: replay one Session on a pipeline version into a new Session, to reproduce or retry one test case's replay (costs money; not added to the Experiment; to retry an Experiment's failed replays use `rerun_failed_experiment`). |
+| `get_session_replay` | required | none | Experiment support: read one replay run to see why it failed (status, error detail, setup and cleanup logs, the new Session). |
 | `list_datasets` | required | explorable | List the workspace's Datasets (named lists of test cases), optionally only those on one pipeline. |
 | `get_dataset` | required | explorable | Fetch one Dataset with all its test cases. |
 | `create_dataset` | required | none | Create a Dataset, optionally with its first test cases (recorded Sessions or inputs). |
