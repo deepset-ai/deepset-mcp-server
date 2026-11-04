@@ -54,6 +54,7 @@ from deepset_mcp.tools.evaluation import (
     delete_experiment as delete_experiment_tool,
     delete_metric_group as delete_metric_group_tool,
     get_dataset as get_dataset_tool,
+    get_evaluation_run as get_evaluation_run_tool,
     get_evaluation_try as get_evaluation_try_tool,
     get_evaluator as get_evaluator_tool,
     get_experiment as get_experiment_tool,
@@ -61,8 +62,10 @@ from deepset_mcp.tools.evaluation import (
     get_experiment_run as get_experiment_run_tool,
     get_session_replay as get_session_replay_tool,
     list_datasets as list_datasets_tool,
+    list_evaluation_runs as list_evaluation_runs_tool,
     list_evaluator_templates as list_evaluator_templates_tool,
     list_evaluators as list_evaluators_tool,
+    list_experiment_runs as list_experiment_runs_tool,
     list_experiments as list_experiments_tool,
     list_metric_groups as list_metric_groups_tool,
     list_sessions as list_sessions_tool,
@@ -70,7 +73,9 @@ from deepset_mcp.tools.evaluation import (
     replay_session as replay_session_tool,
     rerun_failed_experiment as rerun_failed_experiment_tool,
     rescore_experiment as rescore_experiment_tool,
+    run_evaluator as run_evaluator_tool,
     set_evaluator_archived as set_evaluator_archived_tool,
+    start_experiment_run as start_experiment_run_tool,
     try_evaluator as try_evaluator_tool,
     update_dataset as update_dataset_tool,
     update_evaluator as update_evaluator_tool,
@@ -443,6 +448,26 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     ),
     "get_experiment_run": (
         get_experiment_run_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "list_experiment_runs": (
+        list_experiment_runs_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "start_experiment_run": (
+        start_experiment_run_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "run_evaluator": (
+        run_evaluator_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "list_evaluation_runs": (
+        list_evaluation_runs_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_evaluation_run": (
+        get_evaluation_run_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
     "list_sessions": (

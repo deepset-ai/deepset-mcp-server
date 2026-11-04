@@ -165,8 +165,16 @@ class EvaluationResource(EvaluationResourceProtocol):
     async def list_session_experiment_runs(
         self, pipeline_name: str, session_id: str, limit: int = 50
     ) -> list[ExperimentRun]:
-        """Not implemented yet."""
-        raise NotImplementedError
+        """List the scoring runs, of any Metric Group, that judged one Session, newest first.
+
+        :param pipeline_name: Name of the pipeline.
+        :param session_id: The Session the runs judged.
+        :param limit: Maximum number of runs to return (the API caps it at 200).
+        :returns: The runs, each naming its Metric Group.
+        """
+        path = await self._pipeline_path(pipeline_name, "scoring-runs")
+        data = await self._get(path, {"session_id": session_id, "limit": limit})
+        return [ExperimentRun.model_validate(item) for item in data or []]
 
     async def start_experiment_run(
         self,
@@ -178,26 +186,76 @@ class EvaluationResource(EvaluationResourceProtocol):
         selection: str | None = None,
         focus: dict[str, list[str]] | None = None,
     ) -> ExperimentRunAccepted:
-        """Not implemented yet."""
-        raise NotImplementedError
+        """Start a scoring run: a Metric Group judging named Sessions, or every Session in a window.
+
+        :param pipeline_name: Name of the pipeline.
+        :param metric_group_id: The Metric Group to judge with.
+        :param session_ids: The Sessions to judge. Send this or ``window``.
+        :param window: Judge every Session whose last activity falls in this window. Send this or ``session_ids``.
+        :param reuse: RERUN_ALL or REUSE_SUCCEEDED; omitted, the server's default (RERUN_ALL).
+        :param selection: SAMPLED or HAND_PICKED; omitted, the server's default (SAMPLED).
+        :param focus: Per Session, the turns to judge by query id; a Session left out is judged on every turn.
+        :returns: The queued run and how many cells it will have.
+        """
+        body: dict[str, Any] = {}
+        if session_ids is not None:
+            body["session_ids"] = session_ids
+        if window is not None:
+            body["window"] = window.model_dump(by_alias=True, exclude_none=True)
+        if reuse is not None:
+            body["reuse"] = reuse
+        if selection is not None:
+            body["selection"] = selection
+        if focus is not None:
+            body["focus"] = focus
+        path = await self._pipeline_path(pipeline_name, "metric-groups", metric_group_id, "scoring-runs")
+        return ExperimentRunAccepted.model_validate(await self._post(path, body))
 
     async def preview_experiment_run(
         self, pipeline_name: str, metric_group_id: str, window: SessionWindow
     ) -> ExperimentRunPreview:
-        """Not implemented yet."""
-        raise NotImplementedError
+        """Count what a window run would judge, without starting it.
+
+        :param pipeline_name: Name of the pipeline.
+        :param metric_group_id: The Metric Group the run would judge with.
+        :param window: The window of Sessions.
+        :returns: Sessions, Evaluators and cells, against the ceiling a window run may not pass.
+        """
+        path = await self._pipeline_path(pipeline_name, "metric-groups", metric_group_id, "scoring-runs", "preview")
+        data = await self._post(path, window.model_dump(by_alias=True, exclude_none=True))
+        return ExperimentRunPreview.model_validate(data)
 
     async def run_evaluator(self, pipeline_name: str, evaluator_version_id: str, session_id: str) -> str:
-        """Not implemented yet."""
-        raise NotImplementedError
+        """Start one Evaluator version on one Session.
+
+        :param pipeline_name: Name of the pipeline.
+        :param evaluator_version_id: The exact Evaluator version to run.
+        :param session_id: The Session to judge.
+        :returns: The Evaluation Run id to poll.
+        """
+        path = await self._pipeline_path(pipeline_name, "evaluation-runs")
+        data = await self._post(path, {"evaluator_version_id": evaluator_version_id, "session_id": session_id})
+        return str(data["evaluation_run_id"])
 
     async def list_evaluation_runs(self, pipeline_name: str, limit: int = 50) -> list[EvaluationRun]:
-        """Not implemented yet."""
-        raise NotImplementedError
+        """List a pipeline's Evaluation Runs, newest first.
+
+        :param pipeline_name: Name of the pipeline.
+        :param limit: Maximum number of runs to return (the API caps it at 200).
+        :returns: The runs.
+        """
+        data = await self._get(await self._pipeline_path(pipeline_name, "evaluation-runs"), {"limit": limit})
+        return [EvaluationRun.model_validate(item) for item in data or []]
 
     async def get_evaluation_run(self, pipeline_name: str, evaluation_run_id: str) -> EvaluationRun:
-        """Not implemented yet."""
-        raise NotImplementedError
+        """Read one Evaluation Run: its progress, or its Metrics once judged.
+
+        :param pipeline_name: Name of the pipeline.
+        :param evaluation_run_id: The run's id.
+        :returns: The run.
+        """
+        path = await self._pipeline_path(pipeline_name, "evaluation-runs", evaluation_run_id)
+        return EvaluationRun.model_validate(await self._get(path))
 
     async def get_experiment_run(self, pipeline_name: str, metric_group_id: str, run_id: str) -> ExperimentRunGrid:
         """Fetch one scoring run as a grid of Sessions by Evaluators.
@@ -234,6 +292,7 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param baseline_pipeline_version_id: Baseline version id; required when baseline_pipeline_name is given.
         :param sessions_per_test_case: Repetitions per test case (1..50).
         :param replay_mode: FIRST_USER_MESSAGE or ALL_USER_MESSAGES.
+        :param reuse_sessions: False replays every Session each side scores instead of reusing existing ones.
         :returns: The created Experiment.
         """
         body = {
@@ -247,6 +306,7 @@ class EvaluationResource(EvaluationResourceProtocol):
                 baseline_pipeline_version_id,
                 sessions_per_test_case,
                 replay_mode,
+                reuse_sessions,
             ),
         }
         data = await self._post(await self._workspace_path("experiments"), body)
@@ -262,6 +322,7 @@ class EvaluationResource(EvaluationResourceProtocol):
         baseline_pipeline_version_id: str | None,
         sessions_per_test_case: int,
         replay_mode: str,
+        reuse_sessions: bool,
     ) -> dict[str, Any]:
         """What an Experiment compares: the body of a preview, and of a create once it has a name."""
         body: dict[str, Any] = {
@@ -273,6 +334,8 @@ class EvaluationResource(EvaluationResourceProtocol):
         }
         if baseline_pipeline_name is not None:
             body["baseline"] = await self._side(baseline_pipeline_name, baseline_pipeline_version_id)
+        if not reuse_sessions:
+            body["reuse_sessions"] = False
         return body
 
     async def _side(self, pipeline_name: str, pipeline_version_id: str | None) -> dict[str, Any]:
@@ -301,6 +364,7 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param baseline_pipeline_version_id: Baseline version id; required when baseline_pipeline_name is given.
         :param sessions_per_test_case: Repetitions per test case (1..50).
         :param replay_mode: FIRST_USER_MESSAGE or ALL_USER_MESSAGES.
+        :param reuse_sessions: False replays every Session each side scores instead of reusing existing ones.
         :returns: The plan.
         """
         body = await self._experiment_targets(
@@ -312,6 +376,7 @@ class EvaluationResource(EvaluationResourceProtocol):
             baseline_pipeline_version_id,
             sessions_per_test_case,
             replay_mode,
+            reuse_sessions,
         )
         data = await self._post(await self._workspace_path("experiments", "preview"), body)
         return ExperimentPlan.model_validate(data)

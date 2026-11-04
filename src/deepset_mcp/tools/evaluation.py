@@ -43,6 +43,7 @@ from deepset_mcp.api.evaluation.models import (
     SessionList,
     SessionReplayReport,
     SessionReplayRun,
+    SessionWindow,
     TestCase,
     TraceSummary,
     TryReport,
@@ -168,7 +169,10 @@ async def create_experiment(
     ``reused_sessions`` and how many ``replays_needed``, plus ``cells`` (Sessions times Evaluators)
     against ``max_cells``. Show that to the user and get a yes before creating for real.
     ``sessions_per_test_case`` sets how many Sessions each side scores per test case
-    (1..50); existing Sessions on that version are reused and only the shortfall is replayed. Find
+    (1..50); existing Sessions on that version are reused and only the shortfall is replayed.
+    Set ``reuse_sessions=False`` to replay every Session instead of reusing any, for example after a
+    change outside the pipeline's configuration such as a secret; it costs more replays, so preview
+    it. A Recorded baseline still scores the Dataset's own Sessions. Find
     ids with ``list_metric_groups`` (metric groups) and ``list_experiments`` (an existing
     Experiment's ``dataset_id``). Read the running or finished Experiment with
     ``get_experiment_results``; follow its progress with ``get_experiment``.
@@ -184,6 +188,7 @@ async def create_experiment(
     :param baseline_pipeline_version_id: Baseline version id; required when baseline_pipeline_name is given.
     :param sessions_per_test_case: Repetitions per test case (1..50, default 1).
     :param replay_mode: FIRST_USER_MESSAGE replays the first turn only; ALL_USER_MESSAGES replays every turn.
+    :param reuse_sessions: False replays every Session each side scores and reuses none (default True).
     :param preview: True returns the plan (what would be reused and replayed) and creates nothing.
     :returns: The created Experiment, or with ``preview`` the plan, or an error message.
     """
@@ -204,6 +209,7 @@ async def create_experiment(
                 baseline_pipeline_version_id=baseline_pipeline_version_id,
                 sessions_per_test_case=sessions_per_test_case,
                 replay_mode=replay_mode,
+                reuse_sessions=reuse_sessions,
             )
         return await resource.create_experiment(
             name=name,
@@ -215,6 +221,7 @@ async def create_experiment(
             baseline_pipeline_version_id=baseline_pipeline_version_id,
             sessions_per_test_case=sessions_per_test_case,
             replay_mode=replay_mode,
+            reuse_sessions=reuse_sessions,
         )
     except ResourceNotFoundError as e:
         missing = [
@@ -463,7 +470,7 @@ async def list_sessions(
 # ---------------------------------------------------------------------------------------------
 
 POLL_INTERVAL_SECONDS = 2.0
-REPLAY_DONE_STATUSES = frozenset({"ENDED", "FAILED"})
+RUN_DONE_STATUSES = frozenset({"ENDED", "FAILED"})
 TOOL_NAME_TAG = "haystack.tool.name"
 
 _State = TypeVar("_State")
@@ -639,7 +646,7 @@ async def replay_session(
         run_id = await resource.start_session_replay(pipeline_name, session_id, pipeline_version_id, replay_mode)
         run = await _poll(
             lambda: resource.get_session_replay(pipeline_name, run_id),
-            lambda r: r.status in REPLAY_DONE_STATUSES,
+            lambda r: r.status in RUN_DONE_STATUSES,
             wait_seconds,
         )
         return await _replay_report(client, workspace, pipeline_name, run)
@@ -1268,8 +1275,35 @@ async def list_experiment_runs(
     session_id: str | None = None,
     limit: int = 50,
 ) -> list[ExperimentRun] | str:
-    """Not implemented yet."""
-    raise NotImplementedError
+    """Lists scoring runs: a Metric Group's on one pipeline, or every one that judged a given Session.
+
+    A scoring run is a Metric Group judging chosen Sessions of one pipeline, outside any Experiment
+    (see ``start_experiment_run``); the runs an Experiment makes are listed too. Give
+    ``metric_group_id`` for that group's runs, or ``session_id`` for the runs, of any Metric
+    Group, that judged that Session; each run names its Metric Group in
+    ``pipeline_experiment_id``. Newest first, without their grids: ``status`` says whether the
+    fan-out finished, not whether every cell succeeded, ``window`` is what a window run judged
+    and ``resolved_sessions`` how many Sessions it had. Read one run's grid with
+    ``get_experiment_run``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline.
+    :param metric_group_id: List this Metric Group's runs. Give this or ``session_id``.
+    :param session_id: List the runs that judged this Session. Give this or ``metric_group_id``.
+    :param limit: Maximum number of runs to return (the API caps it at 200).
+    :returns: The runs, or an error message.
+    """
+    if (metric_group_id is None) == (session_id is None):
+        return "Give exactly one of metric_group_id (a Metric Group's runs) and session_id (the runs on a Session)."
+    resource = client.evaluation(workspace=workspace)
+    try:
+        if metric_group_id is not None:
+            return await resource.list_experiment_runs(pipeline_name, metric_group_id, limit)
+        assert session_id is not None
+        return await resource.list_session_experiment_runs(pipeline_name, session_id, limit)
+    except _API_ERRORS as e:
+        return f"Failed to list scoring runs on pipeline '{pipeline_name}': {e}"
 
 
 async def start_experiment_run(
@@ -1290,8 +1324,77 @@ async def start_experiment_run(
     focus: dict[str, list[str]] | None = None,
     preview: bool = False,
 ) -> ExperimentRunAccepted | ExperimentRunPreview | str:
-    """Not implemented yet."""
-    raise NotImplementedError
+    """Scores a pipeline's Sessions with a Metric Group, outside any Experiment. Costs money.
+
+    Every Evaluator of the Metric Group judges every chosen Session, so the run has Sessions times
+    Evaluators cells, and an Evaluator that judges with a model is billed per judged turn on the
+    customer's provider. Name the Sessions in ``session_ids`` (find them with ``list_sessions``), or
+    give a window of time: ``window_from`` and ``window_to`` together, optionally narrowed by
+    ``origin``, ``deployment_id``, ``pipeline_version_id`` and ``revision_id``, judge every Session
+    whose last activity falls in it. The server resolves the window to its Sessions when the run
+    starts. Give ``session_ids`` or a window, never both. A window run is always SAMPLED and cannot take
+    ``focus``; it is refused when it has more Sessions or cells than the ceiling.
+
+    Preview first: ``preview=True`` with a window starts nothing and returns ``sessions``,
+    ``evaluators`` and ``cells`` (the judge calls it would make) against the ``ceiling``. Show that to
+    the user and get a yes before starting for real. There is no preview for named Sessions: their
+    cells are the number of Sessions times the Metric Group's Evaluators.
+
+    The run is queued, not finished: poll it with ``get_experiment_run`` (``counts``, then the grid),
+    and find earlier runs with ``list_experiment_runs``. ``reuse`` REUSE_SUCCEEDED judges only
+    what this Metric Group has not already judged successfully, which makes re-running after a
+    partial failure cheap; RERUN_ALL judges everything again. ``selection`` HAND_PICKED marks Sessions
+    chosen because they looked wrong, which keeps the run out of trends and exports; use it
+    for named Sessions that are not a sample of the traffic. A ``focus`` makes it HAND_PICKED.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline whose Sessions are judged.
+    :param metric_group_id: The Metric Group to judge with (see ``list_metric_groups``).
+    :param session_ids: The Sessions to judge: ``search_session_id`` values, or a single-turn run's ``query_id``.
+    :param window_from: Window start, ISO 8601 with a timezone: last activity at or after it.
+    :param window_to: Window end, ISO 8601 with a timezone, not in the future: last activity at or before it.
+    :param origin: Window filter: only Sessions from SERVICE, PIPELINE_RUN or PLAYGROUND.
+    :param deployment_id: Window filter: only Sessions this Service served.
+    :param pipeline_version_id: Window filter: only Sessions this pipeline version served.
+    :param revision_id: Window filter: only Sessions this Service revision served.
+    :param reuse: RERUN_ALL (default) or REUSE_SUCCEEDED.
+    :param selection: SAMPLED (default) or HAND_PICKED.
+    :param focus: Per Session id, the turns to judge by ``query_id``; a Session left out is judged on every turn.
+    :param preview: True counts what the window would judge and starts nothing.
+    :returns: The queued run (``pipeline_experiment_run_id``, ``cells``), or with ``preview`` the counts, or an error.
+    """
+    window_parts = (window_from, window_to, origin, deployment_id, pipeline_version_id, revision_id)
+    window: SessionWindow | None = None
+    if any(part is not None for part in window_parts):
+        if window_from is None or window_to is None:
+            return "A window needs both window_from and window_to; origin and the other filters narrow it."
+        window = SessionWindow(
+            start=window_from,
+            end=window_to,
+            origin=origin,
+            deployment_id=deployment_id,
+            pipeline_version_id=pipeline_version_id,
+            revision_id=revision_id,
+        )
+    if preview and window is None:
+        return "Only a window can be previewed: give window_from and window_to. Named Sessions have no preview."
+    resource = client.evaluation(workspace=workspace)
+    try:
+        if preview:
+            assert window is not None
+            return await resource.preview_experiment_run(pipeline_name, metric_group_id, window)
+        return await resource.start_experiment_run(
+            pipeline_name,
+            metric_group_id,
+            session_ids=session_ids,
+            window=window,
+            reuse=reuse,
+            selection=selection,
+            focus=focus,
+        )
+    except _API_ERRORS as e:
+        return f"Failed to start a scoring run of Metric Group '{metric_group_id}' on pipeline '{pipeline_name}': {e}"
 
 
 async def run_evaluator(
@@ -1303,19 +1406,77 @@ async def run_evaluator(
     session_id: str,
     wait_seconds: int = 120,
 ) -> EvaluationRun | str:
-    """Not implemented yet."""
-    raise NotImplementedError
+    """Runs one Evaluator version on one Session and keeps the result. A judged Evaluator costs money.
+
+    Unlike ``try_evaluator``, which runs source you send and stores nothing, this runs a saved
+    Evaluator version and stores an Evaluation Run that shows in ``list_evaluation_runs`` and in the Metric's history
+    over time. Use it to judge one Session with
+    an Evaluator that already exists; to judge many Sessions with a Metric Group use
+    ``start_experiment_run``. An Evaluator that judges with a model costs a model call per judged
+    turn on the customer's provider, so say so and get a yes first. Find the version id with
+    ``get_evaluator`` (``latest_version`` or ``versions``) and the Session with ``list_sessions``.
+
+    ``outcome`` ERRORED means the Evaluator's code broke: read ``error_detail``. ``metrics`` are
+    the values per address with their rationales. If ``status`` is still CREATED or STARTED the
+    wait ran out: poll ``get_evaluation_run`` with the ``evaluation_run_id``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline the Session belongs to.
+    :param evaluator_version_id: The exact Evaluator version to run.
+    :param session_id: The Session to judge: a ``search_session_id``, or a single-turn run's ``query_id``.
+    :param wait_seconds: How long to wait for the result before handing back the id to poll.
+    :returns: The Evaluation Run, or an error message.
+    """
+    resource = client.evaluation(workspace=workspace)
+    try:
+        run_id = await resource.run_evaluator(pipeline_name, evaluator_version_id, session_id)
+        return await _poll(
+            lambda: resource.get_evaluation_run(pipeline_name, run_id),
+            lambda r: r.status in RUN_DONE_STATUSES,
+            wait_seconds,
+        )
+    except _API_ERRORS as e:
+        return f"Failed to run Evaluator version '{evaluator_version_id}' on Session '{session_id}': {e}"
 
 
 async def list_evaluation_runs(
     *, client: AsyncClientProtocol, workspace: str, pipeline_name: str, limit: int = 50
 ) -> list[EvaluationRun] | str:
-    """Not implemented yet."""
-    raise NotImplementedError
+    """Lists a pipeline's Evaluation Runs, newest first: one Evaluator version judging one Session each.
+
+    Includes the runs behind a scoring run's cells and the ones ``run_evaluator`` made. Each has its
+    ``session_id``, ``evaluator_version_id``, ``outcome`` and ``metrics``. Read one with
+    ``get_evaluation_run``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline.
+    :param limit: Maximum number of runs to return (the API caps it at 200).
+    :returns: The runs, or an error message.
+    """
+    try:
+        return await client.evaluation(workspace=workspace).list_evaluation_runs(pipeline_name, limit)
+    except _API_ERRORS as e:
+        return f"Failed to list Evaluation Runs of pipeline '{pipeline_name}': {e}"
 
 
 async def get_evaluation_run(
     *, client: AsyncClientProtocol, workspace: str, pipeline_name: str, evaluation_run_id: str
 ) -> EvaluationRun | str:
-    """Not implemented yet."""
-    raise NotImplementedError
+    """Reads one Evaluation Run: its progress, or what the Evaluator found once it ended.
+
+    Use it to follow a run ``run_evaluator`` handed back while still going. ``status`` ENDED with
+    ``outcome`` SUCCEEDED has ``metrics``; ERRORED means the Evaluator's code broke (see
+    ``error_detail``); FAILED never completed and can be run again.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline.
+    :param evaluation_run_id: The ``evaluation_run_id`` from ``run_evaluator`` or ``list_evaluation_runs``.
+    :returns: The Evaluation Run, or an error message.
+    """
+    try:
+        return await client.evaluation(workspace=workspace).get_evaluation_run(pipeline_name, evaluation_run_id)
+    except _API_ERRORS as e:
+        return f"Failed to read Evaluation Run '{evaluation_run_id}': {e}"

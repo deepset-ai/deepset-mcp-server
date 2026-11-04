@@ -125,6 +125,11 @@ draft/version history. Each deployment tracks its own history of served pipeline
 | `delete_experiment` | required | none | Delete an Experiment (destructive); its Sessions and scoring runs are kept. |
 | `get_experiment_results` | required | explorable | Read an Experiment's results: each Metric and duration, tokens and cost, candidate against baseline, then per test case. |
 | `get_experiment_run` | required | explorable | Read one scoring run: cell counts, a summary per Metric, and the grid rows. |
+| `list_experiment_runs` | required | explorable | List a Metric Group's scoring runs on a pipeline, or every run that judged one Session. |
+| `start_experiment_run` | required | none | Score named Sessions or a time window with a Metric Group, outside an Experiment (`preview` a window first: judged Evaluators cost money). |
+| `run_evaluator` | required | none | Run one saved Evaluator version on one Session and keep the Evaluation Run (judged Evaluators cost money). |
+| `list_evaluation_runs` | required | explorable | List a pipeline's Evaluation Runs, newest first. |
+| `get_evaluation_run` | required | explorable | Read one Evaluation Run: its progress, or its Metrics. |
 | `list_sessions` | required | explorable | List the Sessions of a pipeline that a scoring run can judge. |
 | `try_evaluator` | required | none | Try Evaluator source on one Session and return its Metrics; persists nothing. |
 | `get_evaluation_try` | required | none | Read a try that was still running. |
