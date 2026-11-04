@@ -60,6 +60,9 @@ from deepset_mcp.tools.evaluation import (
     get_experiment as get_experiment_tool,
     get_experiment_results as get_experiment_results_tool,
     get_experiment_run as get_experiment_run_tool,
+    get_imported_session_trace as get_imported_session_trace_tool,
+    get_imported_session_trace_span_tags as get_imported_session_trace_span_tags_tool,
+    get_replay_suite as get_replay_suite_tool,
     get_session_replay as get_session_replay_tool,
     list_datasets as list_datasets_tool,
     list_evaluation_runs as list_evaluation_runs_tool,
@@ -67,7 +70,10 @@ from deepset_mcp.tools.evaluation import (
     list_evaluators as list_evaluators_tool,
     list_experiment_runs as list_experiment_runs_tool,
     list_experiments as list_experiments_tool,
+    list_imported_session_traces as list_imported_session_traces_tool,
     list_metric_groups as list_metric_groups_tool,
+    list_replay_suites as list_replay_suites_tool,
+    list_session_replays as list_session_replays_tool,
     list_sessions as list_sessions_tool,
     remove_test_cases as remove_test_cases_tool,
     replay_session as replay_session_tool,
@@ -76,6 +82,7 @@ from deepset_mcp.tools.evaluation import (
     run_evaluator as run_evaluator_tool,
     set_evaluator_archived as set_evaluator_archived_tool,
     start_experiment_run as start_experiment_run_tool,
+    start_replay_suite as start_replay_suite_tool,
     try_evaluator as try_evaluator_tool,
     update_dataset as update_dataset_tool,
     update_evaluator as update_evaluator_tool,
@@ -489,6 +496,34 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "get_session_replay": (
         get_session_replay_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "list_session_replays": (
+        list_session_replays_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "start_replay_suite": (
+        start_replay_suite_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "list_replay_suites": (
+        list_replay_suites_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_replay_suite": (
+        get_replay_suite_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "list_imported_session_traces": (
+        list_imported_session_traces_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_imported_session_trace": (
+        get_imported_session_trace_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_imported_session_trace_span_tags": (
+        get_imported_session_trace_span_tags_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
     "list_datasets": (
         list_datasets_tool,

@@ -631,7 +631,8 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param limit: Maximum number of runs to return (the API caps it at 200).
         :returns: The runs.
         """
-        raise NotImplementedError
+        path = await self._pipeline_path(pipeline_name, "replay-runs")
+        return [SessionReplayRun.model_validate(item) for item in await self._get(path, {"limit": limit}) or []]
 
     async def start_replay_suite(
         self,
@@ -654,7 +655,19 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param reuse: With a Metric Group, RERUN_ALL or REUSE_SUCCEEDED; omitted, the server's default.
         :returns: The queued suite.
         """
-        raise NotImplementedError
+        body: dict[str, Any] = {
+            "session_replay_dataset_id": dataset_id,
+            "pipeline_version_id": pipeline_version_id,
+            "repetitions": repetitions,
+            "replay_mode": replay_mode,
+        }
+        if metric_group_id is not None:
+            # hub-api calls a Metric Group a pipeline experiment.
+            body["experiment"] = {"pipeline_experiment_id": metric_group_id}
+            if reuse is not None:
+                body["experiment"]["reuse"] = reuse
+        data = await self._post(await self._pipeline_path(pipeline_name, "replay-suites"), body)
+        return ReplaySuiteAccepted.model_validate(data)
 
     async def list_replay_suites(self, pipeline_name: str, limit: int = 50) -> list[ReplaySuiteSummary]:
         """List a pipeline's Replay Suites, newest first, without their runs.
@@ -663,7 +676,8 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param limit: Maximum number of suites to return (the API caps it at 200).
         :returns: The suites.
         """
-        raise NotImplementedError
+        path = await self._pipeline_path(pipeline_name, "replay-suites")
+        return [ReplaySuiteSummary.model_validate(item) for item in await self._get(path, {"limit": limit}) or []]
 
     async def get_replay_suite(self, pipeline_name: str, suite_id: str) -> ReplaySuite:
         """Fetch one Replay Suite with every run.
@@ -672,7 +686,8 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param suite_id: The suite's id.
         :returns: The suite.
         """
-        raise NotImplementedError
+        path = await self._pipeline_path(pipeline_name, "replay-suites", suite_id)
+        return ReplaySuite.model_validate(await self._get(path))
 
     async def list_imported_session_traces(self, session_id: str) -> list[PipelineTraceEntry]:
         """List every turn of an imported Session, oldest first, with spans (component-type tags only).
@@ -680,7 +695,8 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param session_id: The imported Session's id.
         :returns: The turns.
         """
-        raise NotImplementedError
+        path = await self._workspace_path("imported-sessions", session_id, "traces")
+        return [PipelineTraceEntry.model_validate(item) for item in await self._get(path) or []]
 
     async def get_imported_session_trace(self, session_id: str, query_id: str) -> PipelineTraceEntry:
         """Fetch one turn of an imported Session with spans (component-type tags only).
@@ -689,7 +705,8 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param query_id: The turn's id.
         :returns: The turn.
         """
-        raise NotImplementedError
+        path = await self._workspace_path("imported-sessions", session_id, "traces", query_id)
+        return PipelineTraceEntry.model_validate(await self._get(path))
 
     async def get_imported_session_trace_span_tags(
         self, session_id: str, query_id: str, span_id: str
@@ -701,7 +718,8 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param span_id: The span's id.
         :returns: The span's tags.
         """
-        raise NotImplementedError
+        path = await self._workspace_path("imported-sessions", session_id, "traces", query_id, "tags", span_id)
+        return dict(await self._get(path) or {})
 
     async def list_datasets(self, pipeline_name: str | None = None, limit: int = 50) -> list[DatasetSummary]:
         """List the workspace's Datasets without their test cases, newest first.

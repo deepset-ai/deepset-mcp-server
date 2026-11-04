@@ -1508,7 +1508,12 @@ async def list_session_replays(
     :param limit: Maximum number of runs to return (the API caps it at 200).
     :returns: The runs, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).list_session_replays(pipeline_name, limit)
+    except ResourceNotFoundError:
+        return f"Pipeline '{pipeline_name}' not found in workspace '{workspace}'."
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to list replay runs of pipeline '{pipeline_name}': {e}"
 
 
 async def start_replay_suite(
@@ -1554,7 +1559,25 @@ async def start_replay_suite(
     :param reuse: With a Metric Group: RERUN_ALL judges everything again, REUSE_SUCCEEDED skips what it judged.
     :returns: The queued suite (``suite_id``, ``run_count``), or an error message.
     """
-    raise NotImplementedError
+    if reuse is not None and metric_group_id is None:
+        return "reuse applies to the scoring a Metric Group does after the replays: give metric_group_id too."
+    try:
+        return await client.evaluation(workspace=workspace).start_replay_suite(
+            pipeline_name,
+            dataset_id,
+            pipeline_version_id,
+            repetitions=repetitions,
+            replay_mode=replay_mode,
+            metric_group_id=metric_group_id,
+            reuse=reuse,
+        )
+    except ResourceNotFoundError:
+        return (
+            f"Pipeline '{pipeline_name}', version '{pipeline_version_id}', Dataset '{dataset_id}' or Metric Group "
+            f"'{metric_group_id}' not found in workspace '{workspace}'."
+        )
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to start a replay suite of Dataset '{dataset_id}' on pipeline '{pipeline_name}': {e}"
 
 
 async def list_replay_suites(
@@ -1574,7 +1597,12 @@ async def list_replay_suites(
     :param limit: Maximum number of suites to return (the API caps it at 200).
     :returns: The suites, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).list_replay_suites(pipeline_name, limit)
+    except ResourceNotFoundError:
+        return f"Pipeline '{pipeline_name}' not found in workspace '{workspace}'."
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to list replay suites of pipeline '{pipeline_name}': {e}"
 
 
 async def get_replay_suite(
@@ -1594,7 +1622,12 @@ async def get_replay_suite(
     :param suite_id: The suite's id (from ``start_replay_suite`` or ``list_replay_suites``).
     :returns: The suite, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).get_replay_suite(pipeline_name, suite_id)
+    except ResourceNotFoundError:
+        return f"Replay suite '{suite_id}' not found for pipeline '{pipeline_name}'."
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to read replay suite '{suite_id}': {e}"
 
 
 async def list_imported_session_traces(
@@ -1616,7 +1649,12 @@ async def list_imported_session_traces(
     :param session_id: The imported Session's id.
     :returns: The turns, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).list_imported_session_traces(session_id)
+    except ResourceNotFoundError:
+        return f"Imported Session '{session_id}' not found in workspace '{workspace}'."
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to list traces of imported Session '{session_id}': {e}"
 
 
 async def get_imported_session_trace(
@@ -1633,7 +1671,12 @@ async def get_imported_session_trace(
     :param query_id: The turn's ``query_id`` from ``list_imported_session_traces``.
     :returns: The turn with its spans, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).get_imported_session_trace(session_id, query_id)
+    except ResourceNotFoundError:
+        return f"Turn '{query_id}' of imported Session '{session_id}' not found (workspace '{workspace}')."
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to get trace '{query_id}' of imported Session '{session_id}': {e}"
 
 
 async def get_imported_session_trace_span_tags(
@@ -1651,4 +1694,14 @@ async def get_imported_session_trace_span_tags(
     :param span_id: The span's id.
     :returns: The span's tag dictionary, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).get_imported_session_trace_span_tags(
+            session_id, query_id, span_id
+        )
+    except ResourceNotFoundError:
+        return (
+            f"Span '{span_id}' of turn '{query_id}' in imported Session '{session_id}' not found "
+            f"(workspace '{workspace}')."
+        )
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to get span tags for span '{span_id}' (turn '{query_id}'): {e}"
