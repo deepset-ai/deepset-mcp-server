@@ -333,6 +333,70 @@ class Experiment(BaseModel):
     updated_at: str | None = None
 
 
+class ExperimentReplayCounts(BaseModel):
+    """How many of a side's replays are in each status."""
+
+    created: int = 0
+    started: int = 0
+    ended: int = 0
+    failed: int = 0
+
+
+class ExperimentSideDetail(ExperimentSide):
+    """A side of one Experiment read on its own: its pipeline, replays and scoring run.
+
+    The Sessions the side scores are left out: they can run to thousands, and each test case's
+    Sessions are in ``get_experiment_results``.
+    """
+
+    pipeline_name: str | None = Field(default=None, description="Null for a recorded baseline or a deleted pipeline")
+    version_number: int | None = Field(default=None, description="Null for a draft or a recorded baseline")
+    experiment_run_id: str | None = Field(
+        default=None, description="The scoring run of this side once started; read it with ``get_experiment_run``"
+    )
+    run_counts: ExperimentReplayCounts | None = Field(default=None, description="The side's replays by status")
+
+
+class ExperimentTestCase(BaseModel):
+    """A test case of an Experiment as it was when the Experiment was created."""
+
+    test_case_id: str = Field(validation_alias="session_replay_test_case_id")
+    name: str
+
+
+class ExperimentDetail(Experiment):
+    """One Experiment with its test cases and how far each side has got."""
+
+    candidate: ExperimentSideDetail
+    baseline: ExperimentSideDetail
+    test_cases: list[ExperimentTestCase] = Field(default_factory=list)
+
+
+class ExperimentSidePlan(BaseModel):
+    """What one side would score, and how much of it has to be replayed first."""
+
+    reused_sessions: int = Field(description="Sessions that already exist and are scored as they are")
+    replays_needed: int = Field(description="Replays this side starts, each of which costs a pipeline run")
+    test_cases_short: int = Field(default=0, description="Test cases with fewer than the asked-for Sessions already")
+
+
+class ExperimentPlan(BaseModel):
+    """What creating the Experiment now would do. Advisory: nothing was started."""
+
+    candidate: ExperimentSidePlan
+    baseline: ExperimentSidePlan
+    cells: int = Field(default=0, description="Sessions times Evaluators of the larger side's scoring run")
+    max_cells: int | None = Field(default=None, description="The most cells one scoring run may have")
+    max_runs: int | None = Field(default=None, description="The most replays one side may start")
+
+
+class ExperimentUpdatePlan(BaseModel):
+    """What changing an Experiment's sides would do. Advisory: nothing was changed."""
+
+    candidate: ExperimentSidePlan | None = Field(default=None, description="Null when the candidate is unchanged")
+    baseline: ExperimentSidePlan | None = Field(default=None, description="Null when the baseline is unchanged")
+
+
 class ExperimentValue(BaseModel):
     """One Metric on one side of an Experiment, over the test cases both sides have a value for."""
 

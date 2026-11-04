@@ -12,9 +12,12 @@ from deepset_mcp.api.evaluation.models import (
     EvaluatorTemplate,
     EvaluatorVersion,
     Experiment,
+    ExperimentDetail,
+    ExperimentPlan,
     ExperimentResults,
     ExperimentRun,
     ExperimentRunGrid,
+    ExperimentUpdatePlan,
     MetricGroup,
     MetricWeight,
     NewTestCase,
@@ -191,4 +194,60 @@ class EvaluationResourceProtocol(Protocol):
 
     async def delete_metric_group(self, metric_group_id: str) -> None:
         """Delete a Metric Group and its Experiment runs."""
+        ...
+
+    async def preview_experiment(
+        self,
+        dataset_id: str,
+        metric_group_id: str,
+        candidate_pipeline_name: str,
+        candidate_pipeline_version_id: str,
+        baseline_pipeline_name: str | None = None,
+        baseline_pipeline_version_id: str | None = None,
+        sessions_per_test_case: int = 1,
+        replay_mode: str = "FIRST_USER_MESSAGE",
+    ) -> ExperimentPlan:
+        """Plan an Experiment without starting it: Sessions reused and replays needed per side."""
+        ...
+
+    async def get_experiment(self, experiment_id: str) -> ExperimentDetail:
+        """Fetch one Experiment with its test cases and each side's progress."""
+        ...
+
+    async def update_experiment(
+        self,
+        experiment_id: str,
+        name: str | None = None,
+        candidate_pipeline_name: str | None = None,
+        candidate_pipeline_version_id: str | None = None,
+        baseline_pipeline_name: str | None = None,
+        baseline_pipeline_version_id: str | None = None,
+        recorded_baseline: bool = False,
+    ) -> Experiment:
+        """Rename an Experiment or change a side; a changed side is replayed and scored again."""
+        ...
+
+    async def preview_update_experiment(
+        self,
+        experiment_id: str,
+        name: str | None = None,
+        candidate_pipeline_name: str | None = None,
+        candidate_pipeline_version_id: str | None = None,
+        baseline_pipeline_name: str | None = None,
+        baseline_pipeline_version_id: str | None = None,
+        recorded_baseline: bool = False,
+    ) -> ExperimentUpdatePlan:
+        """Plan an update without changing anything."""
+        ...
+
+    async def rerun_failed_experiment(self, experiment_id: str, replays: bool = False) -> Experiment:
+        """Judge again the failed evaluations, or with ``replays`` replay again the failed replays."""
+        ...
+
+    async def rescore_experiment(self, experiment_id: str) -> Experiment:
+        """Score both sides again with the Metric Group as it is now."""
+        ...
+
+    async def delete_experiment(self, experiment_id: str) -> None:
+        """Delete an Experiment; its Sessions, replays and scoring runs are kept."""
         ...

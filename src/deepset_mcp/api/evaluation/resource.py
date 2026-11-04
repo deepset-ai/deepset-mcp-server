@@ -17,9 +17,12 @@ from deepset_mcp.api.evaluation.models import (
     EvaluatorTemplate,
     EvaluatorVersion,
     Experiment,
+    ExperimentDetail,
+    ExperimentPlan,
     ExperimentResults,
     ExperimentRun,
     ExperimentRunGrid,
+    ExperimentUpdatePlan,
     MetricGroup,
     MetricWeight,
     NewTestCase,
@@ -525,3 +528,52 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param metric_group_id: The Metric Group's id.
         """
         await self._delete(await self._workspace_path("metric-groups", metric_group_id))
+
+    async def preview_experiment(
+        self,
+        dataset_id: str,
+        metric_group_id: str,
+        candidate_pipeline_name: str,
+        candidate_pipeline_version_id: str,
+        baseline_pipeline_name: str | None = None,
+        baseline_pipeline_version_id: str | None = None,
+        sessions_per_test_case: int = 1,
+        replay_mode: str = "FIRST_USER_MESSAGE",
+    ) -> ExperimentPlan:
+        raise NotImplementedError
+
+    async def get_experiment(self, experiment_id: str) -> ExperimentDetail:
+        raise NotImplementedError
+
+    async def update_experiment(
+        self,
+        experiment_id: str,
+        name: str | None = None,
+        candidate_pipeline_name: str | None = None,
+        candidate_pipeline_version_id: str | None = None,
+        baseline_pipeline_name: str | None = None,
+        baseline_pipeline_version_id: str | None = None,
+        recorded_baseline: bool = False,
+    ) -> Experiment:
+        raise NotImplementedError
+
+    async def preview_update_experiment(
+        self,
+        experiment_id: str,
+        name: str | None = None,
+        candidate_pipeline_name: str | None = None,
+        candidate_pipeline_version_id: str | None = None,
+        baseline_pipeline_name: str | None = None,
+        baseline_pipeline_version_id: str | None = None,
+        recorded_baseline: bool = False,
+    ) -> ExperimentUpdatePlan:
+        raise NotImplementedError
+
+    async def rerun_failed_experiment(self, experiment_id: str, replays: bool = False) -> Experiment:
+        raise NotImplementedError
+
+    async def rescore_experiment(self, experiment_id: str) -> Experiment:
+        raise NotImplementedError
+
+    async def delete_experiment(self, experiment_id: str) -> None:
+        raise NotImplementedError

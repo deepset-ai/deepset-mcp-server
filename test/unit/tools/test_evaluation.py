@@ -16,6 +16,9 @@ from deepset_mcp.api.evaluation.models import (
     EvaluatorTemplate,
     EvaluatorVersion,
     Experiment,
+    ExperimentDetail,
+    ExperimentPlan,
+    ExperimentUpdatePlan,
     ExperimentResults,
     ExperimentResultsReport,
     ExperimentRun,
@@ -47,6 +50,7 @@ from deepset_mcp.tools.evaluation import (
     create_dataset,
     create_evaluator,
     create_experiment,
+    delete_experiment,
     create_metric_group,
     delete_dataset,
     delete_metric_group,
@@ -59,15 +63,19 @@ from deepset_mcp.tools.evaluation import (
     list_datasets,
     list_evaluator_templates,
     list_evaluators,
+    get_experiment,
     list_experiments,
     list_metric_groups,
     list_sessions,
     remove_test_cases,
     replay_session,
+    rerun_failed_experiment,
+    rescore_experiment,
     set_evaluator_archived,
     try_evaluator,
     update_dataset,
     update_evaluator,
+    update_experiment,
     update_metric_group,
     update_test_case,
 )
@@ -87,6 +95,7 @@ PIPELINE_ID = "88888888-8888-8888-8888-888888888888"
 
 DATASET_ID = "bbbbbbbb-1111-2222-3333-444444444444"
 TEST_CASE_ID = "cccccccc-1111-2222-3333-444444444444"
+SIDE_PLAN = {"reused_sessions": 2, "replays_needed": 1, "test_cases_short": 1}
 
 
 def dataset_dict() -> dict[str, Any]:
@@ -522,6 +531,67 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
 
     async def delete_metric_group(self, metric_group_id: str) -> None:
         self._record("delete_metric_group", metric_group_id=metric_group_id)
+
+    async def preview_experiment(
+        self,
+        dataset_id: str,
+        metric_group_id: str,
+        candidate_pipeline_name: str,
+        candidate_pipeline_version_id: str,
+        baseline_pipeline_name: str | None = None,
+        baseline_pipeline_version_id: str | None = None,
+        sessions_per_test_case: int = 1,
+        replay_mode: str = "FIRST_USER_MESSAGE",
+    ) -> ExperimentPlan:
+        self._record("preview_experiment", dataset_id=dataset_id, sessions_per_test_case=sessions_per_test_case)
+        return ExperimentPlan.model_validate({"candidate": SIDE_PLAN, "baseline": SIDE_PLAN, "cells": 6})
+
+    async def get_experiment(self, experiment_id: str) -> ExperimentDetail:
+        self._record("get_experiment", experiment_id=experiment_id)
+        return ExperimentDetail.model_validate(
+            {
+                **comparison(),
+                "test_cases": [{"session_replay_test_case_id": E2, "name": "Order status"}],
+                "candidate": comparison_side(run_counts={"created": 0, "started": 0, "ended": 1, "failed": 1}),
+            }
+        )
+
+    async def update_experiment(
+        self,
+        experiment_id: str,
+        name: str | None = None,
+        candidate_pipeline_name: str | None = None,
+        candidate_pipeline_version_id: str | None = None,
+        baseline_pipeline_name: str | None = None,
+        baseline_pipeline_version_id: str | None = None,
+        recorded_baseline: bool = False,
+    ) -> Experiment:
+        self._record("update_experiment", experiment_id=experiment_id, name=name, recorded_baseline=recorded_baseline)
+        return Experiment.model_validate(comparison())
+
+    async def preview_update_experiment(
+        self,
+        experiment_id: str,
+        name: str | None = None,
+        candidate_pipeline_name: str | None = None,
+        candidate_pipeline_version_id: str | None = None,
+        baseline_pipeline_name: str | None = None,
+        baseline_pipeline_version_id: str | None = None,
+        recorded_baseline: bool = False,
+    ) -> ExperimentUpdatePlan:
+        self._record("preview_update_experiment", experiment_id=experiment_id, name=name)
+        return ExperimentUpdatePlan.model_validate({"candidate": SIDE_PLAN, "baseline": None})
+
+    async def rerun_failed_experiment(self, experiment_id: str, replays: bool = False) -> Experiment:
+        self._record("rerun_failed_experiment", experiment_id=experiment_id, replays=replays)
+        return Experiment.model_validate(comparison())
+
+    async def rescore_experiment(self, experiment_id: str) -> Experiment:
+        self._record("rescore_experiment", experiment_id=experiment_id)
+        return Experiment.model_validate(comparison())
+
+    async def delete_experiment(self, experiment_id: str) -> None:
+        self._record("delete_experiment", experiment_id=experiment_id)
 
 
 class FakeClient(BaseFakeClient):
@@ -1419,6 +1489,139 @@ async def test_evaluator_and_metric_group_write_tools_return_the_api_message_ins
         await create_metric_group(**common, name="W", evaluator_ids=[E1]),
         await update_metric_group(**common, metric_group_id=METRIC_GROUP_ID, name="W", evaluator_ids=[E1]),
         await delete_metric_group(**common, metric_group_id=METRIC_GROUP_ID),
+    ]
+
+    assert all(isinstance(result, str) and str(error.args[0]) in result for result in results)
+
+
+@pytest.mark.asyncio
+async def test_create_experiment_with_preview_returns_the_plan_and_creates_nothing() -> None:
+    resource = FakeEvaluationResource()
+
+    plan = await create_experiment(
+        client=FakeClient(resource),
+        workspace=WORKSPACE,
+        name="Preview",
+        dataset_id="d-1",
+        metric_group_id=METRIC_GROUP_ID,
+        candidate_pipeline_name=PIPELINE,
+        candidate_pipeline_version_id=V1,
+        sessions_per_test_case=3,
+        preview=True,
+    )
+
+    assert isinstance(plan, ExperimentPlan)
+    assert plan.candidate.replays_needed == 1
+    assert resource.calls == [("preview_experiment", {"dataset_id": "d-1", "sessions_per_test_case": 3})]
+
+
+@pytest.mark.asyncio
+async def test_get_experiment_returns_test_cases_and_run_counts_but_not_the_sessions() -> None:
+    resource = FakeEvaluationResource()
+
+    experiment = await get_experiment(client=FakeClient(resource), workspace=WORKSPACE, experiment_id=COMPARISON_ID)
+
+    assert isinstance(experiment, ExperimentDetail)
+    assert resource.calls == [("get_experiment", {"experiment_id": COMPARISON_ID})]
+    dumped = experiment.model_dump()
+    assert dumped["test_cases"] == [{"test_case_id": E2, "name": "Order status"}]
+    assert dumped["candidate"]["run_counts"]["failed"] == 1
+    assert dumped["candidate"]["scoring_counts"]["errored"] == 1
+    assert dumped["candidate"]["experiment_run_id"] == RUN_ID
+    assert dumped["baseline"]["error"] == "No Sessions"
+    assert "sessions" not in dumped["candidate"]
+
+
+@pytest.mark.asyncio
+async def test_update_experiment_forwards_the_changes_and_previews_without_changing() -> None:
+    resource = FakeEvaluationResource()
+    common: dict[str, Any] = {"client": FakeClient(resource), "workspace": WORKSPACE, "experiment_id": COMPARISON_ID}
+
+    updated = await update_experiment(**common, name="Renamed", recorded_baseline=True)
+    plan = await update_experiment(**common, name="Renamed", preview=True)
+
+    assert isinstance(updated, Experiment)
+    assert isinstance(plan, ExperimentUpdatePlan)
+    assert plan.baseline is None
+    assert resource.calls == [
+        ("update_experiment", {"experiment_id": COMPARISON_ID, "name": "Renamed", "recorded_baseline": True}),
+        ("preview_update_experiment", {"experiment_id": COMPARISON_ID, "name": "Renamed"}),
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "side", [{"candidate_pipeline_name": PIPELINE}, {"baseline_pipeline_version_id": V1}], ids=["candidate", "baseline"]
+)
+async def test_update_experiment_refuses_a_half_given_side_without_calling_the_resource(side: dict[str, str]) -> None:
+    resource = FakeEvaluationResource()
+
+    result = await update_experiment(
+        client=FakeClient(resource), workspace=WORKSPACE, experiment_id=COMPARISON_ID, **side
+    )
+
+    assert isinstance(result, str)
+    assert "pipeline_name" in result
+    assert resource.calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("rerun", "replays"), [("evaluations", False), ("replays", True)])
+async def test_rerun_failed_experiment_picks_evaluations_or_replays(rerun: Any, replays: bool) -> None:
+    resource = FakeEvaluationResource()
+
+    result = await rerun_failed_experiment(
+        client=FakeClient(resource), workspace=WORKSPACE, experiment_id=COMPARISON_ID, rerun=rerun
+    )
+
+    assert isinstance(result, Experiment)
+    assert resource.calls == [("rerun_failed_experiment", {"experiment_id": COMPARISON_ID, "replays": replays})]
+
+
+@pytest.mark.asyncio
+async def test_rescore_and_delete_experiment_call_the_resource_and_delete_confirms_in_a_string() -> None:
+    resource = FakeEvaluationResource()
+    common: dict[str, Any] = {"client": FakeClient(resource), "workspace": WORKSPACE, "experiment_id": COMPARISON_ID}
+
+    rescored = await rescore_experiment(**common)
+    deleted = await delete_experiment(**common)
+
+    assert isinstance(rescored, Experiment)
+    assert COMPARISON_ID in deleted
+    assert [name for name, _ in resource.calls] == ["rescore_experiment", "delete_experiment"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "error",
+    [
+        ResourceNotFoundError(message="Experiment not found"),
+        BadRequestError(message="bad"),
+        UnexpectedAPIError(status_code=409, message="No failed evaluations to rerun in this Experiment"),
+        UnexpectedAPIError(status_code=429, message="Too many scoring runs"),
+    ],
+)
+async def test_experiment_tools_return_the_api_message_instead_of_raising(error: Exception) -> None:
+    client = FakeClient(FakeEvaluationResource(error=error))
+    common: dict[str, Any] = {"client": client, "workspace": WORKSPACE}
+    target: dict[str, Any] = {**common, "experiment_id": COMPARISON_ID}
+
+    results = [
+        await create_experiment(
+            **common,
+            name="N",
+            dataset_id="d-1",
+            metric_group_id=METRIC_GROUP_ID,
+            candidate_pipeline_name=PIPELINE,
+            candidate_pipeline_version_id=V1,
+            preview=True,
+        ),
+        await get_experiment(**target),
+        await update_experiment(**target, name="N"),
+        await update_experiment(**target, name="N", preview=True),
+        await rerun_failed_experiment(**target),
+        await rescore_experiment(**target),
+        await delete_experiment(**target),
     ]
 
     assert all(isinstance(result, str) and str(error.args[0]) in result for result in results)

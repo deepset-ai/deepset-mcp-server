@@ -23,9 +23,12 @@ from deepset_mcp.api.evaluation.models import (
     EvaluatorTemplate,
     EvaluatorVersion,
     Experiment,
+    ExperimentDetail,
+    ExperimentPlan,
     ExperimentResultsReport,
     ExperimentRunGrid,
     ExperimentRunReport,
+    ExperimentUpdatePlan,
     MetricGroup,
     MetricGroupSummary,
     MetricSummary,
@@ -144,7 +147,8 @@ async def create_experiment(
     baseline_pipeline_version_id: str | None = None,
     sessions_per_test_case: int = 1,
     replay_mode: Literal["FIRST_USER_MESSAGE", "ALL_USER_MESSAGES"] = "FIRST_USER_MESSAGE",
-) -> Experiment | str:
+    preview: bool = False,
+) -> Experiment | ExperimentPlan | str:
     """Creates an Experiment that compares a candidate pipeline version against a baseline.
 
     Both sides are scored by the same Metric Group over the test cases of one Dataset. The baseline
@@ -153,12 +157,16 @@ async def create_experiment(
     reuses the Sessions each test case recorded, with nothing replayed. The candidate is always a
     pipeline version that will be replayed on each test case.
 
-    Replaying runs the pipeline on the customer's models, so get a yes before creating when the
-    cost matters. ``sessions_per_test_case`` sets how many Sessions each side scores per test case
+    Creating costs money: it replays the pipeline on the customer's models, and then every Session
+    is judged by the Metric Group's Evaluators, which are billed when they use an LLM. Call it first
+    with ``preview=True``: that starts nothing and returns, per side, how many Sessions are
+    ``reused_sessions`` and how many ``replays_needed``, plus ``cells`` (Sessions times Evaluators)
+    against ``max_cells``. Show that to the user and get a yes before creating for real.
+    ``sessions_per_test_case`` sets how many Sessions each side scores per test case
     (1..50); existing Sessions on that version are reused and only the shortfall is replayed. Find
     ids with ``list_metric_groups`` (metric groups) and ``list_experiments`` (an existing
     Experiment's ``dataset_id``). Read the running or finished Experiment with
-    ``get_experiment_results``.
+    ``get_experiment_results``; follow its progress with ``get_experiment``.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
@@ -171,7 +179,8 @@ async def create_experiment(
     :param baseline_pipeline_version_id: Baseline version id; required when baseline_pipeline_name is given.
     :param sessions_per_test_case: Repetitions per test case (1..50, default 1).
     :param replay_mode: FIRST_USER_MESSAGE replays the first turn only; ALL_USER_MESSAGES replays every turn.
-    :returns: The created Experiment, or an error message.
+    :param preview: True returns the plan (what would be reused and replayed) and creates nothing.
+    :returns: The created Experiment, or with ``preview`` the plan, or an error message.
     """
     if (baseline_pipeline_name is None) != (baseline_pipeline_version_id is None):
         return (
@@ -1086,3 +1095,115 @@ async def delete_metric_group(*, client: AsyncClientProtocol, workspace: str, me
     except _API_ERRORS as e:
         return f"Failed to delete metric group '{metric_group_id}': {e}"
     return f"Metric group '{metric_group_id}' deleted."
+
+
+async def get_experiment(*, client: AsyncClientProtocol, workspace: str, experiment_id: str) -> ExperimentDetail | str:
+    """Reads one Experiment: its test cases and how far each side has got. Free to call.
+
+    Use it to follow an Experiment after ``create_experiment``, ``update_experiment`` or a rerun,
+    and to see why a side failed. ``status`` and each side's ``status`` go REPLAYING, SCORING, then
+    ENDED or FAILED. Per side: ``run_counts`` (replays by status, ``failed`` ones can be replayed
+    again), ``scoring_counts`` (evaluations; ``failed`` and ``errored`` ones can be judged again),
+    ``error`` (why it could not be scored) and ``experiment_run_id`` (the scoring run, for
+    ``get_experiment_run``). The Sessions each side scored are not included; they are per test case
+    in ``get_experiment_results``. To retry what failed use ``rerun_failed_experiment``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param experiment_id: The Experiment's id, from ``list_experiments``.
+    :returns: The Experiment, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def update_experiment(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    experiment_id: str,
+    name: str | None = None,
+    candidate_pipeline_name: str | None = None,
+    candidate_pipeline_version_id: str | None = None,
+    baseline_pipeline_name: str | None = None,
+    baseline_pipeline_version_id: str | None = None,
+    recorded_baseline: bool = False,
+    preview: bool = False,
+) -> Experiment | ExperimentUpdatePlan | str:
+    """Renames an Experiment or changes its candidate or baseline. Changing a side costs money.
+
+    Send only what changes. A changed side is planned again as on a new Experiment: Sessions that
+    already exist on it are reused, the rest are replayed, and it is judged again once they have
+    finished; its previous scoring run is stopped and the other side is left alone. Only renaming
+    costs nothing. Call it first with ``preview=True``: that changes nothing and returns, for each
+    changed side, ``reused_sessions`` and ``replays_needed`` (a side left alone is null). Show that
+    to the user and get a yes before changing for real. Follow progress with ``get_experiment``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param experiment_id: The Experiment's id.
+    :param name: A new name.
+    :param candidate_pipeline_name: Pipeline of the new candidate; give it with its version id.
+    :param candidate_pipeline_version_id: The new candidate version.
+    :param baseline_pipeline_name: Pipeline of the new baseline; give it with its version id.
+    :param baseline_pipeline_version_id: The new baseline version.
+    :param recorded_baseline: True makes the baseline the Dataset's recorded Sessions, with nothing replayed.
+    :param preview: True returns the plan and changes nothing.
+    :returns: The updated Experiment, or with ``preview`` the plan, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def rerun_failed_experiment(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    experiment_id: str,
+    rerun: Literal["evaluations", "replays"] = "evaluations",
+) -> Experiment | str:
+    """Retries what failed in an Experiment. Costs money: judges or replays again.
+
+    ``rerun="evaluations"`` judges again the evaluations a side's scoring run left failed or
+    errored (see ``scoring_counts`` in ``get_experiment``), reusing every one that succeeded; it
+    bills only those Evaluators again. ``rerun="replays"`` replays again the replays that failed
+    (``run_counts.failed``), reusing every Session that exists, then scores that side again, which
+    bills the new Sessions' replays and evaluations. hub-api refuses with a message when nothing
+    failed or while a side is still running. Follow progress with ``get_experiment``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param experiment_id: The Experiment's id.
+    :param rerun: Which failures to retry: "evaluations" (default) or "replays".
+    :returns: The Experiment, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def rescore_experiment(*, client: AsyncClientProtocol, workspace: str, experiment_id: str) -> Experiment | str:
+    """Scores both sides of an Experiment again with the Metric Group as it is now. Costs money.
+
+    Use it after changing the Metric Group's Evaluators or weights (``update_metric_group``,
+    ``update_evaluator``). Every Session is judged again, so every evaluation is billed again; the
+    Sessions are not replayed. hub-api refuses with a message while a side is still running or if
+    no side has been scored. Follow progress with ``get_experiment``, then read
+    ``get_experiment_results``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param experiment_id: The Experiment's id.
+    :returns: The Experiment, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def delete_experiment(*, client: AsyncClientProtocol, workspace: str, experiment_id: str) -> str:
+    """Deletes an Experiment and its results. This cannot be undone: get a yes first.
+
+    The Sessions it reused, its replays and its scoring runs are kept, so later Experiments can
+    reuse them.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param experiment_id: The Experiment's id.
+    :returns: A confirmation, or an error message.
+    """
+    raise NotImplementedError
