@@ -12,7 +12,6 @@ from statistics import fmean
 from typing import Any, Literal, TypeVar
 
 from deepset_mcp.api.evaluation.models import (
-    CombinedEvaluatorTemplates,
     Dataset,
     DatasetSummary,
     EvaluationRun,
@@ -1045,7 +1044,6 @@ async def list_evaluator_templates(*, client: AsyncClientProtocol, workspace: st
     ``judge_model`` asks a model per Session, so running it costs money. ``expected_columns`` are the
     columns of a Dataset test case's expected data it reads. To use one, pass its ``name`` and
     ``python_code`` to ``create_evaluator``; the copy is yours and does not follow the template.
-    ``combinable_as_code`` templates can be merged with ``combine_evaluator_templates``.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
@@ -1055,27 +1053,6 @@ async def list_evaluator_templates(*, client: AsyncClientProtocol, workspace: st
         return await client.evaluation(workspace=workspace).list_evaluator_templates()
     except _API_ERRORS as e:
         return f"Failed to list evaluator templates: {e}"
-
-
-async def combine_evaluator_templates(
-    *, client: AsyncClientProtocol, workspace: str, template_keys: list[str], title: str
-) -> CombinedEvaluatorTemplates | str:
-    """Merges code templates into one Evaluation Function that reports all their Metrics. Saves nothing.
-
-    Only templates whose ``combinable_as_code`` is true can be merged; an unknown key, a judge template
-    or a repeated key is rejected. The returned ``python_code`` is not yet an Evaluator: pass it to
-    ``try_evaluator`` and then ``create_evaluator``.
-
-    :param client: The async client for API communication.
-    :param workspace: The workspace name.
-    :param template_keys: Keys of two or more templates, in the order their Metrics should be reported.
-    :param title: What the combined code's opening comment calls it, e.g. "Agent efficiency metrics".
-    :returns: The merged code and its Metrics, or an error message.
-    """
-    try:
-        return await client.evaluation(workspace=workspace).combine_evaluator_templates(template_keys, title)
-    except _API_ERRORS as e:
-        return f"Failed to combine evaluator templates: {e}"
 
 
 async def create_metric_group(

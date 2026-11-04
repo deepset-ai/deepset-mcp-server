@@ -9,7 +9,6 @@ from urllib.parse import quote
 
 from deepset_mcp.api import ids
 from deepset_mcp.api.evaluation.models import (
-    CombinedEvaluatorTemplates,
     Dataset,
     DatasetSummary,
     EvaluationRun,
@@ -821,17 +820,6 @@ class EvaluationResource(EvaluationResourceProtocol):
         """
         data = await self._get(await self._workspace_path("evaluator-templates"))
         return [EvaluatorTemplate.model_validate(item) for item in data or []]
-
-    async def combine_evaluator_templates(self, template_keys: list[str], title: str) -> CombinedEvaluatorTemplates:
-        """Merge code templates into one Evaluation Function. Computes only; saves nothing.
-
-        :param template_keys: Keys of two or more combinable templates, in the order their Metrics are reported.
-        :param title: What the combined code's opening comment calls it.
-        :returns: The merged code and the Metrics it declares.
-        """
-        path = await self._workspace_path("evaluator-templates", "combine")
-        data = await self._post(path, {"template_keys": template_keys, "title": title})
-        return CombinedEvaluatorTemplates.model_validate(data)
 
     async def create_metric_group(
         self, name: str, evaluator_ids: list[str], weights: list[MetricWeight] | None = None

@@ -26,7 +26,6 @@ from .deployment import (
 from .doc_search import list_doc_sections, search_docs
 from .evaluation import (
     add_test_cases,
-    combine_evaluator_templates,
     copy_test_cases,
     create_dataset,
     create_evaluator,
@@ -210,7 +209,6 @@ __all__ = [
     "update_evaluator",
     "set_evaluator_archived",
     "list_evaluator_templates",
-    "combine_evaluator_templates",
     "create_metric_group",
     "update_metric_group",
     "delete_metric_group",

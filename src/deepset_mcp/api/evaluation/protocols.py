@@ -5,7 +5,6 @@
 from typing import Any, Protocol
 
 from deepset_mcp.api.evaluation.models import (
-    CombinedEvaluatorTemplates,
     Dataset,
     DatasetSummary,
     EvaluationRun,
@@ -234,10 +233,6 @@ class EvaluationResourceProtocol(Protocol):
 
     async def list_evaluator_templates(self) -> list[EvaluatorTemplate]:
         """List the built-in Evaluator templates."""
-        ...
-
-    async def combine_evaluator_templates(self, template_keys: list[str], title: str) -> CombinedEvaluatorTemplates:
-        """Merge code templates into one Evaluation Function. Computes only; saves nothing."""
         ...
 
     async def create_metric_group(

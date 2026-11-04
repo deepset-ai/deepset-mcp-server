@@ -148,7 +148,6 @@ draft/version history. Each deployment tracks its own history of served pipeline
 | `update_evaluator` | required | none | Rename an Evaluator or save new source as a new version. |
 | `set_evaluator_archived` | required | none | Archive or unarchive an Evaluator; nothing is deleted. |
 | `list_evaluator_templates` | required | explorable | List the built-in Evaluator templates with their code and Metrics. |
-| `combine_evaluator_templates` | required | none | Merge code templates into one Evaluation Function; computes only, saves nothing. |
 | `create_metric_group` | required | none | Create a Metric Group of Evaluators, optionally with Metric weights for the Composite. |
 | `update_metric_group` | required | none | Replace a Metric Group's name and Evaluators, and optionally its Metric weights. |
 | `delete_metric_group` | required | none | Delete a Metric Group and its scoring runs (destructive). |

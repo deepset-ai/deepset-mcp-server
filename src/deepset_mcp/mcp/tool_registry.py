@@ -44,7 +44,6 @@ from deepset_mcp.tools.doc_search import (
 )
 from deepset_mcp.tools.evaluation import (
     add_test_cases as add_test_cases_tool,
-    combine_evaluator_templates as combine_evaluator_templates_tool,
     copy_test_cases as copy_test_cases_tool,
     create_dataset as create_dataset_tool,
     create_evaluator as create_evaluator_tool,
@@ -541,10 +540,6 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "list_evaluator_templates": (
         list_evaluator_templates_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
-    ),
-    "combine_evaluator_templates": (
-        combine_evaluator_templates_tool,
-        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
     ),
     "create_metric_group": (
         create_metric_group_tool,

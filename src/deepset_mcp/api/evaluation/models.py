@@ -270,18 +270,6 @@ class EvaluatorTemplate(BaseModel):
         default_factory=list,
         description="The columns of a test case's expected data the template reads; without them it reports n/a.",
     )
-    combinable_as_code: bool = Field(
-        default=False, description="Whether `combine_evaluator_templates` can merge it. False for a judge template."
-    )
-
-
-class CombinedEvaluatorTemplates(BaseModel):
-    """One Evaluation Function reporting the Metrics of several templates."""
-
-    python_code: str = Field(description="The merged Evaluation Function, to send as an Evaluator's `python_code`.")
-    metrics: dict[str, MetricDeclaration] = Field(
-        default_factory=dict, description="Every Metric of the combined templates, keyed by name."
-    )
 
 
 class ExperimentRun(BaseModel):

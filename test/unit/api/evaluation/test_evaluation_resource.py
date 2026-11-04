@@ -10,7 +10,6 @@ from uuid import UUID
 import pytest
 
 from deepset_mcp.api.evaluation.models import (
-    CombinedEvaluatorTemplates,
     Dataset,
     DatasetSummary,
     EvaluationRun,
@@ -911,7 +910,6 @@ def template_dict() -> dict[str, Any]:
         "metrics": {"calls": {"shape": "score", "grain": "session"}},
         "judge_model": None,
         "expected_columns": [],
-        "combinable_as_code": True,
     }
 
 
@@ -978,23 +976,8 @@ async def test_list_evaluator_templates_gets_the_templates() -> None:
     templates = await resource(client).list_evaluator_templates()
 
     assert isinstance(templates[0], EvaluatorTemplate)
-    assert templates[0].combinable_as_code is True
     assert templates[0].metrics["calls"].grain == "session"
     assert client.requests[0]["method"] == "GET"
-
-
-@pytest.mark.asyncio
-async def test_combine_evaluator_templates_posts_keys_and_title() -> None:
-    endpoint = f"{EVALUATION}/evaluator-templates/combine"
-    client = FakeEvaluationClient({endpoint: {"python_code": "merged", "metrics": {"a": {"grain": "session"}}}})
-
-    combined = await resource(client).combine_evaluator_templates(["tool_calls", "steps"], "Efficiency")
-
-    assert isinstance(combined, CombinedEvaluatorTemplates)
-    assert combined.python_code == "merged"
-    [request] = client.requests
-    assert (request["method"], request["endpoint"]) == ("POST", endpoint)
-    assert request["data"] == {"template_keys": ["tool_calls", "steps"], "title": "Efficiency"}
 
 
 @pytest.mark.asyncio

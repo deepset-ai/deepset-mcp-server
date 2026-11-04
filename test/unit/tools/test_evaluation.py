@@ -7,7 +7,6 @@ from typing import Any
 import pytest
 
 from deepset_mcp.api.evaluation.models import (
-    CombinedEvaluatorTemplates,
     Composite,
     Dataset,
     DatasetSummary,
@@ -48,7 +47,6 @@ from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, U
 from deepset_mcp.tools import evaluation as evaluation_tools
 from deepset_mcp.tools.evaluation import (
     add_test_cases,
-    combine_evaluator_templates,
     copy_test_cases,
     create_dataset,
     create_evaluator,
@@ -614,10 +612,6 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
     async def list_evaluator_templates(self) -> list[EvaluatorTemplate]:
         self._record("list_evaluator_templates")
         return [EvaluatorTemplate(key="tool_calls", name="Tool calls", python_code="def evaluate(): ...")]
-
-    async def combine_evaluator_templates(self, template_keys: list[str], title: str) -> CombinedEvaluatorTemplates:
-        self._record("combine_evaluator_templates", template_keys=template_keys, title=title)
-        return CombinedEvaluatorTemplates(python_code="merged")
 
     def _metric_group(self) -> MetricGroup:
         return MetricGroup(
@@ -1533,17 +1527,10 @@ async def test_template_tools_return_the_template_models() -> None:
     client = FakeClient(resource)
 
     templates = await list_evaluator_templates(client=client, workspace=WORKSPACE)
-    combined = await combine_evaluator_templates(
-        client=client, workspace=WORKSPACE, template_keys=["a", "b"], title="T"
-    )
 
     assert isinstance(templates, list)
     assert templates[0].key == "tool_calls"
-    assert isinstance(combined, CombinedEvaluatorTemplates)
-    assert resource.calls == [
-        ("list_evaluator_templates", {}),
-        ("combine_evaluator_templates", {"template_keys": ["a", "b"], "title": "T"}),
-    ]
+    assert resource.calls == [("list_evaluator_templates", {})]
 
 
 @pytest.mark.asyncio
@@ -1602,7 +1589,6 @@ async def test_evaluator_and_metric_group_write_tools_return_the_api_message_ins
         await update_evaluator(**common, evaluator_id=E1, name="N"),
         await set_evaluator_archived(**common, evaluator_id=E1, archived=False),
         await list_evaluator_templates(**common),
-        await combine_evaluator_templates(**common, template_keys=["a", "b"], title="T"),
         await create_metric_group(**common, name="W", evaluator_ids=[E1]),
         await update_metric_group(**common, metric_group_id=METRIC_GROUP_ID, name="W", evaluator_ids=[E1]),
         await delete_metric_group(**common, metric_group_id=METRIC_GROUP_ID),
