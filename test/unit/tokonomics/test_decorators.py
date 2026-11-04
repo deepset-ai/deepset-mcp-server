@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import asyncio
+import enum
 import inspect
 from typing import Any
 
@@ -660,3 +661,14 @@ class TestExplorableAndReferenceableDecorator:
         # Should have modified parameter types (from @referenceable)
         assert sig.parameters["data"].annotation == (dict | str)
         assert sig.parameters["threshold"].annotation == (int | str)
+
+
+def test_enum_parameter_coerced_from_string() -> None:
+    class Mode(enum.StrEnum):
+        MANAGED = "MANAGED"
+        SERVERLESS = "SERVERLESS"
+
+    assert _try_coerce_from_string("SERVERLESS", Mode) is Mode.SERVERLESS
+    assert _try_coerce_from_string("SERVERLESS", Mode | None) is Mode.SERVERLESS
+    with pytest.raises(ValueError):
+        _try_coerce_from_string("nope", Mode)
