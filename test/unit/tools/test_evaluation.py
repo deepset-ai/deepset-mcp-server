@@ -157,7 +157,6 @@ def comparison_side(**overrides: Any) -> dict[str, Any]:
         "pipeline_version_id": "00000000-0000-0000-0000-0000000000b1",
         "recorded": False,
         "status": "ENDED",
-        "session_replay_suite_id": None,
         "experiment_run_id": RUN_ID,
         "scoring_runs": [{"pipeline_id": PIPELINE_ID, "experiment_run_id": RUN_ID}],
         "reused_sessions": 2,
