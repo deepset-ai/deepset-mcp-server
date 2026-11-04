@@ -38,6 +38,9 @@ from deepset_mcp.api.evaluation.models import (
     MetricSummary,
     MetricWeight,
     NewTestCase,
+    ReplaySuite,
+    ReplaySuiteAccepted,
+    ReplaySuiteSummary,
     ReportCell,
     ReportRow,
     SessionList,
@@ -51,6 +54,7 @@ from deepset_mcp.api.evaluation.models import (
 )
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
 from deepset_mcp.api.protocols import AsyncClientProtocol
+from deepset_mcp.api.search_history.models import PipelineTraceEntry
 
 
 async def list_evaluators(*, client: AsyncClientProtocol, workspace: str) -> list[Evaluator] | str:
@@ -1485,3 +1489,166 @@ async def get_evaluation_run(
         return await client.evaluation(workspace=workspace).get_evaluation_run(pipeline_name, evaluation_run_id)
     except _API_ERRORS as e:
         return f"Failed to read Evaluation Run '{evaluation_run_id}': {e}"
+
+
+async def list_session_replays(
+    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str, limit: int = 50
+) -> list[SessionReplayRun] | str:
+    """Lists a pipeline's replay runs, newest first: single replays and the runs of Replay Suites.
+
+    Each run says what it replayed (``source_session_id``), on which ``pipeline_version_id``, its
+    ``status`` (CREATED, STARTED, ENDED or FAILED), the new Session its traces landed in
+    (``session_id``) and, for a suite's run, ``suite_id``, ``test_case_id`` and ``repetition``. Use
+    it to find a replay you did not start yourself; read one with ``get_session_replay``, a suite
+    with ``get_replay_suite``. Reading is free.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline.
+    :param limit: Maximum number of runs to return (the API caps it at 200).
+    :returns: The runs, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def start_replay_suite(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    dataset_id: str,
+    pipeline_version_id: str,
+    repetitions: int = 1,
+    replay_mode: Literal["FIRST_USER_MESSAGE", "ALL_USER_MESSAGES"] = "FIRST_USER_MESSAGE",
+    metric_group_id: str | None = None,
+    reuse: Literal["RERUN_ALL", "REUSE_SUCCEEDED"] | None = None,
+) -> ReplaySuiteAccepted | str:
+    """Replays every test case of a Dataset on one pipeline version, ``repetitions`` times each. Costs money.
+
+    A Replay Suite is a Dataset replayed as one batch on one exact pipeline version: every test case
+    runs ``repetitions`` times, and each of those is its own replay with the test case's setup and
+    cleanup steps and a new Session. Repeating a test case shows how stable the pipeline's answers
+    are. The suite replays test cases times ``repetitions`` runs (``run_count``), and every run is a
+    pipeline run on the customer's models, so say that number, get a yes, and only then start. There
+    is no preview: work it out from ``get_dataset`` (its test cases) times ``repetitions``. The server
+    refuses a suite over its run limit.
+
+    Give ``metric_group_id`` to also score: once every replay has finished, that Metric Group judges
+    the test cases' source Sessions and the Sessions the replays produced, so you can compare. That
+    bills every Evaluator of the group on both sides, so it multiplies the cost; leave it out to only
+    replay and score later with ``start_experiment_run``. For a replay-and-compare that is kept as one
+    comparison, ``create_experiment`` is the better fit.
+
+    The suite is queued, not finished: poll it with ``get_replay_suite`` (``status``, ``run_counts``);
+    ENDED only means every run was picked up, so read ``run_counts.failed``. Earlier suites:
+    ``list_replay_suites``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline to replay on.
+    :param dataset_id: The Dataset whose test cases to replay (see ``list_datasets``).
+    :param pipeline_version_id: The exact pipeline version to replay on, a draft included.
+    :param repetitions: How many times to replay each test case (1..50, default 1).
+    :param replay_mode: FIRST_USER_MESSAGE replays the first turn only; ALL_USER_MESSAGES replays every turn.
+    :param metric_group_id: A Metric Group to score the source and replayed Sessions with once replays finish.
+    :param reuse: With a Metric Group: RERUN_ALL judges everything again, REUSE_SUCCEEDED skips what it judged.
+    :returns: The queued suite (``suite_id``, ``run_count``), or an error message.
+    """
+    raise NotImplementedError
+
+
+async def list_replay_suites(
+    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str, limit: int = 50
+) -> list[ReplaySuiteSummary] | str:
+    """Lists a pipeline's Replay Suites, newest first, without their runs.
+
+    A Replay Suite is a Dataset replayed on one pipeline version, several times per test case (see
+    ``start_replay_suite``). Each entry has its ``status``, how many runs are in each status
+    (``run_counts``), the version and Dataset replayed and, if it scores afterwards, its Metric Group
+    (``metric_group``) with the two scoring runs. Read one suite's runs with ``get_replay_suite``.
+    Reading is free.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline.
+    :param limit: Maximum number of suites to return (the API caps it at 200).
+    :returns: The suites, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def get_replay_suite(
+    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str, suite_id: str
+) -> ReplaySuite | str:
+    """Reads one Replay Suite with every run, grouped by test case and, within it, by repetition.
+
+    Use it to follow a suite ``start_replay_suite`` queued: ``status`` and ``run_counts`` say how
+    far it got, and each test case lists its replays with their ``status``, the new ``session_id``
+    each produced and ``trace_ids``. A suite that scores afterwards names its two scoring runs in
+    ``metric_group``; read them with ``get_experiment_run``. ``source_error`` or ``replayed_error``
+    says why a scoring side did not start. Reading is free.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline.
+    :param suite_id: The suite's id (from ``start_replay_suite`` or ``list_replay_suites``).
+    :returns: The suite, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def list_imported_session_traces(
+    *, client: AsyncClientProtocol, workspace: str, session_id: str
+) -> list[PipelineTraceEntry] | str:
+    """Lists every turn of a Session that came in with an imported Dataset, oldest first, with its spans.
+
+    An imported Session never ran in this workspace, so ``list_pipeline_traces`` and
+    ``get_pipeline_trace`` cannot find it; read it here, the same way. Each turn is a trace
+    with its ``query_id``, query, status, timing and, in ``haystack_trace``, every component span
+    with essential tags (component type only, not input or output). Not paginated. Get one turn
+    with ``get_imported_session_trace``, a span's input and output with
+    ``get_imported_session_trace_span_tags``. Find an imported Session's id as a test case's
+    ``session_id`` in ``get_dataset`` (``is_imported``). Imported Sessions carry no logs, and the
+    JSON export of a turn is a file download that this tool set does not offer.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param session_id: The imported Session's id.
+    :returns: The turns, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def get_imported_session_trace(
+    *, client: AsyncClientProtocol, workspace: str, session_id: str, query_id: str
+) -> PipelineTraceEntry | str:
+    """Reads one turn of an imported Session with its spans (component-type tags only).
+
+    Same shape as ``get_pipeline_trace``, for a Session that came in with an imported Dataset. For
+    one span's input and output use ``get_imported_session_trace_span_tags``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param session_id: The imported Session's id.
+    :param query_id: The turn's ``query_id`` from ``list_imported_session_traces``.
+    :returns: The turn with its spans, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def get_imported_session_trace_span_tags(
+    *, client: AsyncClientProtocol, workspace: str, session_id: str, query_id: str, span_id: str
+) -> dict[str, Any] | str:
+    """Reads every tag of one span of an imported Session's turn, input and output included.
+
+    Same as ``get_pipeline_trace_span_tags``, for a Session that came in with an imported Dataset.
+    Take ``span_id`` from a span in ``get_imported_session_trace``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param session_id: The imported Session's id.
+    :param query_id: The turn's ``query_id``.
+    :param span_id: The span's id.
+    :returns: The span's tag dictionary, or an error message.
+    """
+    raise NotImplementedError

@@ -883,6 +883,17 @@ class SessionReplayRun(BaseModel):
     replay_mode: str | None = None
     trace_ids: list[str] = Field(default_factory=list, description="The traces the replay produced, in order")
     error_detail: dict[str, Any] | None = None
+    session_id: str | None = Field(default=None, description="The new Session the replay's traces land in")
+    suite_id: str | None = Field(
+        default=None,
+        validation_alias="session_replay_suite_id",
+        description="The Replay Suite this run is one replay of; null for a run on its own",
+    )
+    repetition: int | None = Field(default=None, description="Which replay of its test case in the suite, from 1")
+    test_case_id: str | None = Field(
+        default=None, validation_alias="session_replay_test_case_id", description="Null for a run on its own"
+    )
+    created_at: str | None = None
 
 
 class SessionReplayReport(BaseModel):
@@ -976,3 +987,82 @@ class Dataset(DatasetSummary):
     """A Dataset and every test case in it, in the order an Experiment replays them."""
 
     test_cases: list[TestCase] = Field(default_factory=list)
+
+
+class ReplaySuiteAccepted(BaseModel):
+    """A Replay Suite whose runs were queued; none of them has necessarily succeeded."""
+
+    suite_id: str = Field(validation_alias="session_replay_suite_id", description="Pass it to get_replay_suite to poll")
+    run_count: int = Field(default=0, description="Replays queued: test cases times repetitions, each a pipeline run")
+
+
+class ReplaySuiteRunCounts(BaseModel):
+    """How many of a Replay Suite's runs are in each status."""
+
+    created: int = 0
+    started: int = 0
+    ended: int = 0
+    failed: int = 0
+
+
+class ReplaySuiteMetricGroup(BaseModel):
+    """The Metric Group a Replay Suite scores twice once its replays finish, and the two scoring runs.
+
+    Each side ends with a run or an error. Both null: it has not started yet.
+    """
+
+    metric_group_id: str = Field(validation_alias="pipeline_experiment_id")
+    reuse: str | None = Field(default=None, description="RERUN_ALL or REUSE_SUCCEEDED")
+    source_run_id: str | None = Field(
+        default=None,
+        validation_alias="source_experiment_run_id",
+        description="The scoring run over the test cases' source Sessions; read it with get_experiment_run",
+    )
+    source_error: str | None = Field(default=None, description="Why the run over the source Sessions did not start")
+    replayed_run_id: str | None = Field(
+        default=None,
+        validation_alias="replayed_experiment_run_id",
+        description="The scoring run over the Sessions the replays produced; read it with get_experiment_run",
+    )
+    replayed_error: str | None = Field(default=None, description="Why the run over the replayed Sessions did not start")
+
+
+class ReplaySuiteSummary(BaseModel):
+    """A Replay Suite: a Dataset replayed on one pipeline version, ``repetitions`` times per test case."""
+
+    suite_id: str = Field(validation_alias="session_replay_suite_id")
+    pipeline_id: str | None = None
+    pipeline_version_id: str | None = Field(default=None, description="The version every test case was replayed on")
+    dataset_id: str | None = Field(
+        default=None, validation_alias="session_replay_dataset_id", description="Null once the Dataset is deleted"
+    )
+    test_case_count: int = 0
+    repetitions: int = 1
+    replay_mode: str | None = None
+    status: str = Field(
+        description=(
+            "CREATED, STARTED, then ENDED (FAILED when every run failed). ENDED does not mean every run "
+            "succeeded: read run_counts"
+        )
+    )
+    run_counts: ReplaySuiteRunCounts = Field(default_factory=ReplaySuiteRunCounts)
+    metric_group: ReplaySuiteMetricGroup | None = Field(
+        default=None, validation_alias="experiment", description="The Metric Group scored twice after the replays"
+    )
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class ReplaySuiteTestCase(BaseModel):
+    """One test case of a Replay Suite and every replay of it, by repetition."""
+
+    test_case_id: str = Field(validation_alias="session_replay_test_case_id")
+    name: str | None = None
+    session_id: str | None = Field(default=None, description="The Session it replays; null when it sends inputs")
+    runs: list[SessionReplayRun] = Field(default_factory=list)
+
+
+class ReplaySuite(ReplaySuiteSummary):
+    """A Replay Suite with every run, grouped by test case in the Dataset's order."""
+
+    test_cases: list[ReplaySuiteTestCase] = Field(default_factory=list)

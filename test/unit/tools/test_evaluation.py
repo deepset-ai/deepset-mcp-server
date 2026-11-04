@@ -35,6 +35,9 @@ from deepset_mcp.api.evaluation.models import (
     NoComposite,
     NoNormalizedMean,
     NormalizedMean,
+    ReplaySuite,
+    ReplaySuiteAccepted,
+    ReplaySuiteSummary,
     ScoreAggregate,
     SessionList,
     SessionReplayReport,
@@ -46,7 +49,7 @@ from deepset_mcp.api.evaluation.models import (
 )
 from deepset_mcp.api.evaluation.protocols import EvaluationResourceProtocol
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.search_history.models import PipelineTraceSummary
+from deepset_mcp.api.search_history.models import PipelineTraceEntry, PipelineTraceSummary
 from deepset_mcp.api.shared_models import PaginatedResponse
 from deepset_mcp.tools import evaluation as evaluation_tools
 from deepset_mcp.tools.evaluation import (
@@ -67,6 +70,9 @@ from deepset_mcp.tools.evaluation import (
     get_experiment,
     get_experiment_results,
     get_experiment_run,
+    get_imported_session_trace,
+    get_imported_session_trace_span_tags,
+    get_replay_suite,
     get_session_replay,
     list_datasets,
     list_evaluation_runs,
@@ -74,7 +80,10 @@ from deepset_mcp.tools.evaluation import (
     list_evaluators,
     list_experiment_runs,
     list_experiments,
+    list_imported_session_traces,
     list_metric_groups,
+    list_replay_suites,
+    list_session_replays,
     list_sessions,
     remove_test_cases,
     replay_session,
@@ -83,6 +92,7 @@ from deepset_mcp.tools.evaluation import (
     run_evaluator,
     set_evaluator_archived,
     start_experiment_run,
+    start_replay_suite,
     try_evaluator,
     update_dataset,
     update_evaluator,
@@ -303,6 +313,60 @@ def grid() -> ExperimentRunGrid:
     )
 
 
+SUITE_ID = "dddddddd-1111-2222-3333-555555555555"
+IMPORTED_SESSION_ID = "eeeeeeee-1111-2222-3333-555555555555"
+IMPORTED_QUERY_ID = "ffffffff-1111-2222-3333-555555555555"
+IMPORTED_SPAN_ID = "abababab-1111-2222-3333-555555555555"
+
+
+def suite_dict() -> dict[str, Any]:
+    return {
+        "session_replay_suite_id": SUITE_ID,
+        "pipeline_version_id": "88888888-8888-8888-8888-888888888888",
+        "test_case_count": 1,
+        "repetitions": 2,
+        "status": "ENDED",
+        "run_counts": {"ended": 1, "failed": 1},
+        "experiment": {"pipeline_experiment_id": METRIC_GROUP_ID, "source_experiment_run_id": RUN_ID},
+        "created_at": "2026-10-07T00:00:00Z",
+        "test_cases": [
+            {
+                "session_replay_test_case_id": "cccccccc-1111-2222-3333-444444444444",
+                "name": "Order status",
+                "runs": [
+                    {
+                        "session_replay_run_id": "77777777-7777-7777-7777-777777777777",
+                        "status": "FAILED",
+                        "repetition": 2,
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def imported_turn_dict() -> dict[str, Any]:
+    return {
+        "query_id": IMPORTED_QUERY_ID,
+        "query": "who wrote Dune?",
+        "duration_s": 1.5,
+        "created_at": "2026-10-07T00:00:00Z",
+        "haystack_trace": {
+            "schema_version": "haystack-trace/v1",
+            "run_id": RUN_ID,
+            "started_at": "2026-10-07T00:00:00Z",
+            "traces": [
+                {
+                    "span_id": IMPORTED_SPAN_ID,
+                    "operation_name": "haystack.component.run",
+                    "start_time": "2026-10-07T00:00:00Z",
+                    "tags": {"haystack.component.type": "Retriever"},
+                }
+            ],
+        },
+    }
+
+
 class FakeEvaluationResource(EvaluationResourceProtocol):
     """Answers reads with fixtures, and each check poll with the next state in line, then the last."""
 
@@ -516,6 +580,53 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
     async def get_session_replay(self, pipeline_name: str, replay_run_id: str) -> SessionReplayRun:
         self._record("get_session_replay", replay_run_id=replay_run_id)
         return self.replay_states.pop(0) if len(self.replay_states) > 1 else self.replay_states[0]
+
+    async def list_session_replays(self, pipeline_name: str, limit: int = 50) -> list[SessionReplayRun]:
+        self._record("list_session_replays", pipeline_name=pipeline_name, limit=limit)
+        return [replay_run("ENDED")]
+
+    async def start_replay_suite(
+        self,
+        pipeline_name: str,
+        dataset_id: str,
+        pipeline_version_id: str,
+        repetitions: int = 1,
+        replay_mode: str = "FIRST_USER_MESSAGE",
+        metric_group_id: str | None = None,
+        reuse: str | None = None,
+    ) -> ReplaySuiteAccepted:
+        self._record(
+            "start_replay_suite",
+            dataset_id=dataset_id,
+            pipeline_version_id=pipeline_version_id,
+            repetitions=repetitions,
+            replay_mode=replay_mode,
+            metric_group_id=metric_group_id,
+            reuse=reuse,
+        )
+        return ReplaySuiteAccepted.model_validate({"session_replay_suite_id": SUITE_ID, "run_count": 6})
+
+    async def list_replay_suites(self, pipeline_name: str, limit: int = 50) -> list[ReplaySuiteSummary]:
+        self._record("list_replay_suites", pipeline_name=pipeline_name, limit=limit)
+        return [ReplaySuiteSummary.model_validate(suite_dict())]
+
+    async def get_replay_suite(self, pipeline_name: str, suite_id: str) -> ReplaySuite:
+        self._record("get_replay_suite", suite_id=suite_id)
+        return ReplaySuite.model_validate(suite_dict())
+
+    async def list_imported_session_traces(self, session_id: str) -> list[PipelineTraceEntry]:
+        self._record("list_imported_session_traces", session_id=session_id)
+        return [PipelineTraceEntry.model_validate(imported_turn_dict())]
+
+    async def get_imported_session_trace(self, session_id: str, query_id: str) -> PipelineTraceEntry:
+        self._record("get_imported_session_trace", session_id=session_id, query_id=query_id)
+        return PipelineTraceEntry.model_validate(imported_turn_dict())
+
+    async def get_imported_session_trace_span_tags(
+        self, session_id: str, query_id: str, span_id: str
+    ) -> dict[str, Any]:
+        self._record("get_imported_session_trace_span_tags", session_id=session_id, query_id=query_id, span_id=span_id)
+        return {"haystack.component.input": {"query": "x"}}
 
     async def list_datasets(self, pipeline_name: str | None = None, limit: int = 50) -> list[DatasetSummary]:
         self._record("list_datasets", pipeline_name=pipeline_name)
@@ -2064,3 +2175,136 @@ async def test_get_session_replay_reports_a_run_of_inputs_without_a_source_sessi
 
     assert isinstance(report, SessionReplayReport)
     assert (report.status, report.source_session_id, report.pipeline_version_id) == ("FAILED", None, None)
+
+
+@pytest.mark.asyncio
+async def test_list_session_replays_returns_the_runs() -> None:
+    resource = FakeEvaluationResource()
+
+    runs = await list_session_replays(client=FakeClient(resource), workspace=WORKSPACE, pipeline_name=PIPELINE, limit=5)
+
+    assert isinstance(runs, list)
+    assert runs[0].session_replay_run_id == REPLAY_RUN_ID
+    assert resource.calls == [("list_session_replays", {"pipeline_name": PIPELINE, "limit": 5})]
+
+
+@pytest.mark.asyncio
+async def test_start_replay_suite_hands_back_the_suite_without_waiting() -> None:
+    resource = FakeEvaluationResource()
+
+    accepted = await start_replay_suite(
+        client=FakeClient(resource),
+        workspace=WORKSPACE,
+        pipeline_name=PIPELINE,
+        dataset_id="bbbbbbbb-1111-2222-3333-444444444444",
+        pipeline_version_id=DRAFT_VERSION_ID,
+        repetitions=3,
+        metric_group_id=METRIC_GROUP_ID,
+        reuse="REUSE_SUCCEEDED",
+    )
+
+    assert isinstance(accepted, ReplaySuiteAccepted)
+    assert (accepted.suite_id, accepted.run_count) == (SUITE_ID, 6)
+    assert resource.calls == [
+        (
+            "start_replay_suite",
+            {
+                "dataset_id": "bbbbbbbb-1111-2222-3333-444444444444",
+                "pipeline_version_id": DRAFT_VERSION_ID,
+                "repetitions": 3,
+                "replay_mode": "FIRST_USER_MESSAGE",
+                "metric_group_id": METRIC_GROUP_ID,
+                "reuse": "REUSE_SUCCEEDED",
+            },
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_reuse_without_a_metric_group_is_refused_before_any_replay_starts() -> None:
+    resource = FakeEvaluationResource()
+
+    result = await start_replay_suite(
+        client=FakeClient(resource),
+        workspace=WORKSPACE,
+        pipeline_name=PIPELINE,
+        dataset_id="bbbbbbbb-1111-2222-3333-444444444444",
+        pipeline_version_id=DRAFT_VERSION_ID,
+        reuse="RERUN_ALL",
+    )
+
+    assert isinstance(result, str)
+    assert "metric_group_id" in result
+    assert resource.calls == []
+
+
+@pytest.mark.asyncio
+async def test_list_and_get_replay_suite_return_the_suite_with_its_counts_and_runs() -> None:
+    client = FakeClient(FakeEvaluationResource())
+
+    suites = await list_replay_suites(client=client, workspace=WORKSPACE, pipeline_name=PIPELINE)
+    suite = await get_replay_suite(client=client, workspace=WORKSPACE, pipeline_name=PIPELINE, suite_id=SUITE_ID)
+
+    assert isinstance(suites, list)
+    assert suites[0].run_counts.failed == 1
+    assert isinstance(suite, ReplaySuite)
+    assert suite.test_cases[0].runs[0].repetition == 2
+
+
+@pytest.mark.asyncio
+async def test_imported_session_traces_read_like_pipeline_traces() -> None:
+    resource = FakeEvaluationResource()
+    client = FakeClient(resource)
+
+    turns = await list_imported_session_traces(client=client, workspace=WORKSPACE, session_id=IMPORTED_SESSION_ID)
+    turn = await get_imported_session_trace(
+        client=client, workspace=WORKSPACE, session_id=IMPORTED_SESSION_ID, query_id=IMPORTED_QUERY_ID
+    )
+    tags = await get_imported_session_trace_span_tags(
+        client=client,
+        workspace=WORKSPACE,
+        session_id=IMPORTED_SESSION_ID,
+        query_id=IMPORTED_QUERY_ID,
+        span_id=IMPORTED_SPAN_ID,
+    )
+
+    assert isinstance(turns, list)
+    assert isinstance(turn, PipelineTraceEntry)
+    assert turns[0].query_id == turn.query_id == IMPORTED_QUERY_ID
+    assert tags == {"haystack.component.input": {"query": "x"}}
+    assert [name for name, _ in resource.calls] == [
+        "list_imported_session_traces",
+        "get_imported_session_trace",
+        "get_imported_session_trace_span_tags",
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        (ResourceNotFoundError(), "not found"),
+        (BadRequestError(message="bad"), "Failed"),
+        (UnexpectedAPIError(status_code=503, message="queue down"), "Failed"),
+    ],
+)
+async def test_replay_suite_and_imported_trace_errors_come_back_as_readable_strings(
+    error: Exception, expected: str
+) -> None:
+    client = FakeClient(FakeEvaluationResource(error=error))
+    base: dict[str, Any] = {"client": client, "workspace": WORKSPACE}
+    imported = {**base, "session_id": IMPORTED_SESSION_ID}
+
+    results = [
+        await list_session_replays(**base, pipeline_name=PIPELINE),
+        await start_replay_suite(**base, pipeline_name=PIPELINE, dataset_id="d", pipeline_version_id=DRAFT_VERSION_ID),
+        await list_replay_suites(**base, pipeline_name=PIPELINE),
+        await get_replay_suite(**base, pipeline_name=PIPELINE, suite_id=SUITE_ID),
+        await list_imported_session_traces(**imported),
+        await get_imported_session_trace(**imported, query_id=IMPORTED_QUERY_ID),
+        await get_imported_session_trace_span_tags(**imported, query_id=IMPORTED_QUERY_ID, span_id=IMPORTED_SPAN_ID),
+    ]
+
+    for result in results:
+        assert isinstance(result, str)
+        assert expected in result
