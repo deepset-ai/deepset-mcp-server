@@ -33,6 +33,11 @@ if TYPE_CHECKING:
     from deepset_mcp.api.protocols import AsyncClientProtocol
 
 
+def _dump(test_cases: list[NewTestCase]) -> list[dict[str, Any]]:
+    """Only the fields the caller set: hub-api rejects a test case that sends both a Session and inputs."""
+    return [test_case.model_dump(exclude_none=True) for test_case in test_cases]
+
+
 class EvaluationResource(EvaluationResourceProtocol):
     """Reads Evaluators, Experiments, their runs, and Sessions through the v2 evaluation routes.
 
@@ -55,6 +60,14 @@ class EvaluationResource(EvaluationResourceProtocol):
         if resp.json is None:
             raise UnexpectedAPIError(status_code=resp.status_code, message="Empty response", detail=None)
         return resp.json
+
+    async def _put(self, path: str, data: dict[str, Any]) -> Any:
+        resp = await self._client.request(endpoint=path, method="PUT", data=data)
+        raise_for_status(resp)
+        return resp.json
+
+    async def _delete(self, path: str) -> None:
+        raise_for_status(await self._client.request(endpoint=path, method="DELETE"))
 
     async def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         resp = await self._client.request(endpoint=path, method="GET", params=params)
@@ -304,7 +317,15 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param limit: Maximum number of Datasets to return (the API caps it at 200).
         :returns: The Datasets.
         """
-        raise NotImplementedError
+        params: dict[str, Any] = {"limit": limit}
+        if pipeline_name is None:
+            path = await self._workspace_path("datasets")
+        else:
+            workspace_id, params["pipeline_id"] = await ids.workspace_and_pipeline_ids(
+                self._client, self._workspace, pipeline_name
+            )
+            path = self._path(workspace_id, "evaluation", "datasets")
+        return [DatasetSummary.model_validate(item) for item in await self._get(path, params) or []]
 
     async def get_dataset(self, dataset_id: str) -> Dataset:
         """Fetch one Dataset with its test cases.
@@ -312,7 +333,7 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param dataset_id: The Dataset's id.
         :returns: The Dataset.
         """
-        raise NotImplementedError
+        return Dataset.model_validate(await self._get(await self._workspace_path("datasets", dataset_id)))
 
     async def create_dataset(
         self, name: str, pipeline_name: str | None = None, test_cases: list[NewTestCase] | None = None
@@ -324,7 +345,12 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param test_cases: The test cases to start with.
         :returns: The created Dataset.
         """
-        raise NotImplementedError
+        body: dict[str, Any] = {"name": name}
+        if pipeline_name is not None:
+            body["pipeline_id"] = await ids.pipeline_id(self._client, self._workspace, pipeline_name)
+        if test_cases:
+            body["test_cases"] = _dump(test_cases)
+        return Dataset.model_validate(await self._post(await self._workspace_path("datasets"), body))
 
     async def update_dataset(self, dataset_id: str, name: str) -> Dataset:
         """Rename a Dataset.
@@ -333,14 +359,15 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param name: The new name.
         :returns: The Dataset.
         """
-        raise NotImplementedError
+        data = await self._put(await self._workspace_path("datasets", dataset_id), {"name": name})
+        return Dataset.model_validate(data)
 
     async def delete_dataset(self, dataset_id: str) -> None:
         """Delete a Dataset and its test cases.
 
         :param dataset_id: The Dataset's id.
         """
-        raise NotImplementedError
+        await self._delete(await self._workspace_path("datasets", dataset_id))
 
     async def add_test_cases(
         self, dataset_id: str, test_cases: list[NewTestCase], pipeline_name: str | None = None
@@ -352,7 +379,11 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param pipeline_name: The pipeline the test cases' Sessions were recorded on; needed for Sessions.
         :returns: The Dataset with all its test cases.
         """
-        raise NotImplementedError
+        body: dict[str, Any] = {"test_cases": _dump(test_cases)}
+        if pipeline_name is not None:
+            body["pipeline_id"] = await ids.pipeline_id(self._client, self._workspace, pipeline_name)
+        path = await self._workspace_path("datasets", dataset_id, "test-cases")
+        return Dataset.model_validate(await self._post(path, body))
 
     async def copy_test_cases(self, dataset_id: str, test_case_ids: list[str]) -> Dataset:
         """Copy existing test cases, from any Dataset of the workspace, into a Dataset.
@@ -361,7 +392,8 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param test_case_ids: The test cases to copy, in order.
         :returns: The Dataset with all its test cases.
         """
-        raise NotImplementedError
+        path = await self._workspace_path("datasets", dataset_id, "test-cases", "copy")
+        return Dataset.model_validate(await self._post(path, {"session_replay_test_case_ids": test_case_ids}))
 
     async def remove_test_cases(self, dataset_id: str, test_case_ids: list[str]) -> Dataset:
         """Remove test cases from a Dataset. Ids it does not hold are ignored.
@@ -370,7 +402,8 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param test_case_ids: The test cases to remove.
         :returns: The Dataset with the test cases left.
         """
-        raise NotImplementedError
+        path = await self._workspace_path("datasets", dataset_id, "test-cases", "remove")
+        return Dataset.model_validate(await self._post(path, {"session_replay_test_case_ids": test_case_ids}))
 
     async def update_test_case(self, dataset_id: str, test_case_id: str, changes: dict[str, Any]) -> TestCase:
         """Change one test case. A field left out of ``changes`` is kept; one sent as None is removed.
@@ -380,4 +413,5 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param changes: The fields to change: name, inputs, expected, setup_source, cleanup_source.
         :returns: The test case.
         """
-        raise NotImplementedError
+        path = await self._workspace_path("datasets", dataset_id, "test-cases", test_case_id)
+        return TestCase.model_validate(await self._put(path, changes))

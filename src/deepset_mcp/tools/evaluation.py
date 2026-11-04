@@ -660,7 +660,10 @@ async def list_datasets(
     :param pipeline_name: Only Datasets with a test case on this pipeline, when given.
     :returns: The Datasets, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).list_datasets(pipeline_name)
+    except _DATASET_ERRORS as e:
+        return f"Failed to list datasets: {e}"
 
 
 async def get_dataset(*, client: AsyncClientProtocol, workspace: str, dataset_id: str) -> Dataset | str:
@@ -675,7 +678,10 @@ async def get_dataset(*, client: AsyncClientProtocol, workspace: str, dataset_id
     :param dataset_id: The Dataset's id.
     :returns: The Dataset, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).get_dataset(dataset_id)
+    except _DATASET_ERRORS as e:
+        return f"Failed to get dataset '{dataset_id}': {e}"
 
 
 async def create_dataset(
@@ -700,7 +706,10 @@ async def create_dataset(
     :param test_cases: The test cases to start with; none by default.
     :returns: The created Dataset, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).create_dataset(name, pipeline_name, test_cases)
+    except _DATASET_ERRORS as e:
+        return f"Failed to create dataset '{name}': {e}"
 
 
 async def update_dataset(*, client: AsyncClientProtocol, workspace: str, dataset_id: str, name: str) -> Dataset | str:
@@ -712,7 +721,10 @@ async def update_dataset(*, client: AsyncClientProtocol, workspace: str, dataset
     :param name: The new name.
     :returns: The Dataset, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).update_dataset(dataset_id, name)
+    except _DATASET_ERRORS as e:
+        return f"Failed to rename dataset '{dataset_id}': {e}"
 
 
 async def delete_dataset(*, client: AsyncClientProtocol, workspace: str, dataset_id: str) -> str:
@@ -725,7 +737,11 @@ async def delete_dataset(*, client: AsyncClientProtocol, workspace: str, dataset
     :param dataset_id: The Dataset's id.
     :returns: A confirmation, or an error message.
     """
-    raise NotImplementedError
+    try:
+        await client.evaluation(workspace=workspace).delete_dataset(dataset_id)
+    except _DATASET_ERRORS as e:
+        return f"Failed to delete dataset '{dataset_id}': {e}"
+    return f"Dataset '{dataset_id}' deleted."
 
 
 async def add_test_cases(
@@ -749,7 +765,10 @@ async def add_test_cases(
     :param pipeline_name: The pipeline the Sessions were recorded on; required when a test case has a ``session_id``.
     :returns: The Dataset with all its test cases, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).add_test_cases(dataset_id, test_cases, pipeline_name)
+    except _DATASET_ERRORS as e:
+        return f"Failed to add test cases to dataset '{dataset_id}': {e}"
 
 
 async def update_test_case(
@@ -782,7 +801,26 @@ async def update_test_case(
     :param clear: Fields to remove from the test case.
     :returns: The test case, or an error message.
     """
-    raise NotImplementedError
+    changes: dict[str, Any] = {
+        field: value
+        for field, value in (
+            ("name", name),
+            ("inputs", inputs),
+            ("expected", expected),
+            ("setup_source", setup_source),
+            ("cleanup_source", cleanup_source),
+        )
+        if value is not None
+    }
+    changes.update(dict.fromkeys(clear or []))
+    if not changes:
+        return (
+            "Nothing to change: give a new value for name, inputs, expected, setup_source or cleanup_source, or clear."
+        )
+    try:
+        return await client.evaluation(workspace=workspace).update_test_case(dataset_id, test_case_id, changes)
+    except _DATASET_ERRORS as e:
+        return f"Failed to update test case '{test_case_id}': {e}"
 
 
 async def copy_test_cases(
@@ -799,7 +837,10 @@ async def copy_test_cases(
     :param test_case_ids: The test cases to copy, in order.
     :returns: The Dataset with all its test cases, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).copy_test_cases(dataset_id, test_case_ids)
+    except _DATASET_ERRORS as e:
+        return f"Failed to copy test cases into dataset '{dataset_id}': {e}"
 
 
 async def remove_test_cases(
@@ -815,4 +856,7 @@ async def remove_test_cases(
     :param test_case_ids: The test cases to remove.
     :returns: The Dataset with the test cases left, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).remove_test_cases(dataset_id, test_case_ids)
+    except _DATASET_ERRORS as e:
+        return f"Failed to remove test cases from dataset '{dataset_id}': {e}"
