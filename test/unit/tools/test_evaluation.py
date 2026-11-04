@@ -459,6 +459,10 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
         self._record("update_test_case", dataset_id=dataset_id, test_case_id=test_case_id, changes=changes)
         return TestCase.model_validate(dataset_dict()["test_cases"][0])
 
+    @staticmethod
+    def _evaluator(evaluator_id: str) -> Evaluator:
+        return Evaluator(evaluator_id=evaluator_id, name="Answered", created_at="2026-10-01T00:00:00Z")
+
     async def create_evaluator(
         self,
         name: str,
@@ -468,22 +472,22 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
     ) -> Evaluator:
         self._record(
             "create_evaluator",
-            name=name,
+            evaluator_name=name,
             python_code=python_code,
             metric_group_ids=metric_group_ids,
             new_metric_group_name=new_metric_group_name,
         )
-        return await self.get_evaluator(E1)
+        return self._evaluator(E1)
 
     async def update_evaluator(
         self, evaluator_id: str, name: str | None = None, python_code: str | None = None
     ) -> Evaluator:
-        self._record("update_evaluator", evaluator_id=evaluator_id, name=name, python_code=python_code)
-        return await self.get_evaluator(evaluator_id)
+        self._record("update_evaluator", evaluator_id=evaluator_id, evaluator_name=name, python_code=python_code)
+        return self._evaluator(evaluator_id)
 
     async def set_evaluator_archived(self, evaluator_id: str, archived: bool) -> Evaluator:
         self._record("set_evaluator_archived", evaluator_id=evaluator_id, archived=archived)
-        return await self.get_evaluator(evaluator_id)
+        return self._evaluator(evaluator_id)
 
     async def list_evaluator_templates(self) -> list[EvaluatorTemplate]:
         self._record("list_evaluator_templates")
@@ -501,7 +505,7 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
     async def create_metric_group(
         self, name: str, evaluator_ids: list[str], weights: list[MetricWeight] | None = None
     ) -> MetricGroup:
-        self._record("create_metric_group", name=name, evaluator_ids=evaluator_ids, weights=weights)
+        self._record("create_metric_group", group_name=name, evaluator_ids=evaluator_ids, weights=weights)
         return self._metric_group()
 
     async def update_metric_group(
@@ -510,7 +514,7 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
         self._record(
             "update_metric_group",
             metric_group_id=metric_group_id,
-            name=name,
+            group_name=name,
             evaluator_ids=evaluator_ids,
             weights=weights,
         )
@@ -1325,13 +1329,13 @@ async def test_evaluator_writes_forward_their_arguments_and_return_the_evaluator
         (
             "create_evaluator",
             {
-                "name": "N",
+                "evaluator_name": "N",
                 "python_code": "code",
                 "metric_group_ids": [METRIC_GROUP_ID],
                 "new_metric_group_name": "G",
             },
         ),
-        ("update_evaluator", {"evaluator_id": E1, "name": None, "python_code": "new"}),
+        ("update_evaluator", {"evaluator_id": E1, "evaluator_name": None, "python_code": "new"}),
         ("set_evaluator_archived", {"evaluator_id": E1, "archived": True}),
     ]
 
@@ -1371,10 +1375,10 @@ async def test_metric_group_writes_forward_weights_and_return_the_group() -> Non
     assert isinstance(created, MetricGroup)
     assert isinstance(updated, MetricGroup)
     assert resource.calls == [
-        ("create_metric_group", {"name": "W", "evaluator_ids": [E1], "weights": weights}),
+        ("create_metric_group", {"group_name": "W", "evaluator_ids": [E1], "weights": weights}),
         (
             "update_metric_group",
-            {"metric_group_id": METRIC_GROUP_ID, "name": "W", "evaluator_ids": [E1], "weights": None},
+            {"metric_group_id": METRIC_GROUP_ID, "group_name": "W", "evaluator_ids": [E1], "weights": None},
         ),
     ]
 

@@ -894,7 +894,12 @@ async def create_evaluator(
     :param new_metric_group_name: Also creates a Metric Group of this name holding only this Evaluator.
     :returns: The created Evaluator, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).create_evaluator(
+            name, python_code, metric_group_ids, new_metric_group_name
+        )
+    except _API_ERRORS as e:
+        return f"Failed to create evaluator '{name}': {e}"
 
 
 async def update_evaluator(
@@ -921,7 +926,10 @@ async def update_evaluator(
     :param python_code: The new Python source.
     :returns: The Evaluator, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).update_evaluator(evaluator_id, name, python_code)
+    except _API_ERRORS as e:
+        return f"Failed to update evaluator '{evaluator_id}': {e}"
 
 
 async def set_evaluator_archived(
@@ -938,7 +946,10 @@ async def set_evaluator_archived(
     :param archived: True to archive it, False to unarchive it.
     :returns: The Evaluator, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).set_evaluator_archived(evaluator_id, archived)
+    except _API_ERRORS as e:
+        return f"Failed to {'archive' if archived else 'unarchive'} evaluator '{evaluator_id}': {e}"
 
 
 async def list_evaluator_templates(*, client: AsyncClientProtocol, workspace: str) -> list[EvaluatorTemplate] | str:
@@ -955,7 +966,10 @@ async def list_evaluator_templates(*, client: AsyncClientProtocol, workspace: st
     :param workspace: The workspace name.
     :returns: The templates, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).list_evaluator_templates()
+    except _API_ERRORS as e:
+        return f"Failed to list evaluator templates: {e}"
 
 
 async def combine_evaluator_templates(
@@ -973,7 +987,10 @@ async def combine_evaluator_templates(
     :param title: What the combined code's opening comment calls it, e.g. "Agent efficiency metrics".
     :returns: The merged code and its Metrics, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).combine_evaluator_templates(template_keys, title)
+    except _API_ERRORS as e:
+        return f"Failed to combine evaluator templates: {e}"
 
 
 async def create_metric_group(
@@ -1005,7 +1022,10 @@ async def create_metric_group(
     :param weights: Optional Metric weights, as described above.
     :returns: The created Metric Group, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).create_metric_group(name, evaluator_ids, weights)
+    except _API_ERRORS as e:
+        return f"Failed to create metric group '{name}': {e}"
 
 
 async def update_metric_group(
@@ -1042,7 +1062,12 @@ async def update_metric_group(
     :param weights: Replaces the stored weights; None keeps them, [] clears them.
     :returns: The Metric Group, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).update_metric_group(
+            metric_group_id, name, evaluator_ids, weights
+        )
+    except _API_ERRORS as e:
+        return f"Failed to update metric group '{metric_group_id}': {e}"
 
 
 async def delete_metric_group(*, client: AsyncClientProtocol, workspace: str, metric_group_id: str) -> str:
@@ -1056,4 +1081,8 @@ async def delete_metric_group(*, client: AsyncClientProtocol, workspace: str, me
     :param metric_group_id: The Metric Group's id.
     :returns: A confirmation, or an error message.
     """
-    raise NotImplementedError
+    try:
+        await client.evaluation(workspace=workspace).delete_metric_group(metric_group_id)
+    except _API_ERRORS as e:
+        return f"Failed to delete metric group '{metric_group_id}': {e}"
+    return f"Metric group '{metric_group_id}' deleted."

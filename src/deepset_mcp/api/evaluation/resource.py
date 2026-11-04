@@ -41,6 +41,14 @@ def _dump(test_cases: list[NewTestCase]) -> list[dict[str, Any]]:
     return [test_case.model_dump(exclude_none=True) for test_case in test_cases]
 
 
+def _metric_group_body(name: str, evaluator_ids: list[str], weights: list[MetricWeight] | None) -> dict[str, Any]:
+    """``weights`` is left out when None, which on update keeps the stored ones; [] clears them."""
+    body: dict[str, Any] = {"name": name, "evaluator_ids": evaluator_ids}
+    if weights is not None:
+        body["weights"] = [weight.model_dump() for weight in weights]
+    return body
+
+
 class EvaluationResource(EvaluationResourceProtocol):
     """Reads Evaluators, Experiments, their runs, and Sessions through the v2 evaluation routes.
 
@@ -434,7 +442,12 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param new_metric_group_name: Creates a Metric Group of this name with the Evaluator as its only member.
         :returns: The created Evaluator.
         """
-        raise NotImplementedError
+        body: dict[str, Any] = {"name": name, "python_code": python_code}
+        if metric_group_ids:
+            body["metric_group_ids"] = metric_group_ids
+        if new_metric_group_name is not None:
+            body["new_metric_group_name"] = new_metric_group_name
+        return Evaluator.model_validate(await self._post(await self._evaluators_path(), body))
 
     async def update_evaluator(
         self, evaluator_id: str, name: str | None = None, python_code: str | None = None
@@ -446,7 +459,8 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param python_code: The new source; adds a version unless the lineage already holds it.
         :returns: The Evaluator.
         """
-        raise NotImplementedError
+        changes = {k: v for k, v in (("name", name), ("python_code", python_code)) if v is not None}
+        return Evaluator.model_validate(await self._put(await self._evaluators_path(evaluator_id), changes))
 
     async def set_evaluator_archived(self, evaluator_id: str, archived: bool) -> Evaluator:
         """Archive or unarchive an Evaluator.
@@ -455,14 +469,16 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param archived: True to archive it, False to unarchive it.
         :returns: The Evaluator.
         """
-        raise NotImplementedError
+        path = await self._evaluators_path(evaluator_id, "archive" if archived else "unarchive")
+        return Evaluator.model_validate(await self._post(path, {}))
 
     async def list_evaluator_templates(self) -> list[EvaluatorTemplate]:
         """List the built-in Evaluator templates, each with its code.
 
         :returns: The templates.
         """
-        raise NotImplementedError
+        data = await self._get(await self._workspace_path("evaluator-templates"))
+        return [EvaluatorTemplate.model_validate(item) for item in data or []]
 
     async def combine_evaluator_templates(self, template_keys: list[str], title: str) -> CombinedEvaluatorTemplates:
         """Merge code templates into one Evaluation Function. Computes only; saves nothing.
@@ -471,7 +487,9 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param title: What the combined code's opening comment calls it.
         :returns: The merged code and the Metrics it declares.
         """
-        raise NotImplementedError
+        path = await self._workspace_path("evaluator-templates", "combine")
+        data = await self._post(path, {"template_keys": template_keys, "title": title})
+        return CombinedEvaluatorTemplates.model_validate(data)
 
     async def create_metric_group(
         self, name: str, evaluator_ids: list[str], weights: list[MetricWeight] | None = None
@@ -483,7 +501,8 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param weights: How much each Metric counts toward the Composite; none by default.
         :returns: The created Metric Group.
         """
-        raise NotImplementedError
+        body = _metric_group_body(name, evaluator_ids, weights)
+        return MetricGroup.model_validate(await self._post(await self._workspace_path("metric-groups"), body))
 
     async def update_metric_group(
         self, metric_group_id: str, name: str, evaluator_ids: list[str], weights: list[MetricWeight] | None = None
@@ -496,11 +515,13 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param weights: Replaces the weights (an empty list clears them); None keeps those of the Evaluators that stay.
         :returns: The Metric Group.
         """
-        raise NotImplementedError
+        body = _metric_group_body(name, evaluator_ids, weights)
+        path = await self._workspace_path("metric-groups", metric_group_id)
+        return MetricGroup.model_validate(await self._put(path, body))
 
     async def delete_metric_group(self, metric_group_id: str) -> None:
         """Delete a Metric Group and its Experiment runs. The Evaluators stay.
 
         :param metric_group_id: The Metric Group's id.
         """
-        raise NotImplementedError
+        await self._delete(await self._workspace_path("metric-groups", metric_group_id))

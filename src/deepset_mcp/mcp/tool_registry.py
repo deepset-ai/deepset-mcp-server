@@ -44,10 +44,14 @@ from deepset_mcp.tools.doc_search import (
 )
 from deepset_mcp.tools.evaluation import (
     add_test_cases as add_test_cases_tool,
+    combine_evaluator_templates as combine_evaluator_templates_tool,
     copy_test_cases as copy_test_cases_tool,
     create_dataset as create_dataset_tool,
+    create_evaluator as create_evaluator_tool,
     create_experiment as create_experiment_tool,
+    create_metric_group as create_metric_group_tool,
     delete_dataset as delete_dataset_tool,
+    delete_metric_group as delete_metric_group_tool,
     get_dataset as get_dataset_tool,
     get_evaluation_try as get_evaluation_try_tool,
     get_evaluator as get_evaluator_tool,
@@ -55,14 +59,18 @@ from deepset_mcp.tools.evaluation import (
     get_experiment_run as get_experiment_run_tool,
     get_session_replay as get_session_replay_tool,
     list_datasets as list_datasets_tool,
+    list_evaluator_templates as list_evaluator_templates_tool,
     list_evaluators as list_evaluators_tool,
     list_experiments as list_experiments_tool,
     list_metric_groups as list_metric_groups_tool,
     list_sessions as list_sessions_tool,
     remove_test_cases as remove_test_cases_tool,
     replay_session as replay_session_tool,
+    set_evaluator_archived as set_evaluator_archived_tool,
     try_evaluator as try_evaluator_tool,
     update_dataset as update_dataset_tool,
+    update_evaluator as update_evaluator_tool,
+    update_metric_group as update_metric_group_tool,
     update_test_case as update_test_case_tool,
 )
 from deepset_mcp.tools.haystack_service import (
@@ -466,6 +474,38 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     ),
     "remove_test_cases": (
         remove_test_cases_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "create_evaluator": (
+        create_evaluator_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "update_evaluator": (
+        update_evaluator_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "set_evaluator_archived": (
+        set_evaluator_archived_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "list_evaluator_templates": (
+        list_evaluator_templates_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "combine_evaluator_templates": (
+        combine_evaluator_templates_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "create_metric_group": (
+        create_metric_group_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "update_metric_group": (
+        update_metric_group_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "delete_metric_group": (
+        delete_metric_group_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
     ),
     # Cost tools
