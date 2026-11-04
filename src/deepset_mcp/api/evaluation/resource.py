@@ -117,7 +117,7 @@ class EvaluationResource(EvaluationResourceProtocol):
         workspace_id, pipeline_id = await ids.workspace_and_pipeline_ids(self._client, self._workspace, pipeline_name)
         return self._path(workspace_id, "evaluation", "pipelines", pipeline_id, *parts)
 
-    async def list_evaluators(self, limit: int = 200) -> list[Evaluator]:
+    async def list_evaluators(self, limit: int = 200, archived: bool | None = None) -> list[Evaluator]:
         """List the workspace's Evaluators, each with its newest version but no source.
 
         :param limit: Maximum number of Evaluators to return (the API caps it at 200).
@@ -261,7 +261,16 @@ class EvaluationResource(EvaluationResourceProtocol):
         path = await self._pipeline_path(pipeline_name, "evaluation-runs", evaluation_run_id)
         return EvaluationRun.model_validate(await self._get(path))
 
-    async def get_experiment_run(self, pipeline_name: str, metric_group_id: str, run_id: str) -> ExperimentRunGrid:
+    async def get_experiment_run(
+        self,
+        pipeline_name: str,
+        metric_group_id: str,
+        run_id: str,
+        origin: str | None = None,
+        deployment_id: str | None = None,
+        pipeline_version_id: str | None = None,
+        session_id: str | None = None,
+    ) -> ExperimentRunGrid:
         """Fetch one scoring run as a grid of Sessions by Evaluators.
 
         :param pipeline_name: Name of the pipeline.
@@ -539,6 +548,7 @@ class EvaluationResource(EvaluationResourceProtocol):
         origin: str | None = None,
         deployment_id: str | None = None,
         pipeline_version_id: str | None = None,
+        revision_id: str | None = None,
         since: str | None = None,
         until: str | None = None,
         limit: int = 50,

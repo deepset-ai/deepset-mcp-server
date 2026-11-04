@@ -456,6 +456,96 @@ async def test_get_experiment_run_returns_the_grid() -> None:
 
 
 @pytest.mark.asyncio
+async def test_list_evaluators_sends_the_archived_filter_only_when_given() -> None:
+    client = FakeEvaluationClient({EVALUATORS: []})
+
+    await resource(client).list_evaluators(limit=5, archived=False)
+    await resource(client).list_evaluators()
+
+    assert client.requests[0]["params"] == {"limit": 5, "archived": False}
+    assert client.requests[1]["params"] == {"limit": 200}
+
+
+@pytest.mark.asyncio
+async def test_get_experiment_run_sends_the_grid_filters_and_parses_aggregate_and_usage() -> None:
+    payload = {
+        **grid_dict(),
+        "usage": {
+            "duration_s": 3.0,
+            "prompt_tokens": 1,
+            "completion_tokens": 2,
+            "total_tokens": 3,
+            "cost": None,
+            "cost_status": "pending",
+            "sessions": 1,
+        },
+        "aggregate": {
+            "metrics": [
+                {
+                    "shape": "label",
+                    "evaluator_id": EVALUATOR_ID,
+                    "metric_key": "answered",
+                    "evaluator_version_ids": [VERSION_ID],
+                    "sessions": {"valued": 1},
+                    "coverage": 1.0,
+                    "shares": {"yes": 1.0},
+                    "vocabulary": ["yes", "no"],
+                }
+            ]
+        },
+        "evaluator_versions": [
+            {
+                "evaluator_version_id": VERSION_ID,
+                "evaluator_id": EVALUATOR_ID,
+                "content_hash": "abc",
+                "metrics": {},
+                "metrics_legacy": False,
+                "created_at": "2026-10-01T00:00:00Z",
+            }
+        ],
+    }
+    client = FakeEvaluationClient({f"{RUNS}/{RUN_ID}": payload})
+
+    grid = await resource(client).get_experiment_run(
+        PIPELINE_NAME,
+        METRIC_GROUP_ID,
+        RUN_ID,
+        origin="SERVICE",
+        deployment_id="dep-1",
+        pipeline_version_id="ver-1",
+        session_id="ses-1",
+    )
+
+    assert client.requests[0]["params"] == {
+        "origin": "SERVICE",
+        "deployment_id": "dep-1",
+        "pipeline_version_id": "ver-1",
+        "session_id": "ses-1",
+    }
+    assert grid.usage is not None and grid.usage.cost_status == "pending" and grid.usage.cost is None
+    assert grid.aggregate is not None and grid.aggregate.metrics[0].metric_key == "answered"
+    assert [v.evaluator_version_id for v in grid.evaluator_versions] == [VERSION_ID]
+
+
+@pytest.mark.asyncio
+async def test_get_experiment_run_sends_no_params_without_filters() -> None:
+    client = FakeEvaluationClient({f"{RUNS}/{RUN_ID}": grid_dict()})
+
+    await resource(client).get_experiment_run(PIPELINE_NAME, METRIC_GROUP_ID, RUN_ID)
+
+    assert not client.requests[0]["params"]
+
+
+@pytest.mark.asyncio
+async def test_list_sessions_sends_the_revision_id() -> None:
+    client = FakeEvaluationClient({SESSIONS: sessions_dict()})
+
+    await resource(client).list_sessions(PIPELINE_NAME, revision_id="rev-1", cursor="c")
+
+    assert client.requests[0]["params"] == {"revision_id": "rev-1", "limit": 50, "cursor": "c"}
+
+
+@pytest.mark.asyncio
 async def test_list_sessions_passes_filters_under_the_route_names() -> None:
     client = FakeEvaluationClient({SESSIONS: sessions_dict()})
 

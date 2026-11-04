@@ -39,7 +39,7 @@ from deepset_mcp.api.search_history.models import PipelineTraceEntry
 class EvaluationResourceProtocol(Protocol):
     """Protocol defining the implementation for EvaluationResource."""
 
-    async def list_evaluators(self, limit: int = 200) -> list[Evaluator]:
+    async def list_evaluators(self, limit: int = 200, archived: bool | None = None) -> list[Evaluator]:
         """List the workspace's Evaluators."""
         ...
 
@@ -98,7 +98,16 @@ class EvaluationResourceProtocol(Protocol):
         """Read one Evaluation Run: its progress, or its Metrics."""
         ...
 
-    async def get_experiment_run(self, pipeline_name: str, metric_group_id: str, run_id: str) -> ExperimentRunGrid:
+    async def get_experiment_run(
+        self,
+        pipeline_name: str,
+        metric_group_id: str,
+        run_id: str,
+        origin: str | None = None,
+        deployment_id: str | None = None,
+        pipeline_version_id: str | None = None,
+        session_id: str | None = None,
+    ) -> ExperimentRunGrid:
         """Fetch one scoring run as a grid."""
         ...
 
@@ -132,6 +141,7 @@ class EvaluationResourceProtocol(Protocol):
         origin: str | None = None,
         deployment_id: str | None = None,
         pipeline_version_id: str | None = None,
+        revision_id: str | None = None,
         since: str | None = None,
         until: str | None = None,
         limit: int = 50,

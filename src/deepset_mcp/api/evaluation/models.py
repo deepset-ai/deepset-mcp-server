@@ -156,6 +156,37 @@ class MixedAggregate(_MetricAggregateBase):
 MetricAggregate = Annotated[ScoreAggregate | LabelAggregate | MixedAggregate, Field(discriminator="shape")]
 
 
+class Aggregate(BaseModel):
+    """What a whole scoring run found, one entry per Metric. Values only, not a verdict."""
+
+    metrics: list[MetricAggregate] = Field(default_factory=list)
+
+
+class PipelineUsage(BaseModel):
+    """What the pipeline spent producing Sessions: tokens, cost and duration."""
+
+    duration_s: float = Field(default=0.0, description="The pipeline's run time summed over every turn, in seconds")
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    cost: float | None = Field(
+        default=None, description="USD the LLM calls cost. Null unless ``cost_status`` is 'priced'"
+    )
+    cost_status: Literal["priced", "pending", "unpriced"] | None = Field(
+        default=None,
+        description=(
+            "'priced' when every LLM call has a cost; 'pending' when some are not priced yet (resolves within "
+            "minutes); 'unpriced' when a model has no price on file"
+        ),
+    )
+
+
+class ExperimentRunUsage(PipelineUsage):
+    """A run's usage summed over every Session that has one."""
+
+    sessions: int = Field(default=0, description="How many Sessions the totals cover")
+
+
 class MetricDeclaration(BaseModel):
     """One Metric an Evaluator version declares in its ``@metrics`` decorator."""
 
@@ -693,6 +724,17 @@ class ExperimentRunGrid(BaseModel):
     evaluator_ids: list[str]
     rows: list[ExperimentRunRow] = Field(default_factory=list)
     counts: ExperimentRunCounts
+    usage: ExperimentRunUsage | None = Field(
+        default=None, description="What the pipeline spent on the run's Sessions. Null until a cell has judged one."
+    )
+    evaluator_versions: list[EvaluatorVersionSummary] = Field(
+        default_factory=list,
+        description="Every Evaluator version that judged a cell, oldest first. A filter does not narrow it.",
+    )
+    aggregate: Aggregate | None = Field(
+        default=None,
+        description="The whole run per Metric. A filter does not narrow it. Null until the run ends.",
+    )
     normalized_means: list[MetricNormalizedMean] = Field(default_factory=list, description=_NORMALIZED_MEANS)
     composite: CompositeResult | None = Field(
         default=None,
@@ -745,7 +787,23 @@ class ExperimentRunReport(BaseModel):
     run: ExperimentRun
     evaluator_ids: list[str]
     counts: ExperimentRunCounts
-    metrics: list[MetricSummary] = Field(description="Computed over every row, including rows cut by max_rows")
+    metrics: list[MetricSummary] = Field(
+        description="Computed over every row the filters kept, including rows cut by max_rows"
+    )
+    aggregate: Aggregate | None = Field(
+        default=None,
+        description=(
+            "The API's whole-run result per Metric: how its Sessions fell out, and its mean or label shares. "
+            "Never narrowed by a filter, unlike ``metrics``. Null until the run ends."
+        ),
+    )
+    usage: ExperimentRunUsage | None = Field(
+        default=None, description="What the pipeline spent on the run's Sessions, summed. Null until one is judged."
+    )
+    evaluator_versions: list[EvaluatorVersionSummary] = Field(
+        default_factory=list,
+        description="Every Evaluator version that judged a cell, oldest first, with the Metrics it declares",
+    )
     normalized_means: list[MetricNormalizedMean] = Field(default_factory=list, description=_NORMALIZED_MEANS)
     composite: CompositeResult | None = Field(
         default=None,

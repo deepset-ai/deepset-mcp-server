@@ -394,8 +394,8 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
         if self.error is not None:
             raise self.error
 
-    async def list_evaluators(self, limit: int = 200) -> list[Evaluator]:
-        self._record("list_evaluators", limit=limit)
+    async def list_evaluators(self, limit: int = 200, archived: bool | None = None) -> list[Evaluator]:
+        self._record("list_evaluators", limit=limit, archived=archived)
         return [
             Evaluator.model_validate(
                 {"evaluator_id": E1, "name": "Answered", "created_at": "2026-10-01T00:00:00Z", "latest_version": None}
@@ -502,12 +502,29 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
             return self.evaluation_run_states.pop(0)
         return self.evaluation_run_states[0] if self.evaluation_run_states else evaluation_run()
 
-    async def get_experiment_run(self, pipeline_name: str, metric_group_id: str, run_id: str) -> ExperimentRunGrid:
-        self._record("get_experiment_run", metric_group_id=metric_group_id, run_id=run_id)
+    async def get_experiment_run(
+        self,
+        pipeline_name: str,
+        metric_group_id: str,
+        run_id: str,
+        origin: str | None = None,
+        deployment_id: str | None = None,
+        pipeline_version_id: str | None = None,
+        session_id: str | None = None,
+    ) -> ExperimentRunGrid:
+        self._record(
+            "get_experiment_run",
+            metric_group_id=metric_group_id,
+            run_id=run_id,
+            origin=origin,
+            deployment_id=deployment_id,
+            pipeline_version_id=pipeline_version_id,
+            session_id=session_id,
+        )
         return self.run_grid or grid()
 
     async def list_experiments(self, pipeline_name: str | None = None, limit: int = 50) -> list[Experiment]:
-        self._record("list_experiments", pipeline_name=pipeline_name)
+        self._record("list_experiments", pipeline_name=pipeline_name, limit=limit)
         return [Experiment.model_validate(comparison())]
 
     async def create_experiment(
@@ -550,12 +567,15 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
         origin: str | None = None,
         deployment_id: str | None = None,
         pipeline_version_id: str | None = None,
+        revision_id: str | None = None,
         since: str | None = None,
         until: str | None = None,
         limit: int = 50,
         cursor: str | None = None,
     ) -> SessionList:
-        self._record("list_sessions", origin=origin, since=since, limit=limit, cursor=cursor)
+        self._record(
+            "list_sessions", origin=origin, revision_id=revision_id, since=since, limit=limit, cursor=cursor
+        )
         return SessionList.model_validate({"data": [], "next": None})
 
     async def start_try(self, pipeline_name: str, python_code: str, session_id: str) -> str:
@@ -629,7 +649,7 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
         return {"haystack.component.input": {"query": "x"}}
 
     async def list_datasets(self, pipeline_name: str | None = None, limit: int = 50) -> list[DatasetSummary]:
-        self._record("list_datasets", pipeline_name=pipeline_name)
+        self._record("list_datasets", pipeline_name=pipeline_name, limit=limit)
         return [DatasetSummary.model_validate({k: v for k, v in dataset_dict().items() if k != "test_cases"})]
 
     async def get_dataset(self, dataset_id: str) -> Dataset:
@@ -881,7 +901,7 @@ async def test_list_experiments_passes_the_pipeline_and_drops_each_sides_session
 
     assert isinstance(experiments, list)
     [experiment] = experiments
-    assert resource.calls == [("list_experiments", {"pipeline_name": PIPELINE})]
+    assert resource.calls == [("list_experiments", {"pipeline_name": PIPELINE, "limit": 50})]
     dumped = experiment.model_dump()
     assert dumped["experiment_id"] == COMPARISON_ID
     assert dumped["dataset_name"] == "Regression set"
@@ -979,7 +999,7 @@ async def test_list_evaluators_and_sessions_pass_through() -> None:
     assert isinstance(sessions, SessionList)
     assert resource.calls[-1] == (
         "list_sessions",
-        {"origin": "SERVICE", "since": "2026-09-28T00:00:00Z", "limit": 50, "cursor": None},
+        {"origin": "SERVICE", "revision_id": None, "since": "2026-09-28T00:00:00Z", "limit": 50, "cursor": None},
     )
 
 
@@ -1478,7 +1498,7 @@ async def test_dataset_reads_return_the_dataset_models() -> None:
     assert isinstance(dataset, Dataset)
     assert dataset.test_cases[0].test_case_id == TEST_CASE_ID
     assert resource.calls == [
-        ("list_datasets", {"pipeline_name": PIPELINE}),
+        ("list_datasets", {"pipeline_name": PIPELINE, "limit": 50}),
         ("get_dataset", {"dataset_id": DATASET_ID}),
     ]
 
@@ -2308,3 +2328,128 @@ async def test_replay_suite_and_imported_trace_errors_come_back_as_readable_stri
     for result in results:
         assert isinstance(result, str)
         assert expected in result
+
+
+@pytest.mark.asyncio
+async def test_lists_without_paging_pass_the_limit_so_the_agent_can_raise_it_to_the_api_cap() -> None:
+    resource = FakeEvaluationResource()
+    client = FakeClient(resource)
+
+    await list_evaluators(client=client, workspace=WORKSPACE, limit=7, archived=True)
+    await list_metric_groups(client=client, workspace=WORKSPACE, limit=8)
+    await list_experiments(client=client, workspace=WORKSPACE, limit=200)
+    await list_datasets(client=client, workspace=WORKSPACE, limit=9)
+
+    assert resource.calls == [
+        ("list_evaluators", {"limit": 7, "archived": True}),
+        ("list_metric_groups", {"limit": 8}),
+        ("list_experiments", {"pipeline_name": None, "limit": 200}),
+        ("list_datasets", {"pipeline_name": None, "limit": 9}),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_list_sessions_passes_the_revision_and_the_cursor_for_the_next_page() -> None:
+    resource = FakeEvaluationResource()
+
+    await list_sessions(
+        client=FakeClient(resource),
+        workspace=WORKSPACE,
+        pipeline_name=PIPELINE,
+        revision_id="rev-1",
+        cursor="cursor-2",
+    )
+
+    assert resource.calls[-1][1]["revision_id"] == "rev-1"
+    assert resource.calls[-1][1]["cursor"] == "cursor-2"
+
+
+@pytest.mark.asyncio
+async def test_get_experiment_run_passes_the_grid_filters() -> None:
+    resource = FakeEvaluationResource()
+
+    await get_experiment_run(
+        client=FakeClient(resource),
+        workspace=WORKSPACE,
+        pipeline_name=PIPELINE,
+        metric_group_id=METRIC_GROUP_ID,
+        run_id=RUN_ID,
+        origin="SERVICE",
+        deployment_id="dep-1",
+        pipeline_version_id="ver-1",
+        session_id="ses-1",
+    )
+
+    assert resource.calls == [
+        (
+            "get_experiment_run",
+            {
+                "metric_group_id": METRIC_GROUP_ID,
+                "run_id": RUN_ID,
+                "origin": "SERVICE",
+                "deployment_id": "dep-1",
+                "pipeline_version_id": "ver-1",
+                "session_id": "ses-1",
+            },
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_get_experiment_run_returns_the_apis_aggregate_usage_and_evaluator_versions() -> None:
+    version = {
+        "evaluator_version_id": V1,
+        "evaluator_id": E1,
+        "content_hash": "abc",
+        "metrics": {},
+        "created_at": "2026-10-01T00:00:00Z",
+    }
+    report = await _report(
+        _grid_with(
+            aggregate={
+                "metrics": [
+                    {
+                        "shape": "score",
+                        "evaluator_id": E1,
+                        "metric_key": "accuracy",
+                        "evaluator_version_ids": [V1],
+                        "sessions": {"valued": 2, "errored": 1},
+                        "coverage": 0.67,
+                        "mean": 0.6,
+                        "better": "higher",
+                        "range": [0, 1],
+                    }
+                ]
+            },
+            usage={
+                "duration_s": 12.5,
+                "prompt_tokens": 100,
+                "completion_tokens": 50,
+                "total_tokens": 150,
+                "cost": 0.02,
+                "cost_status": "priced",
+                "sessions": 2,
+            },
+            evaluator_versions=[version],
+        )
+    )
+
+    assert report.aggregate is not None
+    [accuracy] = report.aggregate.metrics
+    assert isinstance(accuracy, ScoreAggregate)
+    assert (accuracy.mean, accuracy.sessions.valued, accuracy.sessions.errored) == (0.6, 2, 1)
+    assert report.usage is not None
+    assert (report.usage.total_tokens, report.usage.cost, report.usage.cost_status, report.usage.sessions) == (
+        150,
+        0.02,
+        "priced",
+        2,
+    )
+    assert [v.evaluator_version_id for v in report.evaluator_versions] == [V1]
+
+
+@pytest.mark.asyncio
+async def test_get_experiment_run_from_an_older_api_has_no_aggregate_or_usage() -> None:
+    report = await _report(grid())
+
+    assert (report.aggregate, report.usage, report.evaluator_versions) == (None, None, [])

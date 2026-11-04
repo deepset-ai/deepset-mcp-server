@@ -57,7 +57,9 @@ from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.search_history.models import PipelineTraceEntry
 
 
-async def list_evaluators(*, client: AsyncClientProtocol, workspace: str) -> list[Evaluator] | str:
+async def list_evaluators(
+    *, client: AsyncClientProtocol, workspace: str, limit: int = 200, archived: bool | None = None
+) -> list[Evaluator] | str:
     """Lists the Evaluators in the workspace.
 
     An Evaluator is a versioned Python function that judges a Session and reports named Metrics.
@@ -106,7 +108,7 @@ async def get_evaluator(
 
 
 async def list_metric_groups(
-    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str | None = None
+    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str | None = None, limit: int = 200
 ) -> list[MetricGroupSummary] | str:
     """Lists the workspace's Metric Groups, newest first.
 
@@ -240,7 +242,7 @@ async def create_experiment(
 
 
 async def list_experiments(
-    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str | None = None
+    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str | None = None, limit: int = 50
 ) -> list[Experiment] | str:
     """Lists the workspace's Experiments, newest first.
 
@@ -322,6 +324,10 @@ async def get_experiment_run(
     metric_group_id: str,
     run_id: str,
     max_rows: int = 100,
+    origin: Literal["SERVICE", "PIPELINE_RUN", "PLAYGROUND"] | None = None,
+    deployment_id: str | None = None,
+    pipeline_version_id: str | None = None,
+    session_id: str | None = None,
 ) -> ExperimentRunReport | str:
     """Reads one scoring run: how its cells ended, a summary per Metric, then the grid rows.
 
@@ -431,6 +437,7 @@ async def list_sessions(
     origin: Literal["SERVICE", "PIPELINE_RUN", "PLAYGROUND"] | None = None,
     deployment_id: str | None = None,
     pipeline_version_id: str | None = None,
+    revision_id: str | None = None,
     since: str | None = None,
     until: str | None = None,
     limit: int = 50,
@@ -691,7 +698,7 @@ _API_ERRORS = (ResourceNotFoundError, BadRequestError, UnexpectedAPIError)
 
 
 async def list_datasets(
-    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str | None = None
+    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str | None = None, limit: int = 50
 ) -> list[DatasetSummary] | str:
     """Lists the workspace's Datasets, newest first, without their test cases.
 
