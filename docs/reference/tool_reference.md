@@ -117,7 +117,12 @@ draft/version history. Each deployment tracks its own history of served pipeline
 | `get_evaluator` | required | explorable | Fetch one Evaluator with its versions, or one version with its Python source. |
 | `list_metric_groups` | required | explorable | List the workspace's Metric Groups, optionally with each one's most recent scoring run on a pipeline. |
 | `list_experiments` | required | explorable | List the workspace's Experiments (a candidate version against a baseline on a Dataset), optionally only those on one pipeline. |
-| `create_experiment` | required | none | Create an Experiment: a candidate pipeline version against a Recorded or Pipeline-version baseline on a Dataset. |
+| `create_experiment` | required | none | Create an Experiment: a candidate pipeline version against a Recorded or Pipeline-version baseline on a Dataset (`preview` first: it costs money). |
+| `get_experiment` | required | explorable | Read one Experiment: test cases, each side's replays, scoring counts and error. |
+| `update_experiment` | required | none | Rename an Experiment or change a side (replays and judges again; `preview` first). |
+| `rerun_failed_experiment` | required | none | Judge again the failed evaluations, or replay again the failed replays (costs money). |
+| `rescore_experiment` | required | none | Score both sides again with the Metric Group as it is now (bills every evaluation again). |
+| `delete_experiment` | required | none | Delete an Experiment (destructive); its Sessions and scoring runs are kept. |
 | `get_experiment_results` | required | explorable | Read an Experiment's results: each Metric and duration, tokens and cost, candidate against baseline, then per test case. |
 | `get_experiment_run` | required | explorable | Read one scoring run: cell counts, a summary per Metric, and the grid rows. |
 | `list_sessions` | required | explorable | List the Sessions of a pipeline that a scoring run can judge. |

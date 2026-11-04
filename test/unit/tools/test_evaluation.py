@@ -18,12 +18,12 @@ from deepset_mcp.api.evaluation.models import (
     Experiment,
     ExperimentDetail,
     ExperimentPlan,
-    ExperimentUpdatePlan,
     ExperimentResults,
     ExperimentResultsReport,
     ExperimentRun,
     ExperimentRunGrid,
     ExperimentRunReport,
+    ExperimentUpdatePlan,
     MetricDeclaration,
     MetricGroup,
     MetricWeight,
@@ -50,20 +50,20 @@ from deepset_mcp.tools.evaluation import (
     create_dataset,
     create_evaluator,
     create_experiment,
-    delete_experiment,
     create_metric_group,
     delete_dataset,
+    delete_experiment,
     delete_metric_group,
     get_dataset,
     get_evaluation_try,
     get_evaluator,
+    get_experiment,
     get_experiment_results,
     get_experiment_run,
     get_session_replay,
     list_datasets,
     list_evaluator_templates,
     list_evaluators,
-    get_experiment,
     list_experiments,
     list_metric_groups,
     list_sessions,
@@ -294,7 +294,7 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
         self.try_states = try_states or []
         self.replay_states = replay_states or []
 
-    def _record(self, name: str, **kwargs: Any) -> None:
+    def _record(self, name: str, /, **kwargs: Any) -> None:
         self.calls.append((name, kwargs))
         if self.error is not None:
             raise self.error
@@ -1553,7 +1553,7 @@ async def test_update_experiment_forwards_the_changes_and_previews_without_chang
 @pytest.mark.parametrize(
     "side", [{"candidate_pipeline_name": PIPELINE}, {"baseline_pipeline_version_id": V1}], ids=["candidate", "baseline"]
 )
-async def test_update_experiment_refuses_a_half_given_side_without_calling_the_resource(side: dict[str, str]) -> None:
+async def test_update_experiment_refuses_a_half_given_side_without_calling_the_resource(side: dict[str, Any]) -> None:
     resource = FakeEvaluationResource()
 
     result = await update_experiment(

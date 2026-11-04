@@ -187,8 +187,20 @@ async def create_experiment(
             "Give both baseline_pipeline_name and baseline_pipeline_version_id for a Pipeline-version "
             "baseline, or neither for a Recorded baseline."
         )
+    resource = client.evaluation(workspace=workspace)
     try:
-        return await client.evaluation(workspace=workspace).create_experiment(
+        if preview:
+            return await resource.preview_experiment(
+                dataset_id=dataset_id,
+                metric_group_id=metric_group_id,
+                candidate_pipeline_name=candidate_pipeline_name,
+                candidate_pipeline_version_id=candidate_pipeline_version_id,
+                baseline_pipeline_name=baseline_pipeline_name,
+                baseline_pipeline_version_id=baseline_pipeline_version_id,
+                sessions_per_test_case=sessions_per_test_case,
+                replay_mode=replay_mode,
+            )
+        return await resource.create_experiment(
             name=name,
             dataset_id=dataset_id,
             metric_group_id=metric_group_id,
@@ -199,14 +211,14 @@ async def create_experiment(
             sessions_per_test_case=sessions_per_test_case,
             replay_mode=replay_mode,
         )
-    except ResourceNotFoundError:
+    except ResourceNotFoundError as e:
         missing = [
             f"workspace '{workspace}'",
             f"pipeline '{candidate_pipeline_name}'",
         ]
         if baseline_pipeline_name is not None:
             missing.append(f"baseline pipeline '{baseline_pipeline_name}'")
-        return f"Could not create experiment: one of {', '.join(missing)} not found."
+        return f"Could not create experiment: one of {', '.join(missing)} not found ({e})."
     except (BadRequestError, UnexpectedAPIError) as e:
         return f"Failed to create experiment '{name}': {e}"
 
@@ -1113,7 +1125,10 @@ async def get_experiment(*, client: AsyncClientProtocol, workspace: str, experim
     :param experiment_id: The Experiment's id, from ``list_experiments``.
     :returns: The Experiment, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).get_experiment(experiment_id)
+    except _API_ERRORS as e:
+        return f"Failed to get experiment '{experiment_id}': {e}"
 
 
 async def update_experiment(
@@ -1150,7 +1165,25 @@ async def update_experiment(
     :param preview: True returns the plan and changes nothing.
     :returns: The updated Experiment, or with ``preview`` the plan, or an error message.
     """
-    raise NotImplementedError
+    if (candidate_pipeline_name is None) != (candidate_pipeline_version_id is None):
+        return "Give both candidate_pipeline_name and candidate_pipeline_version_id, or neither."
+    if (baseline_pipeline_name is None) != (baseline_pipeline_version_id is None):
+        return "Give both baseline_pipeline_name and baseline_pipeline_version_id, or neither."
+    resource = client.evaluation(workspace=workspace)
+    changes: dict[str, Any] = {
+        "name": name,
+        "candidate_pipeline_name": candidate_pipeline_name,
+        "candidate_pipeline_version_id": candidate_pipeline_version_id,
+        "baseline_pipeline_name": baseline_pipeline_name,
+        "baseline_pipeline_version_id": baseline_pipeline_version_id,
+        "recorded_baseline": recorded_baseline,
+    }
+    try:
+        if preview:
+            return await resource.preview_update_experiment(experiment_id, **changes)
+        return await resource.update_experiment(experiment_id, **changes)
+    except _API_ERRORS as e:
+        return f"Failed to update experiment '{experiment_id}': {e}"
 
 
 async def rerun_failed_experiment(
@@ -1175,7 +1208,12 @@ async def rerun_failed_experiment(
     :param rerun: Which failures to retry: "evaluations" (default) or "replays".
     :returns: The Experiment, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).rerun_failed_experiment(
+            experiment_id, replays=rerun == "replays"
+        )
+    except _API_ERRORS as e:
+        return f"Failed to rerun failed {rerun} of experiment '{experiment_id}': {e}"
 
 
 async def rescore_experiment(*, client: AsyncClientProtocol, workspace: str, experiment_id: str) -> Experiment | str:
@@ -1192,7 +1230,10 @@ async def rescore_experiment(*, client: AsyncClientProtocol, workspace: str, exp
     :param experiment_id: The Experiment's id.
     :returns: The Experiment, or an error message.
     """
-    raise NotImplementedError
+    try:
+        return await client.evaluation(workspace=workspace).rescore_experiment(experiment_id)
+    except _API_ERRORS as e:
+        return f"Failed to rescore experiment '{experiment_id}': {e}"
 
 
 async def delete_experiment(*, client: AsyncClientProtocol, workspace: str, experiment_id: str) -> str:
@@ -1206,4 +1247,8 @@ async def delete_experiment(*, client: AsyncClientProtocol, workspace: str, expe
     :param experiment_id: The Experiment's id.
     :returns: A confirmation, or an error message.
     """
-    raise NotImplementedError
+    try:
+        await client.evaluation(workspace=workspace).delete_experiment(experiment_id)
+    except _API_ERRORS as e:
+        return f"Failed to delete experiment '{experiment_id}': {e}"
+    return f"Experiment '{experiment_id}' deleted."

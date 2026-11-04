@@ -80,6 +80,13 @@ class EvaluationResource(EvaluationResourceProtocol):
         raise_for_status(resp)
         return resp.json
 
+    async def _patch(self, path: str, data: dict[str, Any]) -> Any:
+        resp = await self._client.request(endpoint=path, method="PATCH", data=data)
+        raise_for_status(resp)
+        if resp.json is None:
+            raise UnexpectedAPIError(status_code=resp.status_code, message="Empty response", detail=None)
+        return resp.json
+
     async def _delete(self, path: str) -> None:
         raise_for_status(await self._client.request(endpoint=path, method="DELETE"))
 
@@ -187,24 +194,205 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param replay_mode: FIRST_USER_MESSAGE or ALL_USER_MESSAGES.
         :returns: The created Experiment.
         """
-        workspace_uuid = await ids.workspace_id(self._client, self._workspace)
-        candidate_pid = await ids.pipeline_id(self._client, self._workspace, candidate_pipeline_name)
-        body: dict[str, Any] = {
+        body = {
             "name": name,
+            **await self._experiment_targets(
+                dataset_id,
+                metric_group_id,
+                candidate_pipeline_name,
+                candidate_pipeline_version_id,
+                baseline_pipeline_name,
+                baseline_pipeline_version_id,
+                sessions_per_test_case,
+                replay_mode,
+            ),
+        }
+        data = await self._post(await self._workspace_path("experiments"), body)
+        return Experiment.model_validate(data)
+
+    async def _experiment_targets(
+        self,
+        dataset_id: str,
+        metric_group_id: str,
+        candidate_pipeline_name: str,
+        candidate_pipeline_version_id: str,
+        baseline_pipeline_name: str | None,
+        baseline_pipeline_version_id: str | None,
+        sessions_per_test_case: int,
+        replay_mode: str,
+    ) -> dict[str, Any]:
+        """What an Experiment compares: the body of a preview, and of a create once it has a name."""
+        body: dict[str, Any] = {
             "session_replay_dataset_id": dataset_id,
             "metric_group_id": metric_group_id,
-            "candidate": {"pipeline_id": candidate_pid, "pipeline_version_id": candidate_pipeline_version_id},
+            "candidate": await self._side(candidate_pipeline_name, candidate_pipeline_version_id),
             "sessions_per_test_case": sessions_per_test_case,
             "replay_mode": replay_mode,
         }
         if baseline_pipeline_name is not None:
-            baseline_pid = await ids.pipeline_id(self._client, self._workspace, baseline_pipeline_name)
-            body["baseline"] = {
-                "pipeline_id": baseline_pid,
-                "pipeline_version_id": baseline_pipeline_version_id,
-            }
-        data = await self._post(self._path(workspace_uuid, "evaluation", "experiments"), body)
+            body["baseline"] = await self._side(baseline_pipeline_name, baseline_pipeline_version_id)
+        return body
+
+    async def _side(self, pipeline_name: str, pipeline_version_id: str | None) -> dict[str, Any]:
+        pipeline_id = await ids.pipeline_id(self._client, self._workspace, pipeline_name)
+        return {"pipeline_id": pipeline_id, "pipeline_version_id": pipeline_version_id}
+
+    async def preview_experiment(
+        self,
+        dataset_id: str,
+        metric_group_id: str,
+        candidate_pipeline_name: str,
+        candidate_pipeline_version_id: str,
+        baseline_pipeline_name: str | None = None,
+        baseline_pipeline_version_id: str | None = None,
+        sessions_per_test_case: int = 1,
+        replay_mode: str = "FIRST_USER_MESSAGE",
+    ) -> ExperimentPlan:
+        """Plan an Experiment without starting it: Sessions reused and replays needed per side.
+
+        :param dataset_id: The Dataset's id.
+        :param metric_group_id: The Metric Group to score with.
+        :param candidate_pipeline_name: Name of the candidate pipeline.
+        :param candidate_pipeline_version_id: Candidate version id.
+        :param baseline_pipeline_name: Baseline pipeline name; None means a Recorded baseline.
+        :param baseline_pipeline_version_id: Baseline version id; required when baseline_pipeline_name is given.
+        :param sessions_per_test_case: Repetitions per test case (1..50).
+        :param replay_mode: FIRST_USER_MESSAGE or ALL_USER_MESSAGES.
+        :returns: The plan.
+        """
+        body = await self._experiment_targets(
+            dataset_id,
+            metric_group_id,
+            candidate_pipeline_name,
+            candidate_pipeline_version_id,
+            baseline_pipeline_name,
+            baseline_pipeline_version_id,
+            sessions_per_test_case,
+            replay_mode,
+        )
+        data = await self._post(await self._workspace_path("experiments", "preview"), body)
+        return ExperimentPlan.model_validate(data)
+
+    async def get_experiment(self, experiment_id: str) -> ExperimentDetail:
+        """Fetch one Experiment with its test cases and each side's progress.
+
+        :param experiment_id: The Experiment's id.
+        :returns: The Experiment.
+        """
+        data = await self._get(await self._workspace_path("experiments", experiment_id))
+        return ExperimentDetail.model_validate(data)
+
+    async def _experiment_changes(
+        self,
+        name: str | None,
+        candidate_pipeline_name: str | None,
+        candidate_pipeline_version_id: str | None,
+        baseline_pipeline_name: str | None,
+        baseline_pipeline_version_id: str | None,
+        recorded_baseline: bool,
+    ) -> dict[str, Any]:
+        """Only what changes: hub-api reads a side left out as unchanged."""
+        body: dict[str, Any] = {}
+        if name is not None:
+            body["name"] = name
+        if candidate_pipeline_name is not None:
+            body["candidate"] = await self._side(candidate_pipeline_name, candidate_pipeline_version_id)
+        if baseline_pipeline_name is not None:
+            body["baseline"] = await self._side(baseline_pipeline_name, baseline_pipeline_version_id)
+        if recorded_baseline:
+            body["recorded_baseline"] = True
+        return body
+
+    async def update_experiment(
+        self,
+        experiment_id: str,
+        name: str | None = None,
+        candidate_pipeline_name: str | None = None,
+        candidate_pipeline_version_id: str | None = None,
+        baseline_pipeline_name: str | None = None,
+        baseline_pipeline_version_id: str | None = None,
+        recorded_baseline: bool = False,
+    ) -> Experiment:
+        """Rename an Experiment or change a side; a changed side is replayed and scored again.
+
+        :param experiment_id: The Experiment's id.
+        :param name: A new name.
+        :param candidate_pipeline_name: Pipeline of the new candidate.
+        :param candidate_pipeline_version_id: The new candidate version.
+        :param baseline_pipeline_name: Pipeline of the new baseline.
+        :param baseline_pipeline_version_id: The new baseline version.
+        :param recorded_baseline: True makes the baseline the Dataset's recorded Sessions.
+        :returns: The Experiment.
+        """
+        body = await self._experiment_changes(
+            name,
+            candidate_pipeline_name,
+            candidate_pipeline_version_id,
+            baseline_pipeline_name,
+            baseline_pipeline_version_id,
+            recorded_baseline,
+        )
+        data = await self._patch(await self._workspace_path("experiments", experiment_id), body)
         return Experiment.model_validate(data)
+
+    async def preview_update_experiment(
+        self,
+        experiment_id: str,
+        name: str | None = None,
+        candidate_pipeline_name: str | None = None,
+        candidate_pipeline_version_id: str | None = None,
+        baseline_pipeline_name: str | None = None,
+        baseline_pipeline_version_id: str | None = None,
+        recorded_baseline: bool = False,
+    ) -> ExperimentUpdatePlan:
+        """Plan an update without changing anything; a side the changes leave alone is null.
+
+        :param experiment_id: The Experiment's id.
+        :param name: A new name.
+        :param candidate_pipeline_name: Pipeline of the new candidate.
+        :param candidate_pipeline_version_id: The new candidate version.
+        :param baseline_pipeline_name: Pipeline of the new baseline.
+        :param baseline_pipeline_version_id: The new baseline version.
+        :param recorded_baseline: True makes the baseline the Dataset's recorded Sessions.
+        :returns: The plan.
+        """
+        body = await self._experiment_changes(
+            name,
+            candidate_pipeline_name,
+            candidate_pipeline_version_id,
+            baseline_pipeline_name,
+            baseline_pipeline_version_id,
+            recorded_baseline,
+        )
+        data = await self._post(await self._workspace_path("experiments", experiment_id, "preview-update"), body)
+        return ExperimentUpdatePlan.model_validate(data)
+
+    async def rerun_failed_experiment(self, experiment_id: str, replays: bool = False) -> Experiment:
+        """Judge again the failed evaluations, or with ``replays`` replay again the failed replays.
+
+        :param experiment_id: The Experiment's id.
+        :param replays: True retries the failed replays; False the failed evaluations.
+        :returns: The Experiment.
+        """
+        route = "rerun-failed-replays" if replays else "rerun-failed"
+        data = await self._post(await self._workspace_path("experiments", experiment_id, route), {})
+        return Experiment.model_validate(data)
+
+    async def rescore_experiment(self, experiment_id: str) -> Experiment:
+        """Score both sides again with the Metric Group as it is now.
+
+        :param experiment_id: The Experiment's id.
+        :returns: The Experiment.
+        """
+        data = await self._post(await self._workspace_path("experiments", experiment_id, "rescore"), {})
+        return Experiment.model_validate(data)
+
+    async def delete_experiment(self, experiment_id: str) -> None:
+        """Delete an Experiment; its Sessions, replays and scoring runs are kept.
+
+        :param experiment_id: The Experiment's id.
+        """
+        await self._delete(await self._workspace_path("experiments", experiment_id))
 
     async def list_experiments(self, pipeline_name: str | None = None, limit: int = 50) -> list[Experiment]:
         """List the workspace's Experiments, newest first.
@@ -528,52 +716,3 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param metric_group_id: The Metric Group's id.
         """
         await self._delete(await self._workspace_path("metric-groups", metric_group_id))
-
-    async def preview_experiment(
-        self,
-        dataset_id: str,
-        metric_group_id: str,
-        candidate_pipeline_name: str,
-        candidate_pipeline_version_id: str,
-        baseline_pipeline_name: str | None = None,
-        baseline_pipeline_version_id: str | None = None,
-        sessions_per_test_case: int = 1,
-        replay_mode: str = "FIRST_USER_MESSAGE",
-    ) -> ExperimentPlan:
-        raise NotImplementedError
-
-    async def get_experiment(self, experiment_id: str) -> ExperimentDetail:
-        raise NotImplementedError
-
-    async def update_experiment(
-        self,
-        experiment_id: str,
-        name: str | None = None,
-        candidate_pipeline_name: str | None = None,
-        candidate_pipeline_version_id: str | None = None,
-        baseline_pipeline_name: str | None = None,
-        baseline_pipeline_version_id: str | None = None,
-        recorded_baseline: bool = False,
-    ) -> Experiment:
-        raise NotImplementedError
-
-    async def preview_update_experiment(
-        self,
-        experiment_id: str,
-        name: str | None = None,
-        candidate_pipeline_name: str | None = None,
-        candidate_pipeline_version_id: str | None = None,
-        baseline_pipeline_name: str | None = None,
-        baseline_pipeline_version_id: str | None = None,
-        recorded_baseline: bool = False,
-    ) -> ExperimentUpdatePlan:
-        raise NotImplementedError
-
-    async def rerun_failed_experiment(self, experiment_id: str, replays: bool = False) -> Experiment:
-        raise NotImplementedError
-
-    async def rescore_experiment(self, experiment_id: str) -> Experiment:
-        raise NotImplementedError
-
-    async def delete_experiment(self, experiment_id: str) -> None:
-        raise NotImplementedError
