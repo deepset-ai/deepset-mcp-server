@@ -236,13 +236,7 @@ async def create_experiment(
             reuse_sessions=reuse_sessions,
         )
     except ResourceNotFoundError as e:
-        missing = [
-            f"workspace '{workspace}'",
-            f"pipeline '{candidate_pipeline_name}'",
-        ]
-        if baseline_pipeline_name is not None:
-            missing.append(f"baseline pipeline '{baseline_pipeline_name}'")
-        return f"Could not create experiment: one of {', '.join(missing)} not found ({e})."
+        return f"Could not create experiment: something it refers to was not found: {e}"
     except (BadRequestError, UnexpectedAPIError) as e:
         return f"Failed to create experiment '{name}': {e}"
 
@@ -590,6 +584,10 @@ async def try_evaluator(
     ``python_code`` with ``get_evaluator`` and pass it. A try that
     judges with a model costs a model call per judged turn on the customer's provider.
 
+    ``test_case_id`` hands the Evaluation Function that Dataset test case's ``expected`` data, so a
+    correctness Evaluator can be tried on any Session; leave it out to use the test case the Session
+    replayed, if any.
+
     ``outcome`` ERRORED means the code broke: read ``error_detail`` and fix it. ``metrics`` are the
     values per address with their rationales. ``trace_summary`` says which Session Tools the
     evaluator called. If ``status`` is RUNNING the wait ran out: poll ``get_evaluation_try``.
@@ -599,12 +597,13 @@ async def try_evaluator(
     :param pipeline_name: Name of the pipeline the Session belongs to.
     :param python_code: The Evaluation Function's source.
     :param session_id: The Session to judge: a ``search_session_id``, or a single-turn run's ``query_id``.
+    :param test_case_id: A Dataset test case whose ``expected`` data the Evaluation Function receives.
     :param wait_seconds: How long to wait for the result before handing back the id to poll.
     :returns: The try report, or an error message.
     """
     resource = client.evaluation(workspace=workspace)
     try:
-        try_id = await resource.start_try(pipeline_name, python_code, session_id)
+        try_id = await resource.start_try(pipeline_name, python_code, session_id, test_case_id)
         state = await _poll(
             lambda: resource.get_try(pipeline_name, try_id), lambda s: s.status != "RUNNING", wait_seconds
         )
@@ -685,18 +684,30 @@ async def replay_session(
     order. Leave it unset to use the server's default (the first turn), and say so when reporting.
     If ``status`` is still CREATED or STARTED the wait ran out: poll ``get_session_replay``.
 
+    ``setup_source`` and ``cleanup_source`` are optional Python run around the pipeline in an isolated
+    worker. Setup must define exactly one public top-level function taking no arguments and returning a
+    mapping with optional ``env`` (dict[str, str]), ``inputs`` (dict[str, Any], keyed by the pipeline's
+    declared input names) and ``logs`` (list[str]); its ``env`` and ``inputs`` take precedence over the
+    Session's own. Cleanup runs even when the replay failed; it must define one public top-level function
+    taking the setup's return value (None without a setup) and returning a mapping with optional ``logs``.
+    Helpers must be underscore-prefixed or imported. Omit either to skip that step.
+
     :param client: The async client for API communication.
     :param workspace: The workspace name.
     :param pipeline_name: Name of the pipeline.
     :param session_id: The Session to replay: a ``search_session_id``, or a single-turn run's ``query_id``.
     :param pipeline_version_id: The pipeline version to replay against, e.g. the current draft's.
     :param replay_mode: FIRST_USER_MESSAGE or ALL_USER_MESSAGES; unset uses the server's default.
+    :param setup_source: Python source run before the pipeline; unset skips the step.
+    :param cleanup_source: Python source run after the pipeline; unset skips the step.
     :param wait_seconds: How long to wait for the replay before handing back the id to poll.
     :returns: The replay report with the new Session's id, or an error message.
     """
     resource = client.evaluation(workspace=workspace)
     try:
-        run_id = await resource.start_session_replay(pipeline_name, session_id, pipeline_version_id, replay_mode)
+        run_id = await resource.start_session_replay(
+            pipeline_name, session_id, pipeline_version_id, replay_mode, setup_source, cleanup_source
+        )
         run = await _poll(
             lambda: resource.get_session_replay(pipeline_name, run_id),
             lambda r: r.status in RUN_DONE_STATUSES,
@@ -824,7 +835,8 @@ async def delete_dataset(*, client: AsyncClientProtocol, workspace: str, dataset
     """Deletes a Dataset and all its test cases. This cannot be undone: get a yes first.
 
     Experiments that used the Dataset keep their results but lose the link to it. hub-api refuses with a
-    message while a Service's gate replays the Dataset.
+    message while a Service's gate replays the Dataset. Afterwards every Experiment that used the Dataset can
+    no longer change sides or rerun failed replays (hub-api answers 409).
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
@@ -906,6 +918,9 @@ async def update_test_case(
         )
         if value is not None
     }
+    conflict = sorted(set(clear or []) & changes.keys())
+    if conflict:
+        return f"Cannot both set and clear {', '.join(conflict)}: give a new value or list it in clear, not both."
     changes.update(dict.fromkeys(clear or []))
     if not changes:
         return (
@@ -1164,7 +1179,8 @@ async def delete_metric_group(*, client: AsyncClientProtocol, workspace: str, me
     """Deletes a Metric Group together with all its scoring runs. This cannot be undone: get a yes first.
 
     The Evaluators themselves stay. hub-api refuses with a message while an optimization goal judges
-    with the group or a Service's gate checks it; change that first.
+    with the group or a Service's gate checks it; change that first. Afterwards every Experiment that used the
+    group can no longer change sides or rerun failed replays (hub-api answers 409).
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.

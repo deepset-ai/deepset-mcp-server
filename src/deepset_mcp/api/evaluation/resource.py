@@ -605,10 +605,15 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param pipeline_name: Name of the pipeline.
         :param python_code: The Evaluation Function's source.
         :param session_id: The Session to judge.
+        :param test_case_id: A Dataset test case whose `expected` data the Evaluation Function receives; omitted,
+            the test case the Session replayed, if any.
         :returns: The try id to poll.
         """
         path = await self._pipeline_path(pipeline_name, "tries")
-        data = await self._post(path, {"python_code": python_code, "session_id": session_id})
+        body = {"python_code": python_code, "session_id": session_id}
+        if test_case_id is not None:
+            body["session_replay_test_case_id"] = test_case_id
+        data = await self._post(path, body)
         return str(data["try_id"])
 
     async def get_try(self, pipeline_name: str, try_id: str) -> TryState:
@@ -642,11 +647,13 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param session_id: The Session to replay.
         :param pipeline_version_id: The pipeline version to replay it against.
         :param replay_mode: FIRST_USER_MESSAGE or ALL_USER_MESSAGES; omitted, the server's default.
+        :param setup_source: Python source run before the pipeline; omitted, no setup step.
+        :param cleanup_source: Python source run after the pipeline; omitted, no cleanup step.
         :returns: The replay run id to poll.
         """
         body = {"session_id": session_id, "pipeline_version_id": pipeline_version_id}
-        if replay_mode is not None:
-            body["replay_mode"] = replay_mode
+        optional = {"replay_mode": replay_mode, "setup_source": setup_source, "cleanup_source": cleanup_source}
+        body.update({k: v for k, v in optional.items() if v is not None})
         data = await self._post(await self._pipeline_path(pipeline_name, "replay-runs"), body)
         return str(data["session_replay_run_id"])
 
