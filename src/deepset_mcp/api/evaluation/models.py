@@ -169,6 +169,39 @@ class Evaluator(BaseModel):
     )
     created_at: str
     updated_at: str | None = None
+    archived_at: str | None = Field(
+        default=None, description="When the Evaluator was archived, or null. Archived Evaluators still score."
+    )
+
+
+class EvaluatorTemplate(BaseModel):
+    """A ready-made Evaluation Function. Add it by creating an Evaluator from its name and code."""
+
+    key: str = Field(description="Stable identifier, for example `tool_calls`.")
+    name: str = Field(description="The name to create the Evaluator under.")
+    category: str = Field(default="", description="What the template measures, for example `RAG quality`.")
+    description: str = ""
+    python_code: str = Field(description="The Evaluation Function, to send as an Evaluator's `python_code`.")
+    metrics: dict[str, MetricDeclaration] = Field(default_factory=dict, description="The Metrics the code declares.")
+    judge_model: str | None = Field(
+        default=None, description="The model the template asks, which makes it cost money per Session. Null if none."
+    )
+    expected_columns: list[str] = Field(
+        default_factory=list,
+        description="The columns of a test case's expected data the template reads; without them it reports n/a.",
+    )
+    combinable_as_code: bool = Field(
+        default=False, description="Whether `combine_evaluator_templates` can merge it. False for a judge template."
+    )
+
+
+class CombinedEvaluatorTemplates(BaseModel):
+    """One Evaluation Function reporting the Metrics of several templates."""
+
+    python_code: str = Field(description="The merged Evaluation Function, to send as an Evaluator's `python_code`.")
+    metrics: dict[str, MetricDeclaration] = Field(
+        default_factory=dict, description="Every Metric of the combined templates, keyed by name."
+    )
 
 
 class ExperimentRun(BaseModel):
@@ -193,14 +226,20 @@ class ExperimentRun(BaseModel):
     created_at: str
 
 
-class WeightedMetric(BaseModel):
+class MetricWeight(BaseModel):
     """How much one Metric counts toward its Metric Group's Composite."""
 
     evaluator_id: str = Field(description=_EVALUATOR_ID)
     metric_key: str = Field(description=_METRIC_KEY)
     weight: float = Field(
-        description="The weight as saved, a number above 0. Weights are relative: they are divided by their sum."
+        description="A number above 0. Weights are relative: they are divided by their sum, so 2, 1 and 1 count as "
+        "0.5, 0.25 and 0.25."
     )
+
+
+class WeightedMetric(MetricWeight):
+    """A stored weight, with whether the Evaluator's latest version still lets it count."""
+
     usable: bool = Field(
         description=(
             "Whether the Evaluator's latest version still declares the Metric with a Normalized mean. A newer "

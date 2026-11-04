@@ -9,16 +9,19 @@ from urllib.parse import quote
 
 from deepset_mcp.api import ids
 from deepset_mcp.api.evaluation.models import (
+    CombinedEvaluatorTemplates,
     Dataset,
     DatasetSummary,
     EvaluationTryResult,
     Evaluator,
+    EvaluatorTemplate,
     EvaluatorVersion,
     Experiment,
     ExperimentResults,
     ExperimentRun,
     ExperimentRunGrid,
     MetricGroup,
+    MetricWeight,
     NewTestCase,
     SessionList,
     SessionReplayRun,
@@ -415,3 +418,89 @@ class EvaluationResource(EvaluationResourceProtocol):
         """
         path = await self._workspace_path("datasets", dataset_id, "test-cases", test_case_id)
         return TestCase.model_validate(await self._put(path, changes))
+
+    async def create_evaluator(
+        self,
+        name: str,
+        python_code: str,
+        metric_group_ids: list[str] | None = None,
+        new_metric_group_name: str | None = None,
+    ) -> Evaluator:
+        """Create an Evaluator and its first version, optionally adding it to Metric Groups.
+
+        :param name: The Evaluator's name; unused in the workspace.
+        :param python_code: The Evaluation Function's source.
+        :param metric_group_ids: Existing Metric Groups to add it to, each at the end of its set.
+        :param new_metric_group_name: Creates a Metric Group of this name with the Evaluator as its only member.
+        :returns: The created Evaluator.
+        """
+        raise NotImplementedError
+
+    async def update_evaluator(
+        self, evaluator_id: str, name: str | None = None, python_code: str | None = None
+    ) -> Evaluator:
+        """Rename an Evaluator, add a version of its source, or both. Only the fields given are sent.
+
+        :param evaluator_id: The Evaluator's id.
+        :param name: The new name.
+        :param python_code: The new source; adds a version unless the lineage already holds it.
+        :returns: The Evaluator.
+        """
+        raise NotImplementedError
+
+    async def set_evaluator_archived(self, evaluator_id: str, archived: bool) -> Evaluator:
+        """Archive or unarchive an Evaluator.
+
+        :param evaluator_id: The Evaluator's id.
+        :param archived: True to archive it, False to unarchive it.
+        :returns: The Evaluator.
+        """
+        raise NotImplementedError
+
+    async def list_evaluator_templates(self) -> list[EvaluatorTemplate]:
+        """List the built-in Evaluator templates, each with its code.
+
+        :returns: The templates.
+        """
+        raise NotImplementedError
+
+    async def combine_evaluator_templates(self, template_keys: list[str], title: str) -> CombinedEvaluatorTemplates:
+        """Merge code templates into one Evaluation Function. Computes only; saves nothing.
+
+        :param template_keys: Keys of two or more combinable templates, in the order their Metrics are reported.
+        :param title: What the combined code's opening comment calls it.
+        :returns: The merged code and the Metrics it declares.
+        """
+        raise NotImplementedError
+
+    async def create_metric_group(
+        self, name: str, evaluator_ids: list[str], weights: list[MetricWeight] | None = None
+    ) -> MetricGroup:
+        """Create a Metric Group of Evaluators, optionally with Metric weights.
+
+        :param name: The Metric Group's name.
+        :param evaluator_ids: The Evaluators it runs, in order.
+        :param weights: How much each Metric counts toward the Composite; none by default.
+        :returns: The created Metric Group.
+        """
+        raise NotImplementedError
+
+    async def update_metric_group(
+        self, metric_group_id: str, name: str, evaluator_ids: list[str], weights: list[MetricWeight] | None = None
+    ) -> MetricGroup:
+        """Replace a Metric Group's name and Evaluator set; weights only when given.
+
+        :param metric_group_id: The Metric Group's id.
+        :param name: The name to keep or change to.
+        :param evaluator_ids: Every Evaluator the group keeps, in order.
+        :param weights: Replaces the weights (an empty list clears them); None keeps those of the Evaluators that stay.
+        :returns: The Metric Group.
+        """
+        raise NotImplementedError
+
+    async def delete_metric_group(self, metric_group_id: str) -> None:
+        """Delete a Metric Group and its Experiment runs. The Evaluators stay.
+
+        :param metric_group_id: The Metric Group's id.
+        """
+        raise NotImplementedError

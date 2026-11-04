@@ -5,15 +5,18 @@
 from typing import Any, Protocol
 
 from deepset_mcp.api.evaluation.models import (
+    CombinedEvaluatorTemplates,
     Dataset,
     DatasetSummary,
     Evaluator,
+    EvaluatorTemplate,
     EvaluatorVersion,
     Experiment,
     ExperimentResults,
     ExperimentRun,
     ExperimentRunGrid,
     MetricGroup,
+    MetricWeight,
     NewTestCase,
     SessionList,
     SessionReplayRun,
@@ -144,4 +147,48 @@ class EvaluationResourceProtocol(Protocol):
 
     async def update_test_case(self, dataset_id: str, test_case_id: str, changes: dict[str, Any]) -> TestCase:
         """Change one test case; a field left out of ``changes`` is kept, one sent as None is removed."""
+        ...
+
+    async def create_evaluator(
+        self,
+        name: str,
+        python_code: str,
+        metric_group_ids: list[str] | None = None,
+        new_metric_group_name: str | None = None,
+    ) -> Evaluator:
+        """Create an Evaluator and its first version, optionally adding it to Metric Groups."""
+        ...
+
+    async def update_evaluator(
+        self, evaluator_id: str, name: str | None = None, python_code: str | None = None
+    ) -> Evaluator:
+        """Rename an Evaluator, add a version of its source, or both."""
+        ...
+
+    async def set_evaluator_archived(self, evaluator_id: str, archived: bool) -> Evaluator:
+        """Archive or unarchive an Evaluator."""
+        ...
+
+    async def list_evaluator_templates(self) -> list[EvaluatorTemplate]:
+        """List the built-in Evaluator templates."""
+        ...
+
+    async def combine_evaluator_templates(self, template_keys: list[str], title: str) -> CombinedEvaluatorTemplates:
+        """Merge code templates into one Evaluation Function. Computes only; saves nothing."""
+        ...
+
+    async def create_metric_group(
+        self, name: str, evaluator_ids: list[str], weights: list[MetricWeight] | None = None
+    ) -> MetricGroup:
+        """Create a Metric Group of Evaluators, optionally with Metric weights."""
+        ...
+
+    async def update_metric_group(
+        self, metric_group_id: str, name: str, evaluator_ids: list[str], weights: list[MetricWeight] | None = None
+    ) -> MetricGroup:
+        """Replace a Metric Group's name and Evaluator set; weights only when given."""
+        ...
+
+    async def delete_metric_group(self, metric_group_id: str) -> None:
+        """Delete a Metric Group and its Experiment runs."""
         ...

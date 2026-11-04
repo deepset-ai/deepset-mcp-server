@@ -7,11 +7,13 @@ from typing import Any
 import pytest
 
 from deepset_mcp.api.evaluation.models import (
+    CombinedEvaluatorTemplates,
     Composite,
     Dataset,
     DatasetSummary,
     EvaluationTryResult,
     Evaluator,
+    EvaluatorTemplate,
     EvaluatorVersion,
     Experiment,
     ExperimentResults,
@@ -21,6 +23,7 @@ from deepset_mcp.api.evaluation.models import (
     ExperimentRunReport,
     MetricDeclaration,
     MetricGroup,
+    MetricWeight,
     NewTestCase,
     NoComposite,
     NoNormalizedMean,
@@ -39,10 +42,14 @@ from deepset_mcp.api.shared_models import PaginatedResponse
 from deepset_mcp.tools import evaluation as evaluation_tools
 from deepset_mcp.tools.evaluation import (
     add_test_cases,
+    combine_evaluator_templates,
     copy_test_cases,
     create_dataset,
+    create_evaluator,
     create_experiment,
+    create_metric_group,
     delete_dataset,
+    delete_metric_group,
     get_dataset,
     get_evaluation_try,
     get_evaluator,
@@ -50,14 +57,18 @@ from deepset_mcp.tools.evaluation import (
     get_experiment_run,
     get_session_replay,
     list_datasets,
+    list_evaluator_templates,
     list_evaluators,
     list_experiments,
     list_metric_groups,
     list_sessions,
     remove_test_cases,
     replay_session,
+    set_evaluator_archived,
     try_evaluator,
     update_dataset,
+    update_evaluator,
+    update_metric_group,
     update_test_case,
 )
 from test.unit.conftest import BaseFakeClient
@@ -447,6 +458,66 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
     async def update_test_case(self, dataset_id: str, test_case_id: str, changes: dict[str, Any]) -> TestCase:
         self._record("update_test_case", dataset_id=dataset_id, test_case_id=test_case_id, changes=changes)
         return TestCase.model_validate(dataset_dict()["test_cases"][0])
+
+    async def create_evaluator(
+        self,
+        name: str,
+        python_code: str,
+        metric_group_ids: list[str] | None = None,
+        new_metric_group_name: str | None = None,
+    ) -> Evaluator:
+        self._record(
+            "create_evaluator",
+            name=name,
+            python_code=python_code,
+            metric_group_ids=metric_group_ids,
+            new_metric_group_name=new_metric_group_name,
+        )
+        return await self.get_evaluator(E1)
+
+    async def update_evaluator(
+        self, evaluator_id: str, name: str | None = None, python_code: str | None = None
+    ) -> Evaluator:
+        self._record("update_evaluator", evaluator_id=evaluator_id, name=name, python_code=python_code)
+        return await self.get_evaluator(evaluator_id)
+
+    async def set_evaluator_archived(self, evaluator_id: str, archived: bool) -> Evaluator:
+        self._record("set_evaluator_archived", evaluator_id=evaluator_id, archived=archived)
+        return await self.get_evaluator(evaluator_id)
+
+    async def list_evaluator_templates(self) -> list[EvaluatorTemplate]:
+        self._record("list_evaluator_templates")
+        return [EvaluatorTemplate(key="tool_calls", name="Tool calls", python_code="def evaluate(): ...")]
+
+    async def combine_evaluator_templates(self, template_keys: list[str], title: str) -> CombinedEvaluatorTemplates:
+        self._record("combine_evaluator_templates", template_keys=template_keys, title=title)
+        return CombinedEvaluatorTemplates(python_code="merged")
+
+    def _metric_group(self) -> MetricGroup:
+        return MetricGroup(
+            metric_group_id=METRIC_GROUP_ID, name="Weekly", evaluator_ids=[E1], created_at="2026-10-01T00:00:00Z"
+        )
+
+    async def create_metric_group(
+        self, name: str, evaluator_ids: list[str], weights: list[MetricWeight] | None = None
+    ) -> MetricGroup:
+        self._record("create_metric_group", name=name, evaluator_ids=evaluator_ids, weights=weights)
+        return self._metric_group()
+
+    async def update_metric_group(
+        self, metric_group_id: str, name: str, evaluator_ids: list[str], weights: list[MetricWeight] | None = None
+    ) -> MetricGroup:
+        self._record(
+            "update_metric_group",
+            metric_group_id=metric_group_id,
+            name=name,
+            evaluator_ids=evaluator_ids,
+            weights=weights,
+        )
+        return self._metric_group()
+
+    async def delete_metric_group(self, metric_group_id: str) -> None:
+        self._record("delete_metric_group", metric_group_id=metric_group_id)
 
 
 class FakeClient(BaseFakeClient):
@@ -1226,6 +1297,124 @@ async def test_dataset_tools_return_the_api_message_instead_of_raising(error: Ex
         await copy_test_cases(**common, dataset_id=DATASET_ID, test_case_ids=[TEST_CASE_ID]),
         await remove_test_cases(**common, dataset_id=DATASET_ID, test_case_ids=[TEST_CASE_ID]),
         await update_test_case(**common, dataset_id=DATASET_ID, test_case_id=TEST_CASE_ID, name="x"),
+    ]
+
+    assert all(isinstance(result, str) and str(error.args[0]) in result for result in results)
+
+
+@pytest.mark.asyncio
+async def test_evaluator_writes_forward_their_arguments_and_return_the_evaluator() -> None:
+    resource = FakeEvaluationResource()
+    client = FakeClient(resource)
+
+    results = [
+        await create_evaluator(
+            client=client,
+            workspace=WORKSPACE,
+            name="N",
+            python_code="code",
+            metric_group_ids=[METRIC_GROUP_ID],
+            new_metric_group_name="G",
+        ),
+        await update_evaluator(client=client, workspace=WORKSPACE, evaluator_id=E1, python_code="new"),
+        await set_evaluator_archived(client=client, workspace=WORKSPACE, evaluator_id=E1, archived=True),
+    ]
+
+    assert all(isinstance(result, Evaluator) for result in results)
+    assert resource.calls == [
+        (
+            "create_evaluator",
+            {
+                "name": "N",
+                "python_code": "code",
+                "metric_group_ids": [METRIC_GROUP_ID],
+                "new_metric_group_name": "G",
+            },
+        ),
+        ("update_evaluator", {"evaluator_id": E1, "name": None, "python_code": "new"}),
+        ("set_evaluator_archived", {"evaluator_id": E1, "archived": True}),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_template_tools_return_the_template_models() -> None:
+    resource = FakeEvaluationResource()
+    client = FakeClient(resource)
+
+    templates = await list_evaluator_templates(client=client, workspace=WORKSPACE)
+    combined = await combine_evaluator_templates(
+        client=client, workspace=WORKSPACE, template_keys=["a", "b"], title="T"
+    )
+
+    assert isinstance(templates, list)
+    assert templates[0].key == "tool_calls"
+    assert isinstance(combined, CombinedEvaluatorTemplates)
+    assert resource.calls == [
+        ("list_evaluator_templates", {}),
+        ("combine_evaluator_templates", {"template_keys": ["a", "b"], "title": "T"}),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_metric_group_writes_forward_weights_and_return_the_group() -> None:
+    resource = FakeEvaluationResource()
+    client = FakeClient(resource)
+    weights = [MetricWeight(evaluator_id=E1, metric_key="answered", weight=2)]
+
+    created = await create_metric_group(
+        client=client, workspace=WORKSPACE, name="W", evaluator_ids=[E1], weights=weights
+    )
+    updated = await update_metric_group(
+        client=client, workspace=WORKSPACE, metric_group_id=METRIC_GROUP_ID, name="W", evaluator_ids=[E1]
+    )
+
+    assert isinstance(created, MetricGroup)
+    assert isinstance(updated, MetricGroup)
+    assert resource.calls == [
+        ("create_metric_group", {"name": "W", "evaluator_ids": [E1], "weights": weights}),
+        (
+            "update_metric_group",
+            {"metric_group_id": METRIC_GROUP_ID, "name": "W", "evaluator_ids": [E1], "weights": None},
+        ),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_delete_metric_group_confirms_in_a_string() -> None:
+    resource = FakeEvaluationResource()
+
+    result = await delete_metric_group(
+        client=FakeClient(resource), workspace=WORKSPACE, metric_group_id=METRIC_GROUP_ID
+    )
+
+    assert METRIC_GROUP_ID in result
+    assert resource.calls == [("delete_metric_group", {"metric_group_id": METRIC_GROUP_ID})]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "error",
+    [
+        ResourceNotFoundError(message="Evaluator not found"),
+        BadRequestError(message="bad"),
+        UnexpectedAPIError(status_code=409, message="An evaluator named 'N' already exists"),
+    ],
+)
+async def test_evaluator_and_metric_group_write_tools_return_the_api_message_instead_of_raising(
+    error: Exception,
+) -> None:
+    client = FakeClient(FakeEvaluationResource(error=error))
+    common: dict[str, Any] = {"client": client, "workspace": WORKSPACE}
+
+    results = [
+        await create_evaluator(**common, name="N", python_code="code"),
+        await update_evaluator(**common, evaluator_id=E1, name="N"),
+        await set_evaluator_archived(**common, evaluator_id=E1, archived=False),
+        await list_evaluator_templates(**common),
+        await combine_evaluator_templates(**common, template_keys=["a", "b"], title="T"),
+        await create_metric_group(**common, name="W", evaluator_ids=[E1]),
+        await update_metric_group(**common, metric_group_id=METRIC_GROUP_ID, name="W", evaluator_ids=[E1]),
+        await delete_metric_group(**common, metric_group_id=METRIC_GROUP_ID),
     ]
 
     assert all(isinstance(result, str) and str(error.args[0]) in result for result in results)

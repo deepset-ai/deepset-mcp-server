@@ -16,16 +16,20 @@ from statistics import fmean
 from typing import Any, Literal, TypeVar
 
 from deepset_mcp.api.evaluation.models import (
+    CombinedEvaluatorTemplates,
     Dataset,
     DatasetSummary,
     Evaluator,
+    EvaluatorTemplate,
     EvaluatorVersion,
     Experiment,
     ExperimentResultsReport,
     ExperimentRunGrid,
     ExperimentRunReport,
+    MetricGroup,
     MetricGroupSummary,
     MetricSummary,
+    MetricWeight,
     NewTestCase,
     ReportCell,
     ReportRow,
@@ -642,7 +646,7 @@ async def get_session_replay(
         return f"Failed to read replay '{replay_run_id}': {e}"
 
 
-_DATASET_ERRORS = (ResourceNotFoundError, BadRequestError, UnexpectedAPIError)
+_API_ERRORS = (ResourceNotFoundError, BadRequestError, UnexpectedAPIError)
 
 
 async def list_datasets(
@@ -662,7 +666,7 @@ async def list_datasets(
     """
     try:
         return await client.evaluation(workspace=workspace).list_datasets(pipeline_name)
-    except _DATASET_ERRORS as e:
+    except _API_ERRORS as e:
         return f"Failed to list datasets: {e}"
 
 
@@ -680,7 +684,7 @@ async def get_dataset(*, client: AsyncClientProtocol, workspace: str, dataset_id
     """
     try:
         return await client.evaluation(workspace=workspace).get_dataset(dataset_id)
-    except _DATASET_ERRORS as e:
+    except _API_ERRORS as e:
         return f"Failed to get dataset '{dataset_id}': {e}"
 
 
@@ -708,7 +712,7 @@ async def create_dataset(
     """
     try:
         return await client.evaluation(workspace=workspace).create_dataset(name, pipeline_name, test_cases)
-    except _DATASET_ERRORS as e:
+    except _API_ERRORS as e:
         return f"Failed to create dataset '{name}': {e}"
 
 
@@ -723,7 +727,7 @@ async def update_dataset(*, client: AsyncClientProtocol, workspace: str, dataset
     """
     try:
         return await client.evaluation(workspace=workspace).update_dataset(dataset_id, name)
-    except _DATASET_ERRORS as e:
+    except _API_ERRORS as e:
         return f"Failed to rename dataset '{dataset_id}': {e}"
 
 
@@ -739,7 +743,7 @@ async def delete_dataset(*, client: AsyncClientProtocol, workspace: str, dataset
     """
     try:
         await client.evaluation(workspace=workspace).delete_dataset(dataset_id)
-    except _DATASET_ERRORS as e:
+    except _API_ERRORS as e:
         return f"Failed to delete dataset '{dataset_id}': {e}"
     return f"Dataset '{dataset_id}' deleted."
 
@@ -767,7 +771,7 @@ async def add_test_cases(
     """
     try:
         return await client.evaluation(workspace=workspace).add_test_cases(dataset_id, test_cases, pipeline_name)
-    except _DATASET_ERRORS as e:
+    except _API_ERRORS as e:
         return f"Failed to add test cases to dataset '{dataset_id}': {e}"
 
 
@@ -819,7 +823,7 @@ async def update_test_case(
         )
     try:
         return await client.evaluation(workspace=workspace).update_test_case(dataset_id, test_case_id, changes)
-    except _DATASET_ERRORS as e:
+    except _API_ERRORS as e:
         return f"Failed to update test case '{test_case_id}': {e}"
 
 
@@ -839,7 +843,7 @@ async def copy_test_cases(
     """
     try:
         return await client.evaluation(workspace=workspace).copy_test_cases(dataset_id, test_case_ids)
-    except _DATASET_ERRORS as e:
+    except _API_ERRORS as e:
         return f"Failed to copy test cases into dataset '{dataset_id}': {e}"
 
 
@@ -858,5 +862,198 @@ async def remove_test_cases(
     """
     try:
         return await client.evaluation(workspace=workspace).remove_test_cases(dataset_id, test_case_ids)
-    except _DATASET_ERRORS as e:
+    except _API_ERRORS as e:
         return f"Failed to remove test cases from dataset '{dataset_id}': {e}"
+
+
+async def create_evaluator(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    name: str,
+    python_code: str,
+    metric_group_ids: list[str] | None = None,
+    new_metric_group_name: str | None = None,
+) -> Evaluator | str:
+    """Creates an Evaluator from Python source and adds it to the workspace. Judged Metrics cost money when run.
+
+    Always validate new code first: run it on a real Session with ``try_evaluator`` and fix what it
+    reports before saving. ``python_code`` is the Evaluation Function; its ``@metrics`` declaration
+    names the Metrics it reports, and hub-api rejects code whose declaration it cannot read. Start
+    from ``list_evaluator_templates`` rather than from scratch. The name must be unused in the
+    workspace. The Evaluator scores nothing until a Metric Group runs it: add it to existing groups
+    with ``metric_group_ids`` (each at the end of its set), to a new group with
+    ``new_metric_group_name``, or later with ``update_metric_group``. Change it later with
+    ``update_evaluator``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param name: The Evaluator's name; must not exist in the workspace yet.
+    :param python_code: The Evaluation Function's Python source.
+    :param metric_group_ids: Existing Metric Groups to add it to.
+    :param new_metric_group_name: Also creates a Metric Group of this name holding only this Evaluator.
+    :returns: The created Evaluator, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def update_evaluator(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    evaluator_id: str,
+    name: str | None = None,
+    python_code: str | None = None,
+) -> Evaluator | str:
+    """Renames an Evaluator, saves new source as a new version, or both. Send only what changes.
+
+    New source adds a version; the Evaluator's Metric Groups judge with the newest version from the next
+    run on, and past runs keep the version they used. Validate the new code with ``try_evaluator``
+    first. Source the Evaluator already had in its history adds no version, so reverting is safe.
+    hub-api rejects code that changes what an existing Metric measures (its shape, grain or range,
+    a narrowed vocabulary), and a changed declaration can make a Metric Group weight unusable: check
+    ``weights`` with ``list_metric_groups`` afterwards. Read the current source with ``get_evaluator``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param evaluator_id: The Evaluator's id.
+    :param name: The new name; must not be taken.
+    :param python_code: The new Python source.
+    :returns: The Evaluator, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def set_evaluator_archived(
+    *, client: AsyncClientProtocol, workspace: str, evaluator_id: str, archived: bool
+) -> Evaluator | str:
+    """Archives or unarchives an Evaluator. Nothing is deleted.
+
+    An archived Evaluator keeps its versions and name, and its Metric Groups still score with it; it
+    only shows an ``archived_at`` time. Use it to retire an Evaluator without breaking history.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param evaluator_id: The Evaluator's id.
+    :param archived: True to archive it, False to unarchive it.
+    :returns: The Evaluator, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def list_evaluator_templates(*, client: AsyncClientProtocol, workspace: str) -> list[EvaluatorTemplate] | str:
+    """Lists the built-in Evaluator templates: ready-made Evaluation Functions to start from.
+
+    They cover agent efficiency, agent quality, RAG quality and retrieval quality. Each has a ``key``,
+    ``name``, ``category``, its ``python_code`` and the Metrics it declares. A template with a
+    ``judge_model`` asks a model per Session, so running it costs money. ``expected_columns`` are the
+    columns of a Dataset test case's expected data it reads. To use one, pass its ``name`` and
+    ``python_code`` to ``create_evaluator``; the copy is yours and does not follow the template.
+    ``combinable_as_code`` templates can be merged with ``combine_evaluator_templates``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :returns: The templates, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def combine_evaluator_templates(
+    *, client: AsyncClientProtocol, workspace: str, template_keys: list[str], title: str
+) -> CombinedEvaluatorTemplates | str:
+    """Merges code templates into one Evaluation Function that reports all their Metrics. Saves nothing.
+
+    Only templates whose ``combinable_as_code`` is true can be merged; an unknown key, a judge template
+    or a repeated key is rejected. The returned ``python_code`` is not yet an Evaluator: pass it to
+    ``try_evaluator`` and then ``create_evaluator``.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param template_keys: Keys of two or more templates, in the order their Metrics should be reported.
+    :param title: What the combined code's opening comment calls it, e.g. "Agent efficiency metrics".
+    :returns: The merged code and its Metrics, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def create_metric_group(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    name: str,
+    evaluator_ids: list[str],
+    weights: list[MetricWeight] | None = None,
+) -> MetricGroup | str:
+    """Creates a Metric Group: a named, ordered set of Evaluators to score Sessions of any pipeline with.
+
+    The group names Evaluators, not versions, so each run judges with their newest versions. Running
+    it costs money if an Evaluator is judged. Find Evaluator ids with ``list_evaluators``.
+
+    ``weights`` say how much each Metric counts toward the group's Composite, as
+    ``{evaluator_id, metric_key, weight}`` entries. ``weight`` is a number above 0 and relative: weights
+    are divided by their sum, so 2, 1, 1 count as 50%, 25%, 25%. Each Evaluator must be in the group,
+    each ``metric_key`` must be one its newest version declares with a Normalized mean (a Score
+    with both ``range`` and ``better``, or a Label with a ``scale``), and no pair may repeat; otherwise
+    hub-api rejects the request. Without weights a group has no Composite. A stored weight with
+    ``usable`` false and an ``unusable_reason`` means a newer Evaluator version dropped the Metric or
+    its normalization: it is kept but no longer counts in new runs.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param name: The Metric Group's name.
+    :param evaluator_ids: The Evaluators to run, in the order results show them (at least one).
+    :param weights: Optional Metric weights, as described above.
+    :returns: The created Metric Group, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def update_metric_group(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    metric_group_id: str,
+    name: str,
+    evaluator_ids: list[str],
+    weights: list[MetricWeight] | None = None,
+) -> MetricGroup | str:
+    """Replaces a Metric Group's name and Evaluator set, and optionally its Metric weights.
+
+    This is a full replace of name and Evaluators: send every Evaluator the group keeps, in order
+    (read them with ``list_metric_groups``). Past runs are unaffected; each recorded the versions it
+    used, and a run's Composite keeps the weights it started with, so edits change only later runs.
+    Leave ``weights`` out to keep the stored weights of the Evaluators that stay (those of removed
+    Evaluators are dropped); send an empty list to clear them all, which removes the Composite.
+
+    ``weights`` say how much each Metric counts toward the group's Composite, as
+    ``{evaluator_id, metric_key, weight}`` entries. ``weight`` is a number above 0 and relative: weights
+    are divided by their sum, so 2, 1, 1 count as 50%, 25%, 25%. Each Evaluator must be in the group,
+    each ``metric_key`` must be one its newest version declares with a Normalized mean (a Score
+    with both ``range`` and ``better``, or a Label with a ``scale``), and no pair may repeat; otherwise
+    hub-api rejects the request. Without weights a group has no Composite. A stored weight with
+    ``usable`` false and an ``unusable_reason`` means a newer Evaluator version dropped the Metric or
+    its normalization: it is kept but no longer counts in new runs.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param metric_group_id: The Metric Group's id.
+    :param name: The name to keep or change to.
+    :param evaluator_ids: Every Evaluator the group keeps, in order (at least one).
+    :param weights: Replaces the stored weights; None keeps them, [] clears them.
+    :returns: The Metric Group, or an error message.
+    """
+    raise NotImplementedError
+
+
+async def delete_metric_group(*, client: AsyncClientProtocol, workspace: str, metric_group_id: str) -> str:
+    """Deletes a Metric Group together with all its scoring runs. This cannot be undone: get a yes first.
+
+    The Evaluators themselves stay. hub-api refuses with a message while an optimization goal judges
+    with the group; change the goal first.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param metric_group_id: The Metric Group's id.
+    :returns: A confirmation, or an error message.
+    """
+    raise NotImplementedError

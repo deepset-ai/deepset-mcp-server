@@ -10,15 +10,18 @@ from uuid import UUID
 import pytest
 
 from deepset_mcp.api.evaluation.models import (
+    CombinedEvaluatorTemplates,
     Dataset,
     DatasetSummary,
     Evaluator,
+    EvaluatorTemplate,
     EvaluatorVersion,
     Experiment,
     ExperimentResults,
     ExperimentRun,
     ExperimentRunGrid,
     MetricGroup,
+    MetricWeight,
     NewTestCase,
     SessionList,
     TestCase,
@@ -751,3 +754,151 @@ async def test_dataset_methods_surface_a_not_found_from_the_api() -> None:
 
     with pytest.raises(ResourceNotFoundError):
         await resource(client).get_dataset(DATASET_ID)
+
+
+def template_dict() -> dict[str, Any]:
+    return {
+        "key": "tool_calls",
+        "name": "Tool calls",
+        "category": "Agent efficiency",
+        "description": "Counts tool calls.",
+        "python_code": "def evaluate(): ...",
+        "metrics": {"calls": {"shape": "score", "grain": "session"}},
+        "judge_model": None,
+        "expected_columns": [],
+        "combinable_as_code": True,
+    }
+
+
+@pytest.mark.asyncio
+async def test_create_evaluator_posts_name_and_code_only_by_default() -> None:
+    client = FakeEvaluationClient({EVALUATORS: evaluator_dict()})
+
+    evaluator = await resource(client).create_evaluator("Answered", "def evaluate(): ...")
+
+    assert isinstance(evaluator, Evaluator)
+    assert evaluator.evaluator_id == EVALUATOR_ID
+    [request] = client.requests
+    assert request["method"] == "POST"
+    assert request["endpoint"] == EVALUATORS
+    assert request["data"] == {"name": "Answered", "python_code": "def evaluate(): ..."}
+
+
+@pytest.mark.asyncio
+async def test_create_evaluator_posts_the_metric_groups_it_joins() -> None:
+    client = FakeEvaluationClient({EVALUATORS: evaluator_dict()})
+
+    await resource(client).create_evaluator(
+        "Answered", "code", metric_group_ids=[METRIC_GROUP_ID], new_metric_group_name="Fresh"
+    )
+
+    assert client.requests[0]["data"] == {
+        "name": "Answered",
+        "python_code": "code",
+        "metric_group_ids": [METRIC_GROUP_ID],
+        "new_metric_group_name": "Fresh",
+    }
+
+
+@pytest.mark.asyncio
+async def test_update_evaluator_puts_only_the_fields_given() -> None:
+    client = FakeEvaluationClient({f"{EVALUATORS}/{EVALUATOR_ID}": evaluator_dict()})
+
+    await resource(client).update_evaluator(EVALUATOR_ID, python_code="new")
+    await resource(client).update_evaluator(EVALUATOR_ID, name="Renamed")
+
+    assert [(r["method"], r["endpoint"], r["data"]) for r in client.requests] == [
+        ("PUT", f"{EVALUATORS}/{EVALUATOR_ID}", {"python_code": "new"}),
+        ("PUT", f"{EVALUATORS}/{EVALUATOR_ID}", {"name": "Renamed"}),
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("archived", "action"), [(True, "archive"), (False, "unarchive")])
+async def test_set_evaluator_archived_posts_to_archive_or_unarchive(archived: bool, action: str) -> None:
+    endpoint = f"{EVALUATORS}/{EVALUATOR_ID}/{action}"
+    client = FakeEvaluationClient({endpoint: {**evaluator_dict(), "archived_at": "2026-10-02T00:00:00Z"}})
+
+    evaluator = await resource(client).set_evaluator_archived(EVALUATOR_ID, archived)
+
+    assert evaluator.archived_at == "2026-10-02T00:00:00Z"
+    [request] = client.requests
+    assert (request["method"], request["endpoint"]) == ("POST", endpoint)
+
+
+@pytest.mark.asyncio
+async def test_list_evaluator_templates_gets_the_templates() -> None:
+    client = FakeEvaluationClient({f"{EVALUATION}/evaluator-templates": [template_dict()]})
+
+    templates = await resource(client).list_evaluator_templates()
+
+    assert isinstance(templates[0], EvaluatorTemplate)
+    assert templates[0].combinable_as_code is True
+    assert templates[0].metrics["calls"].grain == "session"
+    assert client.requests[0]["method"] == "GET"
+
+
+@pytest.mark.asyncio
+async def test_combine_evaluator_templates_posts_keys_and_title() -> None:
+    endpoint = f"{EVALUATION}/evaluator-templates/combine"
+    client = FakeEvaluationClient({endpoint: {"python_code": "merged", "metrics": {"a": {"grain": "session"}}}})
+
+    combined = await resource(client).combine_evaluator_templates(["tool_calls", "steps"], "Efficiency")
+
+    assert isinstance(combined, CombinedEvaluatorTemplates)
+    assert combined.python_code == "merged"
+    [request] = client.requests
+    assert (request["method"], request["endpoint"]) == ("POST", endpoint)
+    assert request["data"] == {"template_keys": ["tool_calls", "steps"], "title": "Efficiency"}
+
+
+@pytest.mark.asyncio
+async def test_create_metric_group_posts_evaluators_and_weights() -> None:
+    client = FakeEvaluationClient({METRIC_GROUPS: metric_group_dict()})
+
+    group = await resource(client).create_metric_group(
+        "Weekly", [EVALUATOR_ID], [MetricWeight(evaluator_id=EVALUATOR_ID, metric_key="answered", weight=2)]
+    )
+
+    assert isinstance(group, MetricGroup)
+    [request] = client.requests
+    assert (request["method"], request["endpoint"]) == ("POST", METRIC_GROUPS)
+    assert request["data"] == {
+        "name": "Weekly",
+        "evaluator_ids": [EVALUATOR_ID],
+        "weights": [{"evaluator_id": EVALUATOR_ID, "metric_key": "answered", "weight": 2}],
+    }
+
+
+@pytest.mark.asyncio
+async def test_create_metric_group_without_weights_omits_the_field() -> None:
+    client = FakeEvaluationClient({METRIC_GROUPS: metric_group_dict()})
+
+    await resource(client).create_metric_group("Weekly", [EVALUATOR_ID])
+
+    assert client.requests[0]["data"] == {"name": "Weekly", "evaluator_ids": [EVALUATOR_ID]}
+
+
+@pytest.mark.asyncio
+async def test_update_metric_group_puts_weights_only_when_given() -> None:
+    endpoint = f"{METRIC_GROUPS}/{METRIC_GROUP_ID}"
+    client = FakeEvaluationClient({endpoint: metric_group_dict()})
+
+    await resource(client).update_metric_group(METRIC_GROUP_ID, "Weekly", [EVALUATOR_ID])
+    await resource(client).update_metric_group(METRIC_GROUP_ID, "Weekly", [EVALUATOR_ID], weights=[])
+
+    assert [(r["method"], r["endpoint"], r["data"]) for r in client.requests] == [
+        ("PUT", endpoint, {"name": "Weekly", "evaluator_ids": [EVALUATOR_ID]}),
+        ("PUT", endpoint, {"name": "Weekly", "evaluator_ids": [EVALUATOR_ID], "weights": []}),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_delete_metric_group_calls_delete_on_the_group() -> None:
+    endpoint = f"{METRIC_GROUPS}/{METRIC_GROUP_ID}"
+    client = FakeEvaluationClient({endpoint: None})
+
+    await resource(client).delete_metric_group(METRIC_GROUP_ID)
+
+    [request] = client.requests
+    assert (request["method"], request["endpoint"]) == ("DELETE", endpoint)
