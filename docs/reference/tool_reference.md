@@ -113,7 +113,7 @@ draft/version history. Each deployment tracks its own history of served pipeline
 
 | MCP tool name | Workspace | Memory | Description |
 | --- | --- | --- | --- |
-| `list_evaluators` | required | explorable | List the workspace's Evaluators with the Metrics each declares. |
+| `list_evaluators` | required | explorable | List the workspace's Evaluators with the Metrics each declares, optionally only archived or only active ones. |
 | `get_evaluator` | required | explorable | Fetch one Evaluator with its versions, or one version with its Python source. |
 | `list_metric_groups` | required | explorable | List the workspace's Metric Groups, optionally with each one's most recent scoring run on a pipeline. |
 | `list_experiments` | required | explorable | List the workspace's Experiments (a candidate version against a baseline on a Dataset), optionally only those on one pipeline. |
@@ -124,7 +124,7 @@ draft/version history. Each deployment tracks its own history of served pipeline
 | `rescore_experiment` | required | none | Score both sides again with the Metric Group as it is now (bills every evaluation again). |
 | `delete_experiment` | required | none | Delete an Experiment (destructive); its Sessions and scoring runs are kept. |
 | `get_experiment_results` | required | explorable | Read an Experiment's results: each Metric and duration, tokens and cost, candidate against baseline, then per test case. |
-| `get_experiment_run` | required | explorable | Read one scoring run: cell counts, a summary per Metric, and the grid rows. |
+| `get_experiment_run` | required | explorable | Read one scoring run: cell counts, a summary per Metric, the whole-run aggregate, usage and cost, and the grid rows, optionally filtered by origin, Service, version or Session. |
 | `list_experiment_runs` | required | explorable | List a Metric Group's scoring runs on a pipeline, or every run that judged one Session. |
 | `start_experiment_run` | required | none | Score named Sessions or a time window with a Metric Group, outside an Experiment (`preview` a window first: judged Evaluators cost money). |
 | `run_evaluator` | required | none | Run one saved Evaluator version on one Session and keep the Evaluation Run (judged Evaluators cost money). |
