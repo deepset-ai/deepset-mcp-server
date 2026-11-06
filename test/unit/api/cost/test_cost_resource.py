@@ -505,3 +505,14 @@ async def test_forbidden_workspace_read_is_not_an_organization_error() -> None:
         await resource(client).totals()
 
     assert not isinstance(exc_info.value, OrganizationCostForbiddenError)
+
+
+@pytest.mark.asyncio
+async def test_models_filter_is_sent_as_repeated_param() -> None:
+    client = FakeCostClient({f"{STATS}/breakdown": {"group_by": "user", "data": [], "total": 0, "has_more": False}})
+
+    await resource(client).breakdown(group_by="user", models=["gpt-5", "claude-sonnet-4-5"])
+
+    params = client.stats_request()["params"]
+    assert params["model"] == ["gpt-5", "claude-sonnet-4-5"]
+    assert params["group_by"] == "user"

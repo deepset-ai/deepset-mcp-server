@@ -171,6 +171,7 @@ class CostResource(CostResourceProtocol):
         params: dict[str, Any],
         services: list[str] | None,
         providers: list[str] | None,
+        models: list[str] | None,
         api_keys: list[str] | None,
     ) -> Any:
         lookups: list[Coroutine[Any, Any, Any]] = [ids.organization_id(self._client)]
@@ -189,6 +190,7 @@ class CostResource(CostResourceProtocol):
         if services:
             params["deployment_id"] = resolved.pop(0)
         params["provider"] = providers or None
+        params["model"] = models or None
         params["api_token_id"] = api_keys or None
         resp = await self._client.request(
             endpoint=f"v2/cost/organizations/{organization_id}/stats/{stat}",
@@ -211,6 +213,7 @@ class CostResource(CostResourceProtocol):
         end_date: str | None = None,
         services: list[str] | None = None,
         providers: list[str] | None = None,
+        models: list[str] | None = None,
         api_keys: list[str] | None = None,
     ) -> CostTotals:
         """Read the workspace's LLM cost totals.
@@ -220,11 +223,18 @@ class CostResource(CostResourceProtocol):
         :param end_date: Exclusive ISO timestamp. Defaults to no upper bound.
         :param services: Restrict to these Services, by name or ID.
         :param providers: Restrict to these providers, by the provider IDs the breakdown returns.
+        :param models: Restrict to these models, by the exact names the breakdown returns.
         :param api_keys: Restrict to these API keys, by key ID (never the secret token).
         :returns: The totals.
         """
         data = await self._get(
-            "totals", pipeline_name, {"start_date": start_date, "end_date": end_date}, services, providers, api_keys
+            "totals",
+            pipeline_name,
+            {"start_date": start_date, "end_date": end_date},
+            services,
+            providers,
+            models,
+            api_keys,
         )
         return CostTotals.model_validate(data)
 
@@ -235,6 +245,7 @@ class CostResource(CostResourceProtocol):
         end_date: str | None = None,
         services: list[str] | None = None,
         providers: list[str] | None = None,
+        models: list[str] | None = None,
         api_keys: list[str] | None = None,
     ) -> CostOverTime:
         """Read the workspace's LLM cost per UTC day.
@@ -244,6 +255,7 @@ class CostResource(CostResourceProtocol):
         :param end_date: Exclusive ISO timestamp. Defaults to no upper bound.
         :param services: Restrict to these Services, by name or ID.
         :param providers: Restrict to these providers, by the provider IDs the breakdown returns.
+        :param models: Restrict to these models, by the exact names the breakdown returns.
         :param api_keys: Restrict to these API keys, by key ID (never the secret token).
         :returns: One point per day with usage.
         """
@@ -253,6 +265,7 @@ class CostResource(CostResourceProtocol):
             {"start_date": start_date, "end_date": end_date},
             services,
             providers,
+            models,
             api_keys,
         )
         return CostOverTime.model_validate(data)
@@ -269,6 +282,7 @@ class CostResource(CostResourceProtocol):
         page_number: int = 1,
         services: list[str] | None = None,
         providers: list[str] | None = None,
+        models: list[str] | None = None,
         api_keys: list[str] | None = None,
     ) -> CostBreakdown:
         """Read the workspace's LLM cost grouped by a dimension.
@@ -283,6 +297,7 @@ class CostResource(CostResourceProtocol):
         :param page_number: The page to read, starting at 1.
         :param services: Restrict to these Services, by name or ID.
         :param providers: Restrict to these providers, by the provider IDs the breakdown returns.
+        :param models: Restrict to these models, by the exact names the breakdown returns.
         :param api_keys: Restrict to these API keys, by key ID (never the secret token).
         :returns: One page of groups.
         """
@@ -296,5 +311,5 @@ class CostResource(CostResourceProtocol):
             "page_number": page_number,
         }
         return CostBreakdown.model_validate(
-            await self._get("breakdown", pipeline_name, params, services, providers, api_keys)
+            await self._get("breakdown", pipeline_name, params, services, providers, models, api_keys)
         )

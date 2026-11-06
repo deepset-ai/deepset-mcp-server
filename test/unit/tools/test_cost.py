@@ -63,6 +63,7 @@ class FakeCostResource(CostResourceProtocol):
         end_date: str | None = None,
         services: list[str] | None = None,
         providers: list[str] | None = None,
+        models: list[str] | None = None,
         api_keys: list[str] | None = None,
     ) -> CostTotals:
         self._record(
@@ -72,6 +73,7 @@ class FakeCostResource(CostResourceProtocol):
             end_date=end_date,
             services=services,
             providers=providers,
+            models=models,
             api_keys=api_keys,
         )
         return TOTALS
@@ -83,6 +85,7 @@ class FakeCostResource(CostResourceProtocol):
         end_date: str | None = None,
         services: list[str] | None = None,
         providers: list[str] | None = None,
+        models: list[str] | None = None,
         api_keys: list[str] | None = None,
     ) -> CostOverTime:
         self._record(
@@ -92,6 +95,7 @@ class FakeCostResource(CostResourceProtocol):
             end_date=end_date,
             services=services,
             providers=providers,
+            models=models,
             api_keys=api_keys,
         )
         return OVER_TIME
@@ -108,6 +112,7 @@ class FakeCostResource(CostResourceProtocol):
         page_number: int = 1,
         services: list[str] | None = None,
         providers: list[str] | None = None,
+        models: list[str] | None = None,
         api_keys: list[str] | None = None,
     ) -> CostBreakdown:
         self._record(
@@ -122,6 +127,7 @@ class FakeCostResource(CostResourceProtocol):
             page_number=page_number,
             services=services,
             providers=providers,
+            models=models,
             api_keys=api_keys,
         )
         return BREAKDOWN
@@ -157,6 +163,7 @@ async def test_get_cost_totals_passes_filters() -> None:
                 "end_date": None,
                 "services": None,
                 "providers": None,
+                "models": None,
                 "api_keys": None,
             },
         )
@@ -179,6 +186,7 @@ async def test_get_cost_over_time() -> None:
                 "end_date": "2026-10-01T00:00:00Z",
                 "services": None,
                 "providers": None,
+                "models": None,
                 "api_keys": None,
             },
         )
@@ -289,6 +297,7 @@ async def test_totals_passes_service_provider_and_api_key_filters() -> None:
         "end_date": None,
         "services": [SERVICE],
         "providers": ["openai"],
+        "models": None,
         "api_keys": [API_KEY_ID],
     }
 
@@ -395,3 +404,15 @@ async def test_pipeline_name_without_a_workspace_explains_what_to_do() -> None:
     assert isinstance(result, str)
     assert "pipeline_name needs a workspace" in result
     assert "group_by='pipeline'" in result
+
+
+@pytest.mark.asyncio
+async def test_models_filter_is_passed_by_every_tool() -> None:
+    client = FakeClient(FakeCostResource())
+
+    await get_cost_totals(client=client, workspace=WORKSPACE, models=["gpt-5"])
+    await get_cost_over_time(client=client, workspace=WORKSPACE, models=["gpt-5"])
+    await get_cost_breakdown(client=client, workspace=WORKSPACE, group_by="component", models=["gpt-5"])
+
+    assert [call["models"] for _, call in client.resource.calls] == [["gpt-5"]] * 3
+    assert client.resource.calls[2][1]["group_by"] == "component"
