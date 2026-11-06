@@ -17,6 +17,7 @@ class CostResourceProtocol(Protocol):
         end_date: str | None = None,
         services: list[str] | None = None,
         providers: list[str] | None = None,
+        models: list[str] | None = None,
         api_keys: list[str] | None = None,
     ) -> CostTotals:
         """Read the workspace's LLM cost totals."""
@@ -29,6 +30,7 @@ class CostResourceProtocol(Protocol):
         end_date: str | None = None,
         services: list[str] | None = None,
         providers: list[str] | None = None,
+        models: list[str] | None = None,
         api_keys: list[str] | None = None,
     ) -> CostOverTime:
         """Read the workspace's LLM cost per UTC day."""
@@ -46,6 +48,7 @@ class CostResourceProtocol(Protocol):
         page_number: int = 1,
         services: list[str] | None = None,
         providers: list[str] | None = None,
+        models: list[str] | None = None,
         api_keys: list[str] | None = None,
     ) -> CostBreakdown:
         """Read the workspace's LLM cost grouped by a dimension."""
