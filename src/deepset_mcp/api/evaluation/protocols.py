@@ -7,6 +7,7 @@ from typing import Any, Protocol
 from deepset_mcp.api.evaluation.models import (
     Dataset,
     DatasetSummary,
+    EvaluationGoal,
     EvaluationRun,
     Evaluator,
     EvaluatorTemplate,
@@ -48,6 +49,10 @@ class EvaluationResourceProtocol(Protocol):
 
     async def list_metric_groups(self, limit: int = 200) -> list[MetricGroup]:
         """List the workspace's Metric Groups."""
+        ...
+
+    async def list_evaluation_goals(self, pipeline_name: str) -> list[EvaluationGoal]:
+        """List the Evaluation Goals set on one pipeline, oldest first."""
         ...
 
     async def list_experiment_runs(

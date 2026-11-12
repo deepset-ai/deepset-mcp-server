@@ -11,6 +11,7 @@ from deepset_mcp.api import ids
 from deepset_mcp.api.evaluation.models import (
     Dataset,
     DatasetSummary,
+    EvaluationGoal,
     EvaluationRun,
     EvaluationTryResult,
     Evaluator,
@@ -151,6 +152,14 @@ class EvaluationResource(EvaluationResourceProtocol):
         """
         data = await self._get(await self._workspace_path("metric-groups"), {"limit": limit})
         return [MetricGroup.model_validate(item) for item in data or []]
+
+    async def list_evaluation_goals(self, pipeline_name: str) -> list[EvaluationGoal]:
+        """List the Evaluation Goals set on one pipeline, oldest first.
+
+        :param pipeline_name: Name of the pipeline.
+        :returns: The Evaluation Goals.
+        """
+        raise NotImplementedError
 
     async def list_experiment_runs(
         self, pipeline_name: str, metric_group_id: str, limit: int = 50

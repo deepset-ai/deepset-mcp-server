@@ -10,6 +10,7 @@ from deepset_mcp.api.evaluation.models import (
     Composite,
     Dataset,
     DatasetSummary,
+    EvaluationGoal,
     EvaluationRun,
     EvaluationTryResult,
     Evaluator,
@@ -64,6 +65,7 @@ from deepset_mcp.tools.evaluation import (
     get_experiment_run,
     get_session_replay,
     list_datasets,
+    list_evaluation_goals,
     list_evaluation_runs,
     list_evaluator_templates,
     list_evaluators,
@@ -370,6 +372,21 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
                 (METRIC_GROUP_ID, "Weekly"),
                 ("00000000-0000-0000-0000-00000000000e", "Fresh"),
             ]
+        ]
+
+    async def list_evaluation_goals(self, pipeline_name: str) -> list[EvaluationGoal]:
+        self._record("list_evaluation_goals", pipeline_name=pipeline_name)
+        return [
+            EvaluationGoal(
+                evaluation_goal_id="00000000-0000-0000-0000-0000000000a1",
+                pipeline_id=PIPELINE_ID,
+                name="Answers are faithful",
+                evaluator_id=E1,
+                metric_key="faithfulness",
+                threshold=0.8,
+                min_pass_rate=0.9,
+                created_at="2026-10-01T00:00:00Z",
+            )
         ]
 
     async def list_experiment_runs(
@@ -793,6 +810,39 @@ async def test_list_metric_groups_reads_no_runs_without_a_pipeline() -> None:
     assert isinstance(groups, list)
     assert [g.last_run for g in groups] == [None, None]
     assert [c[0] for c in resource.calls] == ["list_metric_groups"]
+
+
+@pytest.mark.asyncio
+async def test_list_evaluation_goals_returns_the_pipelines_goals() -> None:
+    resource = FakeEvaluationResource()
+
+    goals = await list_evaluation_goals(client=FakeClient(resource), workspace=WORKSPACE, pipeline_name=PIPELINE)
+
+    assert isinstance(goals, list)
+    assert [(g.name, g.metric_key, g.threshold, g.min_pass_rate) for g in goals] == [
+        ("Answers are faithful", "faithfulness", 0.8, 0.9)
+    ]
+    assert resource.calls == [("list_evaluation_goals", {"pipeline_name": PIPELINE})]
+
+
+@pytest.mark.asyncio
+async def test_list_evaluation_goals_says_when_the_pipeline_is_missing() -> None:
+    client = FakeClient(FakeEvaluationResource(error=ResourceNotFoundError()))
+
+    result = await list_evaluation_goals(client=client, workspace=WORKSPACE, pipeline_name=PIPELINE)
+
+    assert result == f"There is no pipeline named '{PIPELINE}' in workspace '{WORKSPACE}' (not found)."
+
+
+@pytest.mark.asyncio
+async def test_list_evaluation_goals_reports_an_api_error() -> None:
+    client = FakeClient(FakeEvaluationResource(error=UnexpectedAPIError(status_code=500, message="boom")))
+
+    result = await list_evaluation_goals(client=client, workspace=WORKSPACE, pipeline_name=PIPELINE)
+
+    assert isinstance(result, str)
+    assert result.startswith(f"Failed to list evaluation goals for pipeline '{PIPELINE}' in workspace '{WORKSPACE}'")
+    assert "boom" in result
 
 
 @pytest.mark.asyncio
