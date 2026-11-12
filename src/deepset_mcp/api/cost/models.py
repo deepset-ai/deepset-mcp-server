@@ -8,7 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-CostGroupBy = Literal["model", "workspace", "pipeline", "deployment", "api_key", "provider"]
+CostGroupBy = Literal["model", "workspace", "pipeline", "deployment", "api_key", "provider", "component", "user"]
 CostSortBy = Literal["label", "cost_total", "total_tokens", "total_requests"]
 
 
@@ -59,7 +59,9 @@ class CostBreakdownEntry(BaseModel):
     """The cost of one group in a breakdown."""
 
     key: str = Field(
-        description="Model or provider name, or the UUID of the workspace, pipeline, deployment or API key"
+        description=(
+            "Model, provider or component name, or the UUID of the workspace, pipeline, deployment, API key or user"
+        )
     )
     label: str = Field(description="Readable name; equals key when the object was deleted")
     cost_total: float | None = Field(description="Null when nothing in this group was priced")

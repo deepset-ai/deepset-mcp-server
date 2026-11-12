@@ -92,6 +92,7 @@ async def get_cost_totals(
     end_date: str | None = None,
     services: list[str] | None = None,
     providers: list[str] | None = None,
+    models: list[str] | None = None,
     api_keys: list[str] | None = None,
 ) -> CostTotals | str:
     """Reads the total LLM cost, tokens and requests of the workspace, or of one pipeline, over a date range.
@@ -105,8 +106,8 @@ async def get_cost_totals(
     organization view ``pipeline_name`` and Service names can't be used (they belong to a workspace); pass
     Service ids instead.
 
-    Narrow the figures with ``services``, ``providers`` and ``api_keys``. They combine: usage must match every
-    kind you set, and any one value within a list.
+    Narrow the figures with ``services``, ``providers``, ``models`` and ``api_keys``. They combine: usage must
+    match every kind you set, and any one value within a list.
 
     Check ``is_cost_complete`` before reporting ``total_cost``. When it is false, ``total_cost`` is a lower
     bound, not the final figure: say so, and name the models in ``unpriced_models`` (LLM calls with no price
@@ -127,6 +128,8 @@ async def get_cost_totals(
         well as Costs read; an id needs only Costs read.
     :param providers: Restrict to these providers. Use the provider ids from ``get_cost_breakdown`` with
         ``group_by='provider'``, such as ``bedrock_converse`` or ``openai``, not their display names.
+    :param models: Restrict to these models. Use the model names from ``get_cost_breakdown`` with
+        ``group_by='model'``, exactly as returned.
     :param api_keys: Restrict to these API keys. Use the key ids from ``get_cost_breakdown`` with
         ``group_by='api_key'``, never a key's secret token.
     :returns: The cost totals, or an error message.
@@ -138,6 +141,7 @@ async def get_cost_totals(
             end_date=end_date,
             services=services,
             providers=providers,
+            models=models,
             api_keys=api_keys,
         )
     except (ResourceNotFoundError, BadRequestError, UnexpectedAPIError, RequestTimeoutError) as e:
@@ -153,6 +157,7 @@ async def get_cost_over_time(
     end_date: str | None = None,
     services: list[str] | None = None,
     providers: list[str] | None = None,
+    models: list[str] | None = None,
     api_keys: list[str] | None = None,
 ) -> CostOverTime | str:
     """Reads the LLM cost of the workspace, or of one pipeline, per UTC day.
@@ -169,8 +174,8 @@ async def get_cost_over_time(
     organization view ``pipeline_name`` and Service names can't be used (they belong to a workspace); pass
     Service ids instead.
 
-    Narrow the figures with ``services``, ``providers`` and ``api_keys``. They combine: usage must match every
-    kind you set, and any one value within a list.
+    Narrow the figures with ``services``, ``providers``, ``models`` and ``api_keys``. They combine: usage must
+    match every kind you set, and any one value within a list.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name. Omit for the whole organization, which needs the organization admin role;
@@ -185,6 +190,8 @@ async def get_cost_over_time(
         well as Costs read; an id needs only Costs read.
     :param providers: Restrict to these providers. Use the provider ids from ``get_cost_breakdown`` with
         ``group_by='provider'``, such as ``bedrock_converse`` or ``openai``, not their display names.
+    :param models: Restrict to these models. Use the model names from ``get_cost_breakdown`` with
+        ``group_by='model'``, exactly as returned.
     :param api_keys: Restrict to these API keys. Use the key ids from ``get_cost_breakdown`` with
         ``group_by='api_key'``, never a key's secret token.
     :returns: The daily cost, or an error message.
@@ -196,6 +203,7 @@ async def get_cost_over_time(
             end_date=end_date,
             services=services,
             providers=providers,
+            models=models,
             api_keys=api_keys,
         )
     except (ResourceNotFoundError, BadRequestError, UnexpectedAPIError, RequestTimeoutError) as e:
@@ -216,13 +224,15 @@ async def get_cost_breakdown(
     page_number: int = 1,
     services: list[str] | None = None,
     providers: list[str] | None = None,
+    models: list[str] | None = None,
     api_keys: list[str] | None = None,
 ) -> CostBreakdown | str:
-    """Reads the LLM cost of the workspace, or of one pipeline, grouped by model, pipeline, Service or API key.
+    """Reads the LLM cost of the workspace, or of one pipeline, grouped by a dimension such as model or pipeline.
 
-    Use this to find what drove the cost: which models, pipelines, Services or API keys spent the most.
+    Use this to find what drove the cost: which models, pipelines, Services, API keys, components or users
+    spent the most.
     Costs are in USD. Results are sorted by cost, highest first, unless you set ``sort_by`` and ``sort_order``.
-    Each entry has a ``key`` (a model or provider name, or a UUID for the other dimensions) and a readable
+    Each entry has a ``key`` (a model, provider or component name, or a UUID for the other dimensions) and a readable
     ``label``. A deleted pipeline still shows up with ``group_by='pipeline'``, labelled with its UUID.
     ``total`` is the number of groups across all pages; when ``has_more`` is true, read the next
     ``page_number``. ``total_requests`` counts queries, not individual LLM calls. A ``cost_total`` of null
@@ -238,14 +248,15 @@ async def get_cost_breakdown(
     organization view ``pipeline_name`` and Service names can't be used (they belong to a workspace); pass
     Service ids instead.
 
-    Narrow the breakdown with ``services``, ``providers`` and ``api_keys``, for example the models of one
+    Narrow the breakdown with ``services``, ``providers``, ``models`` and ``api_keys``, for example the models of one
     Service. They combine: usage must match every kind you set, and any one value within a list.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name. Omit for the whole organization, which needs the organization admin role;
         then ``pipeline_name`` and Service names can't be used, only Service ids.
-    :param group_by: The dimension to group by: model, workspace, pipeline, deployment (a Service), api_key or
-        provider.
+    :param group_by: The dimension to group by: model, workspace, pipeline, deployment (a Service), api_key,
+        provider, component (the pipeline component that made the LLM call) or user (labelled with the user's
+        name or email).
     :param pipeline_name: Restrict to this pipeline. Omit for the whole workspace. Needs Pipelines read as well as
         Costs read.
     :param start_date: Inclusive start as an ISO timestamp. Defaults to 30 days before ``end_date``.
@@ -260,6 +271,8 @@ async def get_cost_breakdown(
         well as Costs read; an id needs only Costs read.
     :param providers: Restrict to these providers. Use the provider ids from ``get_cost_breakdown`` with
         ``group_by='provider'``, such as ``bedrock_converse`` or ``openai``, not their display names.
+    :param models: Restrict to these models. Use the model names from ``get_cost_breakdown`` with
+        ``group_by='model'``, exactly as returned.
     :param api_keys: Restrict to these API keys. Use the key ids from ``get_cost_breakdown`` with
         ``group_by='api_key'``, never a key's secret token.
     :returns: One page of the breakdown, or an error message.
@@ -276,6 +289,7 @@ async def get_cost_breakdown(
             page_number=page_number,
             services=services,
             providers=providers,
+            models=models,
             api_keys=api_keys,
         )
     except (ResourceNotFoundError, BadRequestError, UnexpectedAPIError, RequestTimeoutError) as e:
