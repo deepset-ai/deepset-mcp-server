@@ -72,7 +72,7 @@ from .haystack_service import (
     search_component_definition,
 )
 from .indexes import create_index, deploy_index, get_index, list_indexes, update_index, validate_index
-from .model import get_models
+from .model import compare_models, get_models
 from .object_store import (
     create_get_from_object_store,
     create_get_slice_from_object_store,
@@ -145,6 +145,7 @@ __all__ = [
     "get_deployment_metrics",
     "get_deployment_stats",
     "get_models",
+    "compare_models",
     "create_get_from_object_store",
     "create_get_slice_from_object_store",
     "create_grep_object_store",
