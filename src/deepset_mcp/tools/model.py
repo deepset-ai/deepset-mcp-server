@@ -5,7 +5,7 @@
 """Tools for interacting with models."""
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.model.models import ModelList, ModelProvider
+from deepset_mcp.api.model.models import ModelCategory, ModelList, ModelProvider
 from deepset_mcp.api.protocols import AsyncClientProtocol
 
 
@@ -19,6 +19,7 @@ async def get_models(
     provider: ModelProvider | str | None = None,
     model: str | None = None,
     include_price: bool = False,
+    category: ModelCategory | None = None,
 ) -> ModelList | str:
     """Lists the models including their configuration options available for use in a workspace's pipelines and indexes.
 
@@ -26,6 +27,14 @@ async def get_models(
     at the workspace or organization level. Use this tool to discover which model names and
     providers can be used, which configuration options are available, and which default
     configuration is offered when configuring chat generators.
+
+    Without `category`, only LLMs are listed. To find the embedders and rerankers deepset hosts, pass
+    `category="EMBEDDER"` or `category="RANKER"`. Each of these models carries `components`: the ready-to-use
+    pipeline components by role (`document_embedder` for the indexing pipeline, `text_embedder` and `ranker` for
+    the query pipeline), plus `details` to compare them on (embedding dimension, max input tokens, languages,
+    MTEB retrieval score). Use the same embedder in the indexing and the query pipeline: switching an embedder
+    means re-indexing the documents. Don't pick a model with `stage` LEGACY for a new pipeline; EXPERIMENTAL
+    models are still being tried out.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
@@ -42,6 +51,7 @@ async def get_models(
         (input, output and cache prices), with the workspace's and organization's custom prices applied.
         Requires read access to costs. Models without a known price have no `price`, e.g. Azure models that
         are only identified by their deployment name. Defaults to False.
+    :param category: The kind of model to list: 'LLM', 'EMBEDDER' or 'RANKER'. Defaults to LLMs only.
     :returns: A page of models including their configuration options or an error message.
     """
     try:
@@ -52,6 +62,7 @@ async def get_models(
             provider=provider,
             model=model,
             include_price=include_price,
+            category=category,
         )
     except ResourceNotFoundError:
         return f"There is no workspace named '{workspace}'. Did you mean to configure it?"

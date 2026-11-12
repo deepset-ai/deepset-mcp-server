@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.model.models import ModelList, ModelOrigin, ModelProvider
+from deepset_mcp.api.model.models import ModelCategory, ModelList, ModelOrigin, ModelProvider, ModelStage
 from deepset_mcp.api.model.resource import ModelResource
 from deepset_mcp.api.transport import TransportResponse
 from deepset_mcp.api.workspace.models import Workspace
@@ -375,3 +375,91 @@ async def test_list_models_include_price_is_sent_when_filtering_locally() -> Non
     await ModelResource(client=fake_client, workspace="my-workspace").list(provider="openai", include_price=True)
 
     assert all(request["params"]["include_price"] is True for request in fake_client.requests)
+
+
+def _hosted_embedder_data() -> dict[str, Any]:
+    init_parameters = {"model": "intfloat/multilingual-e5-base"}
+    return {
+        "model_id": str(uuid.uuid4()),
+        "name": "intfloat/multilingual-e5-base",
+        "provider": "deepset",
+        "connected": True,
+        "origin": ModelOrigin.PLATFORM.value,
+        "chat_generator_config": {},
+        "generation_kwargs": {},
+        "category": "EMBEDDER",
+        "components": {
+            "text_embedder": {"type": "DeepsetNvidiaTextEmbedder", "init_parameters": init_parameters},
+            "document_embedder": {"type": "DeepsetNvidiaDocumentEmbedder", "init_parameters": init_parameters},
+        },
+        "stage": "EXPERIMENTAL",
+        "details": {
+            "embedding_dimension": 768,
+            "max_input_tokens": 512,
+            "modalities": ["text"],
+            "languages": ["multilingual"],
+            "mteb_score": 52.72,
+            "mteb_url": "https://huggingface.co/spaces/mteb/leaderboard",
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_list_models_sends_category_only_when_given() -> None:
+    """Test that category is sent as a query param when given, and left out otherwise (LLMs only)."""
+    mock_data = {"data": [], "has_more": False, "total": 0}
+    fake_client = FakeModelClient(responses={f"v2/workspaces/{WORKSPACE_ID}/models": mock_data})
+    resource = ModelResource(client=fake_client, workspace="my-workspace")
+
+    await resource.list()
+    await resource.list(category=ModelCategory.RANKER)
+
+    assert "category" not in fake_client.requests[0]["params"]
+    assert fake_client.requests[1]["params"]["category"] == "RANKER"
+
+
+@pytest.mark.asyncio
+async def test_list_models_category_is_sent_when_filtering_locally() -> None:
+    """Test that category is also sent on every page fetched for local provider/model filtering."""
+    mock_data = {"data": [_hosted_embedder_data()], "has_more": False, "total": 1}
+    fake_client = FakeModelClient(responses={f"v2/workspaces/{WORKSPACE_ID}/models": mock_data})
+
+    result = await ModelResource(client=fake_client, workspace="my-workspace").list(
+        provider="deepset", model="e5", category=ModelCategory.EMBEDDER
+    )
+
+    assert all(request["params"]["category"] == "EMBEDDER" for request in fake_client.requests)
+    assert [model.name for model in result.data] == ["intfloat/multilingual-e5-base"]
+
+
+@pytest.mark.asyncio
+async def test_list_models_parses_a_hosted_embedder() -> None:
+    """Test that category, components, stage and details are parsed, and model comes from the components."""
+    mock_data = {"data": [_hosted_embedder_data()], "has_more": False, "total": 1}
+    fake_client = FakeModelClient(responses={f"v2/workspaces/{WORKSPACE_ID}/models": mock_data})
+
+    result = await ModelResource(client=fake_client, workspace="my-workspace").list(category=ModelCategory.EMBEDDER)
+
+    embedder = result.data[0]
+    assert embedder.category == ModelCategory.EMBEDDER
+    assert embedder.stage == ModelStage.EXPERIMENTAL
+    assert embedder.model == "intfloat/multilingual-e5-base"
+    assert embedder.components is not None
+    assert embedder.components["document_embedder"].type == "DeepsetNvidiaDocumentEmbedder"
+    assert embedder.components["text_embedder"].init_parameters == {"model": "intfloat/multilingual-e5-base"}
+    assert embedder.details is not None
+    assert embedder.details.languages == ["multilingual"]
+    assert embedder.details.mteb_score == 52.72
+    assert embedder.model_dump(mode="json")["details"]["embedding_dimension"] == 768
+
+
+@pytest.mark.asyncio
+async def test_list_models_llm_output_has_no_hosted_model_fields() -> None:
+    """Test that an LLM's output carries none of the hosted-model fields, so it looks as before."""
+    mock_data = {"data": [_model_data()], "has_more": False, "total": 1}
+    fake_client = FakeModelClient(responses={f"v2/workspaces/{WORKSPACE_ID}/models": mock_data})
+
+    result = await ModelResource(client=fake_client, workspace="my-workspace").list()
+
+    dumped = result.data[0].model_dump(mode="json")
+    assert not {"category", "components", "stage", "details"} & dumped.keys()

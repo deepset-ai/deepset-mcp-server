@@ -9,7 +9,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
-from deepset_mcp.api.model.models import Model, ModelList, ModelProvider
+from deepset_mcp.api.model.models import Model, ModelCategory, ModelList, ModelProvider
 from deepset_mcp.api.model.protocols import ModelResourceProtocol
 from deepset_mcp.api.transport import raise_for_status
 
@@ -56,6 +56,7 @@ class ModelResource(ModelResourceProtocol):
         provider: ModelProvider | str | None = None,
         model: str | None = None,
         include_price: bool = False,
+        category: ModelCategory | None = None,
     ) -> ModelList:
         """List the models including their configuration options available for the configured workspace.
 
@@ -71,6 +72,8 @@ class ModelResource(ModelResourceProtocol):
             all models are fetched and filtered locally.
         :param include_price: If True, each model with a known price also carries its effective price,
             with workspace and organization custom prices applied. Requires read access to costs.
+        :param category: If set, list models of this kind: LLM, EMBEDDER or RANKER. Without it, the API lists
+            only LLMs.
         :returns: A page of models including their configuration options.
         """
         workspace = await self._client.workspaces().get(self._workspace)
@@ -82,10 +85,14 @@ class ModelResource(ModelResourceProtocol):
                 page_number=page_number,
                 connected=connected,
                 include_price=include_price,
+                category=category,
             )
 
         all_models = await self._fetch_all(
-            workspace_id=str(workspace.workspace_id), connected=connected, include_price=include_price
+            workspace_id=str(workspace.workspace_id),
+            connected=connected,
+            include_price=include_price,
+            category=category,
         )
         filtered = [m for m in all_models if _matches_filters(m, provider, model)]
 
@@ -94,7 +101,9 @@ class ModelResource(ModelResourceProtocol):
 
         return ModelList(data=filtered[start:end], has_more=end < len(filtered), total=len(filtered))
 
-    async def _fetch_all(self, workspace_id: str, connected: bool | None, include_price: bool) -> builtins.list[Model]:
+    async def _fetch_all(
+        self, workspace_id: str, connected: bool | None, include_price: bool, category: ModelCategory | None
+    ) -> builtins.list[Model]:
         """Fetch every model available for the workspace by paging through the API."""
         all_models: builtins.list[Model] = []
         page_number = 1
@@ -106,6 +115,7 @@ class ModelResource(ModelResourceProtocol):
                 page_number=page_number,
                 connected=connected,
                 include_price=include_price,
+                category=category,
             )
             all_models.extend(page.data)
             if not page.has_more:
@@ -121,7 +131,13 @@ class ModelResource(ModelResourceProtocol):
         return all_models
 
     async def _fetch_page(
-        self, workspace_id: str, limit: int, page_number: int, connected: bool | None, include_price: bool
+        self,
+        workspace_id: str,
+        limit: int,
+        page_number: int,
+        connected: bool | None,
+        include_price: bool,
+        category: ModelCategory | None,
     ) -> ModelList:
         """Fetch a single page of models directly from the API."""
         params: dict[str, Any] = {"limit": limit, "page_number": page_number}
@@ -129,6 +145,8 @@ class ModelResource(ModelResourceProtocol):
             params["connected"] = connected
         if include_price:
             params["include_price"] = True
+        if category is not None:
+            params["category"] = category.value
 
         resp = await self._client.request(
             endpoint=f"v2/workspaces/{workspace_id}/models",

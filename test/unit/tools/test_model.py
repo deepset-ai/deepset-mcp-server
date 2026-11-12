@@ -7,7 +7,7 @@ import uuid
 import pytest
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.model.models import Model, ModelList, ModelOrigin, ModelProvider
+from deepset_mcp.api.model.models import Model, ModelCategory, ModelList, ModelOrigin, ModelProvider
 from deepset_mcp.api.model.protocols import ModelResourceProtocol
 from deepset_mcp.tools.model import get_models
 from test.unit.conftest import BaseFakeClient
@@ -31,6 +31,7 @@ class FakeModelResource(ModelResourceProtocol):
         provider: ModelProvider | str | None = None,
         model: str | None = None,
         include_price: bool = False,
+        category: ModelCategory | None = None,
     ) -> ModelList:
         self.last_call_kwargs = {
             "limit": limit,
@@ -39,6 +40,7 @@ class FakeModelResource(ModelResourceProtocol):
             "provider": provider,
             "model": model,
             "include_price": include_price,
+            "category": category,
         }
         if self.list_exception:
             raise self.list_exception
@@ -96,6 +98,7 @@ async def test_get_models_forwards_params() -> None:
         provider="openai",
         model="gpt-4o",
         include_price=True,
+        category=ModelCategory.EMBEDDER,
     )
 
     assert fake_resource.last_call_kwargs == {
@@ -105,6 +108,7 @@ async def test_get_models_forwards_params() -> None:
         "provider": "openai",
         "model": "gpt-4o",
         "include_price": True,
+        "category": ModelCategory.EMBEDDER,
     }
 
 

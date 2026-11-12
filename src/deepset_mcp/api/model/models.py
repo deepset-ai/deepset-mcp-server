@@ -35,6 +35,47 @@ class ModelProvider(StrEnum):
     ANTHROPIC = "anthropic"
 
 
+class ModelCategory(StrEnum):
+    """What a model does. Without a category, the API lists only LLMs."""
+
+    LLM = "LLM"
+    EMBEDDER = "EMBEDDER"
+    RANKER = "RANKER"
+
+
+class ModelStage(StrEnum):
+    """How far a hosted model is from general use. A model without a stage is offered to everyone."""
+
+    EXPERIMENTAL = "EXPERIMENTAL"
+    LEGACY = "LEGACY"
+
+
+class ModelComponent(BaseModel):
+    """A pipeline component that runs the model, as it goes into a pipeline YAML."""
+
+    type: str
+    "The component type, as in a pipeline YAML"
+    init_parameters: dict[str, Any]
+    "The component's init parameters, as in a pipeline YAML"
+
+
+class ModelDetails(BaseModel):
+    """What users compare embedders and rerankers on. Every field is optional: a model may not have it."""
+
+    embedding_dimension: int | None = None
+    "The length of the vectors the embedder returns"
+    max_input_tokens: int | None = None
+    "The longest input the model reads, in tokens. Longer input is truncated."
+    modalities: list[str] | None = None
+    "The kinds of input the model accepts, e.g. 'text'"
+    languages: list[str] | None = None
+    "ISO 639-1 codes such as 'en', or 'multilingual' for a model trained on about 100 languages"
+    mteb_score: float | None = None
+    "Retrieval score on the MTEB leaderboard, benchmark MTEB(Multilingual, v2), as a percentage"
+    mteb_url: str | None = None
+    "The MTEB leaderboard view the score comes from"
+
+
 class ModelPrice(BaseModel):
     """The effective price of a model, in USD per 1,000 tokens, with custom prices applied."""
 
@@ -82,32 +123,48 @@ class Model(BaseModel):
     "Timestamp when the model was last updated, if it is a custom model"
     price: ModelPrice | None = None
     "The effective price of the model. Only set when prices were requested and the model has a known price."
+    category: ModelCategory | None = None
+    "EMBEDDER or RANKER for the models deepset hosts. Not set for LLMs."
+    components: dict[str, ModelComponent] | None = None
+    "The pipeline components that run the model, by role: `text_embedder` (query pipeline) and "
+    "`document_embedder` (indexing pipeline) for an embedder, `ranker` (query pipeline) for a ranker."
+    stage: ModelStage | None = None
+    "EXPERIMENTAL for a model still being tried out, LEGACY for one to move away from. Not set otherwise."
+    details: ModelDetails | None = None
+    "Properties to compare embedders and rerankers on. Only set when known."
 
     @model_serializer(mode="wrap")
-    def _omit_missing_price(self, handler: SerializerFunctionWrapHandler):  # type: ignore[no-untyped-def]
-        """Leave `price` out unless set, so output without prices looks as before.
+    def _omit_missing_optional_fields(self, handler: SerializerFunctionWrapHandler):  # type: ignore[no-untyped-def]
+        """Leave the optional fields out unless set, so an LLM's output looks as before.
 
         Deliberately unannotated: a return annotation would replace the model's serialization JSON schema.
         """
         data = handler(self)
-        if data.get("price") is None:
-            data.pop("price", None)
+        for key in ("price", "category", "components", "stage", "details"):
+            if data.get(key) is None:
+                data.pop(key, None)
         return data
 
     @model_validator(mode="before")
     @classmethod
     def _infer_model(cls, data: Any) -> Any:
-        """Populate `model` from chat_generator_config.init_parameters.model if not set explicitly."""
+        """Populate `model` if not set explicitly.
+
+        From chat_generator_config.init_parameters.model for an LLM, else from the first component's
+        init_parameters.model (an embedder or ranker has an empty chat_generator_config).
+        """
         if not isinstance(data, dict) or data.get("model") is not None:
             return data
 
-        chat_generator_config = data.get("chat_generator_config")
-        if not isinstance(chat_generator_config, dict):
-            return data
-
-        init_parameters = chat_generator_config.get("init_parameters")
-        if isinstance(init_parameters, dict) and isinstance(init_parameters.get("model"), str):
-            data["model"] = init_parameters["model"]
+        configs = [data.get("chat_generator_config")]
+        components = data.get("components")
+        if isinstance(components, dict):
+            configs.extend(components.values())
+        for config in configs:
+            init_parameters = config.get("init_parameters") if isinstance(config, dict) else None
+            if isinstance(init_parameters, dict) and isinstance(init_parameters.get("model"), str):
+                data["model"] = init_parameters["model"]
+                break
 
         return data
 
