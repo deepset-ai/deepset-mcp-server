@@ -158,7 +158,13 @@ async def list_evaluation_goals(
     :param pipeline_name: Name of the pipeline whose goals to list.
     :returns: The Evaluation Goals, or an error message.
     """
-    raise NotImplementedError
+    resource = client.evaluation(workspace=workspace)
+    try:
+        return await resource.list_evaluation_goals(pipeline_name)
+    except ResourceNotFoundError:
+        return f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}' (not found)."
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to list evaluation goals for pipeline '{pipeline_name}' in workspace '{workspace}': {e}"
 
 
 async def create_experiment(
