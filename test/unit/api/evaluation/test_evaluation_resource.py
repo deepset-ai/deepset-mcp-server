@@ -12,6 +12,7 @@ import pytest
 from deepset_mcp.api.evaluation.models import (
     Dataset,
     DatasetSummary,
+    EvaluationGoal,
     EvaluationRun,
     Evaluator,
     EvaluatorTemplate,
@@ -56,6 +57,7 @@ PIPELINE = f"{EVALUATION}/pipelines/{PIPELINE_UUID}"
 EVALUATORS = f"{EVALUATION}/evaluators"
 METRIC_GROUPS = f"{EVALUATION}/metric-groups"
 EXPERIMENTS = f"{EVALUATION}/experiments"
+EVALUATION_GOALS = f"{PIPELINE}/evaluation-goals"
 RUNS = f"{PIPELINE}/metric-groups/{METRIC_GROUP_ID}/scoring-runs"
 SESSIONS = f"{PIPELINE}/sessions"
 DATASETS = f"{EVALUATION}/datasets"
@@ -337,6 +339,49 @@ async def test_list_metric_groups_calls_the_workspace_route() -> None:
     assert groups[0].evaluator_ids == [EVALUATOR_ID]
     assert client.requests[0]["endpoint"] == METRIC_GROUPS
     assert client.pipeline_resource.calls == []
+
+
+@pytest.mark.asyncio
+async def test_list_evaluation_goals_calls_the_pipeline_route() -> None:
+    goals_json = [
+        {
+            "evaluation_goal_id": "88888888-8888-8888-8888-888888888888",
+            "pipeline_id": PIPELINE_UUID,
+            "name": "Answers are faithful",
+            "evaluator_id": EVALUATOR_ID,
+            "metric_key": "faithfulness",
+            "threshold": 0.8,
+            "passing_values": None,
+            "min_pass_rate": 0.9,
+            "created_at": "2026-10-01T00:00:00Z",
+            "updated_at": None,
+        },
+        {
+            "evaluation_goal_id": "99999999-9999-9999-9999-999999999999",
+            "pipeline_id": PIPELINE_UUID,
+            "name": "Tone is polite",
+            "description": "No rude answers",
+            "evaluator_id": EVALUATOR_ID,
+            "metric_key": "tone",
+            "threshold": None,
+            "passing_values": ["polite", "neutral"],
+            "min_pass_rate": 1,
+            "created_at": "2026-10-02T00:00:00Z",
+            "updated_at": "2026-10-03T00:00:00Z",
+        },
+    ]
+    client = FakeEvaluationClient({EVALUATION_GOALS: goals_json})
+
+    goals = await resource(client).list_evaluation_goals(PIPELINE_NAME)
+
+    assert all(isinstance(goal, EvaluationGoal) for goal in goals)
+    assert [(g.name, g.threshold, g.passing_values, g.min_pass_rate) for g in goals] == [
+        ("Answers are faithful", 0.8, None, 0.9),
+        ("Tone is polite", None, ["polite", "neutral"], 1.0),
+    ]
+    assert goals[0].description == ""
+    assert client.requests[0]["endpoint"] == EVALUATION_GOALS
+    assert client.pipeline_resource.calls == [PIPELINE_NAME]
 
 
 @pytest.mark.asyncio
