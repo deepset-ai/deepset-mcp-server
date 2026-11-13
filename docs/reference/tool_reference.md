@@ -116,6 +116,7 @@ draft/version history. Each deployment tracks its own history of served pipeline
 | `list_evaluators` | required | explorable | List the workspace's Evaluators with the Metrics each declares, optionally only archived or only active ones. |
 | `get_evaluator` | required | explorable | Fetch one Evaluator with its versions, or one version with its Python source. |
 | `list_metric_groups` | required | explorable | List the workspace's Metric Groups, optionally with each one's most recent scoring run on a pipeline. |
+| `list_evaluation_goals` | required | explorable | List the Evaluation Goals (pass/fail targets on a Metric) set on one pipeline, so existing goals are not suggested again. |
 | `list_experiments` | required | explorable | List the workspace's Experiments (a candidate version against a baseline on a Dataset), optionally only those on one pipeline. |
 | `create_experiment` | required | none | Create an Experiment: a candidate pipeline version against a Recorded or Pipeline-version baseline on a Dataset (`preview` first: it costs money). |
 | `get_experiment` | required | explorable | Read one Experiment: test cases, each side's replays, scoring counts and error. |

@@ -14,6 +14,7 @@ from typing import Any, Literal, TypeVar
 from deepset_mcp.api.evaluation.models import (
     Dataset,
     DatasetSummary,
+    EvaluationGoal,
     EvaluationRun,
     Evaluator,
     EvaluatorTemplate,
@@ -139,6 +140,31 @@ async def list_metric_groups(
         MetricGroupSummary(**group.model_dump(), last_run=runs[0] if runs else None)
         for group, runs in zip(groups, last_runs, strict=True)
     ]
+
+
+async def list_evaluation_goals(
+    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str
+) -> list[EvaluationGoal] | str:
+    """Lists the Evaluation Goals set on one pipeline, oldest first.
+
+    An Evaluation Goal is a pass/fail target on one pipeline, built on one Evaluator's Metric:
+    ``threshold`` is the value a Session must reach for a Score Metric, ``passing_values`` the labels
+    that count as passing for a Label Metric (exactly one of them is set), and ``min_pass_rate`` the
+    share of judged Sessions that must pass for the goal to be met. Call this before suggesting new
+    goals, so goals that already exist are not proposed again. The API has no paging.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline whose goals to list.
+    :returns: The Evaluation Goals, or an error message.
+    """
+    resource = client.evaluation(workspace=workspace)
+    try:
+        return await resource.list_evaluation_goals(pipeline_name)
+    except ResourceNotFoundError:
+        return f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}' (not found)."
+    except (BadRequestError, UnexpectedAPIError) as e:
+        return f"Failed to list evaluation goals for pipeline '{pipeline_name}' in workspace '{workspace}': {e}"
 
 
 async def create_experiment(

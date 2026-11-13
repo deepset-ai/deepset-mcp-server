@@ -343,6 +343,32 @@ class MetricGroup(BaseModel):
     updated_at: str | None = None
 
 
+class EvaluationGoal(BaseModel):
+    """A pass/fail target on one pipeline, built on one Evaluator's Metric."""
+
+    evaluation_goal_id: str
+    pipeline_id: str
+    name: str
+    description: str = ""
+    evaluator_id: str
+    metric_key: str = Field(description="The Metric of the Evaluator that the goal judges")
+    threshold: float | None = Field(
+        default=None, description="For a Score Metric: the value a Session must reach to pass. Null for a Label Metric."
+    )
+    passing_values: list[str] | None = Field(
+        default=None,
+        description="For a Label Metric: the labels that count as passing. Null for a Score Metric.",
+    )
+    min_pass_rate: float = Field(
+        default=1.0,
+        ge=0,
+        le=1,
+        description="Share (0 to 1) of the judged Sessions that must pass for the goal to be met",
+    )
+    created_at: str
+    updated_at: str | None = None
+
+
 class MetricGroupSummary(MetricGroup):
     """A Metric Group and, when a pipeline was asked about, its most recent scoring run there."""
 
