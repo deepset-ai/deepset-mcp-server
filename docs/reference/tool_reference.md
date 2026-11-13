@@ -197,6 +197,7 @@ draft/version history. Each deployment tracks its own history of served pipeline
 | `list_secrets` | optional | explorable | List the secrets available to the organization, or to a workspace if one is given. |
 | `get_secret` | not needed | explorable | Fetch a secret's metadata by ID. |
 | `get_models` | required | explorable | List models available for use in pipelines. |
+| `compare_models` | required | explorable | Send one prompt to up to 5 LLMs and compare their answers, tokens and latency. |
 
 ### Object store
 

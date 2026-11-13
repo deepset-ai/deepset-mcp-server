@@ -98,7 +98,7 @@ from deepset_mcp.tools.indexes import (
     update_index as update_index_tool,
     validate_index as validate_index_tool,
 )
-from deepset_mcp.tools.model import get_models as get_models_tool
+from deepset_mcp.tools.model import compare_models as compare_models_tool, get_models as get_models_tool
 from deepset_mcp.tools.object_store import (
     create_get_from_object_store,
     create_get_slice_from_object_store,
@@ -356,6 +356,10 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
             # increase max_depth so generation_kwargs are fully captured
             explorer_config=ExplorerConfig(max_depth=1000),
         ),
+    ),
+    "compare_models": (
+        compare_models_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
     "list_templates": (
         list_pipeline_templates_tool,

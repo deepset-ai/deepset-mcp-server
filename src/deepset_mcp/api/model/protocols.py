@@ -6,7 +6,7 @@
 
 from typing import Protocol
 
-from deepset_mcp.api.model.models import ModelList, ModelProvider
+from deepset_mcp.api.model.models import ModelCategory, ModelList, ModelProvider
 
 
 class ModelResourceProtocol(Protocol):
@@ -20,6 +20,7 @@ class ModelResourceProtocol(Protocol):
         provider: ModelProvider | str | None = None,
         model: str | None = None,
         include_price: bool = False,
+        category: ModelCategory | None = None,
     ) -> ModelList:
         """List the models including their configuration options available for the configured workspace.
 
@@ -35,6 +36,8 @@ class ModelResourceProtocol(Protocol):
             all models are fetched and filtered locally.
         :param include_price: If True, each model with a known price also carries its effective price,
             with workspace and organization custom prices applied. Requires read access to costs.
+        :param category: If set, list models of this kind: LLM, EMBEDDER or RANKER. Without it, the API lists
+            only LLMs.
         :returns: A page of models including their configuration options.
         """
         ...
