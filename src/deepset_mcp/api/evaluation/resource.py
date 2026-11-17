@@ -11,6 +11,7 @@ from deepset_mcp.api import ids
 from deepset_mcp.api.evaluation.models import (
     Dataset,
     DatasetSummary,
+    EvaluateGoalsAccepted,
     EvaluationGoal,
     EvaluationRun,
     EvaluationTryResult,
@@ -26,6 +27,8 @@ from deepset_mcp.api.evaluation.models import (
     ExperimentRunGrid,
     ExperimentRunPreview,
     ExperimentUpdatePlan,
+    GoalRunPreview,
+    GoalRunSource,
     MetricGroup,
     MetricWeight,
     NewTestCase,
@@ -865,3 +868,13 @@ class EvaluationResource(EvaluationResourceProtocol):
         :param metric_group_id: The Metric Group's id.
         """
         await self._delete(await self._workspace_path("metric-groups", metric_group_id))
+
+    async def evaluate_goals(self, pipeline_name: str, source: GoalRunSource | None = None) -> EvaluateGoalsAccepted:
+        """Stub."""
+        raise NotImplementedError
+
+    async def preview_goal_run(
+        self, pipeline_name: str, source: GoalRunSource, sessions_per_test_case: int | None = None
+    ) -> GoalRunPreview:
+        """Stub."""
+        raise NotImplementedError

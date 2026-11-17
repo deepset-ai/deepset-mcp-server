@@ -17,17 +17,18 @@ from deepset_mcp.api.evaluation.models import (
     Evaluator,
     EvaluatorTemplate,
     EvaluatorVersion,
+    EvaluateGoalsAccepted,
     Experiment,
     ExperimentDetail,
-    ExperimentPlan,
     ExperimentResults,
     ExperimentRun,
-    ExperimentRunAccepted,
     ExperimentRunGrid,
-    ExperimentRunPreview,
     ExperimentUpdatePlan,
-    MetricGroup,
-    MetricWeight,
+    GoalExperimentStarted,
+    GoalRunDataset,
+    GoalRunNewDataset,
+    GoalRunPreview,
+    GoalRunWindow,
     NewTestCase,
     SessionList,
     SessionWindow,
@@ -46,7 +47,7 @@ PIPELINE_NAME = "my-pipeline"
 PIPELINE_UUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 EVALUATOR_ID = "11111111-1111-1111-1111-111111111111"
 VERSION_ID = "22222222-2222-2222-2222-222222222222"
-METRIC_GROUP_ID = "33333333-3333-3333-3333-333333333333"
+PIPELINE_EXPERIMENT_ID = "33333333-3333-3333-3333-333333333333"
 RUN_ID = "44444444-4444-4444-4444-444444444444"
 SESSION_ID = "55555555-5555-5555-5555-555555555555"
 EVALUATION_RUN_ID = "66666666-6666-6666-6666-666666666666"
@@ -55,10 +56,10 @@ COMPARISON_ID = "77777777-7777-7777-7777-777777777777"
 EVALUATION = f"v2/workspaces/{WORKSPACE_UUID}/evaluation"
 PIPELINE = f"{EVALUATION}/pipelines/{PIPELINE_UUID}"
 EVALUATORS = f"{EVALUATION}/evaluators"
-METRIC_GROUPS = f"{EVALUATION}/metric-groups"
 EXPERIMENTS = f"{EVALUATION}/experiments"
 EVALUATION_GOALS = f"{PIPELINE}/evaluation-goals"
-RUNS = f"{PIPELINE}/metric-groups/{METRIC_GROUP_ID}/scoring-runs"
+RUN_HISTORY = f"{PIPELINE}/scoring-run-history"
+RUN = f"{PIPELINE}/scoring-runs/{RUN_ID}"
 SESSIONS = f"{PIPELINE}/sessions"
 DATASETS = f"{EVALUATION}/datasets"
 DATASET_ID = "bbbbbbbb-1111-2222-3333-444444444444"
@@ -88,17 +89,6 @@ def evaluator_dict() -> dict[str, Any]:
     }
 
 
-def metric_group_dict() -> dict[str, Any]:
-    return {
-        "metric_group_id": METRIC_GROUP_ID,
-        "workspace_id": WORKSPACE_UUID,
-        "name": "Weekly",
-        "evaluator_ids": [EVALUATOR_ID],
-        "created_at": "2026-10-01T00:00:00Z",
-        "updated_at": None,
-    }
-
-
 def comparison_dict() -> dict[str, Any]:
     side = {
         "pipeline_id": PIPELINE_UUID,
@@ -117,7 +107,7 @@ def comparison_dict() -> dict[str, Any]:
         "name": "New prompt",
         "session_replay_dataset_id": None,
         "dataset_name": "Regression set",
-        "metric_group_id": METRIC_GROUP_ID,
+        "metric_group_id": PIPELINE_EXPERIMENT_ID,
         "metric_group_name": "Weekly",
         "sessions_per_test_case": 1,
         "replay_mode": "LIVE",
@@ -174,7 +164,7 @@ def results_dict() -> dict[str, Any]:
 def run_dict() -> dict[str, Any]:
     return {
         "pipeline_experiment_run_id": RUN_ID,
-        "pipeline_experiment_id": METRIC_GROUP_ID,
+        "pipeline_experiment_id": PIPELINE_EXPERIMENT_ID,
         "status": "ENDED",
         "started_at": "2026-10-01T00:00:00Z",
         "ended_at": "2026-10-01T00:05:00Z",
@@ -330,18 +320,6 @@ async def test_get_evaluator_and_version() -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_metric_groups_calls_the_workspace_route() -> None:
-    client = FakeEvaluationClient({METRIC_GROUPS: [metric_group_dict()]})
-
-    groups = await resource(client).list_metric_groups()
-
-    assert isinstance(groups[0], MetricGroup)
-    assert groups[0].evaluator_ids == [EVALUATOR_ID]
-    assert client.requests[0]["endpoint"] == METRIC_GROUPS
-    assert client.pipeline_resource.calls == []
-
-
-@pytest.mark.asyncio
 async def test_list_evaluation_goals_calls_the_pipeline_route() -> None:
     goals_json = [
         {
@@ -384,17 +362,24 @@ async def test_list_evaluation_goals_calls_the_pipeline_route() -> None:
     assert client.pipeline_resource.calls == [PIPELINE_NAME]
 
 
-@pytest.mark.asyncio
-async def test_list_experiment_runs_resolves_the_pipeline_uuid() -> None:
-    client = FakeEvaluationClient({RUNS: [run_dict()]})
+def history(*runs: dict[str, Any]) -> dict[str, Any]:
+    return {"data": list(runs), "has_more": False, "total": len(runs)}
 
-    runs = await resource(client).list_experiment_runs(PIPELINE_NAME, METRIC_GROUP_ID, limit=1)
+
+@pytest.mark.asyncio
+async def test_list_experiment_runs_reads_the_pipelines_scoring_run_history() -> None:
+    client = FakeEvaluationClient({RUN_HISTORY: history(run_dict())})
+
+    runs = await resource(client).list_experiment_runs(PIPELINE_NAME, limit=1)
+    await resource(client).list_experiment_runs(PIPELINE_NAME, historic=False)
 
     assert isinstance(runs[0], ExperimentRun)
     assert runs[0].selection == "SAMPLED"
-    assert client.requests[0]["endpoint"] == RUNS
-    assert client.requests[0]["params"] == {"limit": 1}
-    assert client.pipeline_resource.calls == [PIPELINE_NAME]
+    assert [(r["method"], r["endpoint"], r["params"]) for r in client.requests] == [
+        ("GET", RUN_HISTORY, {"limit": 1}),
+        ("GET", RUN_HISTORY, {"limit": 50, "historic": False}),
+    ]
+    assert client.pipeline_resource.calls == [PIPELINE_NAME, PIPELINE_NAME]
 
 
 @pytest.mark.asyncio
@@ -421,50 +406,50 @@ async def test_list_experiments_filters_by_the_pipeline_uuid() -> None:
     assert client.requests[0]["params"] == {"limit": 10, "pipeline_id": PIPELINE_UUID}
 
 
+GOAL_EXPERIMENTS = f"{EVALUATION_GOALS}/experiments"
+
+
+def goal_experiment_dict() -> dict[str, Any]:
+    return {
+        "experiment_id": COMPARISON_ID,
+        "session_replay_dataset_id": DATASET_ID,
+        "metric_group_id": PIPELINE_EXPERIMENT_ID,
+    }
+
+
 @pytest.mark.asyncio
-async def test_create_experiment_posts_the_body_with_resolved_pipeline_ids() -> None:
-    client = FakeEvaluationClient({EXPERIMENTS: comparison_dict()})
-    dataset_id = "88888888-8888-8888-8888-888888888888"
+async def test_create_experiment_posts_a_goal_experiment_on_the_dataset() -> None:
+    client = FakeEvaluationClient({GOAL_EXPERIMENTS: goal_experiment_dict()})
     candidate_version = "99999999-9999-9999-9999-999999999999"
     baseline_version = "aaaaaaaa-1111-2222-3333-444444444444"
 
     recorded = await resource(client).create_experiment(
-        name="New prompt",
-        dataset_id=dataset_id,
-        metric_group_id=METRIC_GROUP_ID,
-        candidate_pipeline_name=PIPELINE_NAME,
-        candidate_pipeline_version_id=candidate_version,
+        PIPELINE_NAME, name="New prompt", dataset_id=DATASET_ID, candidate_pipeline_version_id=candidate_version
     )
     await resource(client).create_experiment(
+        PIPELINE_NAME,
         name="Against v1",
-        dataset_id=dataset_id,
-        metric_group_id=METRIC_GROUP_ID,
-        candidate_pipeline_name=PIPELINE_NAME,
+        dataset_id=DATASET_ID,
         candidate_pipeline_version_id=candidate_version,
-        baseline_pipeline_name=PIPELINE_NAME,
         baseline_pipeline_version_id=baseline_version,
         sessions_per_test_case=3,
         replay_mode="ALL_USER_MESSAGES",
     )
 
-    assert isinstance(recorded, Experiment)
-    assert recorded.experiment_id == COMPARISON_ID
-
-    posts = [r for r in client.requests if r["method"] == "POST" and r["endpoint"] == EXPERIMENTS]
-    assert posts[0]["data"] == {
+    assert recorded == GoalExperimentStarted.model_validate(goal_experiment_dict())
+    assert (recorded.experiment_id, recorded.dataset_id) == (COMPARISON_ID, DATASET_ID)
+    assert [(r["method"], r["endpoint"]) for r in client.requests] == [("POST", GOAL_EXPERIMENTS)] * 2
+    first, second = (r["data"] for r in client.requests)
+    assert first == {
         "name": "New prompt",
-        "session_replay_dataset_id": dataset_id,
-        "metric_group_id": METRIC_GROUP_ID,
-        "candidate": {"pipeline_id": PIPELINE_UUID, "pipeline_version_id": candidate_version},
+        "source": {"kind": "dataset", "session_replay_dataset_id": DATASET_ID},
+        "candidate": {"pipeline_version_id": candidate_version},
+        "baseline": {"recorded": True},
         "sessions_per_test_case": 1,
         "replay_mode": "FIRST_USER_MESSAGE",
     }
-    assert posts[1]["data"]["baseline"] == {
-        "pipeline_id": PIPELINE_UUID,
-        "pipeline_version_id": baseline_version,
-    }
-    assert posts[1]["data"]["sessions_per_test_case"] == 3
-    assert posts[1]["data"]["replay_mode"] == "ALL_USER_MESSAGES"
+    assert second["baseline"] == {"pipeline_version_id": baseline_version}
+    assert (second["sessions_per_test_case"], second["replay_mode"]) == (3, "ALL_USER_MESSAGES")
 
 
 @pytest.mark.asyncio
@@ -484,15 +469,31 @@ async def test_get_experiment_results_calls_the_workspace_route() -> None:
 
 @pytest.mark.asyncio
 async def test_get_experiment_run_returns_the_grid() -> None:
-    client = FakeEvaluationClient({f"{RUNS}/{RUN_ID}": grid_dict()})
+    client = FakeEvaluationClient({RUN: grid_dict()})
 
-    grid = await resource(client).get_experiment_run(PIPELINE_NAME, METRIC_GROUP_ID, RUN_ID)
+    grid = await resource(client).get_experiment_run(PIPELINE_NAME, RUN_ID)
 
     assert isinstance(grid, ExperimentRunGrid)
     cell = grid.rows[0].cells[0]
     assert cell.evaluation_run.outcome == "SUCCEEDED"
     assert cell.evaluation_run.metrics[0].label == "yes"
     assert grid.counts.succeeded == 1
+    assert (client.requests[0]["method"], client.requests[0]["endpoint"]) == ("GET", RUN)
+
+
+@pytest.mark.asyncio
+async def test_get_experiment_run_reads_a_run_whose_evaluator_set_is_gone_and_names_each_evaluator() -> None:
+    payload = {
+        **grid_dict(),
+        "run": {**run_dict(), "pipeline_experiment_id": None},
+        "evaluator_versions": [{**version_summary(), "evaluator_name": "Answered"}],
+    }
+    client = FakeEvaluationClient({RUN: payload})
+
+    grid = await resource(client).get_experiment_run(PIPELINE_NAME, RUN_ID)
+
+    assert grid.run.pipeline_experiment_id is None
+    assert [v.evaluator_name for v in grid.evaluator_versions] == ["Answered"]
 
 
 @pytest.mark.asyncio
@@ -544,11 +545,10 @@ async def test_get_experiment_run_sends_the_grid_filters_and_parses_aggregate_an
             }
         ],
     }
-    client = FakeEvaluationClient({f"{RUNS}/{RUN_ID}": payload})
+    client = FakeEvaluationClient({RUN: payload})
 
     grid = await resource(client).get_experiment_run(
         PIPELINE_NAME,
-        METRIC_GROUP_ID,
         RUN_ID,
         origin="SERVICE",
         deployment_id="dep-1",
@@ -569,9 +569,9 @@ async def test_get_experiment_run_sends_the_grid_filters_and_parses_aggregate_an
 
 @pytest.mark.asyncio
 async def test_get_experiment_run_sends_no_params_without_filters() -> None:
-    client = FakeEvaluationClient({f"{RUNS}/{RUN_ID}": grid_dict()})
+    client = FakeEvaluationClient({RUN: grid_dict()})
 
-    await resource(client).get_experiment_run(PIPELINE_NAME, METRIC_GROUP_ID, RUN_ID)
+    await resource(client).get_experiment_run(PIPELINE_NAME, RUN_ID)
 
     assert not client.requests[0]["params"]
 
@@ -973,22 +973,6 @@ async def test_create_evaluator_posts_name_and_code_only_by_default() -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_evaluator_posts_the_metric_groups_it_joins() -> None:
-    client = FakeEvaluationClient({EVALUATORS: evaluator_dict()})
-
-    await resource(client).create_evaluator(
-        "Answered", "code", metric_group_ids=[METRIC_GROUP_ID], new_metric_group_name="Fresh"
-    )
-
-    assert client.requests[0]["data"] == {
-        "name": "Answered",
-        "python_code": "code",
-        "metric_group_ids": [METRIC_GROUP_ID],
-        "new_metric_group_name": "Fresh",
-    }
-
-
-@pytest.mark.asyncio
 async def test_update_evaluator_puts_only_the_fields_given() -> None:
     client = FakeEvaluationClient({f"{EVALUATORS}/{EVALUATOR_ID}": evaluator_dict()})
 
@@ -1025,88 +1009,9 @@ async def test_list_evaluator_templates_gets_the_templates() -> None:
     assert client.requests[0]["method"] == "GET"
 
 
-@pytest.mark.asyncio
-async def test_create_metric_group_posts_evaluators_and_weights() -> None:
-    client = FakeEvaluationClient({METRIC_GROUPS: metric_group_dict()})
-
-    group = await resource(client).create_metric_group(
-        "Weekly", [EVALUATOR_ID], [MetricWeight(evaluator_id=EVALUATOR_ID, metric_key="answered", weight=2)]
-    )
-
-    assert isinstance(group, MetricGroup)
-    [request] = client.requests
-    assert (request["method"], request["endpoint"]) == ("POST", METRIC_GROUPS)
-    assert request["data"] == {
-        "name": "Weekly",
-        "evaluator_ids": [EVALUATOR_ID],
-        "weights": [{"evaluator_id": EVALUATOR_ID, "metric_key": "answered", "weight": 2}],
-    }
-
-
-@pytest.mark.asyncio
-async def test_create_metric_group_without_weights_omits_the_field() -> None:
-    client = FakeEvaluationClient({METRIC_GROUPS: metric_group_dict()})
-
-    await resource(client).create_metric_group("Weekly", [EVALUATOR_ID])
-
-    assert client.requests[0]["data"] == {"name": "Weekly", "evaluator_ids": [EVALUATOR_ID]}
-
-
-@pytest.mark.asyncio
-async def test_update_metric_group_puts_weights_only_when_given() -> None:
-    endpoint = f"{METRIC_GROUPS}/{METRIC_GROUP_ID}"
-    client = FakeEvaluationClient({endpoint: metric_group_dict()})
-
-    await resource(client).update_metric_group(METRIC_GROUP_ID, "Weekly", [EVALUATOR_ID])
-    await resource(client).update_metric_group(METRIC_GROUP_ID, "Weekly", [EVALUATOR_ID], weights=[])
-
-    assert [(r["method"], r["endpoint"], r["data"]) for r in client.requests] == [
-        ("PUT", endpoint, {"name": "Weekly", "evaluator_ids": [EVALUATOR_ID]}),
-        ("PUT", endpoint, {"name": "Weekly", "evaluator_ids": [EVALUATOR_ID], "weights": []}),
-    ]
-
-
-@pytest.mark.asyncio
-async def test_delete_metric_group_calls_delete_on_the_group() -> None:
-    endpoint = f"{METRIC_GROUPS}/{METRIC_GROUP_ID}"
-    client = FakeEvaluationClient({endpoint: None})
-
-    await resource(client).delete_metric_group(METRIC_GROUP_ID)
-
-    [request] = client.requests
-    assert (request["method"], request["endpoint"]) == ("DELETE", endpoint)
-
-
 EXPERIMENT = f"{EXPERIMENTS}/{COMPARISON_ID}"
 NEW_VERSION = "99999999-9999-9999-9999-999999999999"
 SIDE_PLAN = {"reused_sessions": 2, "replays_needed": 1, "test_cases_short": 1}
-
-
-@pytest.mark.asyncio
-async def test_preview_experiment_posts_the_targets_without_a_name() -> None:
-    plan = {"candidate": SIDE_PLAN, "baseline": SIDE_PLAN, "cells": 6, "max_cells": 100, "max_runs": 50}
-    client = FakeEvaluationClient({f"{EXPERIMENTS}/preview": plan})
-
-    result = await resource(client).preview_experiment(
-        dataset_id=DATASET_ID,
-        metric_group_id=METRIC_GROUP_ID,
-        candidate_pipeline_name=PIPELINE_NAME,
-        candidate_pipeline_version_id=NEW_VERSION,
-        sessions_per_test_case=2,
-    )
-
-    assert isinstance(result, ExperimentPlan)
-    assert result.candidate.replays_needed == 1
-    assert result.max_cells == 100
-    [request] = client.requests
-    assert (request["method"], request["endpoint"]) == ("POST", f"{EXPERIMENTS}/preview")
-    assert request["data"] == {
-        "session_replay_dataset_id": DATASET_ID,
-        "metric_group_id": METRIC_GROUP_ID,
-        "candidate": {"pipeline_id": PIPELINE_UUID, "pipeline_version_id": NEW_VERSION},
-        "sessions_per_test_case": 2,
-        "replay_mode": "FIRST_USER_MESSAGE",
-    }
 
 
 @pytest.mark.asyncio
@@ -1233,7 +1138,7 @@ async def test_list_session_experiment_runs_reads_the_pipeline_wide_route_with_t
 
     runs = await resource(client).list_session_experiment_runs(PIPELINE_NAME, SESSION_ID, limit=5)
 
-    assert [r.pipeline_experiment_id for r in runs] == [METRIC_GROUP_ID]
+    assert [r.pipeline_experiment_id for r in runs] == [PIPELINE_EXPERIMENT_ID]
     [request] = client.requests
     assert (request["method"], request["endpoint"]) == ("GET", SESSION_SCORING_RUNS)
     assert request["params"] == {"session_id": SESSION_ID, "limit": 5}
@@ -1241,65 +1146,15 @@ async def test_list_session_experiment_runs_reads_the_pipeline_wide_route_with_t
 
 @pytest.mark.asyncio
 async def test_an_experiment_run_reads_the_window_it_judged_by_its_api_names() -> None:
-    client = FakeEvaluationClient({RUNS: [{**run_dict(), "window": WINDOW_BODY, "resolved_sessions": 12}, run_dict()]})
+    client = FakeEvaluationClient(
+        {RUN_HISTORY: history({**run_dict(), "window": WINDOW_BODY, "resolved_sessions": 12}, run_dict())}
+    )
 
-    windowed, named = await resource(client).list_experiment_runs(PIPELINE_NAME, METRIC_GROUP_ID)
+    windowed, named = await resource(client).list_experiment_runs(PIPELINE_NAME)
 
     assert windowed.window == WINDOW
     assert windowed.resolved_sessions == 12
     assert (named.window, named.resolved_sessions) == (None, None)
-
-
-@pytest.mark.asyncio
-async def test_start_experiment_run_posts_the_named_sessions_and_only_what_is_set() -> None:
-    accepted = {"pipeline_experiment_run_id": RUN_ID, "cells": 2}
-    client = FakeEvaluationClient({RUNS: accepted})
-
-    result = await resource(client).start_experiment_run(PIPELINE_NAME, METRIC_GROUP_ID, session_ids=[SESSION_ID])
-
-    assert result == ExperimentRunAccepted(pipeline_experiment_run_id=RUN_ID, cells=2)
-    [request] = client.requests
-    assert (request["method"], request["endpoint"]) == ("POST", RUNS)
-    assert request["data"] == {"session_ids": [SESSION_ID]}
-
-
-@pytest.mark.asyncio
-async def test_start_experiment_run_posts_a_window_under_its_api_names_with_reuse_selection_and_focus() -> None:
-    client = FakeEvaluationClient({RUNS: {"pipeline_experiment_run_id": RUN_ID, "cells": 40}})
-    query_id = "99999999-1111-2222-3333-444444444444"
-
-    await resource(client).start_experiment_run(PIPELINE_NAME, METRIC_GROUP_ID, window=WINDOW, reuse="REUSE_SUCCEEDED")
-    await resource(client).start_experiment_run(
-        PIPELINE_NAME,
-        METRIC_GROUP_ID,
-        session_ids=[SESSION_ID],
-        selection="HAND_PICKED",
-        focus={SESSION_ID: [query_id]},
-    )
-
-    windowed, focused = (r["data"] for r in client.requests)
-    assert windowed == {"window": WINDOW_BODY, "reuse": "REUSE_SUCCEEDED"}
-    assert focused == {"session_ids": [SESSION_ID], "selection": "HAND_PICKED", "focus": {SESSION_ID: [query_id]}}
-
-
-@pytest.mark.asyncio
-async def test_preview_experiment_run_posts_the_window_to_preview() -> None:
-    preview = {
-        "sessions": 12,
-        "more_than": False,
-        "evaluators": 3,
-        "cells": 36,
-        "ceiling": {"sessions": 50, "cells": 200},
-    }
-    client = FakeEvaluationClient({f"{RUNS}/preview": preview})
-
-    result = await resource(client).preview_experiment_run(PIPELINE_NAME, METRIC_GROUP_ID, WINDOW)
-
-    assert isinstance(result, ExperimentRunPreview)
-    assert (result.cells, result.ceiling.cells) == (36, 200)
-    [request] = client.requests
-    assert (request["method"], request["endpoint"]) == ("POST", f"{RUNS}/preview")
-    assert request["data"] == WINDOW_BODY
 
 
 @pytest.mark.asyncio
@@ -1366,34 +1221,79 @@ async def test_an_evaluation_run_from_an_older_api_without_the_extra_fields_stil
     assert (run.provenance, run.focus, run.trace_ids, run.created_at) == (None, None, [], None)
 
 
+EVALUATE = f"{EVALUATION_GOALS}/evaluate"
+GOAL_PREVIEW = f"{EVALUATION_GOALS}/preview"
+ACCEPTED = {
+    "scoring_run_id": RUN_ID,
+    "metric_group_id": PIPELINE_EXPERIMENT_ID,
+    "sessions": 12,
+    "already_running": False,
+    "session_replay_dataset_id": None,
+}
+GOAL_RUN_PREVIEW = {
+    "sessions": 30,
+    "judged": 20,
+    "evaluators": 2,
+    "judgments": 40,
+    "limit": 500,
+    "replays": None,
+    "needs_replay": False,
+}
+
+
 @pytest.mark.asyncio
-async def test_create_and_preview_experiment_send_reuse_sessions_only_when_false() -> None:
-    client = FakeEvaluationClient(
-        {
-            EXPERIMENTS: comparison_dict(),
-            f"{EXPERIMENTS}/preview": {
-                "candidate": SIDE_PLAN,
-                "baseline": SIDE_PLAN,
-                "cells": 6,
-                "max_cells": 100,
-                "max_runs": 50,
-            },
-        }
+async def test_evaluate_goals_without_a_source_posts_no_body_so_the_api_judges_the_last_seven_days() -> None:
+    client = FakeEvaluationClient({EVALUATE: ACCEPTED})
+
+    accepted = await resource(client).evaluate_goals(PIPELINE_NAME)
+
+    assert accepted == EvaluateGoalsAccepted.model_validate(ACCEPTED)
+    assert (accepted.scoring_run_id, accepted.sessions, accepted.dataset_id) == (RUN_ID, 12, None)
+    [request] = client.requests
+    assert (request["method"], request["endpoint"], request["data"]) == ("POST", EVALUATE, None)
+
+
+@pytest.mark.asyncio
+async def test_evaluate_goals_posts_each_source_under_its_api_names() -> None:
+    client = FakeEvaluationClient({EVALUATE: {**ACCEPTED, "session_replay_dataset_id": DATASET_ID}})
+    window = {"start": "2026-10-01T00:00:00Z", "end": "2026-10-08T00:00:00Z"}
+
+    accepted = await resource(client).evaluate_goals(
+        PIPELINE_NAME, GoalRunNewDataset(kind="new_dataset", name="Last week", max_sessions=20, **window)
     )
-    target: dict[str, Any] = {
-        "dataset_id": DATASET_ID,
-        "metric_group_id": METRIC_GROUP_ID,
-        "candidate_pipeline_name": PIPELINE_NAME,
-        "candidate_pipeline_version_id": NEW_VERSION,
-    }
+    await resource(client).evaluate_goals(PIPELINE_NAME, GoalRunWindow(kind="window", **window))
+    await resource(client).evaluate_goals(PIPELINE_NAME, GoalRunDataset(kind="dataset", dataset_id=DATASET_ID))
 
-    await resource(client).create_experiment(name="Default", **target)
-    await resource(client).create_experiment(name="Fresh", reuse_sessions=False, **target)
-    await resource(client).preview_experiment(**target)
-    await resource(client).preview_experiment(reuse_sessions=False, **target)
+    assert accepted.dataset_id == DATASET_ID
+    assert [r["data"] for r in client.requests] == [
+        {
+            "source": {
+                "kind": "new_dataset",
+                "from": "2026-10-01T00:00:00Z",
+                "to": "2026-10-08T00:00:00Z",
+                "max_sessions": 20,
+                "name": "Last week",
+            }
+        },
+        {"source": {"kind": "window", "from": "2026-10-01T00:00:00Z", "to": "2026-10-08T00:00:00Z"}},
+        {"source": {"kind": "dataset", "session_replay_dataset_id": DATASET_ID}},
+    ]
 
-    default_create, fresh_create, default_preview, fresh_preview = (r["data"] for r in client.requests)
-    assert "reuse_sessions" not in default_create
-    assert "reuse_sessions" not in default_preview
-    assert fresh_create["reuse_sessions"] is False
-    assert fresh_preview["reuse_sessions"] is False
+
+@pytest.mark.asyncio
+async def test_preview_goal_run_sizes_a_goal_run_or_with_sessions_per_test_case_an_experiment() -> None:
+    client = FakeEvaluationClient({GOAL_PREVIEW: GOAL_RUN_PREVIEW})
+    source = GoalRunDataset(kind="dataset", dataset_id=DATASET_ID)
+
+    preview = await resource(client).preview_goal_run(PIPELINE_NAME, source)
+    await resource(client).preview_goal_run(PIPELINE_NAME, source, sessions_per_test_case=2)
+
+    assert preview == GoalRunPreview.model_validate(GOAL_RUN_PREVIEW)
+    assert [(r["method"], r["endpoint"]) for r in client.requests] == [("POST", GOAL_PREVIEW)] * 2
+    assert [r["data"] for r in client.requests] == [
+        {"source": {"kind": "dataset", "session_replay_dataset_id": DATASET_ID}},
+        {
+            "source": {"kind": "dataset", "session_replay_dataset_id": DATASET_ID},
+            "experiment": {"sessions_per_test_case": 2},
+        },
+    ]

@@ -891,6 +891,92 @@ class ExperimentRunPreview(BaseModel):
     ceiling: WindowCeiling
 
 
+class _GoalRunWindowBounds(BaseModel):
+    """Live Sessions of the pipeline whose last activity falls in ``[from, to]``."""
+
+    start: str = Field(
+        validation_alias=AliasChoices("start", "from"),
+        serialization_alias="from",
+        description="Last activity at or after this time (ISO 8601, with a timezone).",
+    )
+    end: str = Field(
+        validation_alias=AliasChoices("end", "to"),
+        serialization_alias="to",
+        description="Last activity at or before this time (ISO 8601, with a timezone). Not in the future.",
+    )
+    max_sessions: int | None = Field(
+        default=None,
+        ge=1,
+        description="Judge at most this many of the window's Sessions, newest first; omitted, the run limits decide.",
+    )
+
+
+class GoalRunWindow(_GoalRunWindowBounds):
+    """Judge the pipeline's live Sessions whose last activity falls in the window."""
+
+    kind: Literal["window"]
+
+
+class GoalRunNewDataset(_GoalRunWindowBounds):
+    """Keep the window's newest live Sessions as a new Dataset, then judge them as that Dataset's Sessions."""
+
+    kind: Literal["new_dataset"]
+    name: str = Field(min_length=1, max_length=120, description="What the new Dataset is called.")
+
+
+class GoalRunDataset(BaseModel):
+    """Judge the Sessions a Dataset recorded on this pipeline, as they were recorded: nothing is replayed."""
+
+    kind: Literal["dataset"]
+    dataset_id: str = Field(
+        validation_alias=AliasChoices("dataset_id", "session_replay_dataset_id"),
+        serialization_alias="session_replay_dataset_id",
+        description="The Dataset's id, from `list_datasets`.",
+    )
+
+
+GoalRunSource = Annotated[GoalRunWindow | GoalRunDataset | GoalRunNewDataset, Field(discriminator="kind")]
+
+
+class EvaluateGoalsAccepted(BaseModel):
+    """The scoring run that evaluates the pipeline's goals: just started, or the one already going."""
+
+    scoring_run_id: str = Field(description="The run to read with `get_experiment_run`")
+    sessions: int = Field(description="How many Sessions the run judges")
+    already_running: bool = Field(description="True when a goal run was already going and nothing was started")
+    dataset_id: str | None = Field(
+        default=None,
+        validation_alias="session_replay_dataset_id",
+        description="The Dataset whose Sessions the run judges, the new one for `new_dataset`; null for a window",
+    )
+
+
+class GoalRunPreview(BaseModel):
+    """What a goal run, or one side of an Experiment, would judge over a source. Nothing was started."""
+
+    sessions: int = Field(description="The window's live Sessions, or the Dataset's usable test cases")
+    judged: int = Field(description="How many of them a run would judge, after `max_sessions` and the run limits")
+    evaluators: int = Field(description="The distinct Evaluators of the pipeline's Evaluation goals")
+    judgments: int = Field(
+        description="`judged` times `evaluators`, and for an Experiment also times `sessions_per_test_case`, per side"
+    )
+    limit: int = Field(description="The judgment limit per run. A Dataset over it is refused; a window is cut to it")
+    replays: int | None = Field(
+        default=None,
+        description="For an Experiment: replays each replayed side would start, before reusing any Session",
+    )
+    needs_replay: bool = Field(
+        description="True for a Dataset with test cases that have no Session recorded on this pipeline"
+    )
+
+
+class GoalExperimentStarted(BaseModel):
+    """An Experiment that scores both sides against the pipeline's Evaluation goals."""
+
+    experiment_id: str = Field(description="Follow it with `get_experiment`, read it with `get_experiment_results`")
+    dataset_id: str = Field(validation_alias="session_replay_dataset_id", description="The Dataset it runs on")
+
+
 class SessionListItem(BaseModel):
     """One Session a run can judge."""
 

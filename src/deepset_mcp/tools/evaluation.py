@@ -14,6 +14,7 @@ from typing import Any, Literal, TypeVar
 from deepset_mcp.api.evaluation.models import (
     Dataset,
     DatasetSummary,
+    EvaluateGoalsAccepted,
     EvaluationGoal,
     EvaluationRun,
     Evaluator,
@@ -29,6 +30,8 @@ from deepset_mcp.api.evaluation.models import (
     ExperimentRunPreview,
     ExperimentRunReport,
     ExperimentUpdatePlan,
+    GoalRunPreview,
+    GoalRunSource,
     MetricGroup,
     MetricGroupSummary,
     MetricSummary,
@@ -1539,3 +1542,15 @@ async def get_evaluation_run(
         return await client.evaluation(workspace=workspace).get_evaluation_run(pipeline_name, evaluation_run_id)
     except _API_ERRORS as e:
         return f"Failed to read Evaluation Run '{evaluation_run_id}': {e}"
+
+
+async def evaluate_goals(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    source: GoalRunSource | None = None,
+    preview: bool = False,
+) -> EvaluateGoalsAccepted | GoalRunPreview | str:
+    """Stub."""
+    raise NotImplementedError
