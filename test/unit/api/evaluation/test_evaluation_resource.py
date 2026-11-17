@@ -12,12 +12,12 @@ import pytest
 from deepset_mcp.api.evaluation.models import (
     Dataset,
     DatasetSummary,
+    EvaluateGoalsAccepted,
     EvaluationGoal,
     EvaluationRun,
     Evaluator,
     EvaluatorTemplate,
     EvaluatorVersion,
-    EvaluateGoalsAccepted,
     Experiment,
     ExperimentDetail,
     ExperimentResults,
@@ -1256,12 +1256,12 @@ async def test_evaluate_goals_without_a_source_posts_no_body_so_the_api_judges_t
 @pytest.mark.asyncio
 async def test_evaluate_goals_posts_each_source_under_its_api_names() -> None:
     client = FakeEvaluationClient({EVALUATE: {**ACCEPTED, "session_replay_dataset_id": DATASET_ID}})
-    window = {"start": "2026-10-01T00:00:00Z", "end": "2026-10-08T00:00:00Z"}
+    start, end = "2026-10-01T00:00:00Z", "2026-10-08T00:00:00Z"
 
     accepted = await resource(client).evaluate_goals(
-        PIPELINE_NAME, GoalRunNewDataset(kind="new_dataset", name="Last week", max_sessions=20, **window)
+        PIPELINE_NAME, GoalRunNewDataset(kind="new_dataset", name="Last week", max_sessions=20, start=start, end=end)
     )
-    await resource(client).evaluate_goals(PIPELINE_NAME, GoalRunWindow(kind="window", **window))
+    await resource(client).evaluate_goals(PIPELINE_NAME, GoalRunWindow(kind="window", start=start, end=end))
     await resource(client).evaluate_goals(PIPELINE_NAME, GoalRunDataset(kind="dataset", dataset_id=DATASET_ID))
 
     assert accepted.dataset_id == DATASET_ID

@@ -11,12 +11,12 @@ from deepset_mcp.api.evaluation.models import (
     Composite,
     Dataset,
     DatasetSummary,
+    EvaluateGoalsAccepted,
     EvaluationGoal,
     EvaluationRun,
     EvaluationTryResult,
     Evaluator,
     EvaluatorTemplate,
-    EvaluateGoalsAccepted,
     EvaluatorVersion,
     Experiment,
     ExperimentDetail,
@@ -688,12 +688,6 @@ async def test_get_experiment_run_rows_name_the_replay_that_produced_the_session
     assert [row.session_replay_run_id for row in report.rows] == [REPLAY_RUN_ID, None]
 
 
-
-
-
-
-
-
 @pytest.mark.asyncio
 async def test_list_evaluation_goals_returns_the_pipelines_goals() -> None:
     resource = FakeEvaluationResource()
@@ -742,9 +736,6 @@ async def test_list_experiments_passes_the_pipeline_and_drops_each_sides_session
     assert dumped["candidate"]["scoring_runs"] == [{"pipeline_id": PIPELINE_ID, "experiment_run_id": RUN_ID}]
     assert dumped["baseline"]["error"] == "No Sessions"
     assert "sessions" not in dumped["candidate"]
-
-
-
 
 
 @pytest.mark.asyncio
@@ -912,9 +903,7 @@ async def test_errors_come_back_as_readable_strings(error: Exception, expected: 
         await get_evaluator(client=client, workspace=WORKSPACE, evaluator_id=E1),
         await list_experiments(client=client, workspace=WORKSPACE, pipeline_name=PIPELINE),
         await get_experiment_results(client=client, workspace=WORKSPACE, experiment_id=COMPARISON_ID),
-        await get_experiment_run(
-            client=client, workspace=WORKSPACE, pipeline_name=PIPELINE, run_id=RUN_ID
-        ),
+        await get_experiment_run(client=client, workspace=WORKSPACE, pipeline_name=PIPELINE, run_id=RUN_ID),
         await list_sessions(client=client, workspace=WORKSPACE, pipeline_name=PIPELINE),
     ]
 
@@ -1139,12 +1128,6 @@ async def test_get_experiment_results_from_an_older_api_reads_every_change_as_un
 
 
 WEIGHT = {"evaluator_id": E1, "metric_key": "accuracy", "weight": 2.0}
-
-
-
-
-
-
 
 
 def _grid_with(**extra: Any) -> ExperimentRunGrid:
@@ -1417,12 +1400,6 @@ async def test_template_tools_return_the_template_models() -> None:
     assert resource.calls == [("list_evaluator_templates", {})]
 
 
-
-
-
-
-
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "error",
@@ -1669,18 +1646,6 @@ def test_a_goal_run_source_is_read_by_its_kind_under_its_api_names() -> None:
         adapter.validate_python({"kind": "sessions", "session_ids": [SESSION_A]})
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 @pytest.mark.asyncio
 async def test_run_evaluator_polls_until_the_run_ended_and_returns_it() -> None:
     resource = FakeEvaluationResource(evaluation_run_states=[evaluation_run("STARTED"), evaluation_run("ENDED")])
@@ -1731,9 +1696,6 @@ async def test_list_and_get_evaluation_run_pass_through() -> None:
         ("list_evaluation_runs", {"limit": 3}),
         ("get_evaluation_run", {"evaluation_run_id": EVALUATION_RUN_ID}),
     ]
-
-
-
 
 
 @pytest.mark.asyncio

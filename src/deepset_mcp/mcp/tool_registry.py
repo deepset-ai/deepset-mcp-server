@@ -48,10 +48,9 @@ from deepset_mcp.tools.evaluation import (
     create_dataset as create_dataset_tool,
     create_evaluator as create_evaluator_tool,
     create_experiment as create_experiment_tool,
-    create_metric_group as create_metric_group_tool,
     delete_dataset as delete_dataset_tool,
     delete_experiment as delete_experiment_tool,
-    delete_metric_group as delete_metric_group_tool,
+    evaluate_goals as evaluate_goals_tool,
     get_dataset as get_dataset_tool,
     get_evaluation_run as get_evaluation_run_tool,
     get_evaluation_try as get_evaluation_try_tool,
@@ -67,7 +66,6 @@ from deepset_mcp.tools.evaluation import (
     list_evaluators as list_evaluators_tool,
     list_experiment_runs as list_experiment_runs_tool,
     list_experiments as list_experiments_tool,
-    list_metric_groups as list_metric_groups_tool,
     list_sessions as list_sessions_tool,
     remove_test_cases as remove_test_cases_tool,
     replay_session as replay_session_tool,
@@ -75,12 +73,10 @@ from deepset_mcp.tools.evaluation import (
     rescore_experiment as rescore_experiment_tool,
     run_evaluator as run_evaluator_tool,
     set_evaluator_archived as set_evaluator_archived_tool,
-    start_experiment_run as start_experiment_run_tool,
     try_evaluator as try_evaluator_tool,
     update_dataset as update_dataset_tool,
     update_evaluator as update_evaluator_tool,
     update_experiment as update_experiment_tool,
-    update_metric_group as update_metric_group_tool,
     update_test_case as update_test_case_tool,
 )
 from deepset_mcp.tools.haystack_service import (
@@ -410,10 +406,6 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
         get_evaluator_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
-    "list_metric_groups": (
-        list_metric_groups_tool,
-        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
-    ),
     "list_evaluation_goals": (
         list_evaluation_goals_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
@@ -458,8 +450,8 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
         list_experiment_runs_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
-    "start_experiment_run": (
-        start_experiment_run_tool,
+    "evaluate_goals": (
+        evaluate_goals_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
     ),
     "run_evaluator": (
@@ -545,18 +537,6 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "list_evaluator_templates": (
         list_evaluator_templates_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
-    ),
-    "create_metric_group": (
-        create_metric_group_tool,
-        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
-    ),
-    "update_metric_group": (
-        update_metric_group_tool,
-        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
-    ),
-    "delete_metric_group": (
-        delete_metric_group_tool,
-        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
     ),
     # Cost tools
     "get_cost_totals": (

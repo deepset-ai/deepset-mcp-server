@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Models for the evaluation API: Evaluators, Metric Groups, their scoring runs, Experiments, and Sessions."""
+"""Models for the evaluation API: Evaluators, Evaluation goals, their scoring runs, Experiments, and Sessions."""
 
 from typing import Annotated, Any, Literal
 
@@ -65,7 +65,7 @@ class NoNormalizedMean(BaseModel):
 
 
 class Composite(BaseModel):
-    """The Metric Group's single number for a run."""
+    """A run's single number over its weighted Metrics."""
 
     kind: Literal["value"] = "value"
     value: float = Field(
@@ -87,7 +87,7 @@ class NoComposite(BaseModel):
 
     kind: Literal["missing"] = "missing"
     reason: str = Field(
-        description="Why there is no Composite, for example that the run's Metric Group had no weights when it started."
+        description="Why there is no Composite, for example that the run had no Metric weights when it started."
     )
     missing: list[NoNormalizedMean] = Field(
         default_factory=list,
@@ -230,6 +230,7 @@ class EvaluatorVersionSummary(BaseModel):
         default=False, description="True when the source declares no Metrics and reports one session Metric 'value'"
     )
     created_at: str
+    evaluator_name: str | None = Field(default=None, description="The Evaluator's name")
 
 
 class EvaluatorVersion(EvaluatorVersionSummary):
@@ -276,7 +277,7 @@ class ExperimentRun(BaseModel):
     """One scoring run's lifecycle, without its grid."""
 
     pipeline_experiment_run_id: str
-    pipeline_experiment_id: str
+    pipeline_experiment_id: str | None = None
     status: str = Field(description="Whether the fan-out finished. Not a verdict on the cells.")
     selection: Literal["SAMPLED", "HAND_PICKED"] = Field(
         description="How the Sessions were chosen. Only SAMPLED runs feed trends."
@@ -286,9 +287,9 @@ class ExperimentRun(BaseModel):
     composite_weights: list[CompositeWeight] | None = Field(
         default=None,
         description=(
-            "The Composite formula the run started with: its Metric Group's weights that were usable then. The "
-            "run's Composite always uses these, so editing the group's weights changes only later runs. Null "
-            "when there was nothing to weigh, and the run then has no Composite."
+            "The Composite formula the run started with: the Metric weights that were usable then. The run's "
+            "Composite always uses these, so later weight changes affect only later runs. Null when there was "
+            "nothing to weigh, and the run then has no Composite."
         ),
     )
     window: "SessionWindow | None" = Field(
@@ -298,49 +299,6 @@ class ExperimentRun(BaseModel):
         default=None, description="How many Sessions the run was launched with. Null for runs before it was recorded."
     )
     created_at: str
-
-
-class MetricWeight(BaseModel):
-    """How much one Metric counts toward its Metric Group's Composite."""
-
-    evaluator_id: str = Field(description=_EVALUATOR_ID)
-    metric_key: str = Field(description=_METRIC_KEY)
-    weight: float = Field(
-        description="A number above 0. Weights are relative: they are divided by their sum, so 2, 1 and 1 count as "
-        "0.5, 0.25 and 0.25."
-    )
-
-
-class WeightedMetric(MetricWeight):
-    """A stored weight, with whether the Evaluator's latest version still lets it count."""
-
-    usable: bool = Field(
-        description=(
-            "Whether the Evaluator's latest version still declares the Metric with a Normalized mean. A newer "
-            "version can drop the key or remove its `range`, `better` or `scale`."
-        )
-    )
-    unusable_reason: str | None = Field(
-        default=None, description="Why the weight is not usable, for example that the key is no longer declared."
-    )
-
-
-class MetricGroup(BaseModel):
-    """A named, ordered set of the workspace's Evaluators that a scoring run judges with."""
-
-    metric_group_id: str
-    name: str
-    evaluator_ids: list[str]
-    weights: list[WeightedMetric] = Field(
-        default_factory=list,
-        description=(
-            "How much each Metric counts toward the group's Composite, in the group's Evaluator order. Empty "
-            "when the group has no weights, and then its runs have no Composite. An unusable weight is kept "
-            "and says why; it does not count in new runs."
-        ),
-    )
-    created_at: str
-    updated_at: str | None = None
 
 
 class EvaluationGoal(BaseModel):
@@ -367,12 +325,6 @@ class EvaluationGoal(BaseModel):
     )
     created_at: str
     updated_at: str | None = None
-
-
-class MetricGroupSummary(MetricGroup):
-    """A Metric Group and, when a pipeline was asked about, its most recent scoring run there."""
-
-    last_run: ExperimentRun | None = None
 
 
 class ExperimentScoringCounts(BaseModel):
@@ -412,7 +364,7 @@ class ExperimentSide(BaseModel):
 
 
 class Experiment(BaseModel):
-    """A comparison of a candidate pipeline version against a baseline on one Dataset, scored by one Metric Group."""
+    """A comparison of a candidate pipeline version against a baseline on one Dataset, scored by the same Evaluators."""
 
     experiment_id: str = Field(validation_alias="comparison_id")
     name: str
@@ -420,8 +372,6 @@ class Experiment(BaseModel):
         default=None, validation_alias="session_replay_dataset_id", description="Null once the Dataset is deleted"
     )
     dataset_name: str
-    metric_group_id: str | None = Field(default=None, description="Null once the Metric Group is deleted")
-    metric_group_name: str
     sessions_per_test_case: int
     replay_mode: str
     status: str = Field(
@@ -480,16 +430,6 @@ class ExperimentSidePlan(BaseModel):
     test_cases_short: int = Field(default=0, description="Test cases with fewer than the asked-for Sessions already")
 
 
-class ExperimentPlan(BaseModel):
-    """What creating the Experiment now would do. Advisory: nothing was started."""
-
-    candidate: ExperimentSidePlan
-    baseline: ExperimentSidePlan
-    cells: int = Field(default=0, description="Sessions times Evaluators of the larger side's scoring run")
-    max_cells: int | None = Field(default=None, description="The most cells one scoring run may have")
-    max_runs: int | None = Field(default=None, description="The most replays one side may start")
-
-
 class ExperimentUpdatePlan(BaseModel):
     """What changing an Experiment's sides would do. Advisory: nothing was changed."""
 
@@ -512,7 +452,7 @@ class ExperimentValue(BaseModel):
 
 
 class ExperimentMetric(BaseModel):
-    """One Metric of the Metric Group, candidate against baseline."""
+    """One Metric the Experiment scores, candidate against baseline."""
 
     evaluator_id: str
     evaluator_version_ids: list[str] = Field(description="Every Evaluator version that judged either side")
@@ -573,7 +513,7 @@ class ExperimentTestCaseResult(BaseModel):
 
 
 class ExperimentSideHeadline(BaseModel):
-    """One side's Metrics on the 0-to-1 scale, and the Metric Group's Composite over them."""
+    """One side's Metrics on the 0-to-1 scale, and the Composite over them."""
 
     normalized_means: list[MetricNormalizedMean] = Field(
         default_factory=list, description=_NORMALIZED_MEANS + " Also empty for a side that spans several runs."
@@ -594,7 +534,7 @@ class ExperimentSideHeadline(BaseModel):
 
 
 class ExperimentHeadline(BaseModel):
-    """Each side's single number: the Metric Group's Composite, with the Normalized means it weighs."""
+    """Each side's single number: its Composite, with the Normalized means it weighs."""
 
     candidate: ExperimentSideHeadline
     baseline: ExperimentSideHeadline
@@ -643,7 +583,7 @@ class ExperimentResults(BaseModel):
 
     experiment_id: str = Field(validation_alias="comparison_id")
     status: str = Field(description="REPLAYING, SCORING, ENDED or FAILED")
-    metrics: list[ExperimentMetric] = Field(description="In the Metric Group's order, then by Metric key")
+    metrics: list[ExperimentMetric] = Field(description="In the Evaluators' order, then by Metric key")
     pipeline_metrics: list[ExperimentPipelineMetric] = Field(default_factory=list)
     test_cases: list[ExperimentTestCaseResult] = Field(default_factory=list)
     headline: ExperimentHeadline | None = Field(
@@ -756,7 +696,7 @@ class ExperimentRunGrid(BaseModel):
     composite: CompositeResult | None = Field(
         default=None,
         description=(
-            "The Metric Group's single number for the run, its recorded `run.composite_weights` applied to "
+            "The run's single number, its recorded `run.composite_weights` applied to "
             "`normalized_means`. With `kind` 'value' it has the `value` and its `coverage`. With `kind` "
             "'missing' it has the `reason` there is none and lists in `missing` the weighted Metrics that "
             "have no Normalized mean. Null from an API that predates it."
@@ -828,7 +768,7 @@ class ExperimentRunReport(BaseModel):
     composite: CompositeResult | None = Field(
         default=None,
         description=(
-            "The Metric Group's single number for the run, from 0 to 1 where 1 is best. See `run.composite_weights` "
+            "The run's single number, from 0 to 1 where 1 is best. See `run.composite_weights` "
             "for the formula. With `kind` 'missing' it has the `reason` there is none and the weighted Metrics "
             "that have no Normalized mean in `missing`. Null from an API that predates it."
         ),
@@ -865,30 +805,6 @@ class SessionWindow(BaseModel):
     deployment_id: str | None = Field(default=None, description="Only Sessions this Service served.")
     pipeline_version_id: str | None = Field(default=None, description="Only Sessions this version served.")
     revision_id: str | None = Field(default=None, description="Only Sessions this Service revision served.")
-
-
-class ExperimentRunAccepted(BaseModel):
-    """A queued scoring run: poll it with ``get_experiment_run``."""
-
-    pipeline_experiment_run_id: str
-    cells: int = Field(description="Sessions times Evaluators: how many cells the grid will have")
-
-
-class WindowCeiling(BaseModel):
-    """The largest window run hub-api accepts."""
-
-    sessions: int
-    cells: int
-
-
-class ExperimentRunPreview(BaseModel):
-    """What a window run would judge if it were started now. Advisory: starting it resolves the window again."""
-
-    sessions: int = Field(description="Sessions in the window. With `more_than`, the count stopped here.")
-    more_than: bool = Field(description="The window holds more Sessions than `sessions`, which is over the ceiling")
-    evaluators: int = Field(description="Evaluators in the Metric Group")
-    cells: int = Field(description="Sessions times Evaluators: the judge calls the run would make")
-    ceiling: WindowCeiling
 
 
 class _GoalRunWindowBounds(BaseModel):

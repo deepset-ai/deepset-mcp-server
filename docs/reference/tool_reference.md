@@ -115,19 +115,18 @@ draft/version history. Each deployment tracks its own history of served pipeline
 | --- | --- | --- | --- |
 | `list_evaluators` | required | explorable | List the workspace's Evaluators with the Metrics each declares, optionally only archived or only active ones. |
 | `get_evaluator` | required | explorable | Fetch one Evaluator with its versions, or one version with its Python source. |
-| `list_metric_groups` | required | explorable | List the workspace's Metric Groups, optionally with each one's most recent scoring run on a pipeline. |
 | `list_evaluation_goals` | required | explorable | List the Evaluation Goals (pass/fail targets on a Metric) set on one pipeline, so existing goals are not suggested again. |
 | `list_experiments` | required | explorable | List the workspace's Experiments (a candidate version against a baseline on a Dataset), optionally only those on one pipeline. |
-| `create_experiment` | required | none | Create an Experiment: a candidate pipeline version against a Recorded or Pipeline-version baseline on a Dataset (`preview` first: it costs money). |
+| `create_experiment` | required | none | Create an Experiment scored against a pipeline's Evaluation goals: a candidate version against a Recorded or another version's baseline on a Dataset (`preview` first: it costs money). |
 | `get_experiment` | required | explorable | Read one Experiment: test cases, each side's replays, scoring counts and error. |
 | `update_experiment` | required | none | Rename an Experiment or change a side (replays and judges again; `preview` first). |
 | `rerun_failed_experiment` | required | none | Judge again the failed evaluations, or replay again the failed replays (costs money). |
-| `rescore_experiment` | required | none | Score both sides again with the Metric Group as it is now (bills every evaluation again). |
+| `rescore_experiment` | required | none | Score both sides again with the Evaluators as they are now (bills every evaluation again). |
 | `delete_experiment` | required | none | Delete an Experiment (destructive); its Sessions and scoring runs are kept. |
 | `get_experiment_results` | required | explorable | Read an Experiment's results: each Metric and duration, tokens and cost, candidate against baseline, then per test case. |
 | `get_experiment_run` | required | explorable | Read one scoring run: cell counts, a summary per Metric, the whole-run aggregate, usage and cost, and the grid rows, optionally filtered by origin, Service, version or Session. |
-| `list_experiment_runs` | required | explorable | List a Metric Group's scoring runs on a pipeline, or every run that judged one Session. |
-| `start_experiment_run` | required | none | Score named Sessions or a time window with a Metric Group, outside an Experiment (`preview` a window first: judged Evaluators cost money). |
+| `list_experiment_runs` | required | explorable | List a pipeline's scoring runs, optionally only those before or on Evaluation goals, or every run that judged one Session. |
+| `evaluate_goals` | required | none | Evaluate a pipeline's Evaluation goals now over the last 7 days, a window or a Dataset (`preview` a source first: judged Evaluators cost money). |
 | `run_evaluator` | required | none | Run one saved Evaluator version on one Session and keep the Evaluation Run (judged Evaluators cost money). |
 | `list_evaluation_runs` | required | explorable | List a pipeline's Evaluation Runs, newest first. |
 | `get_evaluation_run` | required | explorable | Read one Evaluation Run: its progress, or its Metrics. |
@@ -145,13 +144,10 @@ draft/version history. Each deployment tracks its own history of served pipeline
 | `update_test_case` | required | none | Change one test case's name, inputs, expected data or scripts. |
 | `copy_test_cases` | required | none | Copy test cases from any Dataset of the workspace into a Dataset. |
 | `remove_test_cases` | required | none | Remove test cases from a Dataset (destructive). |
-| `create_evaluator` | required | none | Create an Evaluator from Python source, optionally adding it to Metric Groups; try the code with `try_evaluator` first. |
+| `create_evaluator` | required | none | Create an Evaluator from Python source; try the code with `try_evaluator` first. |
 | `update_evaluator` | required | none | Rename an Evaluator or save new source as a new version. |
 | `set_evaluator_archived` | required | none | Archive or unarchive an Evaluator; nothing is deleted. |
 | `list_evaluator_templates` | required | explorable | List the built-in Evaluator templates with their code and Metrics. |
-| `create_metric_group` | required | none | Create a Metric Group of Evaluators, optionally with Metric weights for the Composite. |
-| `update_metric_group` | required | none | Replace a Metric Group's name and Evaluators, and optionally its Metric weights. |
-| `delete_metric_group` | required | none | Delete a Metric Group and its scoring runs (destructive). |
 
 ### Cost
 

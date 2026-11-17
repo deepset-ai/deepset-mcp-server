@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Resource for the evaluation API: Evaluators, Metric Groups, their scoring runs, Experiments, and Sessions."""
+"""Resource for the evaluation API: Evaluators, Evaluation goals, their scoring runs, Experiments, and Sessions."""
 
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
@@ -20,21 +20,16 @@ from deepset_mcp.api.evaluation.models import (
     EvaluatorVersion,
     Experiment,
     ExperimentDetail,
-    ExperimentPlan,
     ExperimentResults,
     ExperimentRun,
-    ExperimentRunAccepted,
     ExperimentRunGrid,
-    ExperimentRunPreview,
     ExperimentUpdatePlan,
+    GoalExperimentStarted,
     GoalRunPreview,
     GoalRunSource,
-    MetricGroup,
-    MetricWeight,
     NewTestCase,
     SessionList,
     SessionReplayRun,
-    SessionWindow,
     TestCase,
     TryState,
 )
@@ -49,14 +44,6 @@ if TYPE_CHECKING:
 def _dump(test_cases: list[NewTestCase]) -> list[dict[str, Any]]:
     """Only the fields the caller set: hub-api rejects a test case that sends both a Session and inputs."""
     return [test_case.model_dump(exclude_none=True) for test_case in test_cases]
-
-
-def _metric_group_body(name: str, evaluator_ids: list[str], weights: list[MetricWeight] | None) -> dict[str, Any]:
-    """``weights`` is left out when None, which on update keeps the stored ones; [] clears them."""
-    body: dict[str, Any] = {"name": name, "evaluator_ids": evaluator_ids}
-    if weights is not None:
-        body["weights"] = [weight.model_dump() for weight in weights]
-    return body
 
 
 class EvaluationResource(EvaluationResourceProtocol):
@@ -75,7 +62,7 @@ class EvaluationResource(EvaluationResourceProtocol):
         self._client = client
         self._workspace = workspace
 
-    async def _post(self, path: str, data: dict[str, Any]) -> Any:
+    async def _post(self, path: str, data: dict[str, Any] | None) -> Any:
         resp = await self._client.request(endpoint=path, method="POST", data=data)
         raise_for_status(resp)
         if resp.json is None:
@@ -147,15 +134,6 @@ class EvaluationResource(EvaluationResourceProtocol):
         path = await self._evaluators_path(evaluator_id, "versions", version_id)
         return EvaluatorVersion.model_validate(await self._get(path))
 
-    async def list_metric_groups(self, limit: int = 200) -> list[MetricGroup]:
-        """List the workspace's Metric Groups, newest first.
-
-        :param limit: Maximum number of Metric Groups to return (the API caps it at 200).
-        :returns: The Metric Groups.
-        """
-        data = await self._get(await self._workspace_path("metric-groups"), {"limit": limit})
-        return [MetricGroup.model_validate(item) for item in data or []]
-
     async def list_evaluation_goals(self, pipeline_name: str) -> list[EvaluationGoal]:
         """List the Evaluation Goals set on one pipeline, oldest first.
 
@@ -166,80 +144,62 @@ class EvaluationResource(EvaluationResourceProtocol):
         return [EvaluationGoal.model_validate(item) for item in data or []]
 
     async def list_experiment_runs(
-        self, pipeline_name: str, metric_group_id: str, limit: int = 50
+        self, pipeline_name: str, limit: int = 50, historic: bool | None = None
     ) -> list[ExperimentRun]:
-        """List a Metric Group's scoring runs on one pipeline, newest first, without their grids.
+        """List the scoring runs on one pipeline, newest first, without their grids: the first page only.
 
         :param pipeline_name: Name of the pipeline.
-        :param metric_group_id: The Metric Group's id.
-        :param limit: Maximum number of runs to return.
+        :param limit: Maximum number of runs to return (the API caps it at 100).
+        :param historic: ``True`` for only runs made without Evaluation goals, ``False`` for only those made on
+            them; both, and an Experiment's side runs, when omitted.
         :returns: The runs.
         """
-        path = await self._pipeline_path(pipeline_name, "metric-groups", metric_group_id, "scoring-runs")
-        return [ExperimentRun.model_validate(item) for item in await self._get(path, {"limit": limit}) or []]
+        params: dict[str, Any] = {"limit": limit}
+        if historic is not None:
+            params["historic"] = historic
+        data = await self._get(await self._pipeline_path(pipeline_name, "scoring-run-history"), params)
+        return [ExperimentRun.model_validate(item) for item in (data or {}).get("data", [])]
 
     async def list_session_experiment_runs(
         self, pipeline_name: str, session_id: str, limit: int = 50
     ) -> list[ExperimentRun]:
-        """List the scoring runs, of any Metric Group, that judged one Session, newest first.
+        """List the scoring runs that judged one Session, newest first.
 
         :param pipeline_name: Name of the pipeline.
         :param session_id: The Session the runs judged.
         :param limit: Maximum number of runs to return (the API caps it at 200).
-        :returns: The runs, each naming its Metric Group.
+        :returns: The runs.
         """
         path = await self._pipeline_path(pipeline_name, "scoring-runs")
         data = await self._get(path, {"session_id": session_id, "limit": limit})
         return [ExperimentRun.model_validate(item) for item in data or []]
 
-    async def start_experiment_run(
-        self,
-        pipeline_name: str,
-        metric_group_id: str,
-        session_ids: list[str] | None = None,
-        window: SessionWindow | None = None,
-        reuse: str | None = None,
-        selection: str | None = None,
-        focus: dict[str, list[str]] | None = None,
-    ) -> ExperimentRunAccepted:
-        """Start a scoring run: a Metric Group judging named Sessions, or every Session in a window.
+    async def evaluate_goals(self, pipeline_name: str, source: GoalRunSource | None = None) -> EvaluateGoalsAccepted:
+        """Start a scoring run of the pipeline's Evaluation goals, or return the one already going.
 
         :param pipeline_name: Name of the pipeline.
-        :param metric_group_id: The Metric Group to judge with.
-        :param session_ids: The Sessions to judge. Send this or ``window``.
-        :param window: Judge every Session whose last activity falls in this window. Send this or ``session_ids``.
-        :param reuse: RERUN_ALL or REUSE_SUCCEEDED; omitted, the server's default (RERUN_ALL).
-        :param selection: SAMPLED or HAND_PICKED; omitted, the server's default (SAMPLED).
-        :param focus: Per Session, the turns to judge by query id; a Session left out is judged on every turn.
-        :returns: The queued run and how many cells it will have.
+        :param source: The Sessions to judge; omitted, the API judges the last 7 days of live Sessions.
+        :returns: The run to poll.
         """
-        body: dict[str, Any] = {}
-        if session_ids is not None:
-            body["session_ids"] = session_ids
-        if window is not None:
-            body["window"] = window.model_dump(by_alias=True, exclude_none=True)
-        if reuse is not None:
-            body["reuse"] = reuse
-        if selection is not None:
-            body["selection"] = selection
-        if focus is not None:
-            body["focus"] = focus
-        path = await self._pipeline_path(pipeline_name, "metric-groups", metric_group_id, "scoring-runs")
-        return ExperimentRunAccepted.model_validate(await self._post(path, body))
+        body = None if source is None else {"source": source.model_dump(by_alias=True, exclude_none=True)}
+        data = await self._post(await self._pipeline_path(pipeline_name, "evaluation-goals", "evaluate"), body)
+        return EvaluateGoalsAccepted.model_validate(data)
 
-    async def preview_experiment_run(
-        self, pipeline_name: str, metric_group_id: str, window: SessionWindow
-    ) -> ExperimentRunPreview:
-        """Count what a window run would judge, without starting it.
+    async def preview_goal_run(
+        self, pipeline_name: str, source: GoalRunSource, sessions_per_test_case: int | None = None
+    ) -> GoalRunPreview:
+        """Size what a goal run, or with ``sessions_per_test_case`` an Experiment, would judge. Starts nothing.
 
         :param pipeline_name: Name of the pipeline.
-        :param metric_group_id: The Metric Group the run would judge with.
-        :param window: The window of Sessions.
-        :returns: Sessions, Evaluators and cells, against the ceiling a window run may not pass.
+        :param source: The Sessions it would judge.
+        :param sessions_per_test_case: Given, previews an Experiment scoring this many Sessions per test case.
+        :returns: The counts against the per-run limit.
         """
-        path = await self._pipeline_path(pipeline_name, "metric-groups", metric_group_id, "scoring-runs", "preview")
-        data = await self._post(path, window.model_dump(by_alias=True, exclude_none=True))
-        return ExperimentRunPreview.model_validate(data)
+        body: dict[str, Any] = {"source": source.model_dump(by_alias=True, exclude_none=True)}
+        if sessions_per_test_case is not None:
+            body["experiment"] = {"sessions_per_test_case": sessions_per_test_case}
+        data = await self._post(await self._pipeline_path(pipeline_name, "evaluation-goals", "preview"), body)
+        return GoalRunPreview.model_validate(data)
 
     async def run_evaluator(self, pipeline_name: str, evaluator_version_id: str, session_id: str) -> str:
         """Start one Evaluator version on one Session.
@@ -276,7 +236,6 @@ class EvaluationResource(EvaluationResourceProtocol):
     async def get_experiment_run(
         self,
         pipeline_name: str,
-        metric_group_id: str,
         run_id: str,
         origin: str | None = None,
         deployment_id: str | None = None,
@@ -286,7 +245,6 @@ class EvaluationResource(EvaluationResourceProtocol):
         """Fetch one scoring run as a grid of Sessions by Evaluators.
 
         :param pipeline_name: Name of the pipeline.
-        :param metric_group_id: The Metric Group's id.
         :param run_id: The run's id.
         :param origin: Only cells whose Session came from SERVICE, PIPELINE_RUN or PLAYGROUND.
         :param deployment_id: Only cells whose Session this Service served.
@@ -300,122 +258,50 @@ class EvaluationResource(EvaluationResourceProtocol):
             "pipeline_version_id": pipeline_version_id,
             "session_id": session_id,
         }
-        path = await self._pipeline_path(pipeline_name, "metric-groups", metric_group_id, "scoring-runs", run_id)
+        path = await self._pipeline_path(pipeline_name, "scoring-runs", run_id)
         query = {k: v for k, v in params.items() if v is not None}
         return ExperimentRunGrid.model_validate(await self._get(path, query))
 
     async def create_experiment(
         self,
+        pipeline_name: str,
         name: str,
         dataset_id: str,
-        metric_group_id: str,
-        candidate_pipeline_name: str,
         candidate_pipeline_version_id: str,
-        baseline_pipeline_name: str | None = None,
         baseline_pipeline_version_id: str | None = None,
         sessions_per_test_case: int = 1,
         replay_mode: str = "FIRST_USER_MESSAGE",
-        reuse_sessions: bool = True,
-    ) -> Experiment:
-        """Create an Experiment: a candidate pipeline version against a baseline on one Dataset.
+    ) -> GoalExperimentStarted:
+        """Start an Experiment scored against the pipeline's Evaluation goals: two of its versions on one Dataset.
 
+        :param pipeline_name: Name of the pipeline both sides are versions of.
         :param name: Human-readable name.
-        :param dataset_id: The Dataset's id (the UI's Dataset dropdown).
-        :param metric_group_id: The Metric Group to score with.
-        :param candidate_pipeline_name: Name of the candidate pipeline.
+        :param dataset_id: The Dataset's id.
         :param candidate_pipeline_version_id: Candidate version id.
-        :param baseline_pipeline_name: Baseline pipeline name; None means a Recorded baseline.
-        :param baseline_pipeline_version_id: Baseline version id; required when baseline_pipeline_name is given.
+        :param baseline_pipeline_version_id: Baseline version id; None means a Recorded baseline.
         :param sessions_per_test_case: Repetitions per test case (1..50).
         :param replay_mode: FIRST_USER_MESSAGE or ALL_USER_MESSAGES.
-        :param reuse_sessions: False replays every Session each side scores instead of reusing existing ones.
-        :returns: The created Experiment.
+        :returns: The Experiment's and its Dataset's ids.
         """
+        baseline: dict[str, Any] = (
+            {"recorded": True}
+            if baseline_pipeline_version_id is None
+            else {"pipeline_version_id": baseline_pipeline_version_id}
+        )
         body = {
             "name": name,
-            **await self._experiment_targets(
-                dataset_id,
-                metric_group_id,
-                candidate_pipeline_name,
-                candidate_pipeline_version_id,
-                baseline_pipeline_name,
-                baseline_pipeline_version_id,
-                sessions_per_test_case,
-                replay_mode,
-                reuse_sessions,
-            ),
-        }
-        data = await self._post(await self._workspace_path("experiments"), body)
-        return Experiment.model_validate(data)
-
-    async def _experiment_targets(
-        self,
-        dataset_id: str,
-        metric_group_id: str,
-        candidate_pipeline_name: str,
-        candidate_pipeline_version_id: str,
-        baseline_pipeline_name: str | None,
-        baseline_pipeline_version_id: str | None,
-        sessions_per_test_case: int,
-        replay_mode: str,
-        reuse_sessions: bool,
-    ) -> dict[str, Any]:
-        """What an Experiment compares: the body of a preview, and of a create once it has a name."""
-        body: dict[str, Any] = {
-            "session_replay_dataset_id": dataset_id,
-            "metric_group_id": metric_group_id,
-            "candidate": await self._side(candidate_pipeline_name, candidate_pipeline_version_id),
+            "source": {"kind": "dataset", "session_replay_dataset_id": dataset_id},
+            "candidate": {"pipeline_version_id": candidate_pipeline_version_id},
+            "baseline": baseline,
             "sessions_per_test_case": sessions_per_test_case,
             "replay_mode": replay_mode,
         }
-        if baseline_pipeline_name is not None:
-            body["baseline"] = await self._side(baseline_pipeline_name, baseline_pipeline_version_id)
-        if not reuse_sessions:
-            body["reuse_sessions"] = False
-        return body
+        path = await self._pipeline_path(pipeline_name, "evaluation-goals", "experiments")
+        return GoalExperimentStarted.model_validate(await self._post(path, body))
 
     async def _side(self, pipeline_name: str, pipeline_version_id: str | None) -> dict[str, Any]:
         pipeline_id = await ids.pipeline_id(self._client, self._workspace, pipeline_name)
         return {"pipeline_id": pipeline_id, "pipeline_version_id": pipeline_version_id}
-
-    async def preview_experiment(
-        self,
-        dataset_id: str,
-        metric_group_id: str,
-        candidate_pipeline_name: str,
-        candidate_pipeline_version_id: str,
-        baseline_pipeline_name: str | None = None,
-        baseline_pipeline_version_id: str | None = None,
-        sessions_per_test_case: int = 1,
-        replay_mode: str = "FIRST_USER_MESSAGE",
-        reuse_sessions: bool = True,
-    ) -> ExperimentPlan:
-        """Plan an Experiment without starting it: Sessions reused and replays needed per side.
-
-        :param dataset_id: The Dataset's id.
-        :param metric_group_id: The Metric Group to score with.
-        :param candidate_pipeline_name: Name of the candidate pipeline.
-        :param candidate_pipeline_version_id: Candidate version id.
-        :param baseline_pipeline_name: Baseline pipeline name; None means a Recorded baseline.
-        :param baseline_pipeline_version_id: Baseline version id; required when baseline_pipeline_name is given.
-        :param sessions_per_test_case: Repetitions per test case (1..50).
-        :param replay_mode: FIRST_USER_MESSAGE or ALL_USER_MESSAGES.
-        :param reuse_sessions: False replays every Session each side scores instead of reusing existing ones.
-        :returns: The plan.
-        """
-        body = await self._experiment_targets(
-            dataset_id,
-            metric_group_id,
-            candidate_pipeline_name,
-            candidate_pipeline_version_id,
-            baseline_pipeline_name,
-            baseline_pipeline_version_id,
-            sessions_per_test_case,
-            replay_mode,
-            reuse_sessions,
-        )
-        data = await self._post(await self._workspace_path("experiments", "preview"), body)
-        return ExperimentPlan.model_validate(data)
 
     async def get_experiment(self, experiment_id: str) -> ExperimentDetail:
         """Fetch one Experiment with its test cases and each side's progress.
@@ -523,7 +409,7 @@ class EvaluationResource(EvaluationResourceProtocol):
         return Experiment.model_validate(data)
 
     async def rescore_experiment(self, experiment_id: str) -> Experiment:
-        """Score both sides again with the Metric Group as it is now.
+        """Score both sides again with the Evaluators as they are now.
 
         :param experiment_id: The Experiment's id.
         :returns: The Experiment.
@@ -781,26 +667,14 @@ class EvaluationResource(EvaluationResourceProtocol):
         path = await self._workspace_path("datasets", dataset_id, "test-cases", test_case_id)
         return TestCase.model_validate(await self._put(path, changes))
 
-    async def create_evaluator(
-        self,
-        name: str,
-        python_code: str,
-        metric_group_ids: list[str] | None = None,
-        new_metric_group_name: str | None = None,
-    ) -> Evaluator:
-        """Create an Evaluator and its first version, optionally adding it to Metric Groups.
+    async def create_evaluator(self, name: str, python_code: str) -> Evaluator:
+        """Create an Evaluator and its first version.
 
         :param name: The Evaluator's name; unused in the workspace.
         :param python_code: The Evaluation Function's source.
-        :param metric_group_ids: Existing Metric Groups to add it to, each at the end of its set.
-        :param new_metric_group_name: Creates a Metric Group of this name with the Evaluator as its only member.
         :returns: The created Evaluator.
         """
-        body: dict[str, Any] = {"name": name, "python_code": python_code}
-        if metric_group_ids:
-            body["metric_group_ids"] = metric_group_ids
-        if new_metric_group_name is not None:
-            body["new_metric_group_name"] = new_metric_group_name
+        body = {"name": name, "python_code": python_code}
         return Evaluator.model_validate(await self._post(await self._evaluators_path(), body))
 
     async def update_evaluator(
@@ -833,48 +707,3 @@ class EvaluationResource(EvaluationResourceProtocol):
         """
         data = await self._get(await self._workspace_path("evaluator-templates"))
         return [EvaluatorTemplate.model_validate(item) for item in data or []]
-
-    async def create_metric_group(
-        self, name: str, evaluator_ids: list[str], weights: list[MetricWeight] | None = None
-    ) -> MetricGroup:
-        """Create a Metric Group of Evaluators, optionally with Metric weights.
-
-        :param name: The Metric Group's name.
-        :param evaluator_ids: The Evaluators it runs, in order.
-        :param weights: How much each Metric counts toward the Composite; none by default.
-        :returns: The created Metric Group.
-        """
-        body = _metric_group_body(name, evaluator_ids, weights)
-        return MetricGroup.model_validate(await self._post(await self._workspace_path("metric-groups"), body))
-
-    async def update_metric_group(
-        self, metric_group_id: str, name: str, evaluator_ids: list[str], weights: list[MetricWeight] | None = None
-    ) -> MetricGroup:
-        """Replace a Metric Group's name and Evaluator set; weights only when given.
-
-        :param metric_group_id: The Metric Group's id.
-        :param name: The name to keep or change to.
-        :param evaluator_ids: Every Evaluator the group keeps, in order.
-        :param weights: Replaces the weights (an empty list clears them); None keeps those of the Evaluators that stay.
-        :returns: The Metric Group.
-        """
-        body = _metric_group_body(name, evaluator_ids, weights)
-        path = await self._workspace_path("metric-groups", metric_group_id)
-        return MetricGroup.model_validate(await self._put(path, body))
-
-    async def delete_metric_group(self, metric_group_id: str) -> None:
-        """Delete a Metric Group and its Experiment runs. The Evaluators stay.
-
-        :param metric_group_id: The Metric Group's id.
-        """
-        await self._delete(await self._workspace_path("metric-groups", metric_group_id))
-
-    async def evaluate_goals(self, pipeline_name: str, source: GoalRunSource | None = None) -> EvaluateGoalsAccepted:
-        """Stub."""
-        raise NotImplementedError
-
-    async def preview_goal_run(
-        self, pipeline_name: str, source: GoalRunSource, sessions_per_test_case: int | None = None
-    ) -> GoalRunPreview:
-        """Stub."""
-        raise NotImplementedError

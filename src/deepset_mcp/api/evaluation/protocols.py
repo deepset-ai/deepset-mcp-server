@@ -7,6 +7,7 @@ from typing import Any, Protocol
 from deepset_mcp.api.evaluation.models import (
     Dataset,
     DatasetSummary,
+    EvaluateGoalsAccepted,
     EvaluationGoal,
     EvaluationRun,
     Evaluator,
@@ -14,19 +15,16 @@ from deepset_mcp.api.evaluation.models import (
     EvaluatorVersion,
     Experiment,
     ExperimentDetail,
-    ExperimentPlan,
     ExperimentResults,
     ExperimentRun,
-    ExperimentRunAccepted,
     ExperimentRunGrid,
-    ExperimentRunPreview,
     ExperimentUpdatePlan,
-    MetricGroup,
-    MetricWeight,
+    GoalExperimentStarted,
+    GoalRunPreview,
+    GoalRunSource,
     NewTestCase,
     SessionList,
     SessionReplayRun,
-    SessionWindow,
     TestCase,
     TryState,
 )
@@ -47,43 +45,30 @@ class EvaluationResourceProtocol(Protocol):
         """Fetch one Evaluator version with its source."""
         ...
 
-    async def list_metric_groups(self, limit: int = 200) -> list[MetricGroup]:
-        """List the workspace's Metric Groups."""
-        ...
-
     async def list_evaluation_goals(self, pipeline_name: str) -> list[EvaluationGoal]:
         """List the Evaluation Goals set on one pipeline, oldest first."""
         ...
 
     async def list_experiment_runs(
-        self, pipeline_name: str, metric_group_id: str, limit: int = 50
+        self, pipeline_name: str, limit: int = 50, historic: bool | None = None
     ) -> list[ExperimentRun]:
-        """List a Metric Group's scoring runs on one pipeline, newest first."""
+        """List the scoring runs on one pipeline, newest first."""
         ...
 
     async def list_session_experiment_runs(
         self, pipeline_name: str, session_id: str, limit: int = 50
     ) -> list[ExperimentRun]:
-        """List the scoring runs, of any Metric Group, that judged one Session, newest first."""
+        """List the scoring runs that judged one Session, newest first."""
         ...
 
-    async def start_experiment_run(
-        self,
-        pipeline_name: str,
-        metric_group_id: str,
-        session_ids: list[str] | None = None,
-        window: SessionWindow | None = None,
-        reuse: str | None = None,
-        selection: str | None = None,
-        focus: dict[str, list[str]] | None = None,
-    ) -> ExperimentRunAccepted:
-        """Start a scoring run: a Metric Group judging named Sessions, or every Session in a window."""
+    async def evaluate_goals(self, pipeline_name: str, source: GoalRunSource | None = None) -> EvaluateGoalsAccepted:
+        """Start a scoring run of the pipeline's Evaluation goals, or return the one already going."""
         ...
 
-    async def preview_experiment_run(
-        self, pipeline_name: str, metric_group_id: str, window: SessionWindow
-    ) -> ExperimentRunPreview:
-        """Count what a window run would judge, without starting it."""
+    async def preview_goal_run(
+        self, pipeline_name: str, source: GoalRunSource, sessions_per_test_case: int | None = None
+    ) -> GoalRunPreview:
+        """Size what a goal run, or with ``sessions_per_test_case`` an Experiment, would judge."""
         ...
 
     async def run_evaluator(self, pipeline_name: str, evaluator_version_id: str, session_id: str) -> str:
@@ -101,7 +86,6 @@ class EvaluationResourceProtocol(Protocol):
     async def get_experiment_run(
         self,
         pipeline_name: str,
-        metric_group_id: str,
         run_id: str,
         origin: str | None = None,
         deployment_id: str | None = None,
@@ -113,18 +97,15 @@ class EvaluationResourceProtocol(Protocol):
 
     async def create_experiment(
         self,
+        pipeline_name: str,
         name: str,
         dataset_id: str,
-        metric_group_id: str,
-        candidate_pipeline_name: str,
         candidate_pipeline_version_id: str,
-        baseline_pipeline_name: str | None = None,
         baseline_pipeline_version_id: str | None = None,
         sessions_per_test_case: int = 1,
         replay_mode: str = "FIRST_USER_MESSAGE",
-        reuse_sessions: bool = True,
-    ) -> Experiment:
-        """Create an Experiment comparing a candidate pipeline version against a baseline."""
+    ) -> GoalExperimentStarted:
+        """Start an Experiment scored against the pipeline's Evaluation goals."""
         ...
 
     async def list_experiments(self, pipeline_name: str | None = None, limit: int = 50) -> list[Experiment]:
@@ -216,14 +197,8 @@ class EvaluationResourceProtocol(Protocol):
         """Change one test case; a field left out of ``changes`` is kept, one sent as None is removed."""
         ...
 
-    async def create_evaluator(
-        self,
-        name: str,
-        python_code: str,
-        metric_group_ids: list[str] | None = None,
-        new_metric_group_name: str | None = None,
-    ) -> Evaluator:
-        """Create an Evaluator and its first version, optionally adding it to Metric Groups."""
+    async def create_evaluator(self, name: str, python_code: str) -> Evaluator:
+        """Create an Evaluator and its first version."""
         ...
 
     async def update_evaluator(
@@ -238,37 +213,6 @@ class EvaluationResourceProtocol(Protocol):
 
     async def list_evaluator_templates(self) -> list[EvaluatorTemplate]:
         """List the built-in Evaluator templates."""
-        ...
-
-    async def create_metric_group(
-        self, name: str, evaluator_ids: list[str], weights: list[MetricWeight] | None = None
-    ) -> MetricGroup:
-        """Create a Metric Group of Evaluators, optionally with Metric weights."""
-        ...
-
-    async def update_metric_group(
-        self, metric_group_id: str, name: str, evaluator_ids: list[str], weights: list[MetricWeight] | None = None
-    ) -> MetricGroup:
-        """Replace a Metric Group's name and Evaluator set; weights only when given."""
-        ...
-
-    async def delete_metric_group(self, metric_group_id: str) -> None:
-        """Delete a Metric Group and its Experiment runs."""
-        ...
-
-    async def preview_experiment(
-        self,
-        dataset_id: str,
-        metric_group_id: str,
-        candidate_pipeline_name: str,
-        candidate_pipeline_version_id: str,
-        baseline_pipeline_name: str | None = None,
-        baseline_pipeline_version_id: str | None = None,
-        sessions_per_test_case: int = 1,
-        replay_mode: str = "FIRST_USER_MESSAGE",
-        reuse_sessions: bool = True,
-    ) -> ExperimentPlan:
-        """Plan an Experiment without starting it: Sessions reused and replays needed per side."""
         ...
 
     async def get_experiment(self, experiment_id: str) -> ExperimentDetail:
@@ -306,7 +250,7 @@ class EvaluationResourceProtocol(Protocol):
         ...
 
     async def rescore_experiment(self, experiment_id: str) -> Experiment:
-        """Score both sides again with the Metric Group as it is now."""
+        """Score both sides again with the Evaluators as they are now."""
         ...
 
     async def delete_experiment(self, experiment_id: str) -> None:
