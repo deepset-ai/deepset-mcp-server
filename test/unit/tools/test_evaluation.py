@@ -1625,7 +1625,7 @@ async def test_delete_metric_group_confirms_in_a_string() -> None:
     [
         ResourceNotFoundError(message="Evaluator not found"),
         BadRequestError(message="bad"),
-        UnexpectedAPIError(status_code=409, message="An evaluator named 'N' already exists"),
+        UnexpectedAPIError(status_code=409, message="Evaluator is in use"),
     ],
 )
 async def test_evaluator_and_metric_group_write_tools_return_the_api_message_instead_of_raising(

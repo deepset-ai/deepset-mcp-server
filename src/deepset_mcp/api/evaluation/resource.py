@@ -787,7 +787,7 @@ class EvaluationResource(EvaluationResourceProtocol):
     ) -> Evaluator:
         """Create an Evaluator and its first version, optionally adding it to Metric Groups.
 
-        :param name: The Evaluator's name; unused in the workspace.
+        :param name: The Evaluator's name; it need not be unique in the workspace.
         :param python_code: The Evaluation Function's source.
         :param metric_group_ids: Existing Metric Groups to add it to, each at the end of its set.
         :param new_metric_group_name: Creates a Metric Group of this name with the Evaluator as its only member.

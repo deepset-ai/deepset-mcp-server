@@ -990,15 +990,15 @@ async def create_evaluator(
     Always validate new code first: run it on a real Session with ``try_evaluator`` and fix what it
     reports before saving. ``python_code`` is the Evaluation Function; its ``@metrics`` declaration
     names the Metrics it reports, and hub-api rejects code whose declaration it cannot read. Start
-    from ``list_evaluator_templates`` rather than from scratch. The name must be unused in the
-    workspace. The Evaluator scores nothing until a Metric Group runs it: add it to existing groups
+    from ``list_evaluator_templates`` rather than from scratch. The name need not be unique: Evaluators
+    are identified by id. The Evaluator scores nothing until a Metric Group runs it: add it to existing groups
     with ``metric_group_ids`` (each at the end of its set), to a new group with
     ``new_metric_group_name``, or later with ``update_metric_group``. Change it later with
     ``update_evaluator``.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
-    :param name: The Evaluator's name; must not exist in the workspace yet.
+    :param name: The Evaluator's name; it need not be unique in the workspace.
     :param python_code: The Evaluation Function's Python source.
     :param metric_group_ids: Existing Metric Groups to add it to.
     :param new_metric_group_name: Also creates a Metric Group of this name holding only this Evaluator.
@@ -1032,7 +1032,7 @@ async def update_evaluator(
     :param client: The async client for API communication.
     :param workspace: The workspace name.
     :param evaluator_id: The Evaluator's id.
-    :param name: The new name; must not be taken.
+    :param name: The new name; it need not be unique in the workspace.
     :param python_code: The new Python source.
     :returns: The Evaluator, or an error message.
     """
