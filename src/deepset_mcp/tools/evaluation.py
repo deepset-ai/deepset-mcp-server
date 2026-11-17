@@ -1208,6 +1208,8 @@ async def evaluate_goals(
     most ``max_sessions``; ``dataset`` judges the Sessions a Dataset (``dataset_id``, see
     ``list_datasets``) recorded on this pipeline, as recorded, with nothing replayed; ``new_dataset``
     keeps a window's newest live Sessions as a new Dataset called ``name`` and judges them.
+    To judge specific Sessions, put them in a Dataset (``create_dataset`` or ``copy_test_cases``) and
+    pass a ``dataset`` source; to judge one Session with one Evaluator, use ``run_evaluator``.
 
     Preview first: ``preview=True`` with a ``source`` starts nothing and returns ``sessions``,
     ``judged`` and ``judgments`` (the judge calls it would make) against ``limit``. Show that to the
