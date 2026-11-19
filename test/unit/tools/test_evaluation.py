@@ -25,6 +25,8 @@ from deepset_mcp.api.evaluation.models import (
     ExperimentRunGrid,
     ExperimentRunReport,
     ExperimentUpdatePlan,
+    GoalAggregation,
+    GoalCategory,
     GoalExperimentStarted,
     GoalRunDataset,
     GoalRunPreview,
@@ -411,10 +413,30 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
         ]
 
     async def create_evaluation_goal(
-        self, pipeline_name: str, name: str, evaluator_id: str, **fields: Any
+        self,
+        pipeline_name: str,
+        name: str,
+        evaluator_id: str,
+        description: str = "",
+        threshold: float | None = None,
+        passing_values: list[str] | None = None,
+        min_pass_rate: float = 1.0,
+        category: GoalCategory | None = None,
+        aggregation: GoalAggregation | None = None,
+        percentile: float | None = None,
     ) -> EvaluationGoal:
         self._record(
-            "create_evaluation_goal", pipeline_name=pipeline_name, name=name, evaluator_id=evaluator_id, **fields
+            "create_evaluation_goal",
+            pipeline_name=pipeline_name,
+            name=name,
+            evaluator_id=evaluator_id,
+            description=description,
+            threshold=threshold,
+            passing_values=passing_values,
+            min_pass_rate=min_pass_rate,
+            category=category,
+            aggregation=aggregation,
+            percentile=percentile,
         )
         return fake_goal(name=name)
 
@@ -423,7 +445,18 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
         return fake_goal()
 
     async def update_evaluation_goal(
-        self, pipeline_name: str, evaluation_goal_id: str, name: str, evaluator_id: str, **fields: Any
+        self,
+        pipeline_name: str,
+        evaluation_goal_id: str,
+        name: str,
+        evaluator_id: str,
+        description: str = "",
+        threshold: float | None = None,
+        passing_values: list[str] | None = None,
+        min_pass_rate: float = 1.0,
+        category: GoalCategory | None = None,
+        aggregation: GoalAggregation | None = None,
+        percentile: float | None = None,
     ) -> EvaluationGoal:
         self._record(
             "update_evaluation_goal",
@@ -431,7 +464,13 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
             evaluation_goal_id=evaluation_goal_id,
             name=name,
             evaluator_id=evaluator_id,
-            **fields,
+            description=description,
+            threshold=threshold,
+            passing_values=passing_values,
+            min_pass_rate=min_pass_rate,
+            category=category,
+            aggregation=aggregation,
+            percentile=percentile,
         )
         return fake_goal(name=name)
 
