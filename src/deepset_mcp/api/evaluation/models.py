@@ -412,7 +412,10 @@ class ExperimentSide(BaseModel):
 
 
 class Experiment(BaseModel):
-    """A comparison of a candidate pipeline version against a baseline on one Dataset, scored by one Metric Group."""
+    """A comparison of a candidate pipeline version against a baseline on one Dataset.
+
+    It is scored by its Metric Group, when it has one.
+    """
 
     experiment_id: str = Field(validation_alias="comparison_id")
     name: str
@@ -421,7 +424,7 @@ class Experiment(BaseModel):
     )
     dataset_name: str
     metric_group_id: str | None = Field(default=None, description="Null once the Metric Group is deleted")
-    metric_group_name: str
+    metric_group_name: str | None = Field(default=None, description="Null when the Experiment has no Metric Group")
     sessions_per_test_case: int
     replay_mode: str
     status: str = Field(
