@@ -8,7 +8,6 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from deepset_mcp.api.evaluation.models import (
-    Composite,
     Dataset,
     DatasetSummary,
     EvaluateGoalsAccepted,
@@ -35,7 +34,6 @@ from deepset_mcp.api.evaluation.models import (
     LabelAggregate,
     MetricDeclaration,
     NewTestCase,
-    NoComposite,
     NoNormalizedMean,
     NormalizedMean,
     ScoreAggregate,
@@ -1276,6 +1274,7 @@ async def test_get_experiment_results_from_an_older_api_reads_every_change_as_un
     assert [(m.better, m.change) for m in results.metrics] == [(None, "unknown")]
 
 
+COMPOSITE = {"kind": "value", "value": 0.6, "coverage": 1.0}
 WEIGHT = {"evaluator_id": E1, "metric_key": "accuracy", "weight": 2.0}
 
 
@@ -1298,7 +1297,7 @@ async def _report(resource_grid: ExperimentRunGrid) -> ExperimentRunReport:
 
 
 @pytest.mark.asyncio
-async def test_get_experiment_run_reports_the_formula_normalized_means_and_composite() -> None:
+async def test_get_experiment_run_reports_the_normalized_means_and_ignores_the_composite_the_api_still_sends() -> None:
     report = await _report(
         _grid_with(
             run={"composite_weights": [WEIGHT]},
@@ -1306,49 +1305,33 @@ async def test_get_experiment_run_reports_the_formula_normalized_means_and_compo
                 {"kind": "value", "evaluator_id": E1, "metric_key": "accuracy", "value": 0.6},
                 {"kind": "missing", "evaluator_id": E1, "metric_key": "answered", "reason": "no Scale"},
             ],
-            composite={"kind": "value", "value": 0.6, "coverage": 1.0},
+            composite=COMPOSITE,
         )
     )
 
-    assert [(w.metric_key, w.weight) for w in report.run.composite_weights or []] == [("accuracy", 2.0)]
     assert [type(m) for m in report.normalized_means] == [NormalizedMean, NoNormalizedMean]
-    assert report.composite == Composite(value=0.6, coverage=1.0)
+    assert "composite" not in report.model_dump()
+    assert "composite_weights" not in report.run.model_dump()
 
 
 @pytest.mark.asyncio
-async def test_get_experiment_run_says_why_there_is_no_composite() -> None:
-    report = await _report(
-        _grid_with(
-            composite={
-                "kind": "missing",
-                "reason": "some weighted Metrics have no Normalized mean",
-                "missing": [{"kind": "missing", "evaluator_id": E1, "metric_key": "answered", "reason": "no Scale"}],
-            }
-        )
-    )
-
-    assert isinstance(report.composite, NoComposite)
-    assert [(m.metric_key, m.reason) for m in report.composite.missing] == [("answered", "no Scale")]
-    assert report.run.composite_weights is None
-
-
-@pytest.mark.asyncio
-async def test_get_experiment_run_from_an_older_api_has_no_composite_fields() -> None:
+async def test_get_experiment_run_from_an_older_api_has_no_normalized_means() -> None:
     report = await _report(grid())
 
-    assert (report.run.composite_weights, report.normalized_means, report.composite) == (None, [], None)
+    assert report.normalized_means == []
 
 
-def _side(composite: dict[str, Any]) -> dict[str, Any]:
-    return {"normalized_means": [], "composite": composite}
+def _side(**extra: Any) -> dict[str, Any]:
+    """One side of a headline, with the Composite keys the API still sends unless overridden."""
+    return {"normalized_means": [], "composite": COMPOSITE, **extra}
 
 
 @pytest.mark.asyncio
-async def test_get_experiment_results_reports_each_sides_composite_and_why_they_are_incomparable() -> None:
+async def test_get_experiment_results_reports_why_the_sides_are_incomparable() -> None:
     payload = experiment_results(test_cases=1)
     payload["headline"] = {
-        "candidate": _side({"kind": "value", "value": 0.8, "coverage": 1.0}),
-        "baseline": _side({"kind": "value", "value": 0.7, "coverage": 0.5}),
+        "candidate": _side(),
+        "baseline": _side(),
         "comparable": False,
         "incomparable_reason": "the runs weighed different Metrics",
     }
@@ -1359,7 +1342,7 @@ async def test_get_experiment_results_reports_each_sides_composite_and_why_they_
 
     assert isinstance(results, ExperimentResultsReport)
     assert results.headline is not None
-    assert results.headline.candidate.composite == Composite(value=0.8, coverage=1.0)
+    assert "composite" not in results.headline.candidate.model_dump()
     assert (results.headline.comparable, results.headline.incomparable_reason) == (
         False,
         "the runs weighed different Metrics",
@@ -1367,12 +1350,9 @@ async def test_get_experiment_results_reports_each_sides_composite_and_why_they_
 
 
 @pytest.mark.asyncio
-async def test_get_experiment_results_headline_is_comparable_without_a_reason_and_may_lack_a_composite() -> None:
+async def test_get_experiment_results_headline_is_comparable_without_a_reason() -> None:
     payload = experiment_results(test_cases=1)
-    payload["headline"] = {
-        "candidate": _side({"kind": "value", "value": 0.8, "coverage": 1.0}),
-        "baseline": _side({"kind": "missing", "reason": "not scored yet"}),
-    }
+    payload["headline"] = {"candidate": _side(), "baseline": _side()}
 
     results = await get_experiment_results(
         client=FakeClient(FakeEvaluationResource(results=payload)), workspace=WORKSPACE, experiment_id=COMPARISON_ID
@@ -1381,7 +1361,6 @@ async def test_get_experiment_results_headline_is_comparable_without_a_reason_an
     assert isinstance(results, ExperimentResultsReport)
     assert results.headline is not None
     assert (results.headline.comparable, results.headline.incomparable_reason) == (True, None)
-    assert results.headline.baseline.composite == NoComposite(reason="not scored yet")
 
 
 @pytest.mark.asyncio
@@ -1886,13 +1865,8 @@ def _aggregate(**fields: Any) -> dict[str, Any]:
 
 
 @pytest.mark.asyncio
-async def test_get_experiment_results_reports_each_sides_whole_run_aggregate_and_formula() -> None:
-    weights = [{"evaluator_id": E1, "metric_key": "helpful", "weight": 2.0}]
+async def test_get_experiment_results_reports_each_sides_whole_run_aggregate() -> None:
     payload = experiment_results(test_cases=1)
-    payload["headline"] = {
-        "candidate": {**_side({"kind": "value", "value": 0.8, "coverage": 1.0}), "composite_weights": weights},
-        "baseline": _side({"kind": "missing", "reason": "not scored yet"}),
-    }
     payload["aggregates"] = [
         {
             "evaluator_id": E1,
@@ -1921,9 +1895,6 @@ async def test_get_experiment_results_reports_each_sides_whole_run_aggregate_and
     )
 
     assert isinstance(results, ExperimentResultsReport)
-    assert results.headline is not None
-    assert [(w.metric_key, w.weight) for w in results.headline.candidate.composite_weights] == [("helpful", 2.0)]
-    assert results.headline.baseline.composite_weights == []
     helpful, tone = results.aggregates
     assert (helpful.delta, helpful.change) == (0.3, "improved")
     assert isinstance(helpful.candidate, ScoreAggregate) and helpful.candidate.mean == 0.9

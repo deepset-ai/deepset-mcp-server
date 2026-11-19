@@ -22,19 +22,6 @@ _EVALUATOR_ID = "The Evaluator the Metric belongs to."
 _METRIC_KEY = "The Metric, by the key its Evaluator declares, for example `helpful`."
 
 
-class CompositeWeight(BaseModel):
-    """How much one Metric counted toward a scoring run's Composite, as the run recorded it when it started."""
-
-    evaluator_id: str = Field(description=_EVALUATOR_ID)
-    metric_key: str = Field(description=_METRIC_KEY)
-    weight: float = Field(
-        description=(
-            "The Metric's weight when the run started, a number above 0. Weights are relative: the Composite "
-            "divides each by their sum, so 2, 1 and 1 count as 0.5, 0.25 and 0.25."
-        )
-    )
-
-
 class NormalizedMean(BaseModel):
     """A Metric's whole-run value on a scale from 0 to 1, where 1 is best."""
 
@@ -64,42 +51,7 @@ class NoNormalizedMean(BaseModel):
     )
 
 
-class Composite(BaseModel):
-    """A run's single number over its weighted Metrics."""
-
-    kind: Literal["value"] = "value"
-    value: float = Field(
-        description=(
-            "The weighted mean of the weighted Metrics' Normalized means, from 0 to 1 where 1 is best. It is "
-            "a number to compare runs by, not a verdict that the run is good."
-        )
-    )
-    coverage: float = Field(
-        description=(
-            "The lowest share of judged Sessions that have a value, among the weighted Metrics. Low coverage "
-            "means the Composite rests on few Sessions."
-        )
-    )
-
-
-class NoComposite(BaseModel):
-    """Why a run has no Composite."""
-
-    kind: Literal["missing"] = "missing"
-    reason: str = Field(
-        description="Why there is no Composite, for example that the run had no Metric weights when it started."
-    )
-    missing: list[NoNormalizedMean] = Field(
-        default_factory=list,
-        description=(
-            "The weighted Metrics that have no Normalized mean in this run, each with why. The Composite needs "
-            "every one of them, so fixing these is what brings it back."
-        ),
-    )
-
-
 MetricNormalizedMean = Annotated[NormalizedMean | NoNormalizedMean, Field(discriminator="kind")]
-CompositeResult = Annotated[Composite | NoComposite, Field(discriminator="kind")]
 
 _NORMALIZED_MEANS = (
     "Each Metric on one scale from 0 to 1, where 1 is best. An entry with `kind` 'value' has the `value`; one "
@@ -284,14 +236,6 @@ class ExperimentRun(BaseModel):
     )
     started_at: str | None = None
     ended_at: str | None = None
-    composite_weights: list[CompositeWeight] | None = Field(
-        default=None,
-        description=(
-            "The Composite formula the run started with: the Metric weights that were usable then. The run's "
-            "Composite always uses these, so later weight changes affect only later runs. Null when there was "
-            "nothing to weigh, and the run then has no Composite."
-        ),
-    )
     window: "SessionWindow | None" = Field(
         default=None, description="The window this run judged, or null for a run that named its Sessions."
     )
@@ -550,41 +494,27 @@ class ExperimentTestCaseResult(BaseModel):
 
 
 class ExperimentSideHeadline(BaseModel):
-    """One side's Metrics on the 0-to-1 scale, and the Composite over them."""
+    """One side's Metrics on the 0-to-1 scale."""
 
     normalized_means: list[MetricNormalizedMean] = Field(
         default_factory=list, description=_NORMALIZED_MEANS + " Also empty for a side that spans several runs."
     )
-    composite: CompositeResult = Field(
-        description=(
-            "The side's Composite, from the weights its scoring run recorded when it started. With `kind` "
-            "'missing' it says why there is none, for example the side is not scored yet."
-        )
-    )
-    composite_weights: list[CompositeWeight] = Field(
-        default_factory=list,
-        description=(
-            "The formula the side's scoring run started with: what its Composite weighs. Empty when the side "
-            "has no single scored run, or the run weighed nothing."
-        ),
-    )
 
 
 class ExperimentHeadline(BaseModel):
-    """Each side's single number: its Composite, with the Normalized means it weighs."""
+    """Each side's Metrics on the 0-to-1 scale."""
 
     candidate: ExperimentSideHeadline
     baseline: ExperimentSideHeadline
     comparable: bool = Field(
         default=True,
         description=(
-            "Whether the two Composites can be compared. False when the two runs weighed different Metrics or "
-            "the same Metrics in different ratios: both values stand, but the difference would read a new "
-            "formula as a change in quality, so report no change."
+            "Whether the two sides can be compared. False when the two runs weighed different Metrics: both "
+            "values stand, but the difference would read a new formula as a change in quality, so report no change."
         ),
     )
     incomparable_reason: str | None = Field(
-        default=None, description="Why the Composites cannot be compared. Null when `comparable` is true."
+        default=None, description="Why the two sides cannot be compared. Null when `comparable` is true."
     )
 
 
@@ -626,8 +556,8 @@ class ExperimentResults(BaseModel):
     headline: ExperimentHeadline | None = Field(
         default=None,
         description=(
-            "Each side's Normalized means and Composite, so the two sides compare on one number when "
-            "`comparable` is true. Null from an API that predates it."
+            "Each side's Normalized means, so the two sides compare when `comparable` is true. "
+            "Null from an API that predates it."
         ),
     )
     aggregates: list[ExperimentAggregate] = Field(
@@ -730,15 +660,6 @@ class ExperimentRunGrid(BaseModel):
         description="The whole run per Metric. A filter does not narrow it. Null until the run ends.",
     )
     normalized_means: list[MetricNormalizedMean] = Field(default_factory=list, description=_NORMALIZED_MEANS)
-    composite: CompositeResult | None = Field(
-        default=None,
-        description=(
-            "The run's single number, its recorded `run.composite_weights` applied to "
-            "`normalized_means`. With `kind` 'value' it has the `value` and its `coverage`. With `kind` "
-            "'missing' it has the `reason` there is none and lists in `missing` the weighted Metrics that "
-            "have no Normalized mean. Null from an API that predates it."
-        ),
-    )
 
 
 class MetricSummary(BaseModel):
@@ -802,14 +723,6 @@ class ExperimentRunReport(BaseModel):
         description="Every Evaluator version that judged a cell, oldest first, with the Metrics it declares",
     )
     normalized_means: list[MetricNormalizedMean] = Field(default_factory=list, description=_NORMALIZED_MEANS)
-    composite: CompositeResult | None = Field(
-        default=None,
-        description=(
-            "The run's single number, from 0 to 1 where 1 is best. See `run.composite_weights` "
-            "for the formula. With `kind` 'missing' it has the `reason` there is none and the weighted Metrics "
-            "that have no Normalized mean in `missing`. Null from an API that predates it."
-        ),
-    )
     rows: list[ReportRow]
     total_rows: int
     rows_truncated: bool

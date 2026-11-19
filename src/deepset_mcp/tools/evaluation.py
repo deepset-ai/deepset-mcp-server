@@ -405,10 +405,10 @@ async def get_experiment_results(
     same way. Each test case lists the Sessions each side scored and, per Score Metric keyed
     ``{evaluator_id}:{metric_key}``, each side's mean; that is where to look for the test cases
     behind a regression. Resolve evaluator ids to names with ``list_evaluators``. Results are
-    partial while ``status`` is REPLAYING or SCORING. ``headline`` gives each side's Composite
-    (0 to 1, 1 best) and ``normalized_means``. When ``comparable`` is false the two sides used
-    different formulas: report no change between them and give ``incomparable_reason``; each side's
-    ``composite_weights`` shows the formula it used. ``aggregates`` gives each Metric over every Session
+    partial while ``status`` is REPLAYING or SCORING. ``headline`` gives each side's
+    ``normalized_means`` (each Metric on a 0 to 1 scale, 1 best). When ``comparable`` is false the
+    two sides weighed different Metrics: report no change between them and give
+    ``incomparable_reason``. ``aggregates`` gives each Metric over every Session
     a side scored, not just the paired test cases: each side's whole-run entry (a Score's ``mean``, a
     Label's ``shares``), ``delta``, ``share_deltas`` for a Label and ``change``. Empty until a side's
     scoring runs end.
@@ -458,10 +458,8 @@ async def get_experiment_run(
     not apply. Each row is a Session with its cells; a cell's ``metrics`` carry the value per
     address (``session``, ``turn/2``, ...) and the rationale the Evaluator wrote, which is what to
     group failures by. ``run.selection`` says whether the Sessions were SAMPLED or HAND_PICKED;
-    only sampled runs say anything about traffic as a whole. ``composite`` is the run's single
-    number, 0 to 1 with 1 best, from ``normalized_means`` (each Metric on that
-    scale) weighted by ``run.composite_weights``, the formula the run started with. When it has
-    no value it says ``reason`` and lists the Metrics that block it in ``missing``.
+    only sampled runs say anything about traffic as a whole. ``normalized_means`` puts each
+    Metric on a 0 to 1 scale, 1 best; a Metric that cannot be put on it says why in ``reason``.
     ``aggregate`` is the API's whole-run result per Metric: how its Sessions fell out (``valued``,
     ``errored``, ``failed``, ``pending``, ...), ``coverage`` and the Metric's mean or label
     ``shares``, in the units it declares; it is null until the run ends. ``usage`` is what the
@@ -469,8 +467,8 @@ async def get_experiment_run(
     ``cost_status`` is ``priced``). ``evaluator_versions`` says which version of each Evaluator
     judged and what its Metrics declare. The filters keep only the cells whose Session's origin,
     Service or pipeline version match (a cell still running has no origin and matches none):
-    they narrow ``counts``, ``rows`` and ``metrics``, but not ``aggregate``, ``usage``,
-    ``normalized_means`` or ``composite``, which stay whole-run.
+    they narrow ``counts``, ``rows`` and ``metrics``, but not ``aggregate``, ``usage``
+    or ``normalized_means``, which stay whole-run.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
@@ -523,7 +521,6 @@ async def get_experiment_run(
         usage=grid.usage,
         evaluator_versions=grid.evaluator_versions,
         normalized_means=grid.normalized_means,
-        composite=grid.composite,
         rows=rows[:max_rows],
         total_rows=len(rows),
         rows_truncated=len(rows) > max_rows,
