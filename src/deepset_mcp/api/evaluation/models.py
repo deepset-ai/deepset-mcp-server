@@ -282,9 +282,13 @@ class EvaluationGoal(BaseModel):
 
 
 class GoalRunSummarySource(BaseModel):
-    """What a goal run judged. Which fields are set depends on ``kind``."""
+    """What a goal run judged. Which fields are set depends on ``kind``.
 
-    kind: Literal["window", "dataset", "experiment", "operator"]
+    Known kinds: window, dataset, experiment, operator. It is a plain string so a kind the API adds later
+    does not fail the whole page.
+    """
+
+    kind: str
     start: str | None = Field(default=None, validation_alias=AliasChoices("start", "from"), description="Window start")
     end: str | None = Field(default=None, validation_alias=AliasChoices("end", "to"), description="Window end")
     custom: bool | None = Field(default=None, description="Window: true when a window other than the default was used")

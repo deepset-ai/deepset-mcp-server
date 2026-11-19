@@ -52,6 +52,7 @@ RUN_ID = "44444444-4444-4444-4444-444444444444"
 SESSION_ID = "55555555-5555-5555-5555-555555555555"
 EVALUATION_RUN_ID = "66666666-6666-6666-6666-666666666666"
 COMPARISON_ID = "77777777-7777-7777-7777-777777777777"
+DEPLOYMENT_ID = "dddddddd-1111-2222-3333-444444444444"
 
 EVALUATION = f"v2/workspaces/{WORKSPACE_UUID}/evaluation"
 PIPELINE = f"{EVALUATION}/pipelines/{PIPELINE_UUID}"
@@ -473,6 +474,34 @@ def goal_run_dict() -> dict[str, Any]:
         "reused_judgments": None,
         "composite": {"value": 0.7},
     }
+
+
+GOAL_RUN_SOURCES = [
+    {"kind": "window", "from": "2026-09-24T00:00:00Z", "to": "2026-10-01T00:00:00Z", "custom": True},
+    {"kind": "dataset", "session_replay_dataset_id": DATASET_ID, "dataset_name": "Regression set"},
+    {"kind": "experiment", "experiment_id": COMPARISON_ID, "side": "CANDIDATE", "label": None},
+    {
+        "kind": "operator",
+        "pipeline_optimization_run_id": RUN_ID,
+        "deployment_id": DEPLOYMENT_ID,
+        "service_name": "support-bot",
+        "side": "BASELINE",
+        "candidate_id": None,
+        "technique": None,
+    },
+    {"kind": "something_new", "anything": 1},
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", GOAL_RUN_SOURCES, ids=lambda source: source["kind"])
+async def test_list_experiment_runs_parses_every_source_shape_the_api_sends(source: dict[str, Any]) -> None:
+    run = {**goal_run_dict(), "source": source}
+    client = FakeEvaluationClient({GOAL_RUNS: {"data": [run], "has_more": False, "total": 1}})
+
+    [parsed] = await resource(client).list_experiment_runs(PIPELINE_NAME)
+
+    assert parsed.source.kind == source["kind"]
 
 
 @pytest.mark.asyncio
@@ -1234,7 +1263,6 @@ async def test_delete_experiment_calls_delete_on_the_experiment() -> None:
 
 SESSION_SCORING_RUNS = f"{PIPELINE}/scoring-runs"
 EVALUATION_RUNS = f"{PIPELINE}/evaluation-runs"
-DEPLOYMENT_ID = "dddddddd-1111-2222-3333-444444444444"
 WINDOW = SessionWindow(
     start="2026-10-01T00:00:00Z", end="2026-10-08T00:00:00Z", origin="SERVICE", deployment_id=DEPLOYMENT_ID
 )
