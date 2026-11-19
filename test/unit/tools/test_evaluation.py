@@ -30,6 +30,7 @@ from deepset_mcp.api.evaluation.models import (
     GoalRunDataset,
     GoalRunPreview,
     GoalRunSource,
+    GoalRunSummary,
     GoalRunWindow,
     LabelAggregate,
     MetricDeclaration,
@@ -135,6 +136,18 @@ def dataset_dict() -> dict[str, Any]:
             }
         ],
     }
+
+
+def goal_run_summary() -> GoalRunSummary:
+    return GoalRunSummary.model_validate(
+        {
+            "scoring_run_id": RUN_ID,
+            "status": "ENDED",
+            "created_at": "2026-10-01T00:00:00Z",
+            "sessions": 12,
+            "source": {"kind": "dataset", "session_replay_dataset_id": DATASET_ID, "dataset_name": "Regression set"},
+        }
+    )
 
 
 def run(run_id: str = RUN_ID) -> ExperimentRun:
@@ -381,11 +394,9 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
             )
         ]
 
-    async def list_experiment_runs(
-        self, pipeline_name: str, limit: int = 50, historic: bool | None = None
-    ) -> list[ExperimentRun]:
-        self._record("list_experiment_runs", limit=limit, historic=historic)
-        return [run()]
+    async def list_experiment_runs(self, pipeline_name: str, limit: int = 20) -> list[GoalRunSummary]:
+        self._record("list_experiment_runs", limit=limit)
+        return [goal_run_summary()]
 
     async def list_session_experiment_runs(
         self, pipeline_name: str, session_id: str, limit: int = 50
@@ -1569,20 +1580,19 @@ WINDOW_TO = "2026-10-08T00:00:00Z"
 
 
 @pytest.mark.asyncio
-async def test_list_experiment_runs_reads_the_pipelines_runs_or_the_runs_that_judged_a_session() -> None:
+async def test_list_experiment_runs_reads_the_pipelines_goal_runs_or_the_runs_that_judged_a_session() -> None:
     resource = FakeEvaluationResource()
     client = FakeClient(resource)
 
-    on_pipeline = await list_experiment_runs(
-        client=client, workspace=WORKSPACE, pipeline_name=PIPELINE, limit=5, historic=False
-    )
+    on_pipeline = await list_experiment_runs(client=client, workspace=WORKSPACE, pipeline_name=PIPELINE, limit=5)
     by_session = await list_experiment_runs(
         client=client, workspace=WORKSPACE, pipeline_name=PIPELINE, session_id=SESSION_A
     )
 
-    assert on_pipeline == by_session == [run()]
+    assert on_pipeline == [goal_run_summary()]
+    assert by_session == [run()]
     assert resource.calls == [
-        ("list_experiment_runs", {"limit": 5, "historic": False}),
+        ("list_experiment_runs", {"limit": 5}),
         ("list_session_experiment_runs", {"session_id": SESSION_A, "limit": 50}),
     ]
 

@@ -28,6 +28,7 @@ from deepset_mcp.api.evaluation.models import (
     GoalRunDataset,
     GoalRunNewDataset,
     GoalRunPreview,
+    GoalRunSummary,
     GoalRunWindow,
     NewTestCase,
     SessionList,
@@ -58,7 +59,7 @@ PIPELINE = f"{EVALUATION}/pipelines/{PIPELINE_UUID}"
 EVALUATORS = f"{EVALUATION}/evaluators"
 EXPERIMENTS = f"{EVALUATION}/experiments"
 EVALUATION_GOALS = f"{PIPELINE}/evaluation-goals"
-RUN_HISTORY = f"{PIPELINE}/scoring-run-history"
+GOAL_RUNS = f"{EVALUATION_GOALS}/runs"
 RUN = f"{PIPELINE}/scoring-runs/{RUN_ID}"
 SESSIONS = f"{PIPELINE}/sessions"
 DATASETS = f"{EVALUATION}/datasets"
@@ -362,22 +363,36 @@ async def test_list_evaluation_goals_calls_the_pipeline_route() -> None:
     assert client.pipeline_resource.calls == [PIPELINE_NAME]
 
 
-def history(*runs: dict[str, Any]) -> dict[str, Any]:
-    return {"data": list(runs), "has_more": False, "total": len(runs)}
+def goal_run_dict() -> dict[str, Any]:
+    """One goal run as `GET .../evaluation-goals/runs` returns it, with a key the tool ignores."""
+    return {
+        "scoring_run_id": RUN_ID,
+        "status": "ENDED",
+        "created_at": "2026-10-01T00:00:00Z",
+        "sessions": 12,
+        "source": {"kind": "window", "from": "2026-09-24T00:00:00Z", "to": "2026-10-01T00:00:00Z", "custom": False},
+        "reused_judgments": None,
+        "composite": {"value": 0.7},
+    }
 
 
 @pytest.mark.asyncio
-async def test_list_experiment_runs_reads_the_pipelines_scoring_run_history() -> None:
-    client = FakeEvaluationClient({RUN_HISTORY: history(run_dict())})
+async def test_list_experiment_runs_reads_the_pipelines_goal_runs() -> None:
+    client = FakeEvaluationClient({GOAL_RUNS: {"data": [goal_run_dict()], "has_more": False, "total": 1}})
 
     runs = await resource(client).list_experiment_runs(PIPELINE_NAME, limit=1)
-    await resource(client).list_experiment_runs(PIPELINE_NAME, historic=False)
+    await resource(client).list_experiment_runs(PIPELINE_NAME)
 
-    assert isinstance(runs[0], ExperimentRun)
-    assert runs[0].selection == "SAMPLED"
+    assert isinstance(runs[0], GoalRunSummary)
+    assert (runs[0].scoring_run_id, runs[0].status, runs[0].sessions) == (RUN_ID, "ENDED", 12)
+    assert (runs[0].source.kind, runs[0].source.start, runs[0].source.custom) == (
+        "window",
+        "2026-09-24T00:00:00Z",
+        False,
+    )
     assert [(r["method"], r["endpoint"], r["params"]) for r in client.requests] == [
-        ("GET", RUN_HISTORY, {"limit": 1}),
-        ("GET", RUN_HISTORY, {"limit": 50, "historic": False}),
+        ("GET", GOAL_RUNS, {"limit": 1}),
+        ("GET", GOAL_RUNS, {"limit": 20}),
     ]
     assert client.pipeline_resource.calls == [PIPELINE_NAME, PIPELINE_NAME]
 
@@ -1147,10 +1162,10 @@ async def test_list_session_experiment_runs_reads_the_pipeline_wide_route_with_t
 @pytest.mark.asyncio
 async def test_an_experiment_run_reads_the_window_it_judged_by_its_api_names() -> None:
     client = FakeEvaluationClient(
-        {RUN_HISTORY: history({**run_dict(), "window": WINDOW_BODY, "resolved_sessions": 12}, run_dict())}
+        {SESSION_SCORING_RUNS: [{**run_dict(), "window": WINDOW_BODY, "resolved_sessions": 12}, run_dict()]}
     )
 
-    windowed, named = await resource(client).list_experiment_runs(PIPELINE_NAME)
+    windowed, named = await resource(client).list_session_experiment_runs(PIPELINE_NAME, SESSION_ID)
 
     assert windowed.window == WINDOW
     assert windowed.resolved_sessions == 12

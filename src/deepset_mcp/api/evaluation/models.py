@@ -327,6 +327,33 @@ class EvaluationGoal(BaseModel):
     updated_at: str | None = None
 
 
+class GoalRunSummarySource(BaseModel):
+    """What a goal run judged. Which fields are set depends on ``kind``."""
+
+    kind: Literal["window", "dataset", "experiment", "operator"]
+    start: str | None = Field(default=None, validation_alias=AliasChoices("start", "from"), description="Window start")
+    end: str | None = Field(default=None, validation_alias=AliasChoices("end", "to"), description="Window end")
+    custom: bool | None = Field(default=None, description="Window: true when a window other than the default was used")
+    session_replay_dataset_id: str | None = Field(default=None, description="Dataset: its id")
+    dataset_name: str | None = Field(default=None, description="Dataset: its name")
+    experiment_id: str | None = Field(default=None, description="Experiment: its id")
+    side: str | None = Field(default=None, description="Experiment or AI Operator: `CANDIDATE` or `BASELINE`")
+    label: str | None = Field(default=None, description="Experiment: what the side is called")
+
+
+class GoalRunSummary(BaseModel):
+    """One goal run on a pipeline. Read its grid with ``get_experiment_run``."""
+
+    scoring_run_id: str
+    status: Literal["CREATED", "STARTED", "ENDED", "FAILED"]
+    created_at: str
+    sessions: int = Field(description="How many Sessions the run judges")
+    source: GoalRunSummarySource
+    reused_judgments: int | None = Field(
+        default=None, description="How many judgments came from earlier runs. Null when unknown"
+    )
+
+
 class ExperimentScoringCounts(BaseModel):
     """How a side's scoring evaluations ended."""
 
