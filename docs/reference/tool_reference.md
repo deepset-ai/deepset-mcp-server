@@ -125,7 +125,7 @@ draft/version history. Each deployment tracks its own history of served pipeline
 | `delete_experiment` | required | none | Delete an Experiment (destructive); its Sessions and scoring runs are kept. |
 | `get_experiment_results` | required | explorable | Read an Experiment's results: each Metric and duration, tokens and cost, candidate against baseline, then per test case. |
 | `get_experiment_run` | required | explorable | Read one scoring run: cell counts, a summary per Metric, the whole-run aggregate, usage and cost, and the grid rows, optionally filtered by origin, Service, version or Session. |
-| `list_experiment_runs` | required | explorable | List a pipeline's scoring runs, optionally only those before or on Evaluation goals, or every run that judged one Session. |
+| `list_experiment_runs` | required | explorable | List a pipeline's goal runs, newest first (without AI Operator and Deployment Gate runs), or every run that judged one Session. |
 | `evaluate_goals` | required | none | Evaluate a pipeline's Evaluation goals now over the last 7 days, a window or a Dataset; specific Sessions go in a Dataset (`preview` a source first: judged Evaluators cost money). |
 | `run_evaluator` | required | none | Run one saved Evaluator version on one Session and keep the Evaluation Run (judged Evaluators cost money). |
 | `list_evaluation_runs` | required | explorable | List a pipeline's Evaluation Runs, newest first. |

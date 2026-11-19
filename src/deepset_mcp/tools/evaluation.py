@@ -31,6 +31,7 @@ from deepset_mcp.api.evaluation.models import (
     GoalRunDataset,
     GoalRunPreview,
     GoalRunSource,
+    GoalRunSummary,
     MetricSummary,
     NewTestCase,
     ReportCell,
@@ -1157,26 +1158,22 @@ async def list_experiment_runs(
     workspace: str,
     pipeline_name: str,
     session_id: str | None = None,
-    historic: bool | None = None,
     limit: int = 50,
-) -> list[ExperimentRun] | str:
-    """Lists scoring runs: every one on a pipeline, or every one that judged a given Session.
+) -> list[GoalRunSummary] | list[ExperimentRun] | str:
+    """Lists goal runs: the pipeline's recent ones, or every one that judged a given Session.
 
-    A scoring run judges chosen Sessions of one pipeline with a set of Evaluators: an
+    A goal run judges chosen Sessions of one pipeline against its Evaluation goals: an
     ``evaluate_goals`` run, or one side of an Experiment. Without ``session_id`` it lists the
-    pipeline's runs; ``historic`` true keeps only the runs made before Evaluation goals, false only
-    those made on them, and either leaves out an Experiment's side runs. With ``session_id`` it lists
-    the runs that judged that Session. Newest first, without their grids: ``status`` says whether the
-    fan-out finished, not whether every cell succeeded, ``window`` is what a window run judged
-    and ``resolved_sessions`` how many Sessions it had. Read one run's grid with
+    pipeline's goal runs, newest first. The list leaves out the runs the AI Operator and the
+    Deployment Gate start. Each has its ``status``, how many ``sessions`` it judges, and its
+    ``source`` (a window, a Dataset, or a side of an Experiment). With ``session_id`` it lists the
+    runs that judged that Session, newest first, without their grids. Read one run's grid with
     ``get_experiment_run``.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
     :param pipeline_name: Name of the pipeline.
     :param session_id: List the runs that judged this Session instead.
-    :param historic: Without ``session_id``: true for only runs made before Evaluation goals, false for only
-        those made on them; omit for every run.
     :param limit: Most runs to return (at most 100 for a pipeline, 200 for a Session). The tool reads one
         page: a result of exactly this many may be cut off.
     :returns: The runs, or an error message.
@@ -1185,9 +1182,9 @@ async def list_experiment_runs(
     try:
         if session_id is not None:
             return await resource.list_session_experiment_runs(pipeline_name, session_id, limit)
-        return await resource.list_experiment_runs(pipeline_name, limit, historic)
+        return await resource.list_experiment_runs(pipeline_name, limit)
     except _API_ERRORS as e:
-        return f"Failed to list scoring runs on pipeline '{pipeline_name}': {e}"
+        return f"Failed to list goal runs on pipeline '{pipeline_name}': {e}"
 
 
 async def evaluate_goals(

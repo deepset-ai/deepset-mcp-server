@@ -27,6 +27,7 @@ from deepset_mcp.api.evaluation.models import (
     GoalExperimentStarted,
     GoalRunPreview,
     GoalRunSource,
+    GoalRunSummary,
     NewTestCase,
     SessionList,
     SessionReplayRun,
@@ -143,22 +144,17 @@ class EvaluationResource(EvaluationResourceProtocol):
         data = await self._get(await self._pipeline_path(pipeline_name, "evaluation-goals"))
         return [EvaluationGoal.model_validate(item) for item in data or []]
 
-    async def list_experiment_runs(
-        self, pipeline_name: str, limit: int = 50, historic: bool | None = None
-    ) -> list[ExperimentRun]:
-        """List the scoring runs on one pipeline, newest first, without their grids: the first page only.
+    async def list_experiment_runs(self, pipeline_name: str, limit: int = 20) -> list[GoalRunSummary]:
+        """List the goal runs users started on one pipeline, newest first: the first page only.
+
+        Leaves out the runs the AI Operator and the Deployment Gate start.
 
         :param pipeline_name: Name of the pipeline.
-        :param limit: Maximum number of runs to return (the API caps it at 100).
-        :param historic: ``True`` for only runs made without Evaluation goals, ``False`` for only those made on
-            them; both, and an Experiment's side runs, when omitted.
+        :param limit: Maximum number of runs to return.
         :returns: The runs.
         """
-        params: dict[str, Any] = {"limit": limit}
-        if historic is not None:
-            params["historic"] = historic
-        data = await self._get(await self._pipeline_path(pipeline_name, "scoring-run-history"), params)
-        return [ExperimentRun.model_validate(item) for item in (data or {}).get("data", [])]
+        data = await self._get(await self._pipeline_path(pipeline_name, "evaluation-goals", "runs"), {"limit": limit})
+        return [GoalRunSummary.model_validate(item) for item in (data or {}).get("data", [])]
 
     async def list_session_experiment_runs(
         self, pipeline_name: str, session_id: str, limit: int = 50

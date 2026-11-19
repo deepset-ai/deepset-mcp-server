@@ -22,6 +22,7 @@ from deepset_mcp.api.evaluation.models import (
     GoalExperimentStarted,
     GoalRunPreview,
     GoalRunSource,
+    GoalRunSummary,
     NewTestCase,
     SessionList,
     SessionReplayRun,
@@ -49,10 +50,8 @@ class EvaluationResourceProtocol(Protocol):
         """List the Evaluation Goals set on one pipeline, oldest first."""
         ...
 
-    async def list_experiment_runs(
-        self, pipeline_name: str, limit: int = 50, historic: bool | None = None
-    ) -> list[ExperimentRun]:
-        """List the scoring runs on one pipeline, newest first."""
+    async def list_experiment_runs(self, pipeline_name: str, limit: int = 20) -> list[GoalRunSummary]:
+        """List the goal runs users started on one pipeline, newest first."""
         ...
 
     async def list_session_experiment_runs(
