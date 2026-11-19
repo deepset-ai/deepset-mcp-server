@@ -46,12 +46,15 @@ from deepset_mcp.tools.evaluation import (
     add_test_cases as add_test_cases_tool,
     copy_test_cases as copy_test_cases_tool,
     create_dataset as create_dataset_tool,
+    create_evaluation_goal as create_evaluation_goal_tool,
     create_evaluator as create_evaluator_tool,
     create_experiment as create_experiment_tool,
     delete_dataset as delete_dataset_tool,
+    delete_evaluation_goal as delete_evaluation_goal_tool,
     delete_experiment as delete_experiment_tool,
     evaluate_goals as evaluate_goals_tool,
     get_dataset as get_dataset_tool,
+    get_evaluation_goal as get_evaluation_goal_tool,
     get_evaluation_run as get_evaluation_run_tool,
     get_evaluation_try as get_evaluation_try_tool,
     get_evaluator as get_evaluator_tool,
@@ -75,6 +78,7 @@ from deepset_mcp.tools.evaluation import (
     set_evaluator_archived as set_evaluator_archived_tool,
     try_evaluator as try_evaluator_tool,
     update_dataset as update_dataset_tool,
+    update_evaluation_goal as update_evaluation_goal_tool,
     update_evaluator as update_evaluator_tool,
     update_experiment as update_experiment_tool,
     update_test_case as update_test_case_tool,
@@ -409,6 +413,22 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "list_evaluation_goals": (
         list_evaluation_goals_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "create_evaluation_goal": (
+        create_evaluation_goal_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "get_evaluation_goal": (
+        get_evaluation_goal_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "update_evaluation_goal": (
+        update_evaluation_goal_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "delete_evaluation_goal": (
+        delete_evaluation_goal_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
     ),
     "list_experiments": (
         list_experiments_tool,

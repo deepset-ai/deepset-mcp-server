@@ -143,15 +143,68 @@ async def create_evaluation_goal(
     aggregation: GoalAggregation | None = None,
     percentile: float | None = None,
 ) -> EvaluationGoal | str:
-    """Creates an Evaluation goal."""
-    raise NotImplementedError
+    """Creates an Evaluation goal: a pass/fail target on one pipeline.
+
+    Call ``list_evaluation_goals`` first so a goal is not created twice, and ``get_evaluator`` to see
+    the Metrics the Evaluator declares.
+
+    A goal reads one Metric of one Evaluator. For a Score Metric set ``threshold``: a Session passes
+    when the mean of its rows reaches it (at least if the Score is better when higher, at most if
+    lower). For a Label Metric set ``passing_values`` instead: a Session passes when every one of its
+    rows is one of those labels. Set exactly one of the two. ``min_pass_rate`` (0 to 1, default 1) is
+    the share of valued Sessions that must pass for the goal to be met. ``aggregation`` changes how
+    the verdict is made: ``pass_rate`` (default) uses ``min_pass_rate``; ``mean`` needs the mean of
+    the Session values to reach ``threshold``; ``percentile`` needs the ``percentile`` (between 0 and
+    100, for example 95) of the Session values to reach it. ``mean`` and ``percentile`` take a Score
+    Metric only. The ``percentile`` number is required with aggregation ``percentile`` and refused otherwise.
+    ``category`` (SAFETY, QUALITY, EFFICIENCY, COST or MISC) groups goals in the UI.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline the goal is set on.
+    :param name: What the goal is called.
+    :param evaluator_id: The Evaluator whose Metric the goal reads.
+    :param description: Why the goal matters.
+    :param threshold: For a Score Metric: the value a Session must reach.
+    :param passing_values: For a Label Metric: the labels that pass.
+    :param min_pass_rate: Share (0 to 1) of valued Sessions that must pass.
+    :param category: What the goal is about; the API picks one when omitted.
+    :param aggregation: How Session values fold into a verdict; ``pass_rate`` when omitted.
+    :param percentile: Which percentile, with aggregation ``percentile``.
+    :returns: The new goal, or an error message.
+    """
+    try:
+        return await client.evaluation(workspace=workspace).create_evaluation_goal(
+            pipeline_name,
+            name,
+            evaluator_id,
+            description=description,
+            threshold=threshold,
+            passing_values=passing_values,
+            min_pass_rate=min_pass_rate,
+            category=category,
+            aggregation=aggregation,
+            percentile=percentile,
+        )
+    except _API_ERRORS as e:
+        return f"Failed to create evaluation goal '{name}' on pipeline '{pipeline_name}': {e}"
 
 
 async def get_evaluation_goal(
     *, client: AsyncClientProtocol, workspace: str, pipeline_name: str, evaluation_goal_id: str
 ) -> EvaluationGoal | str:
-    """Reads an Evaluation goal."""
-    raise NotImplementedError
+    """Reads one Evaluation goal of a pipeline, with its rule, category and aggregation.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline.
+    :param evaluation_goal_id: The goal's id, from ``list_evaluation_goals``.
+    :returns: The goal, or an error message.
+    """
+    try:
+        return await client.evaluation(workspace=workspace).get_evaluation_goal(pipeline_name, evaluation_goal_id)
+    except _API_ERRORS as e:
+        return f"Failed to get evaluation goal '{evaluation_goal_id}' on pipeline '{pipeline_name}': {e}"
 
 
 async def update_evaluation_goal(
@@ -170,15 +223,72 @@ async def update_evaluation_goal(
     aggregation: GoalAggregation | None = None,
     percentile: float | None = None,
 ) -> EvaluationGoal | str:
-    """Replaces an Evaluation goal."""
-    raise NotImplementedError
+    """Replaces an Evaluation goal: it does not merge, so send every field, not only the changed ones.
+
+    Read the goal with ``get_evaluation_goal`` first and send back the fields you keep. A field left
+    out is reset to its default (``description`` empty, ``min_pass_rate`` 1, no ``threshold``), except
+    ``category`` and ``aggregation``, which stay as they were.
+
+    A goal reads one Metric of one Evaluator. For a Score Metric set ``threshold``: a Session passes
+    when the mean of its rows reaches it (at least if the Score is better when higher, at most if
+    lower). For a Label Metric set ``passing_values`` instead: a Session passes when every one of its
+    rows is one of those labels. Set exactly one of the two. ``min_pass_rate`` (0 to 1, default 1) is
+    the share of valued Sessions that must pass for the goal to be met. ``aggregation`` changes how
+    the verdict is made: ``pass_rate`` (default) uses ``min_pass_rate``; ``mean`` needs the mean of
+    the Session values to reach ``threshold``; ``percentile`` needs the ``percentile`` (between 0 and
+    100, for example 95) of the Session values to reach it. ``mean`` and ``percentile`` take a Score
+    Metric only. The ``percentile`` number is required with aggregation ``percentile`` and refused otherwise.
+    ``category`` (SAFETY, QUALITY, EFFICIENCY, COST or MISC) groups goals in the UI.
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline.
+    :param evaluation_goal_id: The goal's id.
+    :param name: What the goal is called.
+    :param evaluator_id: The Evaluator whose Metric the goal reads.
+    :param description: Why the goal matters.
+    :param threshold: For a Score Metric: the value a Session must reach.
+    :param passing_values: For a Label Metric: the labels that pass.
+    :param min_pass_rate: Share (0 to 1) of valued Sessions that must pass.
+    :param category: What the goal is about; kept as it was when omitted.
+    :param aggregation: How Session values fold into a verdict; kept as it was when omitted.
+    :param percentile: Which percentile, with aggregation ``percentile``.
+    :returns: The goal as saved, or an error message.
+    """
+    try:
+        return await client.evaluation(workspace=workspace).update_evaluation_goal(
+            pipeline_name,
+            evaluation_goal_id,
+            name,
+            evaluator_id,
+            description=description,
+            threshold=threshold,
+            passing_values=passing_values,
+            min_pass_rate=min_pass_rate,
+            category=category,
+            aggregation=aggregation,
+            percentile=percentile,
+        )
+    except _API_ERRORS as e:
+        return f"Failed to update evaluation goal '{evaluation_goal_id}' on pipeline '{pipeline_name}': {e}"
 
 
 async def delete_evaluation_goal(
     *, client: AsyncClientProtocol, workspace: str, pipeline_name: str, evaluation_goal_id: str
 ) -> str:
-    """Deletes an Evaluation goal."""
-    raise NotImplementedError
+    """Deletes an Evaluation goal (destructive).
+
+    :param client: The async client for API communication.
+    :param workspace: The workspace name.
+    :param pipeline_name: Name of the pipeline.
+    :param evaluation_goal_id: The goal's id.
+    :returns: A confirmation, or an error message.
+    """
+    try:
+        await client.evaluation(workspace=workspace).delete_evaluation_goal(pipeline_name, evaluation_goal_id)
+    except _API_ERRORS as e:
+        return f"Failed to delete evaluation goal '{evaluation_goal_id}' on pipeline '{pipeline_name}': {e}"
+    return f"Evaluation goal '{evaluation_goal_id}' deleted."
 
 
 async def create_experiment(

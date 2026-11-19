@@ -49,6 +49,32 @@ def _dump(test_cases: list[NewTestCase]) -> list[dict[str, Any]]:
     return [test_case.model_dump(exclude_none=True) for test_case in test_cases]
 
 
+def _goal_body(
+    name: str,
+    evaluator_id: str,
+    description: str,
+    threshold: float | None,
+    passing_values: list[str] | None,
+    min_pass_rate: float,
+    category: GoalCategory | None,
+    aggregation: GoalAggregation | None,
+    percentile: float | None,
+) -> dict[str, Any]:
+    """The body of a create or a full update: only the fields that were set, so the API's defaults apply."""
+    body: dict[str, Any] = {
+        "name": name,
+        "description": description,
+        "evaluator_id": evaluator_id,
+        "threshold": threshold,
+        "passing_values": passing_values,
+        "min_pass_rate": min_pass_rate,
+        "category": category,
+        "aggregation": aggregation,
+        "percentile": percentile,
+    }
+    return {key: value for key, value in body.items() if value is not None}
+
+
 class EvaluationResource(EvaluationResourceProtocol):
     """Reads Evaluators, Experiments, their runs, and Sessions through the v2 evaluation routes.
 
@@ -146,6 +172,9 @@ class EvaluationResource(EvaluationResourceProtocol):
         data = await self._get(await self._pipeline_path(pipeline_name, "evaluation-goals"))
         return [EvaluationGoal.model_validate(item) for item in data or []]
 
+    async def _goal_path(self, pipeline_name: str, *parts: str) -> str:
+        return await self._pipeline_path(pipeline_name, "evaluation-goals", *parts)
+
     async def create_evaluation_goal(
         self,
         pipeline_name: str,
@@ -159,12 +188,33 @@ class EvaluationResource(EvaluationResourceProtocol):
         aggregation: GoalAggregation | None = None,
         percentile: float | None = None,
     ) -> EvaluationGoal:
-        """Create an Evaluation goal on one pipeline."""
-        raise NotImplementedError
+        """Create an Evaluation goal on one pipeline.
+
+        :param pipeline_name: Name of the pipeline.
+        :param name: What the goal is called.
+        :param evaluator_id: The Evaluator whose Metric the goal reads.
+        :param description: Why the goal matters.
+        :param threshold: For a Score Metric: the value a Session must reach.
+        :param passing_values: For a Label Metric: the labels that pass.
+        :param min_pass_rate: Share (0 to 1) of valued Sessions that must pass.
+        :param category: What the goal is about; the API picks one when omitted.
+        :param aggregation: How Session values fold into a verdict; ``pass_rate`` when omitted.
+        :param percentile: For aggregation ``percentile``: which percentile (between 0 and 100).
+        :returns: The new goal.
+        """
+        body = _goal_body(
+            name, evaluator_id, description, threshold, passing_values, min_pass_rate, category, aggregation, percentile
+        )
+        return EvaluationGoal.model_validate(await self._post(await self._goal_path(pipeline_name), body))
 
     async def get_evaluation_goal(self, pipeline_name: str, evaluation_goal_id: str) -> EvaluationGoal:
-        """Fetch one Evaluation goal of a pipeline."""
-        raise NotImplementedError
+        """Fetch one Evaluation goal of a pipeline.
+
+        :param pipeline_name: Name of the pipeline.
+        :param evaluation_goal_id: The goal's id.
+        :returns: The goal.
+        """
+        return EvaluationGoal.model_validate(await self._get(await self._goal_path(pipeline_name, evaluation_goal_id)))
 
     async def update_evaluation_goal(
         self,
@@ -180,12 +230,34 @@ class EvaluationResource(EvaluationResourceProtocol):
         aggregation: GoalAggregation | None = None,
         percentile: float | None = None,
     ) -> EvaluationGoal:
-        """Replace an Evaluation goal: every field is sent."""
-        raise NotImplementedError
+        """Replace an Evaluation goal: send every field, as when creating.
+
+        :param pipeline_name: Name of the pipeline.
+        :param evaluation_goal_id: The goal's id.
+        :param name: What the goal is called.
+        :param evaluator_id: The Evaluator whose Metric the goal reads.
+        :param description: Why the goal matters.
+        :param threshold: For a Score Metric: the value a Session must reach.
+        :param passing_values: For a Label Metric: the labels that pass.
+        :param min_pass_rate: Share (0 to 1) of valued Sessions that must pass.
+        :param category: What the goal is about; kept as it was when omitted.
+        :param aggregation: How Session values fold into a verdict; kept as it was when omitted.
+        :param percentile: For aggregation ``percentile``: which percentile (between 0 and 100).
+        :returns: The goal as saved.
+        """
+        body = _goal_body(
+            name, evaluator_id, description, threshold, passing_values, min_pass_rate, category, aggregation, percentile
+        )
+        path = await self._goal_path(pipeline_name, evaluation_goal_id)
+        return EvaluationGoal.model_validate(await self._put(path, body))
 
     async def delete_evaluation_goal(self, pipeline_name: str, evaluation_goal_id: str) -> None:
-        """Delete an Evaluation goal."""
-        raise NotImplementedError
+        """Delete an Evaluation goal.
+
+        :param pipeline_name: Name of the pipeline.
+        :param evaluation_goal_id: The goal's id.
+        """
+        await self._delete(await self._goal_path(pipeline_name, evaluation_goal_id))
 
     async def list_experiment_runs(self, pipeline_name: str, limit: int = 20) -> list[GoalRunSummary]:
         """List the goal runs users started on one pipeline, newest first: the first page only.
