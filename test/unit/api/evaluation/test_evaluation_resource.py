@@ -412,6 +412,18 @@ async def test_list_experiments_lists_the_workspace_without_a_pipeline() -> None
 
 
 @pytest.mark.asyncio
+async def test_list_experiments_keeps_an_experiment_whose_metric_group_is_null() -> None:
+    unscored = {**comparison_dict(), "metric_group_id": None, "metric_group_name": None}
+    client = FakeEvaluationClient({EXPERIMENTS: [unscored]})
+
+    experiments = await resource(client).list_experiments()
+
+    assert [(e.experiment_id, e.metric_group_id, e.metric_group_name) for e in experiments] == [
+        (COMPARISON_ID, None, None)
+    ]
+
+
+@pytest.mark.asyncio
 async def test_list_experiments_filters_by_the_pipeline_uuid() -> None:
     client = FakeEvaluationClient({EXPERIMENTS: [comparison_dict()]})
 
