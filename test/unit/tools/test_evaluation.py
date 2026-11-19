@@ -52,12 +52,15 @@ from deepset_mcp.tools.evaluation import (
     add_test_cases,
     copy_test_cases,
     create_dataset,
+    create_evaluation_goal,
     create_evaluator,
     create_experiment,
     delete_dataset,
+    delete_evaluation_goal,
     delete_experiment,
     evaluate_goals,
     get_dataset,
+    get_evaluation_goal,
     get_evaluation_run,
     get_evaluation_try,
     get_evaluator,
@@ -81,6 +84,7 @@ from deepset_mcp.tools.evaluation import (
     set_evaluator_archived,
     try_evaluator,
     update_dataset,
+    update_evaluation_goal,
     update_evaluator,
     update_experiment,
     update_test_case,
@@ -98,6 +102,7 @@ SESSION_A = "55555555-5555-5555-5555-555555555555"
 SESSION_B = "66666666-6666-6666-6666-666666666666"
 COMPARISON_ID = "99999999-9999-9999-9999-999999999999"
 PIPELINE_ID = "88888888-8888-8888-8888-888888888888"
+GOAL_ID = "00000000-0000-0000-0000-0000000000a1"
 
 DATASET_ID = "bbbbbbbb-1111-2222-3333-444444444444"
 TEST_CASE_ID = "cccccccc-1111-2222-3333-444444444444"
@@ -326,6 +331,19 @@ def grid() -> ExperimentRunGrid:
     )
 
 
+def fake_goal(name: str = "Answers are faithful") -> EvaluationGoal:
+    return EvaluationGoal(
+        evaluation_goal_id=GOAL_ID,
+        pipeline_id=PIPELINE_ID,
+        name=name,
+        evaluator_id=E1,
+        metric_key="faithfulness",
+        threshold=0.8,
+        min_pass_rate=0.9,
+        created_at="2026-10-01T00:00:00Z",
+    )
+
+
 class FakeEvaluationResource(EvaluationResourceProtocol):
     """Answers reads with fixtures, and each check poll with the next state in line, then the last."""
 
@@ -393,6 +411,34 @@ class FakeEvaluationResource(EvaluationResourceProtocol):
                 created_at="2026-10-01T00:00:00Z",
             )
         ]
+
+    async def create_evaluation_goal(
+        self, pipeline_name: str, name: str, evaluator_id: str, **fields: Any
+    ) -> EvaluationGoal:
+        self._record(
+            "create_evaluation_goal", pipeline_name=pipeline_name, name=name, evaluator_id=evaluator_id, **fields
+        )
+        return fake_goal(name=name)
+
+    async def get_evaluation_goal(self, pipeline_name: str, evaluation_goal_id: str) -> EvaluationGoal:
+        self._record("get_evaluation_goal", pipeline_name=pipeline_name, evaluation_goal_id=evaluation_goal_id)
+        return fake_goal()
+
+    async def update_evaluation_goal(
+        self, pipeline_name: str, evaluation_goal_id: str, name: str, evaluator_id: str, **fields: Any
+    ) -> EvaluationGoal:
+        self._record(
+            "update_evaluation_goal",
+            pipeline_name=pipeline_name,
+            evaluation_goal_id=evaluation_goal_id,
+            name=name,
+            evaluator_id=evaluator_id,
+            **fields,
+        )
+        return fake_goal(name=name)
+
+    async def delete_evaluation_goal(self, pipeline_name: str, evaluation_goal_id: str) -> None:
+        self._record("delete_evaluation_goal", pipeline_name=pipeline_name, evaluation_goal_id=evaluation_goal_id)
 
     async def list_experiment_runs(self, pipeline_name: str, limit: int = 20) -> list[GoalRunSummary]:
         self._record("list_experiment_runs", limit=limit)
@@ -710,6 +756,98 @@ async def test_list_evaluation_goals_returns_the_pipelines_goals() -> None:
         ("Answers are faithful", "faithfulness", 0.8, 0.9)
     ]
     assert resource.calls == [("list_evaluation_goals", {"pipeline_name": PIPELINE})]
+
+
+@pytest.mark.asyncio
+async def test_create_evaluation_goal_passes_the_rule_and_returns_the_goal() -> None:
+    resource = FakeEvaluationResource()
+
+    goal = await create_evaluation_goal(
+        client=FakeClient(resource),
+        workspace=WORKSPACE,
+        pipeline_name=PIPELINE,
+        name="Fast",
+        evaluator_id=E1,
+        threshold=5.0,
+        aggregation="percentile",
+        percentile=95.0,
+    )
+
+    assert isinstance(goal, EvaluationGoal)
+    assert goal.name == "Fast"
+    [(name, kwargs)] = resource.calls
+    assert name == "create_evaluation_goal"
+    assert (kwargs["pipeline_name"], kwargs["evaluator_id"], kwargs["threshold"], kwargs["percentile"]) == (
+        PIPELINE,
+        E1,
+        5.0,
+        95.0,
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_evaluation_goal_returns_the_goal() -> None:
+    resource = FakeEvaluationResource()
+
+    goal = await get_evaluation_goal(
+        client=FakeClient(resource), workspace=WORKSPACE, pipeline_name=PIPELINE, evaluation_goal_id=GOAL_ID
+    )
+
+    assert isinstance(goal, EvaluationGoal)
+    assert resource.calls == [("get_evaluation_goal", {"pipeline_name": PIPELINE, "evaluation_goal_id": GOAL_ID})]
+
+
+@pytest.mark.asyncio
+async def test_update_evaluation_goal_sends_the_whole_goal() -> None:
+    resource = FakeEvaluationResource()
+
+    goal = await update_evaluation_goal(
+        client=FakeClient(resource),
+        workspace=WORKSPACE,
+        pipeline_name=PIPELINE,
+        evaluation_goal_id=GOAL_ID,
+        name="Renamed",
+        evaluator_id=E1,
+        passing_values=["yes"],
+    )
+
+    assert isinstance(goal, EvaluationGoal)
+    [(name, kwargs)] = resource.calls
+    assert name == "update_evaluation_goal"
+    assert (kwargs["evaluation_goal_id"], kwargs["name"], kwargs["passing_values"], kwargs["min_pass_rate"]) == (
+        GOAL_ID,
+        "Renamed",
+        ["yes"],
+        1.0,
+    )
+
+
+@pytest.mark.asyncio
+async def test_delete_evaluation_goal_confirms() -> None:
+    resource = FakeEvaluationResource()
+
+    result = await delete_evaluation_goal(
+        client=FakeClient(resource), workspace=WORKSPACE, pipeline_name=PIPELINE, evaluation_goal_id=GOAL_ID
+    )
+
+    assert result == f"Evaluation goal '{GOAL_ID}' deleted."
+    assert resource.calls == [("delete_evaluation_goal", {"pipeline_name": PIPELINE, "evaluation_goal_id": GOAL_ID})]
+
+
+@pytest.mark.asyncio
+async def test_evaluation_goal_tools_return_the_api_message_instead_of_raising() -> None:
+    error = BadRequestError(message="Threshold is outside the Score's range")
+    client = FakeClient(FakeEvaluationResource(error=error))
+    common: dict[str, Any] = {"client": client, "workspace": WORKSPACE, "pipeline_name": PIPELINE}
+
+    results = [
+        await create_evaluation_goal(**common, name="Fast", evaluator_id=E1),
+        await get_evaluation_goal(**common, evaluation_goal_id=GOAL_ID),
+        await update_evaluation_goal(**common, evaluation_goal_id=GOAL_ID, name="Fast", evaluator_id=E1),
+        await delete_evaluation_goal(**common, evaluation_goal_id=GOAL_ID),
+    ]
+
+    assert all(isinstance(result, str) and "outside the Score's range" in result for result in results)
 
 
 @pytest.mark.asyncio

@@ -19,6 +19,8 @@ from deepset_mcp.api.evaluation.models import (
     ExperimentRun,
     ExperimentRunGrid,
     ExperimentUpdatePlan,
+    GoalAggregation,
+    GoalCategory,
     GoalExperimentStarted,
     GoalRunPreview,
     GoalRunSource,
@@ -48,6 +50,47 @@ class EvaluationResourceProtocol(Protocol):
 
     async def list_evaluation_goals(self, pipeline_name: str) -> list[EvaluationGoal]:
         """List the Evaluation Goals set on one pipeline, oldest first."""
+        ...
+
+    async def create_evaluation_goal(
+        self,
+        pipeline_name: str,
+        name: str,
+        evaluator_id: str,
+        description: str = "",
+        threshold: float | None = None,
+        passing_values: list[str] | None = None,
+        min_pass_rate: float = 1.0,
+        category: GoalCategory | None = None,
+        aggregation: GoalAggregation | None = None,
+        percentile: float | None = None,
+    ) -> EvaluationGoal:
+        """Create an Evaluation goal on one pipeline."""
+        ...
+
+    async def get_evaluation_goal(self, pipeline_name: str, evaluation_goal_id: str) -> EvaluationGoal:
+        """Fetch one Evaluation goal of a pipeline."""
+        ...
+
+    async def update_evaluation_goal(
+        self,
+        pipeline_name: str,
+        evaluation_goal_id: str,
+        name: str,
+        evaluator_id: str,
+        description: str = "",
+        threshold: float | None = None,
+        passing_values: list[str] | None = None,
+        min_pass_rate: float = 1.0,
+        category: GoalCategory | None = None,
+        aggregation: GoalAggregation | None = None,
+        percentile: float | None = None,
+    ) -> EvaluationGoal:
+        """Replace an Evaluation goal: every field is sent."""
+        ...
+
+    async def delete_evaluation_goal(self, pipeline_name: str, evaluation_goal_id: str) -> None:
+        """Delete an Evaluation goal."""
         ...
 
     async def list_experiment_runs(self, pipeline_name: str, limit: int = 20) -> list[GoalRunSummary]:

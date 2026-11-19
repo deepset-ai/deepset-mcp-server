@@ -24,6 +24,8 @@ from deepset_mcp.api.evaluation.models import (
     ExperimentRun,
     ExperimentRunGrid,
     ExperimentUpdatePlan,
+    GoalAggregation,
+    GoalCategory,
     GoalExperimentStarted,
     GoalRunPreview,
     GoalRunSource,
@@ -143,6 +145,47 @@ class EvaluationResource(EvaluationResourceProtocol):
         """
         data = await self._get(await self._pipeline_path(pipeline_name, "evaluation-goals"))
         return [EvaluationGoal.model_validate(item) for item in data or []]
+
+    async def create_evaluation_goal(
+        self,
+        pipeline_name: str,
+        name: str,
+        evaluator_id: str,
+        description: str = "",
+        threshold: float | None = None,
+        passing_values: list[str] | None = None,
+        min_pass_rate: float = 1.0,
+        category: GoalCategory | None = None,
+        aggregation: GoalAggregation | None = None,
+        percentile: float | None = None,
+    ) -> EvaluationGoal:
+        """Create an Evaluation goal on one pipeline."""
+        raise NotImplementedError
+
+    async def get_evaluation_goal(self, pipeline_name: str, evaluation_goal_id: str) -> EvaluationGoal:
+        """Fetch one Evaluation goal of a pipeline."""
+        raise NotImplementedError
+
+    async def update_evaluation_goal(
+        self,
+        pipeline_name: str,
+        evaluation_goal_id: str,
+        name: str,
+        evaluator_id: str,
+        description: str = "",
+        threshold: float | None = None,
+        passing_values: list[str] | None = None,
+        min_pass_rate: float = 1.0,
+        category: GoalCategory | None = None,
+        aggregation: GoalAggregation | None = None,
+        percentile: float | None = None,
+    ) -> EvaluationGoal:
+        """Replace an Evaluation goal: every field is sent."""
+        raise NotImplementedError
+
+    async def delete_evaluation_goal(self, pipeline_name: str, evaluation_goal_id: str) -> None:
+        """Delete an Evaluation goal."""
+        raise NotImplementedError
 
     async def list_experiment_runs(self, pipeline_name: str, limit: int = 20) -> list[GoalRunSummary]:
         """List the goal runs users started on one pipeline, newest first: the first page only.

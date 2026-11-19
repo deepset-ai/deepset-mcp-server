@@ -301,6 +301,10 @@ class ExperimentRun(BaseModel):
     created_at: str
 
 
+GoalCategory = Literal["SAFETY", "QUALITY", "EFFICIENCY", "COST", "MISC"]
+GoalAggregation = Literal["pass_rate", "mean", "percentile"]
+
+
 class EvaluationGoal(BaseModel):
     """A pass/fail target on one pipeline, built on one Evaluator's Metric."""
 
@@ -323,6 +327,12 @@ class EvaluationGoal(BaseModel):
         le=1,
         description="Share (0 to 1) of the judged Sessions that must pass for the goal to be met",
     )
+    category: GoalCategory | None = Field(default=None, description="What the goal is about")
+    aggregation: GoalAggregation | None = Field(
+        default=None,
+        description="How Session values fold into a verdict: the share passing, their mean, or a percentile of them",
+    )
+    percentile: float | None = Field(default=None, description="For aggregation `percentile`: which percentile")
     created_at: str
     updated_at: str | None = None
 

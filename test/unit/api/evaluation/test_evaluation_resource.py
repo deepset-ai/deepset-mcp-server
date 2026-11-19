@@ -21,7 +21,6 @@ from deepset_mcp.api.evaluation.models import (
     Experiment,
     ExperimentDetail,
     ExperimentResults,
-    ExperimentRun,
     ExperimentRunGrid,
     ExperimentUpdatePlan,
     GoalExperimentStarted,
@@ -361,6 +360,106 @@ async def test_list_evaluation_goals_calls_the_pipeline_route() -> None:
     assert goals[0].description == ""
     assert client.requests[0]["endpoint"] == EVALUATION_GOALS
     assert client.pipeline_resource.calls == [PIPELINE_NAME]
+
+
+GOAL_ID = "88888888-8888-8888-8888-888888888888"
+GOAL = f"{EVALUATION_GOALS}/{GOAL_ID}"
+
+
+def goal_dict() -> dict[str, Any]:
+    return {
+        "evaluation_goal_id": GOAL_ID,
+        "pipeline_id": PIPELINE_UUID,
+        "name": "Fast answers",
+        "description": "",
+        "evaluator_id": EVALUATOR_ID,
+        "metric_key": "latency",
+        "threshold": 5.0,
+        "passing_values": None,
+        "min_pass_rate": 0.5,
+        "category": "EFFICIENCY",
+        "aggregation": "percentile",
+        "percentile": 95.0,
+        "created_at": "2026-10-01T00:00:00Z",
+        "updated_at": None,
+    }
+
+
+GOAL_FIELDS: dict[str, Any] = {
+    "name": "Fast answers",
+    "evaluator_id": EVALUATOR_ID,
+    "threshold": 5.0,
+    "min_pass_rate": 0.5,
+    "category": "EFFICIENCY",
+    "aggregation": "percentile",
+    "percentile": 95.0,
+}
+GOAL_BODY = {"description": "", **GOAL_FIELDS}
+
+
+@pytest.mark.asyncio
+async def test_create_evaluation_goal_posts_the_goal_and_returns_it() -> None:
+    client = FakeEvaluationClient({EVALUATION_GOALS: goal_dict()})
+
+    goal = await resource(client).create_evaluation_goal(PIPELINE_NAME, **GOAL_FIELDS)
+
+    assert isinstance(goal, EvaluationGoal)
+    assert (goal.evaluation_goal_id, goal.category, goal.aggregation, goal.percentile) == (
+        GOAL_ID,
+        "EFFICIENCY",
+        "percentile",
+        95.0,
+    )
+    [request] = client.requests
+    assert (request["method"], request["endpoint"], request["data"]) == ("POST", EVALUATION_GOALS, GOAL_BODY)
+
+
+@pytest.mark.asyncio
+async def test_create_evaluation_goal_leaves_out_what_was_not_set() -> None:
+    client = FakeEvaluationClient({EVALUATION_GOALS: goal_dict()})
+
+    await resource(client).create_evaluation_goal(
+        PIPELINE_NAME, name="Polite", evaluator_id=EVALUATOR_ID, passing_values=["yes"]
+    )
+
+    assert client.requests[0]["data"] == {
+        "name": "Polite",
+        "description": "",
+        "evaluator_id": EVALUATOR_ID,
+        "passing_values": ["yes"],
+        "min_pass_rate": 1.0,
+    }
+
+
+@pytest.mark.asyncio
+async def test_get_evaluation_goal_reads_the_goal() -> None:
+    client = FakeEvaluationClient({GOAL: goal_dict()})
+
+    goal = await resource(client).get_evaluation_goal(PIPELINE_NAME, GOAL_ID)
+
+    assert goal.name == "Fast answers"
+    assert [(r["method"], r["endpoint"]) for r in client.requests] == [("GET", GOAL)]
+
+
+@pytest.mark.asyncio
+async def test_update_evaluation_goal_puts_every_field() -> None:
+    client = FakeEvaluationClient({GOAL: goal_dict()})
+
+    goal = await resource(client).update_evaluation_goal(PIPELINE_NAME, GOAL_ID, **GOAL_FIELDS)
+
+    assert goal.evaluation_goal_id == GOAL_ID
+    [request] = client.requests
+    assert (request["method"], request["endpoint"], request["data"]) == ("PUT", GOAL, GOAL_BODY)
+
+
+@pytest.mark.asyncio
+async def test_delete_evaluation_goal_calls_delete_on_the_goal() -> None:
+    client = FakeEvaluationClient({GOAL: None})
+
+    await resource(client).delete_evaluation_goal(PIPELINE_NAME, GOAL_ID)
+
+    [request] = client.requests
+    assert (request["method"], request["endpoint"]) == ("DELETE", GOAL)
 
 
 def goal_run_dict() -> dict[str, Any]:

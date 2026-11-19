@@ -27,6 +27,8 @@ from deepset_mcp.api.evaluation.models import (
     ExperimentRunGrid,
     ExperimentRunReport,
     ExperimentUpdatePlan,
+    GoalAggregation,
+    GoalCategory,
     GoalExperimentStarted,
     GoalRunDataset,
     GoalRunPreview,
@@ -124,6 +126,59 @@ async def list_evaluation_goals(
         return f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}' (not found)."
     except (BadRequestError, UnexpectedAPIError) as e:
         return f"Failed to list evaluation goals for pipeline '{pipeline_name}' in workspace '{workspace}': {e}"
+
+
+async def create_evaluation_goal(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    name: str,
+    evaluator_id: str,
+    description: str = "",
+    threshold: float | None = None,
+    passing_values: list[str] | None = None,
+    min_pass_rate: float = 1.0,
+    category: GoalCategory | None = None,
+    aggregation: GoalAggregation | None = None,
+    percentile: float | None = None,
+) -> EvaluationGoal | str:
+    """Creates an Evaluation goal."""
+    raise NotImplementedError
+
+
+async def get_evaluation_goal(
+    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str, evaluation_goal_id: str
+) -> EvaluationGoal | str:
+    """Reads an Evaluation goal."""
+    raise NotImplementedError
+
+
+async def update_evaluation_goal(
+    *,
+    client: AsyncClientProtocol,
+    workspace: str,
+    pipeline_name: str,
+    evaluation_goal_id: str,
+    name: str,
+    evaluator_id: str,
+    description: str = "",
+    threshold: float | None = None,
+    passing_values: list[str] | None = None,
+    min_pass_rate: float = 1.0,
+    category: GoalCategory | None = None,
+    aggregation: GoalAggregation | None = None,
+    percentile: float | None = None,
+) -> EvaluationGoal | str:
+    """Replaces an Evaluation goal."""
+    raise NotImplementedError
+
+
+async def delete_evaluation_goal(
+    *, client: AsyncClientProtocol, workspace: str, pipeline_name: str, evaluation_goal_id: str
+) -> str:
+    """Deletes an Evaluation goal."""
+    raise NotImplementedError
 
 
 async def create_experiment(
