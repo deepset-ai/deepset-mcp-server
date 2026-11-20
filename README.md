@@ -1,3 +1,12 @@
+> [!WARNING]
+> **This repository is deprecated and reaches end of life on 28 February 2027.**
+> It gets no new tools or fixes, and we no longer review issues or pull requests here.
+>
+> Use the hosted MCP server instead: `https://api.cloud.deepset.ai/mcp`.
+> You can sign in with OAuth or connect with an API key, so you don't need to install or run anything yourself.
+>
+> The `deepset-mcp` package keeps working until end of life. Development continues inside the Haystack Enterprise Platform.
+
 # deepset-mcp
 
 **The official MCP server and Python SDK for the Haystack Enterprise Platform**
