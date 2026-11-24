@@ -18,7 +18,7 @@ class NoContentResponse(BaseModel):
 
 
 class DeepsetUser(BaseModel):
-    """Model representing a user on the deepset platform."""
+    """Model representing a user on the Haystack Enterprise Platform."""
 
     id: str = Field(alias="user_id")
     "Unique identifier for the user"

@@ -2,13 +2,9 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-import uuid
-
 import pytest
 
 from deepset_mcp.api.exceptions import ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.integrations.models import Integration, IntegrationProvider
-from deepset_mcp.api.integrations.protocols import IntegrationResourceProtocol
 from deepset_mcp.api.secrets.models import Secret
 from deepset_mcp.api.secrets.protocols import SecretResourceProtocol
 from deepset_mcp.api.shared_models import NoContentResponse, PaginatedResponse
@@ -30,6 +26,7 @@ class FakeSecretResource(SecretResourceProtocol):
         self.get_exception = get_exception
         self.get_call_count = 0
         self.last_secret_id: str | None = None
+        self.last_list_workspace: str | None = None
 
     async def list(
         self,
@@ -37,7 +34,9 @@ class FakeSecretResource(SecretResourceProtocol):
         field: str = "created_at",
         order: str = "DESC",
         after: str | None = None,
+        workspace: str | None = None,
     ) -> PaginatedResponse[Secret]:
+        self.last_list_workspace = workspace
         if self.list_exception:
             raise self.list_exception
         if self.list_response is None:
@@ -60,93 +59,18 @@ class FakeSecretResource(SecretResourceProtocol):
         return NoContentResponse(message="Deleted")
 
 
-class FakeIntegrationResource(IntegrationResourceProtocol):
-    def __init__(
-        self,
-        list_response: list[Integration] | None = None,
-        get_response: Integration | None = None,
-        list_exception: Exception | None = None,
-        get_exception: Exception | None = None,
-    ) -> None:
-        self.list_response = list_response
-        self.get_response = get_response
-        self.list_exception = list_exception
-        self.get_exception = get_exception
-
-    async def list(self) -> list[Integration]:
-        if self.list_exception:
-            raise self.list_exception
-        if self.list_response is None:
-            return []
-        return self.list_response
-
-    async def get(self, provider: IntegrationProvider) -> Integration:
-        if self.get_exception:
-            raise self.get_exception
-        if self.get_response is None:
-            raise ResourceNotFoundError(f"Integration for provider '{provider}' not found.")
-        return self.get_response
-
-
 class FakeClient(BaseFakeClient):
-    def __init__(
-        self,
-        secret_resource: FakeSecretResource | None = None,
-        integration_resource: FakeIntegrationResource | None = None,
-    ) -> None:
+    def __init__(self, secret_resource: FakeSecretResource | None = None) -> None:
         super().__init__()
         self._secret_resource = secret_resource or FakeSecretResource()
-        self._integration_resource = integration_resource or FakeIntegrationResource()
 
     def secrets(self) -> SecretResourceProtocol:
         return self._secret_resource
 
-    def integrations(self) -> IntegrationResourceProtocol:
-        return self._integration_resource
-
 
 @pytest.mark.asyncio
-async def test_list_secrets_and_integrations() -> None:
-    """Test listing secrets and integrations successfully."""
-    secrets_data = [Secret(name="api-key", secret_id="secret-1")]
-    secret_list = PaginatedResponse[Secret](data=secrets_data, has_more=False, total=1)
-
-    integration_id = uuid.uuid4()
-    integration_list = [
-        Integration(
-            invalid=False,
-            model_registry_token_id=integration_id,
-            provider=IntegrationProvider.OPENAI,
-            provider_domain="api.openai.com",
-        )
-    ]
-
-    client = FakeClient(
-        secret_resource=FakeSecretResource(list_response=secret_list),
-        integration_resource=FakeIntegrationResource(list_response=integration_list),
-    )
-
-    result = await list_secrets(client=client)
-
-    assert isinstance(result, EnvironmentSecretList)
-    assert len(result.data) == 2
-    assert result.total == 2
-    assert result.has_more is False
-
-    # Check secret
-    assert result.data[0].name == "api-key"
-    assert result.data[0].id == "secret-1"
-    assert result.data[0].invalid is None
-
-    # Check integration
-    assert result.data[1].name == "OPENAI_API_KEY"
-    assert result.data[1].id == str(integration_id)
-    assert result.data[1].invalid is False
-
-
-@pytest.mark.asyncio
-async def test_list_secrets_only() -> None:
-    """Test listing only secrets when no integrations exist."""
+async def test_list_secrets() -> None:
+    """Test listing secrets successfully."""
     secrets_data = [
         Secret(name="api-key", secret_id="secret-1"),
         Secret(name="db-pass", secret_id="secret-2"),
@@ -162,36 +86,26 @@ async def test_list_secrets_only() -> None:
     assert result.has_more is True
     assert result.data[0].name == "api-key"
     assert result.data[1].name == "db-pass"
+    assert client._secret_resource.last_list_workspace is None
 
 
 @pytest.mark.asyncio
-async def test_list_integrations_only() -> None:
-    """Test listing only integrations when no secrets exist."""
-    integration_id = uuid.uuid4()
-    integration_list = [
-        Integration(
-            invalid=True,
-            model_registry_token_id=integration_id,
-            provider=IntegrationProvider.COHERE,
-            provider_domain="api.cohere.ai",
-        )
-    ]
-    client = FakeClient(integration_resource=FakeIntegrationResource(list_response=integration_list))
+async def test_list_secrets_in_workspace() -> None:
+    """Test listing secrets of a specific workspace."""
+    secret_list = PaginatedResponse[Secret](data=[Secret(name="ws-key", secret_id="secret-3")], has_more=False, total=1)
+    client = FakeClient(secret_resource=FakeSecretResource(list_response=secret_list))
 
-    result = await list_secrets(client=client)
+    result = await list_secrets(client=client, workspace="my-workspace")
 
     assert isinstance(result, EnvironmentSecretList)
     assert len(result.data) == 1
-    assert result.total == 1
-    assert result.has_more is False
-    assert result.data[0].name == "COHERE_API_KEY"
-    assert result.data[0].id == str(integration_id)
-    assert result.data[0].invalid is True
+    assert result.data[0].name == "ws-key"
+    assert client._secret_resource.last_list_workspace == "my-workspace"
 
 
 @pytest.mark.asyncio
 async def test_list_empty() -> None:
-    """Test listing when no secrets or integrations exist."""
+    """Test listing when no secrets exist."""
     client = FakeClient()
     result = await list_secrets(client=client)
     assert isinstance(result, EnvironmentSecretList)
@@ -209,16 +123,6 @@ async def test_list_secrets_api_error() -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_integrations_api_error() -> None:
-    """Test API error during integration listing."""
-    client = FakeClient(
-        integration_resource=FakeIntegrationResource(list_exception=UnexpectedAPIError(500, "Server error"))
-    )
-    result = await list_secrets(client=client)
-    assert result == "API Error: Server error (Status Code: 500)"
-
-
-@pytest.mark.asyncio
 async def test_get_secret_by_id_success() -> None:
     """Test successful retrieval of a secret by its ID."""
     secret = Secret(name="api-key", secret_id="secret-1")
@@ -229,38 +133,11 @@ async def test_get_secret_by_id_success() -> None:
     assert isinstance(result, EnvironmentSecret)
     assert result.name == "api-key"
     assert result.id == "secret-1"
-    assert result.invalid is None
-
-
-@pytest.mark.asyncio
-async def test_get_integration_by_id_success() -> None:
-    """Test successful retrieval of an integration by its ID."""
-    integration_id = uuid.uuid4()
-    integration_list = [
-        Integration(
-            invalid=False,
-            model_registry_token_id=integration_id,
-            provider=IntegrationProvider.OPENAI,
-            provider_domain="api.openai.com",
-        )
-    ]
-
-    client = FakeClient(
-        secret_resource=FakeSecretResource(get_exception=ResourceNotFoundError("Not found")),
-        integration_resource=FakeIntegrationResource(list_response=integration_list),
-    )
-
-    result = await get_secret(client=client, secret_id=str(integration_id))
-
-    assert isinstance(result, EnvironmentSecret)
-    assert result.name == "OPENAI_API_KEY"
-    assert result.id == str(integration_id)
-    assert result.invalid is False
 
 
 @pytest.mark.asyncio
 async def test_get_secret_not_found_anywhere() -> None:
-    """Test when a secret ID is not found in secrets or integrations."""
+    """Test when a secret ID is not found."""
     client = FakeClient(secret_resource=FakeSecretResource(get_exception=ResourceNotFoundError("Not found")))
     result = await get_secret(client=client, secret_id="nonexistent")
     assert result == "Error: Secret with ID 'nonexistent' not found."
@@ -271,17 +148,6 @@ async def test_get_secret_api_error() -> None:
     """Test API error during secret retrieval."""
     client = FakeClient(secret_resource=FakeSecretResource(get_exception=UnexpectedAPIError(500, "Server error")))
     result = await get_secret(client=client, secret_id="secret-1")
-    assert result == "API Error: Server error (Status Code: 500)"
-
-
-@pytest.mark.asyncio
-async def test_get_integration_list_api_error() -> None:
-    """Test API error when listing integrations after secret not found."""
-    client = FakeClient(
-        secret_resource=FakeSecretResource(get_exception=ResourceNotFoundError("Not found")),
-        integration_resource=FakeIntegrationResource(list_exception=UnexpectedAPIError(500, "Server error")),
-    )
-    result = await get_secret(client=client, secret_id="any-id")
     assert result == "API Error: Server error (Status Code: 500)"
 
 

@@ -81,6 +81,19 @@ class StreamingResponse:
         return body.decode() if body else ""
 
 
+def _errors_message(body: dict[str, Any]) -> str | None:
+    """Reads the message from an ``{"errors": [...]}`` or FastAPI ``{"detail": ...}`` error body."""
+    errors = body.get("errors")
+    if isinstance(errors, list) and errors:
+        return "; ".join(error if isinstance(error, str) else json.dumps(error) for error in errors)
+    detail = body.get("detail")
+    if isinstance(detail, dict):
+        return _errors_message(detail)
+    if detail:
+        return detail if isinstance(detail, str) else json.dumps(detail)
+    return None
+
+
 def raise_for_status(response: TransportResponse[Any]) -> None:
     """Raises the appropriate exception based on the response status code."""
     if response.success:
@@ -94,7 +107,7 @@ def raise_for_status(response: TransportResponse[Any]) -> None:
 
     if isinstance(response.json, dict):
         detail = response.json.get("details") if response.json else None
-        message = response.json.get("message") if response.json else response.text
+        message = (response.json.get("message") or _errors_message(response.json)) if response.json else response.text
     else:
         detail = json.dumps(response.json) if response.json else None
         message = response.text

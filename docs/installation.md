@@ -1,13 +1,13 @@
 # Installation
 
-Get the deepset MCP server running in your preferred environment. The server enables AI agents to interact with the deepset AI platform through standardized tools.
+Get the deepset MCP server running in your preferred environment. The server enables AI agents to interact with the Haystack Enterprise Platform through standardized tools.
 
 ## Prerequisites
 
 Before installing the deepset MCP server, ensure you have:
 
-- A deepset AI platform account
-- An API key for the deepset platform ([create one here](https://docs.cloud.deepset.ai/docs/generate-api-key))
+- A Haystack Enterprise Platform account
+- An API key for the Haystack Enterprise Platform ([create one here](https://docs.cloud.deepset.ai/docs/generate-api-key))
 - Python package manager `uv` installed
 
 ## Installing uv

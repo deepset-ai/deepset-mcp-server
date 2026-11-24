@@ -19,6 +19,7 @@ class ModelResourceProtocol(Protocol):
         connected: bool | None = None,
         provider: ModelProvider | str | None = None,
         model: str | None = None,
+        include_price: bool = False,
     ) -> ModelList:
         """List the models including their configuration options available for the configured workspace.
 
@@ -32,6 +33,8 @@ class ModelResourceProtocol(Protocol):
         :param model: If set, only return models whose `model` field contains this value
             (case-insensitive, substring match). Since the API does not support this filter,
             all models are fetched and filtered locally.
+        :param include_price: If True, each model with a known price also carries its effective price,
+            with workspace and organization custom prices applied. Requires read access to costs.
         :returns: A page of models including their configuration options.
         """
         ...

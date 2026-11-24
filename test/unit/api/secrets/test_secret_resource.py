@@ -283,3 +283,27 @@ async def test_list_secrets_cursor_population() -> None:
     single_result = await resource.list(limit=10)
     assert single_result.next_cursor is None  # No cursor since has_more=False
     assert single_result.has_more is False
+
+
+@pytest.mark.asyncio
+async def test_list_secrets_in_workspace() -> None:
+    """Test listing secrets of a workspace uses the workspace endpoint."""
+    mock_secrets_data = {
+        "data": [{"name": "secret-1", "secret_id": "id-1"}],
+        "has_more": False,
+        "total": 1,
+    }
+
+    fake_client = BaseFakeClient(responses={"v2/workspaces/my-workspace/secrets": mock_secrets_data})
+
+    resource = SecretResource(client=fake_client)
+    result = await resource.list(limit=5, workspace="my-workspace")
+
+    assert len(result.data) == 1
+    assert result.data[0].secret_id == "id-1"
+
+    assert len(fake_client.requests) == 1
+    request = fake_client.requests[0]
+    assert request["endpoint"] == "v2/workspaces/my-workspace/secrets"
+    assert request["method"] == "GET"
+    assert request["params"]["limit"] == "5"

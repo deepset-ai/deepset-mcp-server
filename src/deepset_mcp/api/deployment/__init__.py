@@ -2,4 +2,6 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Unit tests for integrations API."""
+from .resource import DeploymentResource
+
+__all__ = ["DeploymentResource"]

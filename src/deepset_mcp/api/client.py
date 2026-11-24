@@ -8,10 +8,12 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from types import TracebackType
 from typing import Any, Literal, Self, TypeVar, overload
 
+from deepset_mcp.api.cost.resource import CostResource
 from deepset_mcp.api.custom_components.resource import CustomComponentsResource
+from deepset_mcp.api.deployment.resource import DeploymentResource
+from deepset_mcp.api.evaluation.resource import EvaluationResource
 from deepset_mcp.api.haystack_service.resource import HaystackServiceResource
 from deepset_mcp.api.indexes.resource import IndexResource
-from deepset_mcp.api.integrations.resource import IntegrationResource
 from deepset_mcp.api.model.resource import ModelResource
 from deepset_mcp.api.pipeline.resource import PipelineResource
 from deepset_mcp.api.pipeline_template.resource import PipelineTemplateResource
@@ -59,6 +61,7 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         base_url: str = "https://api.cloud.deepset.ai/api",
         transport: TransportProtocol | None = None,
         transport_config: dict[str, Any] | None = None,
+        organization_id: str | None = None,
     ) -> None:
         """Initialize an instance of the AsyncDeepsetClient.
 
@@ -67,7 +70,10 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         :param transport: Custom transport implementation
         :param transport_config: Configuration for default transport (e.g. timeout). All configuration parameters are
             forwarded to httpx.AsyncClient.
+        :param organization_id: Organization to scope requests to, sent as 'X-Organization-ID'. Only needed for
+            tokens that are not bound to an organization (OAuth). The platform picks a default when omitted.
         """
+        self.organization_id = organization_id
         self.api_key = api_key or os.environ.get("DEEPSET_API_KEY")
         if not self.api_key:
             raise ValueError("API key not provided and DEEPSET_API_KEY environment variable not set")
@@ -97,6 +103,30 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         """
         return IndexResource(client=self, workspace=workspace)
 
+    def deployments(self, workspace: str) -> DeploymentResource:
+        """Resource to interact with deployments (AI Gateways) in the specified workspace.
+
+        :param workspace: Workspace identifier
+        :returns: Deployment resource instance
+        """
+        return DeploymentResource(client=self, workspace=workspace)
+
+    def evaluation(self, workspace: str) -> EvaluationResource:
+        """Resource to interact with Evaluators, Experiments, their runs, and Sessions in the specified workspace.
+
+        :param workspace: Workspace identifier
+        :returns: Evaluation resource instance
+        """
+        return EvaluationResource(client=self, workspace=workspace)
+
+    def cost(self, workspace: str | None = None) -> CostResource:
+        """Resource to read LLM cost in the specified workspace, or in the whole organization.
+
+        :param workspace: Workspace identifier. Omit for the whole organization.
+        :returns: Cost resource instance
+        """
+        return CostResource(client=self, workspace=workspace)
+
     def pipeline_templates(self, workspace: str) -> PipelineTemplateResource:
         """Resource to interact with pipeline templates in the specified workspace.
 
@@ -119,13 +149,6 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         :returns: Haystack service resource instance
         """
         return HaystackServiceResource(client=self)
-
-    def integrations(self) -> IntegrationResource:
-        """Resource to interact with integrations.
-
-        :returns: Integration resource instance
-        """
-        return IntegrationResource(client=self)
 
     def models(self, workspace: str) -> ModelResource:
         """Resource to interact with models in the specified workspace.
@@ -224,6 +247,8 @@ class AsyncDeepsetClient(AsyncClientProtocol):
         }
         if data is not None:
             request_headers["Content-Type"] = "application/json"
+        if self.organization_id:
+            request_headers["X-Organization-ID"] = self.organization_id
         # Merge custom headers
         if headers:
             headers.setdefault("Authorization", request_headers["Authorization"])
@@ -286,6 +311,8 @@ class AsyncDeepsetClient(AsyncClientProtocol):
             }
             if data is not None:
                 request_headers["Content-Type"] = "application/json"
+            if self.organization_id:
+                request_headers["X-Organization-ID"] = self.organization_id
             # Merge custom headers
             if headers:
                 headers.setdefault("Authorization", request_headers["Authorization"])

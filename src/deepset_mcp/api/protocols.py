@@ -9,10 +9,12 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol, Self, TypeVar, overloa
 from deepset_mcp.api.transport import StreamingResponse, TransportResponse
 
 if TYPE_CHECKING:
+    from deepset_mcp.api.cost.protocols import CostResourceProtocol
     from deepset_mcp.api.custom_components.protocols import CustomComponentsProtocol
+    from deepset_mcp.api.deployment.protocols import DeploymentResourceProtocol
+    from deepset_mcp.api.evaluation.protocols import EvaluationResourceProtocol
     from deepset_mcp.api.haystack_service.protocols import HaystackServiceProtocol
     from deepset_mcp.api.indexes.protocols import IndexResourceProtocol
-    from deepset_mcp.api.integrations.protocols import IntegrationResourceProtocol
     from deepset_mcp.api.model.protocols import ModelResourceProtocol
     from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
     from deepset_mcp.api.pipeline_template.protocols import PipelineTemplateResourceProtocol
@@ -109,6 +111,18 @@ class AsyncClientProtocol(Protocol):
         """Access indexes in the specified workspace."""
         ...
 
+    def deployments(self, workspace: str) -> "DeploymentResourceProtocol":
+        """Access deployments (AI Gateways) in the specified workspace."""
+        ...
+
+    def evaluation(self, workspace: str) -> "EvaluationResourceProtocol":
+        """Access Evaluators, Experiments, their runs, and Sessions in the specified workspace."""
+        ...
+
+    def cost(self, workspace: str | None = None) -> "CostResourceProtocol":
+        """Access LLM cost in the specified workspace, or in the whole organization when it is omitted."""
+        ...
+
     def custom_components(self, workspace: str) -> "CustomComponentsProtocol":
         """Access custom components in the specified workspace."""
         ...
@@ -123,10 +137,6 @@ class AsyncClientProtocol(Protocol):
 
     def workspaces(self) -> "WorkspaceResourceProtocol":
         """Access workspaces."""
-        ...
-
-    def integrations(self) -> "IntegrationResourceProtocol":
-        """Access integrations."""
         ...
 
     def models(self, workspace: str) -> "ModelResourceProtocol":

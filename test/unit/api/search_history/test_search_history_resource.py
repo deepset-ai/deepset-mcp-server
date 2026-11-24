@@ -342,24 +342,20 @@ class TestSearchHistoryResourceList:
 
 class TestSearchHistoryResourceListPipeline:
     @pytest.mark.asyncio
-    async def test_list_pipeline_uses_archive_endpoint(self) -> None:
+    async def test_list_pipeline_uses_search_history_endpoint(self) -> None:
         client = BaseFakeClient(
-            responses={
-                "v1/workspaces/ws/pipelines/pipe/search_history_archive": {"data": [], "has_more": False, "total": 0}
-            }
+            responses={"v1/workspaces/ws/pipelines/pipe/search_history": {"data": [], "has_more": False, "total": 0}}
         )
         resource = SearchHistoryResource(client=client, workspace="ws")
 
         await resource.list_pipeline("pipe")
 
-        assert client.requests[0]["endpoint"] == "v1/workspaces/ws/pipelines/pipe/search_history_archive"
+        assert client.requests[0]["endpoint"] == "v1/workspaces/ws/pipelines/pipe/search_history"
 
     @pytest.mark.asyncio
     async def test_list_pipeline_sort_params_forwarded_as_field_and_order(self) -> None:
         client = BaseFakeClient(
-            responses={
-                "v1/workspaces/ws/pipelines/pipe/search_history_archive": {"data": [], "has_more": False, "total": 0}
-            }
+            responses={"v1/workspaces/ws/pipelines/pipe/search_history": {"data": [], "has_more": False, "total": 0}}
         )
         resource = SearchHistoryResource(client=client, workspace="ws")
 
@@ -376,9 +372,7 @@ class TestSearchHistoryResourceListPipeline:
             {"search_history_id": "sh-2", "time": "2024-03-01T09:00:00Z"},
         ]
         client = BaseFakeClient(
-            responses={
-                "v1/workspaces/ws/pipelines/pipe/search_history_archive": {"data": items, "has_more": True, "total": 50}
-            }
+            responses={"v1/workspaces/ws/pipelines/pipe/search_history": {"data": items, "has_more": True, "total": 50}}
         )
         resource = SearchHistoryResource(client=client, workspace="ws")
 
@@ -392,9 +386,7 @@ class TestSearchHistoryResourceListPipeline:
             {"search_history_id": "sh-1", "request": {"query": "pipeline test"}, "time": "2024-03-01T10:00:00Z"},
         ]
         client = BaseFakeClient(
-            responses={
-                "v1/workspaces/ws/pipelines/pipe/search_history_archive": {"data": items, "has_more": False, "total": 1}
-            }
+            responses={"v1/workspaces/ws/pipelines/pipe/search_history": {"data": items, "has_more": False, "total": 1}}
         )
         resource = SearchHistoryResource(client=client, workspace="ws")
 
@@ -407,9 +399,7 @@ class TestSearchHistoryResourceListPipeline:
     async def test_list_pipeline_404_raises_resource_not_found(self) -> None:
         client = BaseFakeClient(
             responses={
-                "v1/workspaces/ws/pipelines/gone/search_history_archive": TransportResponse(
-                    text="Not Found", status_code=404
-                )
+                "v1/workspaces/ws/pipelines/gone/search_history": TransportResponse(text="Not Found", status_code=404)
             }
         )
         resource = SearchHistoryResource(client=client, workspace="ws")

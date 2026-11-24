@@ -1,6 +1,6 @@
 # Deepset API SDK
 
-The Deepset API SDK provides a Python interface for interacting with the [deepset AI Platform](https://docs.cloud.deepset.ai/docs/getting-started). 
+The Deepset API SDK provides a Python interface for interacting with the [Haystack Enterprise Platform](https://docs.cloud.deepset.ai/docs/getting-started). 
 It enables developers to build, manage, and deploy AI-powered applications through a structured, asynchronous API.
 
 
@@ -270,9 +270,9 @@ async with AsyncDeepsetClient() as client:
 ```
 
 
-### How to Manage Secrets and Integrations
+### How to Manage Secrets
 
-This guide shows you how to securely store API keys and configure external service integrations.
+This guide shows you how to securely store API keys.
 
 ```python
 from deepset_mcp.api import AsyncDeepsetClient
@@ -284,14 +284,11 @@ async with AsyncDeepsetClient() as client:
         name="openai-api-key",
         secret="sk-your-openai-key"
     )
-    
-    # Check available integrations
-    integrations = client.integrations()
-    available = await integrations.list()
-    
-    for integration in available.integrations:
-        print(f"Provider: {integration.provider}")
-        print(f"Domain: {integration.provider_domain}")
+
+    # List secrets available in a specific workspace
+    workspace_secrets = await secrets_client.list(workspace="my-workspace")
+    for secret in workspace_secrets.data:
+        print(f"Secret: {secret.name}")
 ```
 
 ### How to Handle Errors

@@ -18,6 +18,7 @@ async def get_models(
     connected: bool | None = None,
     provider: ModelProvider | str | None = None,
     model: str | None = None,
+    include_price: bool = False,
 ) -> ModelList | str:
     """Lists the models including their configuration options available for use in a workspace's pipelines and indexes.
 
@@ -37,13 +38,29 @@ async def get_models(
         provider name as a plain string. Case-insensitive, exact match.
     :param model: If set, only return models whose configured model name contains this value
         (e.g. 'gpt-4o'). Case-insensitive, substring match.
+    :param include_price: If True, each model also carries its effective `price` in USD per 1,000 tokens
+        (input, output and cache prices), with the workspace's and organization's custom prices applied.
+        Requires read access to costs. Models without a known price have no `price`, e.g. Azure models that
+        are only identified by their deployment name. Defaults to False.
     :returns: A page of models including their configuration options or an error message.
     """
     try:
         return await client.models(workspace=workspace).list(
-            limit=limit, page_number=page_number, connected=connected, provider=provider, model=model
+            limit=limit,
+            page_number=page_number,
+            connected=connected,
+            provider=provider,
+            model=model,
+            include_price=include_price,
         )
     except ResourceNotFoundError:
         return f"There is no workspace named '{workspace}'. Did you mean to configure it?"
-    except (BadRequestError, UnexpectedAPIError) as e:
+    except UnexpectedAPIError as e:
+        if include_price and e.status_code == 403:
+            return (
+                "Prices need read access to costs in this workspace, which the API key does not have. "
+                "Call get_models without include_price to list the models."
+            )
+        return f"Failed to list models: {e}"
+    except BadRequestError as e:
         return f"Failed to list models: {e}"

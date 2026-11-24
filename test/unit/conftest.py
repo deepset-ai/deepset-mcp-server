@@ -8,10 +8,12 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from types import TracebackType
 from typing import Any, Literal, Self, TypeVar, overload
 
+from deepset_mcp.api.cost.protocols import CostResourceProtocol
 from deepset_mcp.api.custom_components.protocols import CustomComponentsProtocol
+from deepset_mcp.api.deployment.protocols import DeploymentResourceProtocol
+from deepset_mcp.api.evaluation.protocols import EvaluationResourceProtocol
 from deepset_mcp.api.haystack_service.protocols import HaystackServiceProtocol
 from deepset_mcp.api.indexes.protocols import IndexResourceProtocol
-from deepset_mcp.api.integrations.protocols import IntegrationResourceProtocol
 from deepset_mcp.api.model.protocols import ModelResourceProtocol
 from deepset_mcp.api.pipeline.protocols import PipelineResourceProtocol
 from deepset_mcp.api.pipeline_template.protocols import PipelineTemplateResourceProtocol
@@ -266,6 +268,18 @@ class BaseFakeClient(AsyncClientProtocol):
         """Overwrite this method when testing IndexResource."""
         raise NotImplementedError
 
+    def deployments(self, workspace: str) -> DeploymentResourceProtocol:
+        """Overwrite this method when testing DeploymentResource."""
+        raise NotImplementedError
+
+    def evaluation(self, workspace: str) -> EvaluationResourceProtocol:
+        """Overwrite this method when testing EvaluationResource."""
+        raise NotImplementedError
+
+    def cost(self, workspace: str | None = None) -> CostResourceProtocol:
+        """Overwrite this method when testing CostResource."""
+        raise NotImplementedError
+
     def custom_components(self, workspace: str) -> CustomComponentsProtocol:
         """Overwrite this method when testing CustomComponentsResource."""
         raise NotImplementedError
@@ -280,10 +294,6 @@ class BaseFakeClient(AsyncClientProtocol):
 
     def workspaces(self) -> WorkspaceResourceProtocol:
         """Overwrite this method when testing WorkspaceResource."""
-        raise NotImplementedError
-
-    def integrations(self) -> IntegrationResourceProtocol:
-        """Overwrite this method when testing IntegrationResource."""
         raise NotImplementedError
 
     def models(self, workspace: str) -> ModelResourceProtocol:

@@ -11,7 +11,6 @@ from typing import Annotated
 import typer
 from mcp.server.fastmcp import FastMCP
 
-from deepset_mcp.config import DEEPSET_DOCS_DEFAULT_SHARE_URL, DOCS_SEARCH_TOOL_NAME
 from deepset_mcp.mcp.server import configure_mcp_server
 from deepset_mcp.mcp.tool_registry import TOOL_REGISTRY
 
@@ -26,7 +25,7 @@ class TransportEnum(StrEnum):
 
 app = typer.Typer(
     name="deepset-mcp",
-    help="Run the Deepset MCP server to interact with the deepset AI platform.",
+    help="Run the Deepset MCP server to interact with the Haystack Enterprise Platform.",
     no_args_is_help=True,
 )
 
@@ -58,7 +57,11 @@ def main(
         str | None,
         typer.Option(
             "--docs-share-url",
-            help="Deepset docs search share URL. Can also be set via DEEPSET_DOCS_SHARE_URL environment variable.",
+            help=(
+                "Optional custom docs-search share URL. When omitted, search_docs uses the "
+                "same public documentation pipeline as https://docs.cloud.deepset.ai/api/mcp. "
+                "Can also be set via DEEPSET_DOCS_SHARE_URL."
+            ),
         ),
     ] = None,
     tools: Annotated[
@@ -131,7 +134,7 @@ def main(
     """
     Run the Deepset MCP server.
 
-    The Deepset MCP server provides tools to interact with the deepset AI platform,
+    The Deepset MCP server provides tools to interact with the Haystack Enterprise Platform,
     allowing you to create, debug, and learn about pipelines on the platform.
 
     :param workspace: Deepset workspace name. Pass if you only want to run the tools on a specific workspace.
@@ -159,7 +162,7 @@ def main(
     workspace = workspace or os.getenv("DEEPSET_WORKSPACE")
     api_key = api_key or os.getenv("DEEPSET_API_KEY")
     api_url = api_url or os.getenv("DEEPSET_API_URL")
-    docs_share_url = docs_share_url or os.getenv("DEEPSET_DOCS_SHARE_URL", DEEPSET_DOCS_DEFAULT_SHARE_URL)
+    docs_share_url = docs_share_url or os.getenv("DEEPSET_DOCS_SHARE_URL")
 
     # ObjectStore configuration
     backend = str(object_store_backend or os.getenv("OBJECT_STORE_BACKEND", "memory"))
@@ -183,15 +186,7 @@ def main(
     if not workspace:
         logging.info("No workspace specified. Workspace needs to be provided during tool calling.")
 
-    if DOCS_SEARCH_TOOL_NAME in tool_names and docs_share_url is None:
-        typer.echo(
-            f"Error: {DOCS_SEARCH_TOOL_NAME} tool is requested but no docs share URL provided. "
-            "Set --docs-share-url or DEEPSET_DOCS_SHARE_URL environment variable.",
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    mcp = FastMCP("deepset AI platform MCP server")
+    mcp = FastMCP("Haystack Enterprise Platform MCP server")
     asyncio.run(
         configure_mcp_server(
             mcp_server_instance=mcp,

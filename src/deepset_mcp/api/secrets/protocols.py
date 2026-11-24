@@ -17,6 +17,7 @@ class SecretResourceProtocol(Protocol):
         field: str = "created_at",
         order: str = "DESC",
         after: str | None = None,
+        workspace: str | None = None,
     ) -> PaginatedResponse[Secret]:
         """List secrets with pagination."""
         ...

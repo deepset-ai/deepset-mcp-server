@@ -1,4 +1,228 @@
-# Tool Base Functions
+# Tool Reference
+
+## MCP tool names
+
+The tables below list every tool the MCP server can expose, by its MCP tool name. MCP tool name is the name an
+agent calls and the name you pass to `tools_to_register`:
+
+```python
+configure_mcp_server(
+    mcp_server_instance=mcp,
+    tools_to_register={"list_pipelines", "get_pipeline", "grep_object_store"},
+)
+```
+
+!!! note
+
+    A few MCP tool names differ from the Python function that implements them (the function is what
+    appears under [Tool base functions](#tool-base-functions) below). Always register the **MCP tool
+    name** listed in this table:
+
+    | MCP tool name | Implemented by Python function |
+    | --- | --- |
+    | `search_component_definitions` | `search_component_definition` |
+    | `get_from_object_store` | `create_get_from_object_store` |
+    | `get_slice_from_object_store` | `create_get_slice_from_object_store` |
+    | `grep_object_store` | `create_grep_object_store` |
+    | `sed_object_store` | `create_sed_object_store` |
+    | `yq_object_store` | `create_yq_object_store` |
+    | `search_docs` | `get_docs_search_tool` |
+
+
+### Pipelines
+
+The *Memory* column describes how a tool interacts with the object store (see
+[MCP server concepts](../concepts/mcp_server_concepts.md)):
+
+- *explorable*: The tool's output is stored and returned as an `@obj_id` reference.
+- *referenceable*: The tool accepts `@obj_id` references as parameters.
+- *none*: The tool returns its output directly.
+
+| MCP tool name | Workspace | Memory | Description |
+| --- | --- | --- | --- |
+| `list_pipelines` | required | explorable | List all pipelines in the workspace. |
+| `get_pipeline` | required | explorable | Fetch a pipeline's configuration and status. |
+| `create_pipeline` | required | explorable, referenceable | Create a new pipeline from a YAML configuration. |
+| `validate_pipeline` | required | explorable, referenceable | Validate a YAML configuration without saving it. |
+| `deploy_pipeline` | required | explorable | Deploy a pipeline and wait for it to become available. |
+| `get_pipeline_logs` | required | explorable | Fetch a deployed pipeline's logs. |
+| `debug_pipeline` | required | explorable, referenceable | Run a YAML configuration in debug mode, optionally breaking at a component or resuming from a snapshot. |
+| `search_pipeline` | required | explorable | Run a query against a deployed pipeline. |
+| `search_pipeline_with_filters` | required | explorable | Run a query with metadata filters. |
+| `search_pipeline_with_params` | required | explorable | Run a query with component-level parameter overrides. |
+
+### Pipeline versions
+
+| MCP tool name | Workspace | Memory | Description |
+| --- | --- | --- | --- |
+| `list_pipeline_versions` | required | explorable | List a pipeline's saved versions. |
+| `get_pipeline_version` | required | explorable | Fetch a specific pipeline version. |
+| `create_pipeline_version` | required | explorable, referenceable | Save the current configuration as a new version. |
+| `patch_pipeline_version` | required | explorable, referenceable | Apply a partial update to a pipeline version. |
+| `restore_pipeline_version` | required | explorable, referenceable | Restore a pipeline to an earlier version. |
+
+### Indexes
+
+| MCP tool name | Workspace | Memory | Description |
+| --- | --- | --- | --- |
+| `list_indexes` | required | explorable | List all indexes in the workspace. |
+| `get_index` | required | explorable | Fetch an index's configuration. |
+| `create_index` | required | explorable, referenceable | Create a new index from a YAML configuration. |
+| `update_index` | required | explorable, referenceable | Replace an existing index's configuration with a full, updated YAML. |
+| `validate_index` | required | explorable, referenceable | Validate an index configuration without saving it. |
+| `deploy_index` | required | explorable | Deploy an index. |
+
+### Deployments (AI Gateways)
+
+A deployment serves a pipeline behind a stable endpoint, independent of the pipeline's own
+draft/version history. Each deployment tracks its own history of served pipeline configurations as
+*revisions*.
+
+| MCP tool name | Workspace | Memory | Description |
+| --- | --- | --- | --- |
+| `list_deployments` | required | explorable | List all deployments in the workspace. |
+| `get_deployment` | required | explorable | Fetch a deployment's details, active revision, and runtime status. |
+| `create_deployment` | required | explorable, referenceable | Create a new deployment, optionally linked to a pipeline. |
+| `update_deployment` | required | explorable, referenceable | Update a deployment's metadata, sizing, or execution mode. |
+| `delete_deployment` | required | explorable | Delete a deployment along with all of its revisions. |
+| `list_deployment_tags` | required | explorable | List distinct tags in use across deployments in the workspace. |
+| `add_deployment_tag` | required | explorable | Add a tag to a deployment. |
+| `delete_deployment_tag` | required | explorable | Remove a tag from a deployment. |
+| `list_deployment_revisions` | required | explorable | List a deployment's revision history. |
+| `get_deployment_revision` | required | explorable | Fetch a specific revision, including its config YAML. |
+| `create_deployment_revision` | required | explorable, referenceable | Push a new revision onto a deployment. |
+| `activate_deployment_revision` | required | explorable | Activate a revision as the deployment's served revision. |
+| `activate_deployment` | required | explorable | Re-activate a deployment's current active revision. |
+| `deactivate_deployment` | required | explorable | Mark a deployment as no longer desired to be served. |
+| `list_deployment_activity` | required | explorable | List activation and revision activity for a deployment. |
+| `get_deployment_metrics` | required | explorable | Fetch per-replica CPU/memory usage and replica counts. |
+| `get_deployment_stats` | required | explorable | Fetch query volume, outcome split, and run durations. |
+
+### Search history and traces
+
+| MCP tool name | Workspace | Memory | Description |
+| --- | --- | --- | --- |
+| `list_search_history` | required | explorable | List search history across the workspace. |
+| `list_pipeline_search_history` | required | explorable | List search history for one pipeline. |
+| `list_pipeline_traces` | required | explorable | List lightweight run-trace summaries for a pipeline. |
+| `get_pipeline_trace` | required | explorable | Fetch the full execution trace for one query, including component spans with input/output and logs. |
+| `get_pipeline_trace_span_tags` | required | explorable | Fetch the tags of a single span, to inspect one component's input/output cheaply. |
+| `get_pipeline_trace_logs` | required | explorable | Fetch only the log entries for one run. |
+
+### Evaluation
+
+| MCP tool name | Workspace | Memory | Description |
+| --- | --- | --- | --- |
+| `list_evaluators` | required | explorable | List the workspace's Evaluators with the Metrics each declares, optionally only archived or only active ones. |
+| `get_evaluator` | required | explorable | Fetch one Evaluator with its versions, or one version with its Python source. |
+| `list_metric_groups` | required | explorable | List the workspace's Metric Groups, optionally with each one's most recent scoring run on a pipeline. |
+| `list_evaluation_goals` | required | explorable | List the Evaluation Goals (pass/fail targets on a Metric) set on one pipeline, so existing goals are not suggested again. |
+| `list_experiments` | required | explorable | List the workspace's Experiments (a candidate version against a baseline on a Dataset), optionally only those on one pipeline. |
+| `create_experiment` | required | none | Create an Experiment: a candidate pipeline version against a Recorded or Pipeline-version baseline on a Dataset (`preview` first: it costs money). |
+| `get_experiment` | required | explorable | Read one Experiment: test cases, each side's replays, scoring counts and error. |
+| `update_experiment` | required | none | Rename an Experiment or change a side (replays and judges again; `preview` first). |
+| `rerun_failed_experiment` | required | none | Judge again the failed evaluations, or replay again the failed replays (costs money). |
+| `rescore_experiment` | required | none | Score both sides again with the Metric Group as it is now (bills every evaluation again). |
+| `delete_experiment` | required | none | Delete an Experiment (destructive); its Sessions and scoring runs are kept. |
+| `get_experiment_results` | required | explorable | Read an Experiment's results: each Metric and duration, tokens and cost, candidate against baseline, then per test case. |
+| `get_experiment_run` | required | explorable | Read one scoring run: cell counts, a summary per Metric, the whole-run aggregate, usage and cost, and the grid rows, optionally filtered by origin, Service, version or Session. |
+| `list_experiment_runs` | required | explorable | List a Metric Group's scoring runs on a pipeline, or every run that judged one Session. |
+| `start_experiment_run` | required | none | Score named Sessions or a time window with a Metric Group, outside an Experiment (`preview` a window first: judged Evaluators cost money). |
+| `run_evaluator` | required | none | Run one saved Evaluator version on one Session and keep the Evaluation Run (judged Evaluators cost money). |
+| `list_evaluation_runs` | required | explorable | List a pipeline's Evaluation Runs, newest first. |
+| `get_evaluation_run` | required | explorable | Read one Evaluation Run: its progress, or its Metrics. |
+| `list_sessions` | required | explorable | List the Sessions of a pipeline that a scoring run can judge. |
+| `try_evaluator` | required | none | Try Evaluator source on one Session and return its Metrics; persists nothing. |
+| `get_evaluation_try` | required | none | Read a try that was still running. |
+| `replay_session` | required | none | Experiment support: replay one Session on a pipeline version into a new Session, to reproduce or retry one test case's replay (costs money; not added to the Experiment; to retry an Experiment's failed replays use `rerun_failed_experiment`). |
+| `get_session_replay` | required | none | Experiment support: read one replay run to see why it failed (status, error detail, setup and cleanup logs, the new Session). |
+| `list_datasets` | required | explorable | List the workspace's Datasets (named lists of test cases), optionally only those on one pipeline. |
+| `get_dataset` | required | explorable | Fetch one Dataset with all its test cases. |
+| `create_dataset` | required | none | Create a Dataset, optionally with its first test cases (recorded Sessions or inputs). |
+| `update_dataset` | required | none | Rename a Dataset. |
+| `delete_dataset` | required | none | Delete a Dataset and its test cases (destructive). |
+| `add_test_cases` | required | none | Add test cases to a Dataset. |
+| `update_test_case` | required | none | Change one test case's name, inputs, expected data or scripts. |
+| `copy_test_cases` | required | none | Copy test cases from any Dataset of the workspace into a Dataset. |
+| `remove_test_cases` | required | none | Remove test cases from a Dataset (destructive). |
+| `create_evaluator` | required | none | Create an Evaluator from Python source, optionally adding it to Metric Groups; try the code with `try_evaluator` first. |
+| `update_evaluator` | required | none | Rename an Evaluator or save new source as a new version. |
+| `set_evaluator_archived` | required | none | Archive or unarchive an Evaluator; nothing is deleted. |
+| `list_evaluator_templates` | required | explorable | List the built-in Evaluator templates with their code and Metrics. |
+| `create_metric_group` | required | none | Create a Metric Group of Evaluators, optionally with Metric weights for the Composite. |
+| `update_metric_group` | required | none | Replace a Metric Group's name and Evaluators, and optionally its Metric weights. |
+| `delete_metric_group` | required | none | Delete a Metric Group and its scoring runs (destructive). |
+
+### Cost
+
+| MCP tool name | Workspace | Memory | Description |
+| --- | --- | --- | --- |
+| `get_cost_totals` | optional | explorable | Read the LLM cost, tokens and requests of a workspace or pipeline over a date range, or of the whole organization when no workspace is given (organization admins). |
+| `get_cost_over_time` | optional | explorable | Read the LLM cost of a workspace or pipeline per UTC day, or of the whole organization when no workspace is given (organization admins). |
+| `get_cost_breakdown` | optional | explorable | Read the LLM cost grouped by model, workspace, pipeline, deployment, API key or provider, for a workspace or (organization admins, no workspace given) the whole organization. |
+
+### Templates
+
+| MCP tool name | Workspace | Memory | Description |
+| --- | --- | --- | --- |
+| `list_templates` | required | explorable | List available pipeline templates. |
+| `get_template` | required | explorable | Fetch a specific pipeline template. |
+| `search_templates` | required | explorable | Search templates by semantic similarity. |
+
+### Haystack components
+
+| MCP tool name | Workspace | Memory | Description |
+| --- | --- | --- | --- |
+| `list_component_families` | not needed | explorable | List the available Haystack component families. |
+| `get_component_definition` | not needed | explorable | Fetch a component's initialization parameters and I/O. |
+| `search_component_definitions` | not needed | explorable | Search component definitions by semantic similarity. |
+| `get_custom_components` | not needed | explorable | List the custom components installed for the organization. |
+| `run_component` | not needed | explorable, referenceable | Run a single component in isolation to test its behavior. |
+
+### Custom components
+
+| MCP tool name | Workspace | Memory | Description |
+| --- | --- | --- | --- |
+| `list_custom_component_installations` | required | explorable | List custom component installations. |
+| `get_latest_custom_component_installation_logs` | required | explorable | Fetch logs for the most recent custom component installation. |
+
+### Workspaces, secrets and models
+
+| MCP tool name | Workspace | Memory | Description |
+| --- | --- | --- | --- |
+| `list_organizations` | not needed | no_memory | List the organizations the user belongs to (OAuth only). |
+| `list_workspaces` | not needed | explorable | List the workspaces available to the API key. |
+| `get_workspace` | not needed | explorable | Fetch a workspace's details. |
+| `create_workspace` | not needed | explorable | Create a new workspace. |
+| `list_secrets` | optional | explorable | List the secrets available to the organization, or to a workspace if one is given. |
+| `get_secret` | not needed | explorable | Fetch a secret's metadata by ID. |
+| `get_models` | required | explorable | List models available for use in pipelines. |
+
+### Object store
+
+These tools let an agent inspect and manipulate stored objects without pulling them into context.
+See [Tool output truncation and exploration](../concepts/mcp_server_concepts.md#tool-output-truncation-and-exploration).
+
+| MCP tool name | Workspace | Memory | Description |
+| --- | --- | --- | --- |
+| `get_from_object_store` | not needed | none | Fetch a stored object, or a nested value by path. |
+| `get_slice_from_object_store` | not needed | none | Extract a range from a stored string or list. |
+| `grep_object_store` | not needed | none | Regex-search a stored string and return matches with context. |
+| `sed_object_store` | not needed | none | Regex-replace within a stored string, storing the result as a new object. |
+| `yq_object_store` | not needed | none | Query or transform stored YAML/JSON with a `jq` filter expression. |
+
+### Documentation and skills
+
+| MCP tool name | Workspace | Memory | Description |
+| --- | --- | --- | --- |
+| `search_docs` | not needed | none | Search the Haystack Enterprise Platform documentation using the same pipeline as the documentation MCP server. |
+| `list_doc_sections` | not needed | none | List the main documentation sections with descriptions and URLs. |
+| `load_skill` | not needed | none | Load a bundled skill containing detailed guidance for a specific task. |
+
+## Tool base functions
+
+The Python functions that implement the tools above. Their docstrings are what the calling LLM
+receives as the tool description.
 
 ::: deepset_mcp.tools
     options:

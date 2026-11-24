@@ -2,9 +2,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from __future__ import annotations
+
 from typing import Protocol
 
-from deepset_mcp.api.indexes.models import Index
+from deepset_mcp.api.indexes.models import Index, MetaFilterConditions
 from deepset_mcp.api.pipeline.models import PipelineValidationResult
 from deepset_mcp.api.shared_models import PaginatedResponse
 
@@ -31,13 +33,32 @@ class IndexResourceProtocol(Protocol):
         ...
 
     async def update(
-        self, index_name: str, updated_index_name: str | None = None, yaml_config: str | None = None
+        self,
+        index_name: str,
+        updated_index_name: str | None = None,
+        yaml_config: str | None = None,
+        description: str | None = None,
+        max_allowed_batch_size: int | None = None,
+        max_index_replica_count: int | None = None,
+        gpu_enabled: bool | None = None,
+        capture_traces: bool | None = None,
+        instance_size: str | None = None,
+        file_name_prefix_filter: str | None = None,
+        file_meta_filter: MetaFilterConditions | None = None,
     ) -> Index:
-        """Update name and/or configuration of an existing index.
+        """Update name, configuration, and/or settings of an existing index.
 
         :param index_name: Name of the index to update
         :param updated_index_name: Optional new name for the index
         :param yaml_config: Optional new YAML configuration
+        :param description: Optional new description
+        :param max_allowed_batch_size: Optional per-pipeline cap on files indexed per batch (1-500)
+        :param max_index_replica_count: Optional max number of index replicas (1-10)
+        :param gpu_enabled: Optional toggle for GPU acceleration
+        :param capture_traces: Optional toggle for recording an indexing trace per queued file
+        :param instance_size: Optional pod size: "small", "medium", "large", or "xl"
+        :param file_name_prefix_filter: Optional file-name prefix pattern filter
+        :param file_meta_filter: Optional metadata conditions filtering which files are indexed
         :returns: Updated index details
         """
         ...

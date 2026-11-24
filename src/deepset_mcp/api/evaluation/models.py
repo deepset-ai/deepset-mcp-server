@@ -1,0 +1,1046 @@
+# SPDX-FileCopyrightText: 2025-present deepset GmbH <info@deepset.ai>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+"""Models for the evaluation API: Evaluators, Metric Groups, their scoring runs, Experiments, and Sessions."""
+
+from typing import Annotated, Any, Literal
+
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+
+Better = Literal["higher", "lower"]
+Change = Literal["improved", "regressed", "unchanged", "unknown"]
+
+_BETTER = "Which way a change in this Metric is an improvement: 'higher', 'lower', or null when unknown."
+_CHANGE = (
+    "How the candidate moved this Metric, read against `better`: 'improved', 'regressed', 'unchanged', or "
+    "'unknown' when no direction is declared or the change cannot be judged. Report improved or regressed "
+    "only from this field, never from the Metric's name."
+)
+
+_EVALUATOR_ID = "The Evaluator the Metric belongs to."
+_METRIC_KEY = "The Metric, by the key its Evaluator declares, for example `helpful`."
+
+
+class CompositeWeight(BaseModel):
+    """How much one Metric counted toward a scoring run's Composite, as the run recorded it when it started."""
+
+    evaluator_id: str = Field(description=_EVALUATOR_ID)
+    metric_key: str = Field(description=_METRIC_KEY)
+    weight: float = Field(
+        description=(
+            "The Metric's weight when the run started, a number above 0. Weights are relative: the Composite "
+            "divides each by their sum, so 2, 1 and 1 count as 0.5, 0.25 and 0.25."
+        )
+    )
+
+
+class NormalizedMean(BaseModel):
+    """A Metric's whole-run value on a scale from 0 to 1, where 1 is best."""
+
+    kind: Literal["value"] = "value"
+    evaluator_id: str = Field(description=_EVALUATOR_ID)
+    metric_key: str = Field(description=_METRIC_KEY)
+    value: float = Field(
+        description=(
+            "The Metric's mean on a scale from 0 to 1, where 1 is best. A Score's mean is placed in its "
+            "`range` and turned around when `better` is 'lower'. A Label's is each label's share of the "
+            "Sessions times its value on the Label's Scale, summed."
+        )
+    )
+
+
+class NoNormalizedMean(BaseModel):
+    """A Metric that cannot be put on the 0-to-1 scale in this run, and why."""
+
+    kind: Literal["missing"] = "missing"
+    evaluator_id: str = Field(description=_EVALUATOR_ID)
+    metric_key: str = Field(description=_METRIC_KEY)
+    reason: str = Field(
+        description=(
+            "Why the Metric has no Normalized mean, for example that the Score declares no `range` or "
+            "`better`, that the Label declares no Scale, or that no Session has a value for it."
+        )
+    )
+
+
+class Composite(BaseModel):
+    """The Metric Group's single number for a run."""
+
+    kind: Literal["value"] = "value"
+    value: float = Field(
+        description=(
+            "The weighted mean of the weighted Metrics' Normalized means, from 0 to 1 where 1 is best. It is "
+            "a number to compare runs by, not a verdict that the run is good."
+        )
+    )
+    coverage: float = Field(
+        description=(
+            "The lowest share of judged Sessions that have a value, among the weighted Metrics. Low coverage "
+            "means the Composite rests on few Sessions."
+        )
+    )
+
+
+class NoComposite(BaseModel):
+    """Why a run has no Composite."""
+
+    kind: Literal["missing"] = "missing"
+    reason: str = Field(
+        description="Why there is no Composite, for example that the run's Metric Group had no weights when it started."
+    )
+    missing: list[NoNormalizedMean] = Field(
+        default_factory=list,
+        description=(
+            "The weighted Metrics that have no Normalized mean in this run, each with why. The Composite needs "
+            "every one of them, so fixing these is what brings it back."
+        ),
+    )
+
+
+MetricNormalizedMean = Annotated[NormalizedMean | NoNormalizedMean, Field(discriminator="kind")]
+CompositeResult = Annotated[Composite | NoComposite, Field(discriminator="kind")]
+
+_NORMALIZED_MEANS = (
+    "Each Metric on one scale from 0 to 1, where 1 is best. An entry with `kind` 'value' has the `value`; one "
+    "with `kind` 'missing' has the `reason` it has none. Empty until the run has results."
+)
+
+
+class SessionCounts(BaseModel):
+    """How a run's Sessions fared on one Metric."""
+
+    valued: int = Field(default=0, description="Sessions with a value")
+    not_applicable: int = 0
+    unusable: int = Field(default=0, description="Sessions whose values the Metric's declaration cannot fold")
+    errored: int = Field(default=0, description="Sessions the Evaluator's own code broke on")
+    failed: int = Field(default=0, description="Sessions whose evaluation never completed. Retryable.")
+    pending: int = Field(default=0, description="Sessions still being judged")
+
+
+class _MetricAggregateBase(BaseModel):
+    evaluator_id: str = Field(description=_EVALUATOR_ID)
+    metric_key: str = Field(description=_METRIC_KEY)
+    evaluator_version_ids: list[str] = Field(default_factory=list)
+    sessions: SessionCounts = Field(default_factory=SessionCounts)
+    coverage: float | None = Field(
+        default=None, description="Share of judged Sessions with a value. Null when nothing was judged."
+    )
+
+
+class ScoreAggregate(_MetricAggregateBase):
+    """A Score Metric over a whole run."""
+
+    shape: Literal["score"] = "score"
+    mean: float | None = Field(default=None, description="The mean of each Session's mean, in the declared units")
+    better: Better | None = Field(default=None, description=_BETTER)
+    range: list[float] | None = Field(default=None, description="The declared [min, max]")
+
+
+class LabelAggregate(_MetricAggregateBase):
+    """A Label Metric over a whole run."""
+
+    shape: Literal["label"] = "label"
+    shares: dict[str, float] | None = Field(
+        default=None, description="Each label's average share of a Session's values. Null when no Session has one."
+    )
+    vocabulary: list[str] | None = Field(default=None, description="The declared labels. Null for an open Label.")
+
+
+class MixedAggregate(_MetricAggregateBase):
+    """A Metric whose versions or values disagree on its shape, so it has no whole-run value."""
+
+    shape: Literal["mixed"] = "mixed"
+
+
+MetricAggregate = Annotated[ScoreAggregate | LabelAggregate | MixedAggregate, Field(discriminator="shape")]
+
+
+class Aggregate(BaseModel):
+    """What a whole scoring run found, one entry per Metric. Values only, not a verdict."""
+
+    metrics: list[MetricAggregate] = Field(default_factory=list)
+
+
+class PipelineUsage(BaseModel):
+    """What the pipeline spent producing Sessions: tokens, cost and duration."""
+
+    duration_s: float = Field(default=0.0, description="The pipeline's run time summed over every turn, in seconds")
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    cost: float | None = Field(
+        default=None, description="USD the LLM calls cost. Null unless ``cost_status`` is 'priced'"
+    )
+    cost_status: Literal["priced", "pending", "unpriced"] | None = Field(
+        default=None,
+        description=(
+            "'priced' when every LLM call has a cost; 'pending' when some are not priced yet (resolves within "
+            "minutes); 'unpriced' when a model has no price on file"
+        ),
+    )
+
+
+class ExperimentRunUsage(PipelineUsage):
+    """A run's usage summed over every Session that has one."""
+
+    sessions: int = Field(default=0, description="How many Sessions the totals cover")
+
+
+class MetricDeclaration(BaseModel):
+    """One Metric an Evaluator version declares in its ``@metrics`` decorator."""
+
+    shape: Literal["score", "label"] | None = Field(
+        default=None, description="What the Metric reports. Null only for a legacy version."
+    )
+    grain: str = Field(
+        description="Where the Metric repeats, e.g. 'session', 'turn' or 'turn/retriever/outputs.documents[*]'"
+    )
+    vocabulary: list[str] | None = Field(default=None, description="The labels a closed Label may take")
+    range: list[float] | None = Field(
+        default=None, description="The scale a Score's values are on, as [low, high]. Null when none is declared."
+    )
+    better: Better | None = Field(
+        default=None,
+        description=(
+            "Which way a change in the Score is an improvement: 'higher' or 'lower'. It says nothing about "
+            "whether a value is good. Null when the Score declares none."
+        ),
+    )
+    scale: dict[str, float] | None = Field(
+        default=None,
+        description=(
+            "A closed Label's Scale: each word of the vocabulary mapped to a number from 0 to 1, higher is "
+            "better. It orders the words; it does not say which pass. Null when the Label declares none, and "
+            "for a Score."
+        ),
+    )
+
+
+class EvaluatorVersionSummary(BaseModel):
+    """One revision of an Evaluator, without its source."""
+
+    evaluator_version_id: str
+    evaluator_id: str
+    content_hash: str = Field(description="SHA-256 of the version's source")
+    metrics: dict[str, MetricDeclaration] = Field(
+        default_factory=dict, description="The Metrics this version declares, keyed by name"
+    )
+    metrics_legacy: bool = Field(
+        default=False, description="True when the source declares no Metrics and reports one session Metric 'value'"
+    )
+    created_at: str
+
+
+class EvaluatorVersion(EvaluatorVersionSummary):
+    """One revision of an Evaluator, with its Python source."""
+
+    python_code: str
+
+
+class Evaluator(BaseModel):
+    """An Evaluator lineage, its newest version, and, when read alone, every version."""
+
+    evaluator_id: str
+    name: str
+    latest_version: EvaluatorVersionSummary | None = Field(default=None, description="The version a run uses today")
+    versions: list[EvaluatorVersionSummary] = Field(
+        default_factory=list, description="Every version, newest first. Only filled when one Evaluator is read."
+    )
+    created_at: str
+    updated_at: str | None = None
+    archived_at: str | None = Field(
+        default=None, description="When the Evaluator was archived, or null. Archived Evaluators still score."
+    )
+
+
+class EvaluatorTemplate(BaseModel):
+    """A ready-made Evaluation Function. Add it by creating an Evaluator from its name and code."""
+
+    key: str = Field(description="Stable identifier, for example `tool_calls`.")
+    name: str = Field(description="The name to create the Evaluator under.")
+    category: str = Field(default="", description="What the template measures, for example `RAG quality`.")
+    description: str = ""
+    python_code: str = Field(description="The Evaluation Function, to send as an Evaluator's `python_code`.")
+    metrics: dict[str, MetricDeclaration] = Field(default_factory=dict, description="The Metrics the code declares.")
+    judge_model: str | None = Field(
+        default=None, description="The model the template asks, which makes it cost money per Session. Null if none."
+    )
+    expected_columns: list[str] = Field(
+        default_factory=list,
+        description="The columns of a test case's expected data the template reads; without them it reports n/a.",
+    )
+
+
+class ExperimentRun(BaseModel):
+    """One scoring run's lifecycle, without its grid."""
+
+    pipeline_experiment_run_id: str
+    pipeline_experiment_id: str
+    status: str = Field(description="Whether the fan-out finished. Not a verdict on the cells.")
+    selection: Literal["SAMPLED", "HAND_PICKED"] = Field(
+        description="How the Sessions were chosen. Only SAMPLED runs feed trends."
+    )
+    started_at: str | None = None
+    ended_at: str | None = None
+    composite_weights: list[CompositeWeight] | None = Field(
+        default=None,
+        description=(
+            "The Composite formula the run started with: its Metric Group's weights that were usable then. The "
+            "run's Composite always uses these, so editing the group's weights changes only later runs. Null "
+            "when there was nothing to weigh, and the run then has no Composite."
+        ),
+    )
+    window: "SessionWindow | None" = Field(
+        default=None, description="The window this run judged, or null for a run that named its Sessions."
+    )
+    resolved_sessions: int | None = Field(
+        default=None, description="How many Sessions the run was launched with. Null for runs before it was recorded."
+    )
+    created_at: str
+
+
+class MetricWeight(BaseModel):
+    """How much one Metric counts toward its Metric Group's Composite."""
+
+    evaluator_id: str = Field(description=_EVALUATOR_ID)
+    metric_key: str = Field(description=_METRIC_KEY)
+    weight: float = Field(
+        description="A number above 0. Weights are relative: they are divided by their sum, so 2, 1 and 1 count as "
+        "0.5, 0.25 and 0.25."
+    )
+
+
+class WeightedMetric(MetricWeight):
+    """A stored weight, with whether the Evaluator's latest version still lets it count."""
+
+    usable: bool = Field(
+        description=(
+            "Whether the Evaluator's latest version still declares the Metric with a Normalized mean. A newer "
+            "version can drop the key or remove its `range`, `better` or `scale`."
+        )
+    )
+    unusable_reason: str | None = Field(
+        default=None, description="Why the weight is not usable, for example that the key is no longer declared."
+    )
+
+
+class MetricGroup(BaseModel):
+    """A named, ordered set of the workspace's Evaluators that a scoring run judges with."""
+
+    metric_group_id: str
+    name: str
+    evaluator_ids: list[str]
+    weights: list[WeightedMetric] = Field(
+        default_factory=list,
+        description=(
+            "How much each Metric counts toward the group's Composite, in the group's Evaluator order. Empty "
+            "when the group has no weights, and then its runs have no Composite. An unusable weight is kept "
+            "and says why; it does not count in new runs."
+        ),
+    )
+    created_at: str
+    updated_at: str | None = None
+
+
+class EvaluationGoal(BaseModel):
+    """A pass/fail target on one pipeline, built on one Evaluator's Metric."""
+
+    evaluation_goal_id: str
+    pipeline_id: str
+    name: str
+    description: str = ""
+    evaluator_id: str
+    metric_key: str = Field(description="The Metric of the Evaluator that the goal judges")
+    threshold: float | None = Field(
+        default=None, description="For a Score Metric: the value a Session must reach to pass. Null for a Label Metric."
+    )
+    passing_values: list[str] | None = Field(
+        default=None,
+        description="For a Label Metric: the labels that count as passing. Null for a Score Metric.",
+    )
+    min_pass_rate: float = Field(
+        default=1.0,
+        ge=0,
+        le=1,
+        description="Share (0 to 1) of the judged Sessions that must pass for the goal to be met",
+    )
+    created_at: str
+    updated_at: str | None = None
+
+
+class MetricGroupSummary(MetricGroup):
+    """A Metric Group and, when a pipeline was asked about, its most recent scoring run there."""
+
+    last_run: ExperimentRun | None = None
+
+
+class ExperimentScoringCounts(BaseModel):
+    """How a side's scoring evaluations ended."""
+
+    cells: int = Field(description="Evaluations the scoring run made: Sessions times Metrics")
+    succeeded: int
+    errored: int = Field(description="Evaluations whose Evaluation Function broke. User code, not a score of 0.")
+    failed: int = Field(description="Evaluations that never ran and can be retried")
+    running: int
+
+
+class ExperimentScoringRun(BaseModel):
+    """One scoring run of a side, on one pipeline. Read it with ``get_experiment_run``."""
+
+    pipeline_id: str
+    experiment_run_id: str | None = Field(default=None, description="Null until it has started")
+
+
+class ExperimentSide(BaseModel):
+    """The candidate or the baseline of an Experiment, and how far it has got."""
+
+    pipeline_id: str | None = Field(default=None, description="Null for a recorded baseline")
+    pipeline_version_id: str | None = Field(default=None, description="Null for a recorded baseline")
+    recorded: bool = Field(
+        default=False,
+        description="True for a baseline made of each test case's own recorded Session, with nothing replayed",
+    )
+    status: str = Field(description="REPLAYING, SCORING, ENDED or FAILED")
+    reused_sessions: int
+    replays_needed: int
+    scoring_runs: list[ExperimentScoringRun] = Field(
+        default_factory=list, description="One per pipeline this side scores on"
+    )
+    scoring_counts: ExperimentScoringCounts | None = Field(default=None, description="Null until scoring has started")
+    error: str | None = Field(default=None, description="Why this side could not be scored")
+
+
+class Experiment(BaseModel):
+    """A comparison of a candidate pipeline version against a baseline on one Dataset, scored by one Metric Group."""
+
+    experiment_id: str = Field(validation_alias="comparison_id")
+    name: str
+    dataset_id: str | None = Field(
+        default=None, validation_alias="session_replay_dataset_id", description="Null once the Dataset is deleted"
+    )
+    dataset_name: str
+    metric_group_id: str | None = Field(default=None, description="Null once the Metric Group is deleted")
+    metric_group_name: str
+    sessions_per_test_case: int
+    replay_mode: str
+    status: str = Field(
+        description="REPLAYING while either side replays, then SCORING, then FAILED if either side failed, else ENDED"
+    )
+    candidate: ExperimentSide
+    baseline: ExperimentSide
+    created_at: str
+    updated_at: str | None = None
+
+
+class ExperimentReplayCounts(BaseModel):
+    """How many of a side's replays are in each status."""
+
+    created: int = 0
+    started: int = 0
+    ended: int = 0
+    failed: int = 0
+
+
+class ExperimentSideDetail(ExperimentSide):
+    """A side of one Experiment read on its own: its pipeline, replays and scoring run.
+
+    The Sessions the side scores are left out: they can run to thousands, and each test case's
+    Sessions are in ``get_experiment_results``.
+    """
+
+    pipeline_name: str | None = Field(default=None, description="Null for a recorded baseline or a deleted pipeline")
+    version_number: int | None = Field(default=None, description="Null for a draft or a recorded baseline")
+    experiment_run_id: str | None = Field(
+        default=None, description="The scoring run of this side once started; read it with ``get_experiment_run``"
+    )
+    run_counts: ExperimentReplayCounts | None = Field(default=None, description="The side's replays by status")
+
+
+class ExperimentTestCase(BaseModel):
+    """A test case of an Experiment as it was when the Experiment was created."""
+
+    test_case_id: str = Field(validation_alias="session_replay_test_case_id")
+    name: str
+
+
+class ExperimentDetail(Experiment):
+    """One Experiment with its test cases and how far each side has got."""
+
+    candidate: ExperimentSideDetail
+    baseline: ExperimentSideDetail
+    test_cases: list[ExperimentTestCase] = Field(default_factory=list)
+
+
+class ExperimentSidePlan(BaseModel):
+    """What one side would score, and how much of it has to be replayed first."""
+
+    reused_sessions: int = Field(description="Sessions that already exist and are scored as they are")
+    replays_needed: int = Field(description="Replays this side starts, each of which costs a pipeline run")
+    test_cases_short: int = Field(default=0, description="Test cases with fewer than the asked-for Sessions already")
+
+
+class ExperimentPlan(BaseModel):
+    """What creating the Experiment now would do. Advisory: nothing was started."""
+
+    candidate: ExperimentSidePlan
+    baseline: ExperimentSidePlan
+    cells: int = Field(default=0, description="Sessions times Evaluators of the larger side's scoring run")
+    max_cells: int | None = Field(default=None, description="The most cells one scoring run may have")
+    max_runs: int | None = Field(default=None, description="The most replays one side may start")
+
+
+class ExperimentUpdatePlan(BaseModel):
+    """What changing an Experiment's sides would do. Advisory: nothing was changed."""
+
+    candidate: ExperimentSidePlan | None = Field(default=None, description="Null when the candidate is unchanged")
+    baseline: ExperimentSidePlan | None = Field(default=None, description="Null when the baseline is unchanged")
+
+
+class ExperimentValue(BaseModel):
+    """One Metric on one side of an Experiment, over the test cases both sides have a value for."""
+
+    value: float | None = Field(
+        default=None,
+        description="Mean over paired test cases of each test case's mean over its Sessions. Null for a Label.",
+    )
+    labels: dict[str, int] | None = Field(
+        default=None, description="For a Label, how often each label occurred on the paired test cases"
+    )
+    sessions: int = Field(description="Sessions with a value, on the paired test cases")
+    errored: int = Field(description="Sessions this side's Evaluator broke on, so produced no Metric")
+
+
+class ExperimentMetric(BaseModel):
+    """One Metric of the Metric Group, candidate against baseline."""
+
+    evaluator_id: str
+    evaluator_version_ids: list[str] = Field(description="Every Evaluator version that judged either side")
+    metric_key: str
+    shape: str | None = Field(default=None, description="score, label, or null when the rows disagree")
+    candidate: ExperimentValue
+    baseline: ExperimentValue
+    delta: float | None = Field(default=None, description="candidate.value minus baseline.value")
+    delta_pct: float | None = Field(
+        default=None, description="delta as a percentage of the baseline's absolute value. Null if the baseline is 0."
+    )
+    paired_test_cases: int = Field(description="Test cases with a value on both sides, the only ones aggregated")
+    better: Better | None = Field(default=None, description=_BETTER)
+    change: Change = Field(default="unknown", description=_CHANGE)
+
+
+class ExperimentPipelineMetric(BaseModel):
+    """One default Metric every scoring run carries, candidate against baseline."""
+
+    key: str = Field(
+        description=(
+            "DURATION is the pipeline's run time in seconds, summed over a Session's turns. TOKENS is every "
+            "token the pipeline's LLM calls used. COST is what those calls cost in USD, counted only for "
+            "Sessions whose every call is priced."
+        )
+    )
+    candidate: ExperimentValue
+    baseline: ExperimentValue
+    delta: float | None = Field(default=None, description="candidate.value minus baseline.value")
+    delta_pct: float | None = Field(
+        default=None, description="delta as a percentage of the baseline's value. Null if the baseline is 0."
+    )
+    paired_test_cases: int = Field(description="Test cases with a value on both sides, the only ones aggregated")
+    better: Better | None = Field(default=None, description=_BETTER)
+    change: Change = Field(default="unknown", description=_CHANGE)
+
+
+class ExperimentTestCaseValue(BaseModel):
+    """One Metric's mean over a test case's Sessions, per side."""
+
+    candidate: float | None = None
+    baseline: float | None = None
+
+
+class ExperimentTestCaseResult(BaseModel):
+    """One test case: the Sessions each side scored, and each Score Metric's mean per side."""
+
+    test_case_id: str = Field(validation_alias="session_replay_test_case_id")
+    name: str
+    candidate_session_ids: list[str]
+    baseline_session_ids: list[str]
+    values: dict[str, ExperimentTestCaseValue] = Field(
+        default_factory=dict, description="Keyed by '{evaluator_id}:{metric_key}'"
+    )
+    pipeline_values: dict[str, ExperimentTestCaseValue] = Field(
+        default_factory=dict, description="Keyed by DURATION, TOKENS and COST"
+    )
+
+
+class ExperimentSideHeadline(BaseModel):
+    """One side's Metrics on the 0-to-1 scale, and the Metric Group's Composite over them."""
+
+    normalized_means: list[MetricNormalizedMean] = Field(
+        default_factory=list, description=_NORMALIZED_MEANS + " Also empty for a side that spans several runs."
+    )
+    composite: CompositeResult = Field(
+        description=(
+            "The side's Composite, from the weights its scoring run recorded when it started. With `kind` "
+            "'missing' it says why there is none, for example the side is not scored yet."
+        )
+    )
+    composite_weights: list[CompositeWeight] = Field(
+        default_factory=list,
+        description=(
+            "The formula the side's scoring run started with: what its Composite weighs. Empty when the side "
+            "has no single scored run, or the run weighed nothing."
+        ),
+    )
+
+
+class ExperimentHeadline(BaseModel):
+    """Each side's single number: the Metric Group's Composite, with the Normalized means it weighs."""
+
+    candidate: ExperimentSideHeadline
+    baseline: ExperimentSideHeadline
+    comparable: bool = Field(
+        default=True,
+        description=(
+            "Whether the two Composites can be compared. False when the two runs weighed different Metrics or "
+            "the same Metrics in different ratios: both values stand, but the difference would read a new "
+            "formula as a change in quality, so report no change."
+        ),
+    )
+    incomparable_reason: str | None = Field(
+        default=None, description="Why the Composites cannot be compared. Null when `comparable` is true."
+    )
+
+
+class ExperimentAggregate(BaseModel):
+    """One Metric over every Session each side scored, and how the candidate moved it."""
+
+    evaluator_id: str = Field(description=_EVALUATOR_ID)
+    metric_key: str = Field(description=_METRIC_KEY)
+    shape: Literal["score", "label", "mixed"]
+    candidate: MetricAggregate | None = Field(
+        default=None, description="Null until the candidate's scoring run ends, or when it does not report the Metric"
+    )
+    baseline: MetricAggregate | None = Field(
+        default=None, description="Null until the baseline's scoring runs end, or when it does not report the Metric"
+    )
+    delta: float | None = Field(
+        default=None,
+        description=(
+            "Candidate minus baseline: a Score's mean, or a Label's Normalized mean on its Scale. Null when a side "
+            "has no value, the shapes differ, or the Label has no Scale."
+        ),
+    )
+    share_deltas: dict[str, float] | None = Field(
+        default=None, description="For a Label on both sides, each label's share on the candidate minus the baseline's"
+    )
+    change: Change = Field(default="unknown", description=_CHANGE)
+
+
+class ExperimentResults(BaseModel):
+    """An Experiment's results so far, as the API returns them. Partial while either side is still scoring."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    experiment_id: str = Field(validation_alias="comparison_id")
+    status: str = Field(description="REPLAYING, SCORING, ENDED or FAILED")
+    metrics: list[ExperimentMetric] = Field(description="In the Metric Group's order, then by Metric key")
+    pipeline_metrics: list[ExperimentPipelineMetric] = Field(default_factory=list)
+    test_cases: list[ExperimentTestCaseResult] = Field(default_factory=list)
+    headline: ExperimentHeadline | None = Field(
+        default=None,
+        description=(
+            "Each side's Normalized means and Composite, so the two sides compare on one number when "
+            "`comparable` is true. Null from an API that predates it."
+        ),
+    )
+    aggregates: list[ExperimentAggregate] = Field(
+        default_factory=list,
+        description=(
+            "Every Metric over all Sessions of each side, unpaired, ordered by Evaluator id then Metric key. "
+            "Empty until a side's scoring runs end."
+        ),
+    )
+
+
+class ExperimentResultsReport(ExperimentResults):
+    """An Experiment's results with the test cases capped."""
+
+    total_test_cases: int
+    test_cases_truncated: bool
+
+
+class MetricRow(BaseModel):
+    """One declared Metric's value at one Address, or why it does not apply there."""
+
+    metric_key: str
+    address: str = Field(
+        description="'session', or a path such as 'turn/2' or 'turn/2/retriever#0/outputs.documents[3]'"
+    )
+    kind: Literal["score", "label", "not_applicable"]
+    score: float | None = None
+    label: str | None = None
+    reason: str | None = Field(default=None, description="Why the Metric does not apply, when kind is not_applicable")
+    rationale: str | None = Field(default=None, description="What the Evaluator wrote about this value")
+
+
+class EvaluationRun(BaseModel):
+    """The Evaluation Run behind one grid cell."""
+
+    evaluation_run_id: str
+    status: str = Field(description="Whether the run executed. Only FAILED is retryable.")
+    outcome: Literal["SUCCEEDED", "ERRORED"] | None = Field(
+        default=None, description="ERRORED means the Evaluator's code broke; null until judged or when it failed"
+    )
+    metrics: list[MetricRow] = Field(default_factory=list)
+    evaluator_version_id: str
+    session_id: str | None = None
+    trace_ids: list[str] = Field(default_factory=list, description="The Traces evaluated, in the Session's turn order")
+    focus: list[str] | None = Field(
+        default=None, description="The turns the run answered for, by query id. Null for a run over every turn."
+    )
+    provenance: "SessionProvenance | None" = Field(
+        default=None, description="Where the judged Session came from. Null when no Session was resolved."
+    )
+    error_detail: dict[str, Any] | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class ExperimentRunCell(BaseModel):
+    """One grid cell: an Evaluator column and the Evaluation Run that filled it."""
+
+    evaluator_id: str
+    evaluation_run: EvaluationRun
+
+
+class ExperimentRunRow(BaseModel):
+    """One grid row: a Session and one cell per Evaluator that judged it."""
+
+    session_id: str
+    session_replay_run_id: str | None = Field(
+        default=None, description="The replay run that produced this Session; null for a Session a user had"
+    )
+    cells: list[ExperimentRunCell] = Field(default_factory=list)
+
+
+class ExperimentRunCounts(BaseModel):
+    """How the run's cells ended."""
+
+    cells: int
+    succeeded: int = Field(description="Cells whose Evaluator produced Metrics")
+    errored: int = Field(description="Cells whose Evaluator code broke: user code, not a Metric of zero")
+    failed: int = Field(description="Cells whose run never completed. Retryable, unlike errored.")
+    unresolved_sessions: int = Field(description="Sessions that could not be read at all, counted once each")
+    running: int
+
+
+class ExperimentRunGrid(BaseModel):
+    """One scoring run as Sessions by Evaluators, as the API returns it."""
+
+    run: ExperimentRun
+    evaluator_ids: list[str]
+    rows: list[ExperimentRunRow] = Field(default_factory=list)
+    counts: ExperimentRunCounts
+    usage: ExperimentRunUsage | None = Field(
+        default=None, description="What the pipeline spent on the run's Sessions. Null until a cell has judged one."
+    )
+    evaluator_versions: list[EvaluatorVersionSummary] = Field(
+        default_factory=list,
+        description="Every Evaluator version that judged a cell, oldest first. A filter does not narrow it.",
+    )
+    aggregate: Aggregate | None = Field(
+        default=None,
+        description="The whole run per Metric. A filter does not narrow it. Null until the run ends.",
+    )
+    normalized_means: list[MetricNormalizedMean] = Field(default_factory=list, description=_NORMALIZED_MEANS)
+    composite: CompositeResult | None = Field(
+        default=None,
+        description=(
+            "The Metric Group's single number for the run, its recorded `run.composite_weights` applied to "
+            "`normalized_means`. With `kind` 'value' it has the `value` and its `coverage`. With `kind` "
+            "'missing' it has the `reason` there is none and lists in `missing` the weighted Metrics that "
+            "have no Normalized mean. Null from an API that predates it."
+        ),
+    )
+
+
+class MetricSummary(BaseModel):
+    """One Metric of one Evaluator, aggregated over every row of a run."""
+
+    evaluator_id: str
+    metric_key: str
+    kind: Literal["score", "label", "not_applicable"] = Field(
+        description="score or label by the values seen; not_applicable when it applied nowhere"
+    )
+    count: int = Field(description="Values reported, not counting not_applicable rows")
+    mean: float | None = None
+    min: float | None = None
+    max: float | None = None
+    labels: dict[str, int] = Field(default_factory=dict, description="How often each label was given")
+    not_applicable: int = 0
+
+
+class ReportCell(BaseModel):
+    """One grid cell, flattened."""
+
+    evaluator_id: str
+    status: str
+    outcome: Literal["SUCCEEDED", "ERRORED"] | None = None
+    evaluator_version_id: str
+    metrics: list[MetricRow] = Field(default_factory=list)
+    error_detail: dict[str, Any] | None = None
+
+
+class ReportRow(BaseModel):
+    """One Session of a run report, with its flattened cells."""
+
+    session_id: str
+    session_replay_run_id: str | None = Field(
+        default=None, description="The replay run that produced this Session (get_session_replay); null if none"
+    )
+    cells: list[ReportCell]
+
+
+class ExperimentRunReport(BaseModel):
+    """A scoring run read for explaining it: counts, per-metric summaries, then the rows."""
+
+    run: ExperimentRun
+    evaluator_ids: list[str]
+    counts: ExperimentRunCounts
+    metrics: list[MetricSummary] = Field(
+        description="Computed over every row the filters kept, including rows cut by max_rows"
+    )
+    aggregate: Aggregate | None = Field(
+        default=None,
+        description=(
+            "The API's whole-run result per Metric: how its Sessions fell out, and its mean or label shares. "
+            "Never narrowed by a filter, unlike ``metrics``. Null until the run ends."
+        ),
+    )
+    usage: ExperimentRunUsage | None = Field(
+        default=None, description="What the pipeline spent on the run's Sessions, summed. Null until one is judged."
+    )
+    evaluator_versions: list[EvaluatorVersionSummary] = Field(
+        default_factory=list,
+        description="Every Evaluator version that judged a cell, oldest first, with the Metrics it declares",
+    )
+    normalized_means: list[MetricNormalizedMean] = Field(default_factory=list, description=_NORMALIZED_MEANS)
+    composite: CompositeResult | None = Field(
+        default=None,
+        description=(
+            "The Metric Group's single number for the run, from 0 to 1 where 1 is best. See `run.composite_weights` "
+            "for the formula. With `kind` 'missing' it has the `reason` there is none and the weighted Metrics "
+            "that have no Normalized mean in `missing`. Null from an API that predates it."
+        ),
+    )
+    rows: list[ReportRow]
+    total_rows: int
+    rows_truncated: bool
+
+
+class SessionProvenance(BaseModel):
+    """Where a Session came from."""
+
+    origin: str = Field(description="SERVICE, PIPELINE_RUN or PLAYGROUND")
+    deployment_id: str | None = Field(default=None, description="The Service that served every turn, if one did")
+    pipeline_version_ids: list[str] = Field(default_factory=list)
+
+
+class SessionWindow(BaseModel):
+    """Every Session of a pipeline whose last activity falls in ``[from, to]``, narrowed by optional filters."""
+
+    start: str = Field(
+        validation_alias=AliasChoices("start", "from"),
+        serialization_alias="from",
+        description="Last activity at or after this time (ISO 8601, with a timezone).",
+    )
+    end: str = Field(
+        validation_alias=AliasChoices("end", "to"),
+        serialization_alias="to",
+        description="Last activity at or before this time (ISO 8601, with a timezone). Not in the future.",
+    )
+    origin: Literal["SERVICE", "PIPELINE_RUN", "PLAYGROUND"] | None = Field(
+        default=None, description="Only Sessions from this origin."
+    )
+    deployment_id: str | None = Field(default=None, description="Only Sessions this Service served.")
+    pipeline_version_id: str | None = Field(default=None, description="Only Sessions this version served.")
+    revision_id: str | None = Field(default=None, description="Only Sessions this Service revision served.")
+
+
+class ExperimentRunAccepted(BaseModel):
+    """A queued scoring run: poll it with ``get_experiment_run``."""
+
+    pipeline_experiment_run_id: str
+    cells: int = Field(description="Sessions times Evaluators: how many cells the grid will have")
+
+
+class WindowCeiling(BaseModel):
+    """The largest window run hub-api accepts."""
+
+    sessions: int
+    cells: int
+
+
+class ExperimentRunPreview(BaseModel):
+    """What a window run would judge if it were started now. Advisory: starting it resolves the window again."""
+
+    sessions: int = Field(description="Sessions in the window. With `more_than`, the count stopped here.")
+    more_than: bool = Field(description="The window holds more Sessions than `sessions`, which is over the ceiling")
+    evaluators: int = Field(description="Evaluators in the Metric Group")
+    cells: int = Field(description="Sessions times Evaluators: the judge calls the run would make")
+    ceiling: WindowCeiling
+
+
+class SessionListItem(BaseModel):
+    """One Session a run can judge."""
+
+    session_id: str = Field(description="The id to pass to a run")
+    turn_count: int
+    first_activity_at: str
+    last_activity_at: str
+    first_query: str
+    provenance: SessionProvenance
+
+
+class SessionList(BaseModel):
+    """One page of Sessions, newest last activity first."""
+
+    data: list[SessionListItem]
+    next: str | None = Field(default=None, description="Pass as cursor for the next page. Null on the last page.")
+
+
+class EvaluationTryResult(BaseModel):
+    """What an ad-hoc try found, as hub-api returns it. Never persisted; it ages out within the hour."""
+
+    session_id: str
+    outcome: Literal["SUCCEEDED", "ERRORED"] | None = None
+    metrics: list[MetricRow] = Field(default_factory=list)
+    trace_ids: list[str] = Field(default_factory=list)
+    trace: dict[str, Any] | None = Field(default=None, description="The judge's own haystack-trace/v1 artifact")
+    error_detail: dict[str, Any] | None = None
+
+
+class TryState(BaseModel):
+    """Where an ad-hoc try stands: still running, finished with a result, or aged out."""
+
+    status: Literal["RUNNING", "READY", "EXPIRED"]
+    result: EvaluationTryResult | None = None
+
+
+class TraceSummary(BaseModel):
+    """What an evaluator did while judging, without the Session content its trace quotes."""
+
+    tool_calls: list[str] = Field(default_factory=list, description="Session Tools it called, in order")
+    failed: bool = Field(description="Whether the evaluator's own run failed")
+
+
+class TryReport(BaseModel):
+    """An ad-hoc try, read for the assistant."""
+
+    status: Literal["RUNNING", "READY", "EXPIRED"] = Field(
+        description="RUNNING: poll get_evaluation_try with try_id. EXPIRED: the result aged out, try again."
+    )
+    try_id: str
+    session_id: str | None = None
+    outcome: Literal["SUCCEEDED", "ERRORED"] | None = Field(
+        default=None, description="ERRORED means the evaluator's code broke; read error_detail"
+    )
+    metrics: list[MetricRow] = Field(default_factory=list)
+    trace_ids: list[str] = Field(default_factory=list, description="The turns judged, in order")
+    trace_summary: TraceSummary | None = None
+    error_detail: dict[str, Any] | None = None
+
+
+class SessionReplayRun(BaseModel):
+    """A session replay run, as hub-api returns it."""
+
+    session_replay_run_id: str
+    pipeline_version_id: str | None = Field(default=None, description="Null when no pipeline version was replayed")
+    status: str = Field(description="CREATED, STARTED, ENDED or FAILED")
+    source_session_id: str | None = Field(default=None, description="Null for a test case that sends inputs")
+    replay_mode: str | None = None
+    trace_ids: list[str] = Field(default_factory=list, description="The traces the replay produced, in order")
+    error_detail: dict[str, Any] | None = None
+    session_id: str | None = Field(default=None, description="The new Session the replay's traces land in")
+    test_case_id: str | None = Field(
+        default=None,
+        validation_alias="session_replay_test_case_id",
+        description="The Dataset test case this replay is for; null for a replay on its own",
+    )
+    setup_logs: list[str] | None = Field(default=None, description="Logs the setup step returned, once it finished")
+    cleanup_logs: list[str] | None = Field(default=None, description="Logs the cleanup step returned, once it finished")
+    created_at: str | None = None
+
+
+class NewTestCase(BaseModel):
+    """One test case to add to a Dataset: a Session to replay or the inputs to send, never both."""
+
+    session_id: str | None = Field(
+        default=None,
+        description=(
+            "The Session to replay: a ``search_session_id`` or, for a Session that never had one, its "
+            "``query_id``. Needs the call's pipeline. A Dataset holds each Session once. Send this or ``inputs``."
+        ),
+    )
+    inputs: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "A test case without a recorded Session: the named pipeline inputs to send as ``{name: value}``. "
+            "``query`` is sent as the query. Send this or ``session_id``."
+        ),
+    )
+    expected: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            'Data an Evaluator reads beside the Session as ``session["test_case"]["expected"]``, for example '
+            '``{"answer": "Paris"}``. Never sent to the pipeline.'
+        ),
+    )
+    name: str | None = Field(
+        default=None,
+        description="What the test case is called. Omitted, it is named after the Session's first query.",
+    )
+    setup_source: str | None = Field(default=None, description="Python source that runs before every replay.")
+    cleanup_source: str | None = Field(default=None, description="Python source that runs after every replay.")
+
+
+class TestCase(BaseModel):
+    """A test case of a Dataset: the Session it replays or the inputs it sends."""
+
+    __test__ = False  # not a pytest class
+
+    test_case_id: str = Field(validation_alias="session_replay_test_case_id")
+    pipeline_id: str | None = Field(
+        default=None, description="The pipeline the Session was recorded on, or the one its inputs were added for."
+    )
+    session_id: str | None = Field(default=None, description="The Session it replays. Null when it sends inputs.")
+    inputs: dict[str, Any] | None = Field(
+        default=None, description="The named pipeline inputs it sends. Null when it replays a Session."
+    )
+    expected: dict[str, Any] | None = Field(default=None, description="What an Evaluator reads beside the Session.")
+    name: str
+    setup_source: str | None = None
+    cleanup_source: str | None = None
+    is_imported: bool = Field(default=False, description="Whether the Session came in an imported Dataset archive.")
+    created_at: str
+    updated_at: str | None = None
+
+
+class DatasetSummary(BaseModel):
+    """A Dataset without its test cases: a named list of test cases to replay together."""
+
+    dataset_id: str = Field(validation_alias="session_replay_dataset_id")
+    workspace_id: str | None = None
+    pipeline_ids: list[str] = Field(
+        default_factory=list, description="The distinct pipelines of its test cases, in the order they first appear."
+    )
+    name: str
+    test_case_count: int = 0
+    created_at: str
+    updated_at: str | None = None
+
+
+class Dataset(DatasetSummary):
+    """A Dataset and every test case in it, in the order an Experiment replays them."""
+
+    test_cases: list[TestCase] = Field(default_factory=list)

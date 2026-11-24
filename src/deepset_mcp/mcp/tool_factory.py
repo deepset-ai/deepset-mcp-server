@@ -8,6 +8,7 @@ import functools
 import inspect
 import re
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from typing import Any
 
 from mcp.server.fastmcp import Context, FastMCP
@@ -15,7 +16,7 @@ from mcp.server.fastmcp import Context, FastMCP
 from deepset_mcp.api.client import AsyncDeepsetClient
 from deepset_mcp.config import DEEPSET_CLIENT_TIMEOUT, DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME
 from deepset_mcp.mcp.tool_models import DeepsetDocsConfig, MemoryType, ToolConfig
-from deepset_mcp.mcp.tool_registry import TOOL_REGISTRY
+from deepset_mcp.mcp.tool_registry import OBJECT_STORE_TOOL_NAMES, TOOL_REGISTRY
 from deepset_mcp.tokonomics import (
     ObjectStore,
     RichExplorer,
@@ -23,6 +24,56 @@ from deepset_mcp.tokonomics import (
     explorable_and_referenceable,
     referenceable,
 )
+
+ORGANIZATION_ID_DOC = (
+    "Optional. The ID of the organization to run this call in, as returned by 'list_organizations'. "
+    "Required if you belong to several organizations; leave empty otherwise. "
+    "Not supported with API keys, which are bound to a single organization."
+)
+
+
+def _format_organizations(organizations: list[dict[str, Any]]) -> str:
+    return ", ".join(f"{org['name']} ({org['organization_id']})" for org in organizations) or "none"
+
+
+async def _organization_error(client: AsyncDeepsetClient, organization_id: str | None) -> str | None:
+    """Checks whether the tool may run given ``organization_id``, and returns an error message if it may not.
+
+    - With an 'organization_id': it must be one of the user's organizations. API keys cannot use it.
+    - Without one: users with several organizations must choose one. Everyone else can proceed.
+
+    :param client: A client that is not scoped to an organization.
+    :param organization_id: The organization requested by the caller, if any.
+    :returns: Error message, or None if the call may proceed.
+    """
+    resp = await client.request("/v2/organizations")
+    if resp.status_code == 401:
+        if not organization_id:
+            return None
+        return (
+            "'organization_id' cannot be used with an API key, which is bound to a single organization. "
+            "Call this tool again without 'organization_id'. If you are not using an API key, your credentials "
+            "may have expired."
+        )
+    organizations = resp.json.get("organizations") if resp.success and isinstance(resp.json, dict) else None
+    if not isinstance(organizations, list):
+        return (
+            f"Could not determine your organizations (HTTP {resp.status_code}). "
+            "Call this tool again with 'organization_id' set, or try again later."
+        )
+    if organization_id:
+        if any(org.get("organization_id") == organization_id for org in organizations):
+            return None
+        return (
+            f"'{organization_id}' is not one of your organizations. "
+            f"Call this tool again with 'organization_id' set to one of: {_format_organizations(organizations)}."
+        )
+    if len(organizations) <= 1:
+        return None
+    return (
+        "You belong to several organizations. "
+        f"Call this tool again with 'organization_id' set to one of: {_format_organizations(organizations)}."
+    )
 
 
 def apply_custom_args(base_func: Callable[..., Any], config: ToolConfig) -> Callable[..., Any]:
@@ -145,6 +196,7 @@ def apply_client(
     use_request_context: bool = True,
     base_url: str | None = None,
     api_key: str | None = None,
+    organization_argument: bool = False,
 ) -> Callable[..., Any]:
     """
     Applies the deepset API client to a function.
@@ -158,6 +210,8 @@ def apply_client(
     :param use_request_context: Whether to collect the API key from the request context.
     :param base_url: Base URL for the deepset API.
     :param api_key: The API key to use.
+    :param organization_argument: Whether to add an optional 'organization_id' argument (request context only) that
+        scopes the API calls of the tool to that organization. Needed for OAuth tokens, which are not bound to one.
     :returns: Function with client injection applied and updated signature/docstring.
     :raises ValueError: If API key cannot be extracted from request context.
     """
@@ -169,6 +223,7 @@ def apply_client(
         @functools.wraps(base_func)
         async def client_wrapper_with_context(*args: Any, **kwargs: Any) -> Any:
             ctx = kwargs.pop("ctx", None)
+            organization_id = kwargs.pop("organization_id", None)
             if not ctx:
                 raise ValueError("Context is required for client authentication")
 
@@ -186,20 +241,30 @@ def apply_client(
             if base_url:
                 client_kwargs["base_url"] = base_url
             async with AsyncDeepsetClient(**client_kwargs) as client:
+                if organization_argument:
+                    error = await _organization_error(client, organization_id)
+                    if error:
+                        return error
+                client.organization_id = organization_id
                 return await base_func(*args, client=client, **kwargs)
 
-        # Remove client from signature and add ctx
+        # Remove client from signature and add ctx (and the optional organization_id)
         original_sig = inspect.signature(base_func)
         new_params = [p for name, p in original_sig.parameters.items() if name != "client"]
+        new_annotations = {k: v for k, v in base_func.__annotations__.items() if k != "client"}
+        doc = remove_params_from_docstring(base_func.__doc__, {"client"})
+        if organization_argument:
+            new_params.append(
+                inspect.Parameter(
+                    "organization_id", inspect.Parameter.KEYWORD_ONLY, default=None, annotation=str | None
+                )
+            )
+            new_annotations["organization_id"] = str | None
+            doc += f"\n\n:param organization_id: {ORGANIZATION_ID_DOC}"
         ctx_param = inspect.Parameter(name="ctx", kind=inspect.Parameter.KEYWORD_ONLY, annotation=Context)
         new_params.append(ctx_param)
         client_wrapper_with_context.__signature__ = original_sig.replace(parameters=new_params)  # type: ignore
-
-        # Remove client from docstring
-        client_wrapper_with_context.__doc__ = remove_params_from_docstring(base_func.__doc__, {"client"})
-
-        # Remove client from annotations and add ctx
-        new_annotations = {k: v for k, v in base_func.__annotations__.items() if k != "client"}
+        client_wrapper_with_context.__doc__ = doc
         new_annotations["ctx"] = Context
         client_wrapper_with_context.__annotations__ = new_annotations
 
@@ -238,6 +303,7 @@ def build_tool(
     use_request_context: bool = True,
     base_url: str | None = None,
     object_store: ObjectStore | None = None,
+    organization_argument: bool = False,
 ) -> Callable[..., Awaitable[Any]]:
     """
     Universal tool creator that handles client injection, workspace, and decorators.
@@ -251,6 +317,7 @@ def build_tool(
     :param use_request_context: Whether to collect the API key from the request context.
     :param base_url: Base URL for the deepset API.
     :param object_store: The ObjectStore instance to use for memory decorators.
+    :param organization_argument: Whether tools get an optional 'organization_id' argument.
     :returns: An enhanced, awaitable tool function with an updated signature and docstring.
     """
     enhanced_func = base_func
@@ -266,7 +333,12 @@ def build_tool(
 
     # Apply client injection (adds ctx parameter if needed)
     enhanced_func = apply_client(
-        enhanced_func, config, use_request_context=use_request_context, base_url=base_url, api_key=api_key
+        enhanced_func,
+        config,
+        use_request_context=use_request_context,
+        base_url=base_url,
+        api_key=api_key,
+        organization_argument=organization_argument,
     )
 
     # Create final async wrapper if needed
@@ -294,35 +366,37 @@ def register_tools(
     docs_config: DeepsetDocsConfig | None = None,
     base_url: str | None = None,
     object_store: ObjectStore | None = None,
+    enable_object_store: bool = True,
+    organization_argument: bool = False,
 ) -> None:
     """Register tools with unified configuration.
 
     Args:
         mcp_server_instance: FastMCP server instance
-        api_key: An api key for the deepset AI platform; only needs to be provided when not read from request context.
+        api_key: An api key for the Haystack Enterprise Platform; only needs to be provided when not
+            read from request context.
         workspace: Pass a deepset workspace name if you only want to run the tools on a specific workspace.
         tool_names: Set of tool names to register (if None, registers all tools)
         get_api_key_from_authorization_header: Whether to use request context to retrieve an API key for tool execution.
-        docs_config: Configuration for the deepset documentation search tool.
+        docs_config: Optional configuration for a custom docs-search pipeline. When omitted,
+            ``search_docs`` uses the same public documentation search pipeline as
+            https://docs.cloud.deepset.ai/api/mcp.
         base_url: Base URL for the deepset API.
         object_store: The ObjectStore instance to use for memory decorators.
+        enable_object_store: Whether tool outputs may be stored in and referenced from the object store. When
+            False, the object-store inspection tools are skipped and every other tool is registered with
+            'MemoryType.NO_MEMORY', so its raw output is always returned as-is.
+        organization_argument: Whether every tool that calls the deepset API gets an optional 'organization_id'
+            argument (only when reading the token from the request context). Enable it when serving OAuth tokens,
+            which are not bound to a single organization.
+
+    Raises:
+        ValueError: If an object-store tool is explicitly requested while 'enable_object_store' is False.
     """
     if api_key is None and not get_api_key_from_authorization_header:
         raise ValueError(
             "'api_key' cannot be 'None' when 'use_request_context' is False. "
             "Either pass 'api_key' or 'use_request_context'."
-        )
-
-    if docs_config is None and tool_names is None:
-        raise ValueError(
-            f"'docs_config' cannot be None when requesting to register all tools. "
-            f"Either pass 'docs_config' or disable the '{DOCS_SEARCH_TOOL_NAME}' tool."
-        )
-
-    if docs_config is None and tool_names is not None and DOCS_SEARCH_TOOL_NAME in tool_names:
-        raise ValueError(
-            f"Requested to register '{DOCS_SEARCH_TOOL_NAME}' tool but 'docs_config' is 'None'. "
-            f"Provide a valid 'docs_config' to register this tool."
         )
 
     # Validate tool names if provided
@@ -338,6 +412,19 @@ def register_tools(
     else:
         tools_to_register = set(TOOL_REGISTRY.keys())
 
+    if not organization_argument:
+        # 'list_organizations' only works with OAuth tokens, so it is only exposed together with the argument.
+        tools_to_register.discard("list_organizations")
+
+    if not enable_object_store:
+        requested_object_store_tools = tools_to_register & OBJECT_STORE_TOOL_NAMES
+        if tool_names is not None and requested_object_store_tools:
+            raise ValueError(
+                f"Cannot register object-store tools ({', '.join(sorted(requested_object_store_tools))}) "
+                f"while 'enable_object_store' is False."
+            )
+        tools_to_register -= OBJECT_STORE_TOOL_NAMES
+
     for tool_name in tools_to_register:
         base_func, config = TOOL_REGISTRY[tool_name]
 
@@ -346,13 +433,7 @@ def register_tools(
             # base_func is a factory function.
             # We configure with the docs_config to get the actual tool function.
             enhanced_tool = base_func(config=docs_config)
-        elif tool_name in (
-            "get_from_object_store",
-            "get_slice_from_object_store",
-            "grep_object_store",
-            "sed_object_store",
-            "yq_object_store",
-        ):
+        elif tool_name in OBJECT_STORE_TOOL_NAMES:
             # ObjectStore tools are factory functions that need an explorer created from the store
             if object_store is None:
                 raise ValueError(f"ObjectStore instance is required for {tool_name}")
@@ -360,6 +441,9 @@ def register_tools(
             explorer = RichExplorer(store=object_store, **config.explorer_config.to_kwargs())
             enhanced_tool = base_func(explorer=explorer)
         else:
+            if not enable_object_store:
+                config = replace(config, memory_type=MemoryType.NO_MEMORY)
+
             enhanced_tool = build_tool(
                 base_func=base_func,
                 config=config,
@@ -368,6 +452,7 @@ def register_tools(
                 base_url=base_url,
                 object_store=object_store,
                 api_key=api_key,
+                organization_argument=organization_argument,
             )
 
         mcp_server_instance.add_tool(enhanced_tool, name=tool_name, structured_output=False)

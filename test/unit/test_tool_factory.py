@@ -12,6 +12,7 @@ import pytest
 from mcp.server.fastmcp import Context, FastMCP
 
 from deepset_mcp.api.protocols import AsyncClientProtocol
+from deepset_mcp.api.transport import TransportResponse
 from deepset_mcp.mcp.tool_factory import (
     apply_client,
     apply_custom_args,
@@ -21,9 +22,11 @@ from deepset_mcp.mcp.tool_factory import (
     register_tools,
 )
 from deepset_mcp.mcp.tool_models import DeepsetDocsConfig, ExplorerConfig, MemoryType, ToolConfig
-from deepset_mcp.mcp.tool_registry import TOOL_REGISTRY
+from deepset_mcp.mcp.tool_registry import OBJECT_STORE_TOOL_NAMES, TOOL_REGISTRY
 from deepset_mcp.tokonomics import InMemoryBackend, ObjectStore
 from test.unit.conftest import BaseFakeClient
+
+_GLOBEX = {"organization_id": "org-2", "name": "Globex"}
 
 
 class TestApplyCustomArgs:
@@ -402,6 +405,97 @@ class TestApplyClient:
             call_args = mock_client_class.call_args
             assert call_args[1]["api_key"] == "test-token"
 
+    def test_organization_argument_is_exposed(self) -> None:
+        """Test that organization_id becomes an optional, documented tool argument."""
+
+        async def sample_func(client: AsyncClientProtocol, a: int) -> str:
+            """Sample function.
+
+            :param client: The client
+            :param a: First param
+            """
+            return str(a)
+
+        result = apply_client(sample_func, ToolConfig(needs_client=True), organization_argument=True)
+
+        assert inspect.signature(result).parameters["organization_id"].default is None
+        assert ":param organization_id:" in (result.__doc__ or "")
+
+    def test_organization_argument_off_by_default(self) -> None:
+        async def sample_func(client: AsyncClientProtocol, a: int) -> str:
+            return str(a)
+
+        result = apply_client(sample_func, ToolConfig(needs_client=True))
+
+        assert "organization_id" not in inspect.signature(result).parameters
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("organizations_response", "organization_id", "expected"),
+        [
+            # API key without organization_id: endpoint rejects it with a 401, call proceeds
+            (TransportResponse(text="", status_code=401, json=None), None, "ok"),
+            # endpoint failure or malformed payload: fail closed
+            (TransportResponse(text="", status_code=503, json=None), None, "Could not determine your organizations"),
+            (TransportResponse(text="{}", status_code=200, json={}), None, "Could not determine your organizations"),
+            # OAuth user with a single organization
+            ({"organizations": [{"organization_id": "org-1", "name": "Acme"}]}, None, "ok"),
+            # OAuth user with several organizations must choose
+            (
+                {"organizations": [{"organization_id": "org-1", "name": "Acme"}, _GLOBEX]},
+                None,
+                "Acme (org-1), Globex (org-2)",
+            ),
+            # OAuth user with an explicit organization of theirs
+            ({"organizations": [{"organization_id": "org-1", "name": "Acme"}, _GLOBEX]}, "org-2", "ok"),
+            # OAuth user with an organization that is not theirs, or a name instead of an ID
+            (
+                {"organizations": [{"organization_id": "org-1", "name": "Acme"}, _GLOBEX]},
+                "Globex",
+                "'Globex' is not one of your organizations. Call this tool again with 'organization_id' set to one "
+                "of: Acme (org-1), Globex (org-2)",
+            ),
+            # API key with an organization_id: the platform would silently ignore it
+            (
+                TransportResponse(text="", status_code=401, json=None),
+                "org-1",
+                "'organization_id' cannot be used with an API key",
+            ),
+        ],
+    )
+    async def test_organization_argument_behavior(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        organizations_response: Any,
+        organization_id: str | None,
+        expected: str,
+    ) -> None:
+        """Test that the organization_id is checked against the user's organizations before the tool runs."""
+        clients: list[Any] = []
+
+        class FakeDeepsetClient(BaseFakeClient):
+            organization_id: str | None = None
+
+            def __init__(self, **kwargs: Any) -> None:
+                super().__init__(responses={"/v2/organizations": organizations_response})
+                assert "organization_id" not in kwargs
+                clients.append(self)
+
+        monkeypatch.setattr("deepset_mcp.mcp.tool_factory.AsyncDeepsetClient", FakeDeepsetClient)
+
+        async def sample_func(client: AsyncClientProtocol, a: int) -> str:
+            return "ok"
+
+        result = apply_client(sample_func, ToolConfig(needs_client=True), organization_argument=True)
+        ctx = MagicMock()
+        ctx.request_context.request.headers.get.return_value = "Bearer test-token"
+
+        output = await result(a=1, organization_id=organization_id, ctx=ctx)
+
+        assert expected in output
+        if output == "ok":
+            assert clients[0].organization_id == organization_id
+
     @pytest.mark.asyncio
     async def test_client_with_api_key_and_context_uses_context(self) -> None:
         """Test that client uses API key from request context."""
@@ -757,9 +851,68 @@ class TestRegisterAllTools:
             tool_names={tool_name},
             object_store=object_store,
             docs_config=docs_config,
+            organization_argument=True,
         )
 
         registered = mcp_server._tool_manager._tools[tool_name]
         properties = registered.parameters.get("properties", {})
         assert "explorer" not in properties
         assert "client" not in properties
+
+
+class TestRegisterToolsWithObjectStoreDisabled:
+    """Test 'register_tools' with 'enable_object_store=False'."""
+
+    def test_object_store_tools_are_skipped(self) -> None:
+        """Registering all tools with the object store disabled must skip the object-store tools."""
+        mcp_server = FastMCP()
+        docs_config = DeepsetDocsConfig(pipeline_name="pipeline", api_key="key", workspace_name="workspace")
+
+        register_tools(mcp_server, docs_config=docs_config, enable_object_store=False)
+
+        registered_names = set(mcp_server._tool_manager._tools.keys())
+        assert registered_names == set(TOOL_REGISTRY.keys()) - OBJECT_STORE_TOOL_NAMES - {"list_organizations"}
+
+    def test_no_object_store_instance_required(self) -> None:
+        """Registering tools with the object store disabled must not require an 'ObjectStore' instance."""
+        mcp_server = FastMCP()
+
+        # Would raise if an ObjectStore were required for a normally-'EXPLORABLE' tool.
+        register_tools(mcp_server, tool_names={"list_pipelines"}, object_store=None, enable_object_store=False)
+
+        assert "list_pipelines" in mcp_server._tool_manager._tools
+
+    @patch("deepset_mcp.mcp.tool_factory.explorable")
+    def test_memory_decorators_are_not_applied(self, mock_explorable: Any) -> None:
+        """Tools that are normally wrapped for memory must be registered with 'NO_MEMORY' instead."""
+        mcp_server = FastMCP()
+
+        register_tools(mcp_server, tool_names={"list_pipelines"}, enable_object_store=False)
+
+        mock_explorable.assert_not_called()
+
+    def test_explicitly_requested_object_store_tool_raises(self) -> None:
+        """Explicitly requesting an object-store tool while disabled is a caller error, not a silent skip."""
+        mcp_server = FastMCP()
+
+        with pytest.raises(ValueError, match="get_from_object_store"):
+            register_tools(mcp_server, tool_names={"get_from_object_store"}, enable_object_store=False)
+
+
+class TestListOrganizationsRegistration:
+    """'list_organizations' is OAuth-only, so it is exposed only together with 'organization_argument'."""
+
+    @pytest.mark.parametrize("organization_argument", [False, True])
+    def test_registered_only_with_organization_argument(self, organization_argument: bool) -> None:
+        mcp_server = FastMCP()
+        docs_config = DeepsetDocsConfig(pipeline_name="pipeline", api_key="key", workspace_name="workspace")
+
+        register_tools(
+            mcp_server,
+            tool_names=set(TOOL_REGISTRY),
+            docs_config=docs_config,
+            object_store=ObjectStore(backend=InMemoryBackend()),
+            organization_argument=organization_argument,
+        )
+
+        assert ("list_organizations" in mcp_server._tool_manager._tools) is organization_argument

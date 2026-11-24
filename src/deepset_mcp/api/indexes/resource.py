@@ -2,11 +2,13 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from __future__ import annotations
+
 from typing import Any
 from urllib.parse import quote
 
 from deepset_mcp.api.exceptions import UnexpectedAPIError
-from deepset_mcp.api.indexes.models import Index
+from deepset_mcp.api.indexes.models import Index, MetaFilterConditions
 from deepset_mcp.api.indexes.protocols import IndexResourceProtocol
 from deepset_mcp.api.pipeline.models import PipelineValidationResult, ValidationError
 from deepset_mcp.api.protocols import AsyncClientProtocol
@@ -107,23 +109,61 @@ class IndexResource(IndexResourceProtocol):
         return index
 
     async def update(
-        self, index_name: str, updated_index_name: str | None = None, yaml_config: str | None = None
+        self,
+        index_name: str,
+        updated_index_name: str | None = None,
+        yaml_config: str | None = None,
+        description: str | None = None,
+        max_allowed_batch_size: int | None = None,
+        max_index_replica_count: int | None = None,
+        gpu_enabled: bool | None = None,
+        capture_traces: bool | None = None,
+        instance_size: str | None = None,
+        file_name_prefix_filter: str | None = None,
+        file_meta_filter: MetaFilterConditions | None = None,
     ) -> Index:
-        """Update name and/or configuration of an existing index.
+        """Update name, configuration, and/or settings of an existing index.
+
+        Only the provided fields are changed. Passing None for a field leaves it untouched
+        (it does not clear the field server-side).
 
         :param index_name: Name of the index to update
         :param updated_index_name: Optional new name for the index
         :param yaml_config: Optional new YAML configuration
+        :param description: Optional new description
+        :param max_allowed_batch_size: Optional per-pipeline cap on files indexed per batch (1-500)
+        :param max_index_replica_count: Optional max number of index replicas (1-10)
+        :param gpu_enabled: Optional toggle for GPU acceleration
+        :param capture_traces: Optional toggle for recording an indexing trace per queued file
+        :param instance_size: Optional pod size: "small", "medium", "large", or "xl"
+        :param file_name_prefix_filter: Optional file-name prefix pattern filter
+        :param file_meta_filter: Optional metadata conditions filtering which files are indexed
         :returns: Updated index details
         """
-        data = {}
+        data: dict[str, Any] = {}
         if updated_index_name is not None:
             data["name"] = updated_index_name
         if yaml_config is not None:
             data["config_yaml"] = yaml_config
+        if description is not None:
+            data["description"] = description
+        if max_allowed_batch_size is not None:
+            data["max_allowed_batch_size"] = max_allowed_batch_size
+        if max_index_replica_count is not None:
+            data["max_index_replica_count"] = max_index_replica_count
+        if gpu_enabled is not None:
+            data["gpu_enabled"] = gpu_enabled
+        if capture_traces is not None:
+            data["capture_traces"] = capture_traces
+        if instance_size is not None:
+            data["instance_size"] = instance_size
+        if file_name_prefix_filter is not None:
+            data["file_name_prefix_filter"] = file_name_prefix_filter
+        if file_meta_filter is not None:
+            data["file_meta_filter"] = [c.model_dump() for c in file_meta_filter]
 
         if not data:
-            raise ValueError("At least one of updated_index_name or yaml_config must be provided")
+            raise ValueError("At least one field to update must be provided")
 
         response = await self._client.request(
             f"/v1/workspaces/{quote(self._workspace, safe='')}/indexes/{quote(index_name, safe='')}",

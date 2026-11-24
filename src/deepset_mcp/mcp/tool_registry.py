@@ -6,14 +6,83 @@ from collections.abc import Callable
 from typing import Any
 
 from deepset_mcp.api.client import AsyncDeepsetClient
-from deepset_mcp.config import DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME
+from deepset_mcp.config import DEFAULT_CLIENT_HEADER, DOCS_SEARCH_TOOL_NAME, LIST_DOC_SECTIONS_TOOL_NAME
 from deepset_mcp.initialize_embedding_model import get_initialized_model
 from deepset_mcp.mcp.tool_models import DeepsetDocsConfig, ExplorerConfig, MemoryType, ToolConfig
+from deepset_mcp.tools.cost import (
+    get_cost_breakdown as get_cost_breakdown_tool,
+    get_cost_over_time as get_cost_over_time_tool,
+    get_cost_totals as get_cost_totals_tool,
+)
 from deepset_mcp.tools.custom_components import (
     get_latest_custom_component_installation_logs as get_latest_custom_component_installation_logs_tool,
     list_custom_component_installations as list_custom_component_installations_tool,
 )
-from deepset_mcp.tools.doc_search import search_docs as search_docs_tool
+from deepset_mcp.tools.deployment import (
+    activate_deployment as activate_deployment_tool,
+    activate_deployment_revision as activate_deployment_revision_tool,
+    add_deployment_tag as add_deployment_tag_tool,
+    create_deployment as create_deployment_tool,
+    create_deployment_revision as create_deployment_revision_tool,
+    deactivate_deployment as deactivate_deployment_tool,
+    delete_deployment as delete_deployment_tool,
+    delete_deployment_tag as delete_deployment_tag_tool,
+    get_deployment as get_deployment_tool,
+    get_deployment_metrics as get_deployment_metrics_tool,
+    get_deployment_revision as get_deployment_revision_tool,
+    get_deployment_stats as get_deployment_stats_tool,
+    list_deployment_activity as list_deployment_activity_tool,
+    list_deployment_revisions as list_deployment_revisions_tool,
+    list_deployment_tags as list_deployment_tags_tool,
+    list_deployments as list_deployments_tool,
+    update_deployment as update_deployment_tool,
+)
+from deepset_mcp.tools.doc_search import (
+    list_doc_sections as list_doc_sections_tool,
+    search_docs as search_docs_tool,
+    search_docs_via_docs_api,
+)
+from deepset_mcp.tools.evaluation import (
+    add_test_cases as add_test_cases_tool,
+    copy_test_cases as copy_test_cases_tool,
+    create_dataset as create_dataset_tool,
+    create_evaluator as create_evaluator_tool,
+    create_experiment as create_experiment_tool,
+    create_metric_group as create_metric_group_tool,
+    delete_dataset as delete_dataset_tool,
+    delete_experiment as delete_experiment_tool,
+    delete_metric_group as delete_metric_group_tool,
+    get_dataset as get_dataset_tool,
+    get_evaluation_run as get_evaluation_run_tool,
+    get_evaluation_try as get_evaluation_try_tool,
+    get_evaluator as get_evaluator_tool,
+    get_experiment as get_experiment_tool,
+    get_experiment_results as get_experiment_results_tool,
+    get_experiment_run as get_experiment_run_tool,
+    get_session_replay as get_session_replay_tool,
+    list_datasets as list_datasets_tool,
+    list_evaluation_goals as list_evaluation_goals_tool,
+    list_evaluation_runs as list_evaluation_runs_tool,
+    list_evaluator_templates as list_evaluator_templates_tool,
+    list_evaluators as list_evaluators_tool,
+    list_experiment_runs as list_experiment_runs_tool,
+    list_experiments as list_experiments_tool,
+    list_metric_groups as list_metric_groups_tool,
+    list_sessions as list_sessions_tool,
+    remove_test_cases as remove_test_cases_tool,
+    replay_session as replay_session_tool,
+    rerun_failed_experiment as rerun_failed_experiment_tool,
+    rescore_experiment as rescore_experiment_tool,
+    run_evaluator as run_evaluator_tool,
+    set_evaluator_archived as set_evaluator_archived_tool,
+    start_experiment_run as start_experiment_run_tool,
+    try_evaluator as try_evaluator_tool,
+    update_dataset as update_dataset_tool,
+    update_evaluator as update_evaluator_tool,
+    update_experiment as update_experiment_tool,
+    update_metric_group as update_metric_group_tool,
+    update_test_case as update_test_case_tool,
+)
 from deepset_mcp.tools.haystack_service import (
     get_component_definition as get_component_definition_tool,
     get_custom_components as get_custom_components_tool,
@@ -37,6 +106,7 @@ from deepset_mcp.tools.object_store import (
     create_sed_object_store,
     create_yq_object_store,
 )
+from deepset_mcp.tools.organization import list_organizations as list_organizations_tool
 from deepset_mcp.tools.pipeline import (
     create_pipeline as create_pipeline_tool,
     create_pipeline_version as create_pipeline_version_tool,
@@ -76,26 +146,37 @@ from deepset_mcp.tools.workspace import (
 )
 
 
-def get_docs_search_tool(config: DeepsetDocsConfig) -> Callable[..., Any]:
-    """Get a docs search tool configured with the provided config."""
+def get_docs_search_tool(config: DeepsetDocsConfig | None = None) -> Callable[..., Any]:
+    """Get a docs search tool configured with the provided config.
 
-    async def search_docs(query: str) -> str:
-        """Search the deepset platform documentation.
+    When ``config`` is omitted, the tool uses the same public documentation search
+    pipeline as the documentation MCP server at https://docs.cloud.deepset.ai/api/mcp.
+    """
 
-        This tool allows you to search through deepset's official documentation to find
-        information about features, API usage, best practices, and troubleshooting guides.
-        Use this when you need to look up specific deepset functionality or help users
-        understand how to use deepset features.
+    async def search_docs(query: str, section: str | None = None) -> str:
+        """Search the Haystack Enterprise Platform documentation.
 
-        :param query: The search query to execute against the documentation.
-        :returns: The formatted search results from the documentation.
+        Use this to find information about Haystack components, pipelines, document
+        stores, embedders, generators, retrievers, and other AI platform features.
+        Returns relevant documentation excerpts with source URLs.
+
+        :param query: The search query. Be specific about what you're looking for.
+            Examples: 'How to create a RAG pipeline', 'OpenAI embedder configuration',
+            'document store filters'.
+        :param section: Optional documentation section id from list_doc_sections (for example,
+            ``how-to-guides`` or ``api``). Limits results to that section.
+        :returns: Relevant documentation excerpts with source URLs.
         """
+        if config is None:
+            return await search_docs_via_docs_api(query=query, section=section)
+
         async with AsyncDeepsetClient(api_key=config.api_key, transport_config=DEFAULT_CLIENT_HEADER) as client:
             response = await search_docs_tool(
                 client=client,
                 workspace=config.workspace_name,
                 pipeline_name=config.pipeline_name,
                 query=query,
+                section=section,
             )
         return response
 
@@ -198,6 +279,74 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
         validate_index_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
     ),
+    "list_deployments": (
+        list_deployments_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "list_deployment_tags": (
+        list_deployment_tags_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "create_deployment": (
+        create_deployment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
+    ),
+    "get_deployment": (
+        get_deployment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "update_deployment": (
+        update_deployment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
+    ),
+    "delete_deployment": (
+        delete_deployment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "add_deployment_tag": (
+        add_deployment_tag_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "delete_deployment_tag": (
+        delete_deployment_tag_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "list_deployment_revisions": (
+        list_deployment_revisions_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_deployment_revision": (
+        get_deployment_revision_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "create_deployment_revision": (
+        create_deployment_revision_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
+    ),
+    "activate_deployment_revision": (
+        activate_deployment_revision_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "activate_deployment": (
+        activate_deployment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "deactivate_deployment": (
+        deactivate_deployment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "list_deployment_activity": (
+        list_deployment_activity_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_deployment_metrics": (
+        get_deployment_metrics_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_deployment_stats": (
+        get_deployment_stats_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
     "get_models": (
         get_models_tool,
         ToolConfig(
@@ -253,6 +402,175 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
         get_pipeline_trace_logs_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
     ),
+    "list_evaluators": (
+        list_evaluators_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_evaluator": (
+        get_evaluator_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "list_metric_groups": (
+        list_metric_groups_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "list_evaluation_goals": (
+        list_evaluation_goals_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "list_experiments": (
+        list_experiments_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "create_experiment": (
+        create_experiment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "get_experiment": (
+        get_experiment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "update_experiment": (
+        update_experiment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "rerun_failed_experiment": (
+        rerun_failed_experiment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "rescore_experiment": (
+        rescore_experiment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "delete_experiment": (
+        delete_experiment_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "get_experiment_results": (
+        get_experiment_results_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_experiment_run": (
+        get_experiment_run_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "list_experiment_runs": (
+        list_experiment_runs_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "start_experiment_run": (
+        start_experiment_run_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "run_evaluator": (
+        run_evaluator_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "list_evaluation_runs": (
+        list_evaluation_runs_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_evaluation_run": (
+        get_evaluation_run_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "list_sessions": (
+        list_sessions_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "try_evaluator": (
+        try_evaluator_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "get_evaluation_try": (
+        get_evaluation_try_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "replay_session": (
+        replay_session_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "get_session_replay": (
+        get_session_replay_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "list_datasets": (
+        list_datasets_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_dataset": (
+        get_dataset_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "create_dataset": (
+        create_dataset_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "update_dataset": (
+        update_dataset_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "delete_dataset": (
+        delete_dataset_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "add_test_cases": (
+        add_test_cases_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "update_test_case": (
+        update_test_case_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "copy_test_cases": (
+        copy_test_cases_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "remove_test_cases": (
+        remove_test_cases_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "create_evaluator": (
+        create_evaluator_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "update_evaluator": (
+        update_evaluator_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "set_evaluator_archived": (
+        set_evaluator_archived_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "list_evaluator_templates": (
+        list_evaluator_templates_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "create_metric_group": (
+        create_metric_group_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "update_metric_group": (
+        update_metric_group_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    "delete_metric_group": (
+        delete_metric_group_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.NO_MEMORY),
+    ),
+    # Cost tools
+    "get_cost_totals": (
+        get_cost_totals_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_cost_over_time": (
+        get_cost_over_time_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
+    "get_cost_breakdown": (
+        get_cost_breakdown_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
     "list_custom_component_installations": (
         list_custom_component_installations_tool,
         ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
@@ -284,9 +602,13 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
         run_component_tool,
         ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE_AND_REFERENCEABLE),
     ),
-    "list_secrets": (list_secrets_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
+    "list_secrets": (
+        list_secrets_tool,
+        ToolConfig(needs_client=True, needs_workspace=True, memory_type=MemoryType.EXPLORABLE),
+    ),
     "get_secret": (get_secret_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "load_skill": (load_skill_tool, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
+    "list_organizations": (list_organizations_tool, ToolConfig(needs_client=True, memory_type=MemoryType.NO_MEMORY)),
     "list_workspaces": (list_workspaces_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "get_workspace": (get_workspace_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
     "create_workspace": (create_workspace_tool, ToolConfig(needs_client=True, memory_type=MemoryType.EXPLORABLE)),
@@ -296,6 +618,15 @@ TOOL_REGISTRY: dict[str, tuple[Callable[..., Any], ToolConfig]] = {
     "sed_object_store": (create_sed_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
     "yq_object_store": (create_yq_object_store, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
     DOCS_SEARCH_TOOL_NAME: (get_docs_search_tool, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
+    LIST_DOC_SECTIONS_TOOL_NAME: (list_doc_sections_tool, ToolConfig(memory_type=MemoryType.NO_MEMORY)),
 }
 
 ALL_DEEPSET_TOOLS = set(TOOL_REGISTRY.keys())
+
+OBJECT_STORE_TOOL_NAMES = {
+    "get_from_object_store",
+    "get_slice_from_object_store",
+    "grep_object_store",
+    "sed_object_store",
+    "yq_object_store",
+}

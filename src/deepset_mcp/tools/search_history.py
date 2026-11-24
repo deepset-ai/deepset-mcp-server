@@ -94,9 +94,6 @@ async def list_pipeline_search_history(
     search query (``request.query``), results (``response``), timing
     (``time``/``duration``), status, user info, feedback, labels, and note.
 
-    Search history is archived ~30 minutes after a search runs and is then
-    available via this endpoint.
-
     Use the ``after`` parameter with ``next_cursor`` from the response to
     fetch the next page.
 
@@ -131,7 +128,7 @@ async def list_pipeline_search_history(
     except ResourceNotFoundError:
         return (
             f"There is no pipeline named '{pipeline_name}' in workspace '{workspace}', "
-            "or the pipeline has no search history yet (archive is available ~30 min after search)."
+            "or the pipeline has no search history yet."
         )
     except (BadRequestError, UnexpectedAPIError) as e:
         return f"Failed to list search history for pipeline '{pipeline_name}': {e}"

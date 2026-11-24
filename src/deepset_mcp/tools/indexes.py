@@ -2,11 +2,13 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from typing import Literal
+
 import yaml
 from pydantic import BaseModel
 
 from deepset_mcp.api.exceptions import BadRequestError, ResourceNotFoundError, UnexpectedAPIError
-from deepset_mcp.api.indexes.models import Index
+from deepset_mcp.api.indexes.models import Index, MetaFilterConditions
 from deepset_mcp.api.pipeline.models import PipelineValidationResult
 from deepset_mcp.api.protocols import AsyncClientProtocol
 from deepset_mcp.api.shared_models import PaginatedResponse
@@ -57,6 +59,7 @@ async def get_index(*, client: AsyncClientProtocol, workspace: str, index_name: 
     :param client: Deepset API client to use for requesting the index.
     :param workspace: Workspace of which to get the index from.
     :param index_name: Unique name of the index to fetch.
+    :returns: The index configuration or an error message.
     """
     try:
         response = await client.indexes(workspace=workspace).get(index_name)
@@ -101,13 +104,14 @@ async def create_index(
     yaml_configuration: str,
     description: str | None = None,
 ) -> dict[str, str | Index] | str:
-    """Creates a new index within your deepset platform workspace.
+    """Creates a new index within your Haystack Enterprise Platform workspace.
 
     :param client: Deepset API client to use.
     :param workspace: Workspace in which to create the index.
     :param index_name: Unique name of the index to create.
     :param yaml_configuration: YAML configuration to use for the index.
     :param description: Description of the index to create.
+    :returns: A message and the created index, or an error message.
     """
     try:
         result = await client.indexes(workspace=workspace).create(
@@ -128,65 +132,114 @@ async def update_index(
     client: AsyncClientProtocol,
     workspace: str,
     index_name: str,
-    original_config_snippet: str,
-    replacement_config_snippet: str,
+    updated_index_name: str | None = None,
+    yaml_configuration: str | None = None,
+    description: str | None = None,
+    max_allowed_batch_size: int | None = None,
+    max_index_replica_count: int | None = None,
+    gpu_enabled: bool | None = None,
+    capture_traces: bool | None = None,
+    instance_size: Literal["small", "medium", "large", "xl"] | None = None,
+    file_name_prefix_filter: str | None = None,
+    file_meta_filter: MetaFilterConditions | None = None,
     skip_validation_errors: bool = True,
 ) -> Index | IndexOperationWithErrors | str:
-    """
-    Updates an index configuration in the specified workspace with a replacement configuration snippet.
+    """Updates an index in the specified workspace.
 
-    This function validates the replacement configuration snippet before applying it to the index.
-    If the validation fails and skip_validation_errors is False, it returns error messages.
-    Otherwise, the replacement snippet is used to update the index's configuration.
+    Only the fields you pass are changed; a field left as None is not touched
+    (it is not cleared server-side).
+
+    Pass `yaml_configuration` to replace the index's YAML. When provided, pass the complete,
+    updated configuration (not just the changed parts); it is validated before being applied.
+    If validation fails and skip_validation_errors is False, it returns error messages.
+
+    All other parameters are index settings that can be updated independently of the YAML:
+
+    - `updated_index_name`: rename the index.
+    - `description`: new description.
+    - `max_allowed_batch_size`: cap the number of files indexed per batch (1-500). Lower values
+      reduce the chance that heavy files exceed the queue timeout and get retried.
+    - `max_index_replica_count`: maximum number of index replicas (1-10).
+    - `gpu_enabled`: enable or disable GPU acceleration.
+    - `capture_traces`: record an indexing trace for every file queued for this index.
+    - `instance_size`: pod size used to index files ("small", "medium", "large", or "xl").
+    - `file_name_prefix_filter`: prefix pattern (e.g. "myprefix*") selecting which files are
+      indexed. Can only be updated while the index is not deployed.
+    - `file_meta_filter`: metadata conditions (field/operator/value, AND-combined) selecting
+      which files are indexed. Can only be updated while the index is not deployed.
 
     :param client: The async client for API communication.
     :param workspace: The workspace name.
     :param index_name: Name of the index to update.
-    :param original_config_snippet: The configuration snippet to replace.
-    :param replacement_config_snippet: The new configuration snippet.
+    :param updated_index_name: Optional new name for the index.
+    :param yaml_configuration: Optional complete, updated YAML configuration for the index.
+    :param description: Optional new description.
+    :param max_allowed_batch_size: Optional per-pipeline cap on files indexed per batch (1-500).
+    :param max_index_replica_count: Optional max number of index replicas (1-10).
+    :param gpu_enabled: Optional toggle for GPU acceleration.
+    :param capture_traces: Optional toggle for recording an indexing trace per queued file.
+    :param instance_size: Optional pod size: "small", "medium", "large", or "xl".
+    :param file_name_prefix_filter: Optional file-name prefix pattern filter.
+    :param file_meta_filter: Optional metadata conditions filtering which files are indexed.
     :param skip_validation_errors: If True (default), updates the index even if validation fails.
                                   If False, stops update when validation fails.
     :returns: Updated index or error message.
     """
-    try:
-        original_index = await client.indexes(workspace=workspace).get(index_name=index_name)
-    except ResourceNotFoundError:
-        return f"There is no index named '{index_name}'. Did you mean to create it?"
-    except (BadRequestError, UnexpectedAPIError) as e:
-        return f"Failed to fetch index '{index_name}': {e}"
-
-    if original_index.yaml_config is None:
-        return f"The index '{index_name}' does not have a YAML configuration."
-
-    occurrences = original_index.yaml_config.count(original_config_snippet)
-
-    if occurrences == 0:
-        return f"No occurrences of the provided configuration snippet were found in the index '{index_name}'."
-
-    if occurrences > 1:
-        return (
-            f"Multiple occurrences ({occurrences}) of the provided configuration snippet were found in the index "
-            f"'{index_name}'. Specify a more precise snippet to proceed with the update."
+    settings_provided = any(
+        v is not None
+        for v in (
+            updated_index_name,
+            description,
+            max_allowed_batch_size,
+            max_index_replica_count,
+            gpu_enabled,
+            capture_traces,
+            instance_size,
+            file_name_prefix_filter,
+            file_meta_filter,
         )
-
-    updated_yaml_configuration = original_index.yaml_config.replace(
-        original_config_snippet, replacement_config_snippet, 1
     )
+    if yaml_configuration is None and not settings_provided:
+        return "You need to provide a YAML configuration or at least one setting to update the index."
+
+    validation_response: PipelineValidationResult | None = None
+
+    if yaml_configuration is not None:
+        if not yaml_configuration.strip():
+            return "You need to provide a YAML configuration to update the index."
+
+        try:
+            yaml.safe_load(yaml_configuration)
+        except yaml.YAMLError as e:
+            return f"Invalid YAML provided: {e}"
 
     try:
-        validation_response = await client.indexes(workspace=workspace).validate(updated_yaml_configuration)
+        if yaml_configuration is not None:
+            validation_response = await client.indexes(workspace=workspace).validate(yaml_configuration)
 
-        if not validation_response.valid and not skip_validation_errors:
-            error_messages = [f"{error.code}: {error.message}" for error in validation_response.errors]
-            return "Index validation failed:\n" + "\n".join(error_messages)
+            if not validation_response.valid and not skip_validation_errors:
+                error_messages = [f"{error.code}: {error.message}" for error in validation_response.errors]
+                return "Index validation failed:\n" + "\n".join(error_messages)
 
-        await client.indexes(workspace=workspace).update(index_name=index_name, yaml_config=updated_yaml_configuration)
+        await client.indexes(workspace=workspace).update(
+            index_name=index_name,
+            yaml_config=yaml_configuration,
+            updated_index_name=updated_index_name,
+            description=description,
+            max_allowed_batch_size=max_allowed_batch_size,
+            max_index_replica_count=max_index_replica_count,
+            gpu_enabled=gpu_enabled,
+            capture_traces=capture_traces,
+            instance_size=instance_size,
+            file_name_prefix_filter=file_name_prefix_filter,
+            file_meta_filter=file_meta_filter,
+        )
 
         # Get the full index after update
         index = await client.indexes(workspace=workspace).get(index_name)
 
         # If validation failed but we proceeded anyway, return the special model
-        if not validation_response.valid:
+        if validation_response is not None and not validation_response.valid:
             return IndexOperationWithErrors(
                 message="The operation completed with errors", validation_result=validation_response, index=index
             )

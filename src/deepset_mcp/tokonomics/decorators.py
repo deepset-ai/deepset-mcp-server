@@ -12,6 +12,7 @@ tools to store their outputs and accept reference inputs.
 from __future__ import annotations
 
 import ast
+import enum
 import inspect
 import json
 from collections.abc import Callable
@@ -39,6 +40,15 @@ def _try_coerce_from_string(value: str, annotation: Any) -> Any:
             except (ValueError, TypeError):
                 continue
         raise ValueError(f"Cannot convert '{value}' to {annotation}")
+    if inspect.isclass(annotation) and issubclass(annotation, enum.Enum):
+        try:
+            return annotation(value)
+        except ValueError:
+            pass
+        try:
+            return annotation[value]
+        except KeyError:
+            raise ValueError(f"Cannot convert '{value}' to {annotation.__name__}") from None
     if annotation is bool:
         if value.lower() in ("true", "1", "yes"):
             return True

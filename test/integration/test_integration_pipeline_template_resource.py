@@ -231,7 +231,7 @@ async def test_mixed_pipeline_types_integration(
     assert len(query_templates) + len(indexing_templates) == len(all_templates.data)
 
 
-@pytest.mark.skip("Cursor-based pagination for pipeline templates needs to be fixed on deepset platform.")
+@pytest.mark.skip("Cursor-based pagination for pipeline templates needs to be fixed on Haystack Enterprise Platform.")
 @pytest.mark.asyncio
 async def test_list_pagination_integration(
     template_resource: PipelineTemplateResource,
@@ -267,7 +267,7 @@ async def test_list_pagination_integration(
             assert second_page.data[0].template_name != first_page.data[0].template_name
 
 
-@pytest.mark.skip("Cursor-based pagination for pipeline templates needs to be fixed on deepset platform.")
+@pytest.mark.skip("Cursor-based pagination for pipeline templates needs to be fixed on Haystack Enterprise Platform.")
 @pytest.mark.asyncio
 async def test_list_all_templates_with_pagination(
     template_resource: PipelineTemplateResource,
